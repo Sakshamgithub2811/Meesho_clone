@@ -22,9 +22,68 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
   const videoRef = React.useRef(null);
   const mediaStreamRef = React.useRef(null);
 
-  // Rejection modal
+  // Customer return reason & evidence data
+  const customerReturnData = {
+    orderId: 'ORD-998241',
+    taskId: 'RET-TSK-8821',
+    customerName: 'Priya Sharma',
+    customerPhone: '+91 98765 43210',
+    itemTitle: 'Kanjivaram Soft Silk Woven Saree with Blouse Piece',
+    itemColor: 'Magenta & Gold',
+    itemSize: 'Free Size',
+    originalPrice: '₹849',
+    reasonCategory: 'Size & Fit / Defective Border',
+    customerComment: 'Too loose / baggy on drape; defective border stitching loose near pallu',
+    customerPhotos: [
+      {
+        id: 'cust_p1',
+        title: 'Customer Photo: Reported Border Defect',
+        url: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80',
+        caption: 'Reported loose stitching near pallu border',
+      },
+      {
+        id: 'cust_p2',
+        title: 'Customer Photo: Saree Overview & Brand Tag',
+        url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=80',
+        caption: 'Full saree drape with manufacturer tag attached',
+      },
+    ],
+  };
+
+  // Driver Physical Inspection & Photo Evidence State
+  const [driverPhotos, setDriverPhotos] = useState([
+    {
+      id: 'drv_p1',
+      name: 'doorstep_product_inspection.jpg',
+      url: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80',
+      label: 'Physical Saree Inspection (Pallu & Border)',
+      time: 'Doorstep Camera',
+    },
+    {
+      id: 'drv_p2',
+      name: 'doorstep_brand_tag_check.jpg',
+      url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=80',
+      label: 'Brand Tag & Price Barcode Verified',
+      time: 'Doorstep Camera',
+    },
+  ]);
+  const [isReasonVerified, setIsReasonVerified] = useState(false);
+  const driverPhotoInputRef = React.useRef(null);
+  const rejectPhotoInputRef = React.useRef(null);
+
+  // Rejection modal & rejection state
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState('tags_missing');
+  const [rejectReason, setRejectReason] = useState('reason_mismatch');
+  const [rejectNotes, setRejectNotes] = useState('');
+  const [rejectPhoto, setRejectPhoto] = useState({
+    name: 'driver_rejection_proof.jpg',
+    url: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
+  });
+  const [isPickupRejected, setIsPickupRejected] = useState(false);
+  const [rejectedSummary, setRejectedSummary] = useState(null);
+
+  // Lightbox Zoom Modal Image
+  const [previewModalImg, setPreviewModalImg] = useState(null);
 
   // Success state
   const [isPickupCompleted, setIsPickupCompleted] = useState(false);
@@ -57,6 +116,79 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
     triggerToast('✓ Return OTP verified successfully!');
   };
 
+  const handleDriverPhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const newPhoto = {
+      id: `drv_${Date.now()}`,
+      name: file.name,
+      url: URL.createObjectURL(file),
+      label: `Inspection Evidence #${driverPhotos.length + 1}`,
+      time: 'Doorstep Live',
+    };
+    setDriverPhotos((prev) => [...prev, newPhoto]);
+    triggerToast(`📷 Driver Evidence photo captured: ${file.name}`);
+  };
+
+  const handleRemoveDriverPhoto = (photoId) => {
+    setDriverPhotos((prev) => prev.filter((p) => p.id !== photoId));
+    triggerToast('Driver photo evidence removed');
+  };
+
+  const handleRejectPhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRejectPhoto({
+      name: file.name,
+      url: URL.createObjectURL(file),
+    });
+    triggerToast(`📷 Rejection discrepancy evidence attached: ${file.name}`);
+  };
+
+  const REJECT_REASONS_MAP = {
+    reason_mismatch: {
+      title: 'Item Does NOT Match Customer Return Reason',
+      desc: 'Claimed border defect is fabricated / not present; saree is intact or different.',
+    },
+    tags_missing: {
+      title: 'Brand Tags / Price Labels Missing or Cut',
+      desc: 'Original manufacturer tags and barcodes are removed or torn.',
+    },
+    used_worn: {
+      title: 'Item is Worn, Washed, Stained or Odorous',
+      desc: 'Strong perfume smell, body sweat marks, or wash detergent stains detected.',
+    },
+    fake_product: {
+      title: 'Different / Fake / Duplicate Item Handed Over',
+      desc: 'Product returned is not the original Meesho catalog brand item.',
+    },
+    damaged_by_customer: {
+      title: 'Physical Damage / Tear Caused by Customer',
+      desc: 'Cloth torn intentionally or burnt/stained at customer end.',
+    },
+    customer_refused: {
+      title: 'Customer Refused to Handover Item',
+      desc: 'Customer declined to give the product or requested pickup reschedule.',
+    },
+  };
+
+  const handleConfirmReject = () => {
+    const reasonInfo = REJECT_REASONS_MAP[rejectReason] || {
+      title: rejectReason,
+      desc: 'Quality check failed at doorstep.',
+    };
+    setRejectedSummary({
+      reasonId: rejectReason,
+      reasonTitle: reasonInfo.title,
+      notes: rejectNotes.trim() || 'Discrepancy observed between customer return claim and physical item.',
+      photo: rejectPhoto,
+      rejectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+    setIsRejectModalOpen(false);
+    setIsPickupRejected(true);
+    triggerToast('❌ Return Pickup Rejected at Doorstep. Reason logged & customer notified via SMS.');
+  };
+
   // Web Audio API Synthesizer for high-pitch delivery barcode scanner beep
   const playBeepSound = () => {
     try {
@@ -66,7 +198,7 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // 880Hz crisp scanner beep
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
       gain.gain.setValueAtTime(0.25, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.14);
       osc.connect(gain);
@@ -117,6 +249,14 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
   };
 
   const handleCompletePickup = () => {
+    if (!isReasonVerified) {
+      triggerToast('⚠️ Please verify that the item matches customer reason and tick the verification checkbox!');
+      return;
+    }
+    if (driverPhotos.length === 0) {
+      triggerToast('⚠️ Please capture at least 1 photo of the physical product as evidence!');
+      return;
+    }
     if (!allQcPassed) {
       triggerToast('Cannot accept return: Quality check failed! Please reject return or verify item.');
       return;
@@ -131,14 +271,6 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
     }
 
     setIsPickupCompleted(true);
-  };
-
-  const handleConfirmReject = () => {
-    setIsRejectModalOpen(false);
-    triggerToast('Return Pickup Rejected. Reason logged & customer notified via SMS.');
-    setTimeout(() => {
-      if (onNavigate) onNavigate('driver_dashboard');
-    }, 1500);
   };
 
   return (
@@ -224,45 +356,336 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
           </div>
         </section>
 
-        {/* Expected Product Card */}
-        <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-3">
+        {/* Doorstep Rejection Summary Banner (Shown when driver rejected return) */}
+        {isPickupRejected && rejectedSummary && (
+          <section className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-rose-200">
+              <div className="flex items-center gap-2.5">
+                <span className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center text-xl font-black shrink-0 shadow-sm">
+                  ✕
+                </span>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-black uppercase tracking-wider bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
+                      Doorstep Discrepancy Logged
+                    </span>
+                    <span className="text-xs font-bold text-rose-700 font-mono">
+                      {rejectedSummary.rejectedAt}
+                    </span>
+                  </div>
+                  <h3 className="font-black text-base sm:text-lg text-rose-950 mt-0.5">
+                    Return Pickup Rejected at Doorstep
+                  </h3>
+                </div>
+              </div>
+
+              <span className="text-xs font-bold text-rose-700 bg-white px-3 py-1.5 rounded-xl border border-rose-200 self-start sm:self-auto">
+                Customer SMS Dispatched 📨
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 bg-white rounded-2xl border border-rose-200/80 space-y-1">
+                <span className="text-[11px] font-bold text-slate-400 uppercase">Primary Rejection Reason:</span>
+                <p className="font-extrabold text-rose-800 text-sm">{rejectedSummary.reasonTitle}</p>
+                <p className="text-slate-600 mt-1 leading-relaxed">
+                  <strong>Driver Remarks:</strong> "{rejectedSummary.notes}"
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-2xl border border-rose-200/80 flex items-center justify-between gap-3">
+                <div className="space-y-1 min-w-0">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase">Rejection Evidence Photo:</span>
+                  <p className="font-bold text-slate-800 truncate">{rejectedSummary.photo?.name || 'Evidence Attached'}</p>
+                  <p className="text-[10px] text-emerald-700 font-bold">Uploaded to Audit Trail</p>
+                </div>
+                {rejectedSummary.photo?.url && (
+                  <img
+                    src={rejectedSummary.photo.url}
+                    alt="Rejection Evidence"
+                    onClick={() => setPreviewModalImg({ url: rejectedSummary.photo.url, title: 'Driver Rejection Discrepancy Photo' })}
+                    className="w-14 h-14 object-cover rounded-xl border border-rose-300 cursor-pointer hover:opacity-90 shrink-0"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPickupRejected(false);
+                  setIsReasonVerified(false);
+                  triggerToast('Re-inspection mode enabled. You can verify and retry pickup.');
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 cursor-pointer transition-colors"
+              >
+                ↻ Cancel Rejection &amp; Re-inspect
+              </button>
+              <button
+                type="button"
+                onClick={() => (onNavigate ? onNavigate('driver_dashboard') : window.history.back())}
+                className="w-full sm:flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs cursor-pointer shadow-sm transition-all text-center"
+              >
+                Return to Logistics Dashboard
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Expected Product & Customer Reported Return Reason Card */}
+        <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-black text-xs uppercase tracking-wider text-slate-400">
-              Expected Return Item
+            <h3 className="font-black text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <span>Expected Return Item &amp; Customer Claim</span>
             </h3>
-            <span className="text-xs font-bold text-[#b90041]">Original Price: ₹849</span>
+            <span className="text-xs font-bold text-[#b90041]">Original Price: {customerReturnData.originalPrice}</span>
           </div>
 
-          <div className="flex gap-3 sm:gap-4 items-center">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <img
               src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=500&auto=format&fit=crop&q=80"
               alt="Saree Preview"
-              className="w-16 h-20 sm:w-20 sm:h-24 object-cover rounded-2xl border border-slate-200 shrink-0"
+              onClick={() => setPreviewModalImg({ url: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=1000&auto=format&fit=crop&q=80', title: customerReturnData.itemTitle })}
+              className="w-20 h-24 sm:w-24 sm:h-28 object-cover rounded-2xl border border-slate-200 shrink-0 cursor-pointer hover:opacity-95"
             />
-            <div className="space-y-1 flex-1 min-w-0">
-              <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 truncate">
-                Kanjivaram Soft Silk Woven Saree with Blouse Piece
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase bg-pink-50 text-[#b90041] px-2 py-0.5 rounded-md border border-pink-200">
+                  Order #{customerReturnData.orderId}
+                </span>
+                <span className="text-[10px] font-bold text-slate-400">
+                  Task #{customerReturnData.taskId}
+                </span>
+              </div>
+              <h4 className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug">
+                {customerReturnData.itemTitle}
               </h4>
               <p className="text-xs text-slate-500 font-semibold">
-                Color: <strong className="text-slate-700">Magenta &amp; Gold</strong> • Size:{' '}
-                <strong className="text-slate-700">Free Size</strong>
+                Color: <strong className="text-slate-700">{customerReturnData.itemColor}</strong> • Size:{' '}
+                <strong className="text-slate-700">{customerReturnData.itemSize}</strong>
               </p>
-              <div className="bg-rose-50/80 border border-rose-200/80 rounded-xl p-2 text-[11px] text-[#b90041] font-bold">
-                Customer Reason: "Too loose / baggy on drape; defective border"
+            </div>
+          </div>
+
+          {/* Customer Stated Reason & Uploaded Evidence Photos Box */}
+          <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+              <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                <span>📋 Customer's Stated Reason for Return:</span>
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-200/80 text-amber-900 font-bold text-[11px] self-start sm:self-auto">
+                {customerReturnData.reasonCategory}
+              </span>
+            </div>
+
+            <div className="p-3 bg-white/90 rounded-xl border border-amber-200 text-xs text-slate-800 italic">
+              "{customerReturnData.customerComment}"
+            </div>
+
+            {/* Customer Evidence Photo Thumbnails */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                  Customer Uploaded Proof Photos (Compare at Doorstep):
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold">Click to zoom</span>
               </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-2.5">
+                {customerReturnData.customerPhotos.map((photo) => (
+                  <div
+                    key={photo.id}
+                    onClick={() => setPreviewModalImg({ url: photo.url, title: photo.title })}
+                    className="p-2 rounded-xl bg-white border border-amber-200 hover:border-amber-400 flex items-center gap-2.5 cursor-pointer transition-all hover:shadow-xs group"
+                  >
+                    <img
+                      src={photo.url}
+                      alt={photo.title}
+                      className="w-12 h-12 object-cover rounded-lg border border-slate-200 shrink-0 group-hover:scale-105 transition-transform"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-bold text-slate-800 truncate">{photo.title}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{photo.caption}</p>
+                      <span className="text-[10px] text-[#b90041] font-bold flex items-center gap-0.5 mt-0.5">
+                        <span>🔍 View Proof</span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-[11px] text-amber-800 font-medium">
+              💡 <strong>Driver Inspection Rule:</strong> Examine the physical product handed over. Verify that it matches this customer claim and has original brand tags before accepting.
+            </p>
+          </div>
+        </section>
+
+        {/* STEP 1: Driver Reverse Product Photo Evidence & Physical Reason Verification */}
+        <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <div>
+              <h3 className="font-black text-sm text-slate-900 flex items-center gap-1.5">
+                <span>1. Driver Physical Inspection &amp; Photo Evidence *</span>
+                {driverPhotos.length > 0 && isReasonVerified && (
+                  <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                    ✓ Verified &amp; Captured
+                  </span>
+                )}
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Click or upload live photos of the handed-over product, brand tags, and defect area.
+              </p>
+            </div>
+
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 self-start sm:self-auto">
+              {driverPhotos.length} Photo{driverPhotos.length !== 1 ? 's' : ''} Attached
+            </span>
+          </div>
+
+          {/* Hidden File Input for Driver Photo Capture */}
+          <input
+            type="file"
+            ref={driverPhotoInputRef}
+            accept="image/*"
+            capture="environment"
+            onChange={handleDriverPhotoUpload}
+            className="hidden"
+          />
+
+          {/* Evidence Photos Gallery */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {driverPhotos.map((photo, idx) => (
+              <div
+                key={photo.id}
+                className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200/90 flex items-center gap-3 transition-colors"
+              >
+                <img
+                  src={photo.url}
+                  alt={photo.name}
+                  onClick={() => setPreviewModalImg({ url: photo.url, title: photo.label })}
+                  className="w-14 h-14 object-cover rounded-xl border border-slate-300 shrink-0 cursor-pointer hover:opacity-90"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                      Photo #{idx + 1}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">{photo.time}</span>
+                  </div>
+                  <p className="font-extrabold text-xs text-slate-800 truncate mt-0.5">{photo.label}</p>
+                  <p className="text-[10px] text-slate-500 font-mono truncate">{photo.name}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewModalImg({ url: photo.url, title: photo.label })}
+                    className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center text-xs cursor-pointer"
+                    title="Zoom Photo"
+                  >
+                    🔍
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveDriverPhoto(photo.id)}
+                    className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-rose-600 flex items-center justify-center text-xs cursor-pointer"
+                    title="Remove Photo"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Add More Evidence Photo Button Card */}
+            <div
+              onClick={() => driverPhotoInputRef.current?.click()}
+              className="p-3 border-2 border-dashed border-pink-300 hover:border-[#b90041] bg-pink-50/40 hover:bg-pink-50/80 rounded-2xl flex items-center justify-center gap-2.5 cursor-pointer transition-all min-h-[68px]"
+            >
+              <span className="w-8 h-8 rounded-full bg-[#b90041] text-white flex items-center justify-center text-lg font-bold shadow-xs shrink-0">
+                📷
+              </span>
+              <div>
+                <span className="text-xs font-extrabold text-[#b90041] block">
+                  Click / Upload Product Photo
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  Capture physical item, tags or defect
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Mandatory Driver Reason Verification Checkbox */}
+          <div className="pt-2 border-t border-slate-100 space-y-2">
+            <label
+              className={`p-4 rounded-2xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                isReasonVerified
+                  ? 'border-emerald-500 bg-emerald-50/70 shadow-xs'
+                  : 'border-amber-300 bg-amber-50/40 hover:border-amber-400'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={isReasonVerified}
+                onChange={(e) => {
+                  setIsReasonVerified(e.target.checked);
+                  if (e.target.checked) {
+                    triggerToast('✓ Driver Inspection Passed: Product verified against customer reason.');
+                  }
+                }}
+                className="mt-0.5 w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer shrink-0"
+              />
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center justify-between flex-wrap gap-1">
+                  <span className="font-extrabold text-xs sm:text-sm text-slate-900 block">
+                    I physically verified the returned item against customer reason *
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      isReasonVerified
+                        ? 'bg-emerald-200 text-emerald-900'
+                        : 'bg-amber-200 text-amber-900'
+                    }`}
+                  >
+                    {isReasonVerified ? '✓ Verified by Driver' : 'Mandatory Check'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  I confirm that the saree matches the customer's reported reason (defective border / fit issue), brand tags &amp; original condition are intact, and live photo evidence is attached.
+                </p>
+              </div>
+            </label>
+
+            {/* Problem Found / Rejection Trigger */}
+            <div className="p-3 rounded-2xl bg-rose-50/70 border border-rose-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+              <div className="flex items-center gap-2 text-rose-900">
+                <span className="text-base shrink-0">⚠️</span>
+                <span className="font-bold">
+                  Product doesn't match, tags missing, or item heavily worn/damaged?
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRejectModalOpen(true)}
+                className="w-full sm:w-auto px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs cursor-pointer transition-all shrink-0"
+              >
+                Reject Return at Doorstep
+              </button>
             </div>
           </div>
         </section>
 
-        {/* STEP 1: Doorstep 4-Point QC Checklist */}
+        {/* STEP 2: Doorstep 4-Point QC Checklist */}
         <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-black text-sm text-slate-900 flex items-center gap-1.5">
-                <span>1. Doorstep Quality Check (QC Inspection)</span>
+                <span>2. Doorstep 4-Point QC Checklist</span>
               </h3>
               <p className="text-[11px] text-slate-500">
-                Inspect physical product before collecting OTP from customer
+                Verify secondary criteria before collecting customer OTP
               </p>
             </div>
             <button
@@ -357,12 +780,12 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
           )}
         </section>
 
-        {/* STEP 2: Customer Return OTP Verification */}
+        {/* STEP 3: Customer Return OTP Verification */}
         <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-black text-sm text-slate-900 flex items-center gap-1.5">
-                <span>2. Customer Return OTP Verification</span>
+                <span>3. Customer Return OTP Verification</span>
                 {isOtpVerified && (
                   <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
                     ✓ Verified
@@ -423,12 +846,12 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
           </div>
         </section>
 
-        {/* STEP 3: Scan Return Security Bag */}
+        {/* STEP 4: Scan Return Security Bag */}
         <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-black text-sm text-slate-900 flex items-center gap-1.5">
-                <span>3. Seal in Return Security Bag</span>
+                <span>4. Seal in Return Security Bag</span>
                 {isBagScanned && (
                   <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
                     ✓ Sealed
@@ -479,59 +902,181 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
         </button>
       </main>
 
-      {/* Rejection Modal */}
+      {/* Enhanced Rejection Modal (Reason Selection, Driver Notes, & Discrepancy Photo Evidence) */}
       {isRejectModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-slate-100 animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-md w-full space-y-4 shadow-2xl border border-slate-100 animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="font-black text-base text-rose-700">Reject Return Pickup</h3>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
+                  Doorstep Verification Failure
+                </span>
+                <h3 className="font-black text-base sm:text-lg text-rose-700 mt-0.5">
+                  Reject Return Pickup
+                </h3>
+              </div>
               <button
                 onClick={() => setIsRejectModalOpen(false)}
-                className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <p className="text-xs text-slate-600">
-              Please specify why you are rejecting the return parcel:
+              Select reason for rejecting pickup and attach photo proof of discrepancy:
             </p>
 
+            {/* Rejection Reason Radios */}
             <div className="space-y-2">
               {[
-                { id: 'tags_missing', label: 'Brand Tags / Barcode Missing' },
-                { id: 'used_worn', label: 'Item is Worn, Washed, or Smells' },
-                { id: 'fake_product', label: 'Different / Fake Product Handed Over' },
-                { id: 'customer_refused', label: 'Customer Refused to Handover' },
+                { id: 'reason_mismatch', label: 'Item Does NOT Match Customer Return Reason', desc: 'No defect present or customer claimed false reason.' },
+                { id: 'tags_missing', label: 'Brand Tags / Price Labels Missing or Cut', desc: 'Original manufacturer tag has been removed or torn.' },
+                { id: 'used_worn', label: 'Item is Worn, Washed, Stained or Odorous', desc: 'Fabric shows sweat, perfume, wash soap marks.' },
+                { id: 'fake_product', label: 'Different / Fake / Duplicate Item Handed Over', desc: 'Wrong product handed over by customer.' },
+                { id: 'damaged_by_customer', label: 'Physical Damage / Tear by Customer', desc: 'Torn or burnt at customer premises.' },
+                { id: 'customer_refused', label: 'Customer Refused Handover', desc: 'Customer declined to hand over or cancelled pickup.' },
               ].map((reason) => (
                 <label
                   key={reason.id}
-                  className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 text-xs font-bold cursor-pointer hover:bg-slate-50"
+                  className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                    rejectReason === reason.id
+                      ? 'border-rose-500 bg-rose-50/70 shadow-xs'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
                 >
                   <input
                     type="radio"
                     name="rejectReason"
                     checked={rejectReason === reason.id}
                     onChange={() => setRejectReason(reason.id)}
-                    className="accent-rose-600"
+                    className="mt-0.5 accent-rose-600 shrink-0"
                   />
-                  <span>{reason.label}</span>
+                  <div className="min-w-0">
+                    <span className="font-extrabold text-slate-900 block leading-tight">{reason.label}</span>
+                    <span className="text-[10px] text-slate-500">{reason.desc}</span>
+                  </div>
                 </label>
               ))}
             </div>
 
-            <div className="flex gap-2 pt-2">
+            {/* Driver Notes Textarea */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 block">
+                Driver Inspection Remarks *
+              </label>
+              <textarea
+                rows={2}
+                value={rejectNotes}
+                onChange={(e) => setRejectNotes(e.target.value)}
+                placeholder="Describe exact discrepancy observed at customer doorstep..."
+                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white resize-none"
+              />
+            </div>
+
+            {/* Rejection Photo Evidence Capture */}
+            <div className="space-y-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">
+                  Discrepancy Photo Proof:
+                </span>
+                <span className="text-[10px] text-slate-400">Required for Audit</span>
+              </div>
+
+              <input
+                type="file"
+                ref={rejectPhotoInputRef}
+                accept="image/*"
+                capture="environment"
+                onChange={handleRejectPhotoUpload}
+                className="hidden"
+              />
+
+              {rejectPhoto ? (
+                <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200">
+                  <div className="flex items-center gap-2 truncate">
+                    <img
+                      src={rejectPhoto.url}
+                      alt="Rejection Proof"
+                      className="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 truncate">{rejectPhoto.name}</p>
+                      <p className="text-[10px] text-emerald-600 font-bold">Evidence Ready</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => rejectPhotoInputRef.current?.click()}
+                    className="text-xs font-bold text-rose-600 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-lg cursor-pointer shrink-0"
+                  >
+                    Retake
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => rejectPhotoInputRef.current?.click()}
+                  className="w-full py-2.5 border-2 border-dashed border-rose-300 bg-white hover:bg-rose-50/50 rounded-xl text-xs font-bold text-rose-700 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>📷 Snap Discrepancy Photo</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
               <button
+                type="button"
                 onClick={() => setIsRejectModalOpen(false)}
-                className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl"
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleConfirmReject}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-md"
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md cursor-pointer uppercase tracking-wider"
               >
                 Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Lightbox Preview Modal */}
+      {previewModalImg && (
+        <div className="fixed inset-0 z-[100000] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="relative max-w-lg w-full bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl space-y-3 p-4">
+            <div className="flex items-center justify-between text-white pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base">🔍</span>
+                <h4 className="text-xs sm:text-sm font-bold truncate">{previewModalImg.title}</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewModalImg(null)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-xs font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden bg-black flex items-center justify-center max-h-[70vh]">
+              <img
+                src={previewModalImg.url}
+                alt={previewModalImg.title}
+                className="w-full h-auto max-h-[70vh] object-contain"
+              />
+            </div>
+
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => setPreviewModalImg(null)}
+                className="px-5 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold cursor-pointer"
+              >
+                Close Preview
               </button>
             </div>
           </div>

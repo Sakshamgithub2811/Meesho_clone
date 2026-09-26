@@ -328,8 +328,16 @@ const INITIAL_AFFILIATES = [
 
 const SIDEBAR_NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { id: 'dropshipper-kyc', label: 'Dropshipper KYC 📦', icon: 'verified_user' },
-  { id: 'affiliate-kyc', label: 'Affiliate KYC 🤝', icon: 'loyalty' },
+  {
+    id: 'kyc',
+    label: 'KYC Verifications',
+    icon: 'verified_user',
+    isParent: true,
+    children: [
+      { id: 'dropshipper-kyc', label: 'Dropshipper KYC 📦', icon: 'local_shipping', path: '/admin-dropshipper-kyc' },
+      { id: 'affiliate-kyc', label: 'Affiliate KYC 🤝', icon: 'loyalty', path: '/admin-affiliate-kyc' },
+    ],
+  },
   { id: 'products', label: 'Products', icon: 'inventory_2' },
   { id: 'orders', label: 'Orders', icon: 'shopping_cart' },
   { id: 'returns', label: 'Returns & Refunds 🔄', icon: 'assignment_return' },
@@ -428,6 +436,7 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
   const [activeDocTab, setActiveDocTab] = useState('pan');
   const [toastMessage, setToastMessage] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isKycMenuOpen, setIsKycMenuOpen] = useState(true);
   const [globalAffiliateAutoApproval, setGlobalAffiliateAutoApproval] = useState(false);
   const [globalPayoutSystem, setGlobalPayoutSystem] = useState(true);
 
@@ -700,7 +709,61 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
 
               <nav className="space-y-1 overflow-y-auto max-h-[70vh]">
                 {SIDEBAR_NAV.map((item) => {
-                  const isActive = item.id === 'affiliate-kyc';
+                  if (item.isParent) {
+                    return (
+                      <div key={item.id} className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsKycMenuOpen(!isKycMenuOpen)}
+                          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-slate-800 text-rose-400"
+                        >
+                          <div className="flex items-center">
+                            <span className="material-symbols-outlined mr-2.5 text-base">{item.icon}</span>
+                            <span>{item.label}</span>
+                          </div>
+                          <span
+                            className={`material-symbols-outlined text-sm transition-transform duration-200 ${
+                              isKycMenuOpen ? 'rotate-180 text-rose-400' : 'text-slate-400'
+                            }`}
+                          >
+                            expand_more
+                          </span>
+                        </button>
+
+                        {isKycMenuOpen && (
+                          <div className="ml-4 pl-3 border-l border-slate-700/80 space-y-1 py-1">
+                            {item.children?.map((subItem) => {
+                              const isSubActive = subItem.id === 'affiliate-kyc';
+                              return (
+                                <button
+                                  key={subItem.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setIsMobileMenuOpen(false);
+                                    if (subItem.path && onNavigate) {
+                                      onNavigate(subItem.path);
+                                    } else {
+                                      handleNav(subItem.id);
+                                    }
+                                  }}
+                                  className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                                    isSubActive
+                                      ? 'bg-rose-600 text-white font-bold'
+                                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                                  }`}
+                                >
+                                  <span className="material-symbols-outlined mr-2 text-sm text-rose-400">{subItem.icon}</span>
+                                  <span>{subItem.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  const isActive = false;
                   return (
                     <button
                       key={item.id}
@@ -752,7 +815,60 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
 
           <nav className="flex-1 px-3 space-y-1 overflow-y-auto no-scrollbar">
             {SIDEBAR_NAV.map((item) => {
-              const isActive = item.id === 'affiliate-kyc';
+              if (item.isParent) {
+                return (
+                  <div key={item.id} className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsKycMenuOpen(!isKycMenuOpen)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-['Plus_Jakarta_Sans',sans-serif] text-sm font-semibold transition-all cursor-pointer bg-rose-50/70 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400"
+                    >
+                      <div className="flex items-center">
+                        <span className="material-symbols-outlined mr-3 text-rose-500">{item.icon}</span>
+                        <span>{item.label}</span>
+                      </div>
+                      <span
+                        className={`material-symbols-outlined text-lg text-slate-400 transition-transform duration-200 ${
+                          isKycMenuOpen ? 'rotate-180 text-rose-500' : ''
+                        }`}
+                      >
+                        expand_more
+                      </span>
+                    </button>
+
+                    {isKycMenuOpen && (
+                      <div className="ml-5 pl-3 border-l-2 border-rose-200 dark:border-rose-900/60 space-y-1 py-1">
+                        {item.children?.map((subItem) => {
+                          const isSubActive = subItem.id === 'affiliate-kyc';
+                          return (
+                            <button
+                              key={subItem.id}
+                              type="button"
+                              onClick={() => {
+                                if (subItem.path && onNavigate) {
+                                  onNavigate(subItem.path);
+                                } else {
+                                  handleNav(subItem.id);
+                                }
+                              }}
+                              className={`w-full flex items-center px-3 py-2 rounded-lg font-['Plus_Jakarta_Sans',sans-serif] text-xs font-semibold transition-all cursor-pointer ${
+                                isSubActive
+                                  ? 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-sm translate-x-1 font-bold'
+                                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 hover:text-slate-800 dark:hover:text-slate-200 hover:translate-x-0.5'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined mr-2 text-base text-rose-500/80">{subItem.icon}</span>
+                              <span>{subItem.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              const isActive = false;
               return (
                 <button
                   key={item.id}
