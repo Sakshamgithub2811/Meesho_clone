@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Meesho Clone - Module-Wise Navigator & Navigation Flow Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  @page {
+    size: A4 portrait;
+    margin: 12mm 14mm;
+    @bottom-right {
+      content: counter(page);
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #1e293b;
+    background: #ffffff;
+    font-size: 11px;
+    line-height: 1.5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page-break {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Header Banner */
+  .doc-header {
+    background: linear-gradient(135deg, #9f0038 0%, #ff3f6c 50%, #ff6b8b 100%);
+    color: #ffffff;
+    padding: 22px 26px;
+    border-radius: 14px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 24px rgba(255, 63, 108, 0.25);
+  }
+
+  .doc-header h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .doc-header p {
+    font-size: 12px;
+    opacity: 0.95;
+    font-weight: 500;
+  }
+
+  .meta-pills {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .meta-pill {
+    background: rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  /* Section Styles */
+  .section-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 14px;
+    margin-top: 18px;
+  }
+
+  .section-title .badge {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .badge-reseller { background: #ff3f6c; }
+  .badge-shopping { background: #8b5cf6; }
+  .badge-logistics { background: #0284c7; }
+  .badge-supplier { background: #059669; }
+  .badge-admin { background: #ea580c; }
+  .badge-theme { background: #d97706; }
+
+  /* Architecture Box */
+  .arch-overview {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .module-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .module-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+  }
+
+  .module-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .module-card-title {
+    font-weight: 700;
+    font-size: 11px;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .module-card-count {
+    font-size: 9.5px;
+    font-weight: 700;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+
+  .module-card-routes {
+    font-size: 9.5px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 14px;
+    font-size: 10px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  thead th {
+    background: #f8fafc;
+    color: #334155;
+    font-weight: 700;
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 2px solid #e2e8f0;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  tbody td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    vertical-align: middle;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #fafafa;
+  }
+
+  .route-pill {
+    font-family: 'JetBrains Mono', monospace;
+    background: #f1f5f9;
+    color: #0f172a;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+    display: inline-block;
+  }
+
+  .screen-name {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  /* Flow Steps Diagram Box */
+  .flow-box {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-left: 4px solid #ff3f6c;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0 16px 0;
+  }
+
+  .flow-box.purple { border-left-color: #8b5cf6; }
+  .flow-box.blue { border-left-color: #0284c7; }
+  .flow-box.green { border-left-color: #059669; }
+  .flow-box.orange { border-left-color: #ea580c; }
+  .flow-box.amber { border-left-color: #d97706; }
+
+  .flow-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .step-sequence {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 9.5px;
+  }
+
+  .step-node {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-weight: 600;
+    color: #1e293b;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    min-width: 105px;
+  }
+
+  .step-node .node-title {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 10px;
+  }
+
+  .step-node .node-route {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: #64748b;
+    margin-top: 1px;
+  }
+
+  .step-arrow {
+    color: #94a3b8;
+    font-weight: 800;
+    font-size: 12px;
+  }
+
+  .step-action-tag {
+    font-size: 7.5px;
+    color: #ff3f6c;
+    font-weight: 700;
+    background: #ffe4e6;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-top: 2px;
+  }
+
+  /* Global Nav Component Callout */
+  .nav-hub-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .nav-hub-card {
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 10px;
+  }
+
+  .nav-hub-card h4 {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .nav-hub-card p {
+    font-size: 9.5px;
+    color: #475569;
+    line-height: 1.4;
+  }
+
+  .highlight-tag {
+    display: inline-block;
+    background: #fdf2f8;
+    color: #be185d;
+    border: 1px solid #fbcfe8;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 8.5px;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ==================== PAGE 1: COVER & ARCHITECTURE OVERVIEW ==================== -->
+  <div class="doc-header">
+    <h1>🛍️ Meesho Clone — Navigation Flow & Module Architecture</h1>
+    <p>Complete End-to-End Module-Wise Screen Catalog, Route Directory & State Transition Manual</p>
+    <div class="meta-pills">
+      <span class="meta-pill">📋 Total Screens: 57+</span>
+      <span class="meta-pill">📦 Functional Modules: 6 Core Modules</span>
+      <span class="meta-pill">🔄 Routing Engine: React Router v7 / v6</span>
+      <span class="meta-pill">🧭 Global Navigators: FloatingNavigator + NavDrawer + AppBottomNav</span>
+      <span class="meta-pill">📅 Generated: September 2026</span>
+    </div>
+  </div>
+
+  <div class="arch-overview avoid-break">
+    <h3 style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 6px;">
+      🌐 Master Navigation Ecosystem Summary
+    </h3>
+    <p style="font-size: 10px; color: #475569; margin-bottom: 10px;">
+      The Meesho Clone application is structured into <strong>6 autonomous yet interconnected business modules</strong>.
+      Users, Resellers, Suppliers, Drivers, and Administrators navigate via targeted journeys, supported by a 
+      centralized <code>AppRoutes</code> bridge and a floating Screen Navigator catalog.
+    </p>
+
+    <div class="module-grid">
+      <div class="module-card">
+        <div class="module-card-header">
+          <span class="module-card-title">💰 Reseller & Fintech</span>
+          <span class="module-card-count">18 Pages</span>
+        </div>
+        <div class="module-card-routes">
+          Earnings dashboards, margin config, reseller wallets, instant payout, affiliate partner network, community chat & notifications.
+        </div>
+      </div>
+
+      <div class="module-card">
+        <div class="module-card-header">
+          <span class="module-card-title">🛒 Customer Shopping</span>
+          <span class="module-card-count">15 Pages</span>
+        </div>
+        <div class="module-card-routes">
+          Flutter Luxe home, Category explorer, saree/western listings, rich product details, customer reviews, cart, and payment gateway.
+        </div>
+      </div>
+
+      <div class="module-card">
+        <div class="module-card-header">
+          <span class="module-card-title">🛵 Logistics & Fleet</span>
+          <span class="module-card-count">9 Pages</span>
+        </div>
+        <div class="module-card-routes">
+          Driver mobile console, task assignment, order pickup, live active map route, delivery history, SwiftRoute AI & Meesho Velocity.
+        </div>
+      </div>
+
+      <div class="module-card">
+        <div class="module-card-header">
+          <span class="module-card-title">🏬 Supplier Hub</span>
+          <span class="module-card-count">9 Pages</span>
+        </div>
+        <div class="module-card-routes">
+          Seller web console, inventory & warehouse stock, order dispatching, product upload workflow, category setup & business profile.
+        </div>
+      </div>
+
+      <div class="module-card">
+        <div class="module-card-header">
+          <span class="module-card-title">🛡️ Admin & Support</span>
+          <span class="module-card-count">6 Pages</span>
+        </div>
+        <div class="module-card-routes">
+          Admin master console, catalog approvals, marketing campaign flow, performance analytics, support center & ticket resolution.
+        </div>
+      </div>
+
+      <div class="module-card">
+        <div class="module-card-header">
+          <span class="module-card-title">🎨 Theme Variations</span>
+          <span class="module-card-count">5 Pages</span>
+        </div>
+        <div class="module-card-routes">
+          Digital Curator, Petal Collective, Gilded Pulse, Social Commerce Luxe, and Signal Core theme design ecosystems.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="avoid-break">
+    <div class="section-title">
+      <span>🧭 Global Navigation Systems & Controllers</span>
+    </div>
+    <div class="nav-hub-grid">
+      <div class="nav-hub-card">
+        <h4><span style="color:#ff3f6c;">●</span> FloatingNavigator Modal (App.jsx)</h4>
+        <p>
+          Global overlay accessible from anywhere via <code>window.dispatchEvent(new CustomEvent('open-screen-navigator'))</code>.
+          Provides a filtered grid of all 57+ routes categorized by module tabs: <em>All, Reseller & Shop, Shopping, Logistics, Supplier, Admin, Themes</em>.
+        </p>
+        <span class="highlight-tag">Global Shortcut & Quick Testing Hub</span>
+      </div>
+
+      <div class="nav-hub-card">
+        <h4><span style="color:#ff3f6c;">●</span> NavDrawer (Slide-Over Drawer)</h4>
+        <p>
+          Side menu displaying user profile, active tier status (Gold Tier), and categorized deep-links into:
+          <em>Shop & Catalog, Business & Earnings, Community & Network, Growth & Programs</em>. Includes logout trigger.
+        </p>
+        <span class="highlight-tag">Reseller Workspace Context</span>
+      </div>
+
+      <div class="nav-hub-card">
+        <h4><span style="color:#ff3f6c;">●</span> AppBottomNav (Persistent Mobile Dock)</h4>
+        <p>
+          Dock bar on mobile/desktop with 6 core touchpoints:
+          <strong>Home</strong> (<code>/reseller-home</code>), <strong>Categories</strong> (<code>/explorer</code>), 
+          <strong>Orders</strong> (<code>/delivery-history</code>), <strong>Earnings</strong> (<code>/earnings-dashboard-1</code>), 
+          <strong>Profile</strong> (<code>/user-dashboard</code>), and <strong>Screens (62)</strong>.
+        </p>
+        <span class="highlight-tag">Primary Mobile Experience Nav</span>
+      </div>
+
+      <div class="nav-hub-card">
+        <h4><span style="color:#ff3f6c;">●</span> AppRoutes Bridge (handleNav & handleBack)</h4>
+        <p>
+          Normalizes legacy string navigation identifiers (e.g. <code>reseller</code>, <code>cart</code>, <code>inventory</code>, <code>webDashboard</code>, <code>campaignFlow</code>)
+          into canonical React Router paths, allowing seamless component reuse.
+        </p>
+        <span class="highlight-tag">Unified Routing Adapter</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PAGE 2: MODULE 1 - RESELLER & FINTECH ==================== -->
+  <div class="section-title">
+    <span class="badge badge-reseller">MODULE 1</span>
+    <span>Reseller & Fintech System (18 Screens)</span>
+  </div>
+
+  <p style="font-size: 10px; color: #475569; margin-bottom: 10px;">
+    <strong>Target Persona:</strong> Resellers, Social Commerce Entrepreneurs, Affiliates.<br>
+    <strong>Core Mission:</strong> Browse supplier catalogs, add profit margins, share on WhatsApp/Social Media, track sales commissions, and withdraw earnings directly to bank accounts.
+  </p>
+
+  <!-- Flow Visual 1 -->
+  <div class="flow-box avoid-break">
+    <div class="flow-title">
+      <span>🔄 Reseller Primary Flow: Margin Setup to Commission Payout</span>
+    </div>
+    <div class="step-sequence">
+      <div class="step-node">
+        <span class="node-title">Login / Auth</span>
+        <span class="node-route">/ or /login</span>
+        <span class="step-action-tag">Verify OTP</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Reseller Home</span>
+        <span class="node-route">/reseller-home</span>
+        <span class="step-action-tag">Select Item</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Resell & Earn</span>
+        <span class="node-route">/resell-earn</span>
+        <span class="step-action-tag">Compare Margin</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Margin Config</span>
+        <span class="node-route">/share-earn-config</span>
+        <span class="step-action-tag">Set Selling Price</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Share to Earn</span>
+        <span class="node-route">WhatsApp / Web</span>
+        <span class="step-action-tag">Copy Customer Link</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Fintech Wallet</span>
+        <span class="node-route">/my-wallet</span>
+        <span class="step-action-tag">Instant Withdraw</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Route Table Module 1 -->
+  <div class="avoid-break">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25px;">#</th>
+          <th style="width: 170px;">Route & URL</th>
+          <th style="width: 130px;">Screen Title</th>
+          <th>Screen Purpose & Outgoing Navigation Triggers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><span class="route-pill">/ or /login</span></td>
+          <td class="screen-name">🔐 Login / Sign Up</td>
+          <td>Mobile OTP authentication screen. Successful verification navigates directly to <code>/reseller-home</code>.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><span class="route-pill">/reseller-home</span></td>
+          <td class="screen-name">🛍️ Reseller Home</td>
+          <td>Main feed with categories, trending items, search & filters. Clicking a product opens <code>/share-earn-config</code>.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><span class="route-pill">/resell-earn</span></td>
+          <td class="screen-name">💰 Resell & Earn</td>
+          <td>Supplier catalogue with verified margin highlights. Clicks lead to <code>/share-earn-config</code> and <code>/product</code>.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><span class="route-pill">/share-earn-config</span></td>
+          <td class="screen-name">🔗 Share & Earn Config</td>
+          <td>Interactive margin calculator (Base price + Profit = Final price). Generates WhatsApp share links.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><span class="route-pill">/earnings-dashboard-1</span></td>
+          <td class="screen-name">📈 Earnings Dashboard 1</td>
+          <td>Overview of total orders, pending margins, and weekly payouts. Links to <code>/earnings-dashboard-2</code> and <code>/my-wallet</code>.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><span class="route-pill">/earnings-dashboard-2</span></td>
+          <td class="screen-name">📊 Earnings Dashboard 2</td>
+          <td>Detailed graphical charts of sales breakdown, margin trends, customer retention, and tier bonuses.</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><span class="route-pill">/my-wallet</span></td>
+          <td class="screen-name">👛 Fintech Style Wallet</td>
+          <td>Modern neo-banking wallet: displays balance, reward tokens, pending cashbacks. CTA: <em>Withdraw</em> ➔ <code>/withdraw-earnings</code>.</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><span class="route-pill">/reseller-wallet</span></td>
+          <td class="screen-name">💳 Reseller Wallet</td>
+          <td>Ledger of all reseller order credits and debit charges. Includes button to <code>/payout-settings</code>.</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><span class="route-pill">/withdraw-earnings</span></td>
+          <td class="screen-name">🏦 Withdraw Earnings</td>
+          <td>Select bank account or UPI ID, enter transfer amount. Submitting initiates transfer ➔ <code>/payout-confirmation</code>.</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td><span class="route-pill">/payout-settings</span></td>
+          <td class="screen-name">⚙️ Payout Settings</td>
+          <td>Manage beneficiary bank accounts, IFSC validation, PAN card verification, and automatic transfer schedules.</td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td><span class="route-pill">/payout-confirmation</span></td>
+          <td class="screen-name">✅ Payout Confirmation</td>
+          <td>Digital transaction receipt with UTR reference number and timestamp. CTAs: Back to Home or Wallet.</td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td><span class="route-pill">/refer-earn</span></td>
+          <td class="screen-name">🎁 Refer & Earn</td>
+          <td>Referral code generator with tier milestone rewards (₹1,000 for 3 referrals). Share directly to social media.</td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td><span class="route-pill">/affiliate-program</span></td>
+          <td class="screen-name">🤝 Affiliate Program</td>
+          <td>Partner program landing page detailing commission tiers, influencer perks, and onboarding guides.</td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td><span class="route-pill">/affiliate-panel</span></td>
+          <td class="screen-name">👑 Affiliate Panel</td>
+          <td>High-volume affiliate tracker: link generator, click-through rates, conversion ratios, and monthly earnings.</td>
+        </tr>
+        <tr>
+          <td>15</td>
+          <td><span class="route-pill">/community-hub</span></td>
+          <td class="screen-name">👥 Community Hub</td>
+          <td>Reseller community forum, top seller spotlights, video learning modules, and community Q&A feed.</td>
+        </tr>
+        <tr>
+          <td>16</td>
+          <td><span class="route-pill">/messenger</span></td>
+          <td class="screen-name">💬 Meesho Messenger Hub</td>
+          <td>Chat inbox listing customer queries, buyer leads, and supplier order negotiations. Clicks open <code>/conversation</code>.</td>
+        </tr>
+        <tr>
+          <td>17</td>
+          <td><span class="route-pill">/conversation</span></td>
+          <td class="screen-name">🗨️ Conversation Screen</td>
+          <td>Real-time 1-on-1 messaging screen with instant price quotes, product cards, and dispute resolution.</td>
+        </tr>
+        <tr>
+          <td>18</td>
+          <td><span class="route-pill">/notifications</span></td>
+          <td class="screen-name">🔔 Notification Center</td>
+          <td>Order status updates, wallet credit alerts, price drops, and promotional campaign notifications.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PAGE 3: MODULE 2 - CUSTOMER SHOPPING ==================== -->
+  <div class="section-title">
+    <span class="badge badge-shopping">MODULE 2</span>
+    <span>Customer Shopping & E-Commerce Flow (15 Screens)</span>
+  </div>
+
+  <p style="font-size: 10px; color: #475569; margin-bottom: 10px;">
+    <strong>Target Persona:</strong> End Consumers, Online Shoppers, Reseller End-Customers.<br>
+    <strong>Core Mission:</strong> Discover fashion, lifestyle, and electronics; filter curated categories; inspect reviews; add items to cart; and proceed through secure checkout and payment.
+  </p>
+
+  <!-- Flow Visual 2 -->
+  <div class="flow-box purple avoid-break">
+    <div class="flow-title">
+      <span>🛒 Customer Primary Flow: Product Discovery to Checkout Payment</span>
+    </div>
+    <div class="step-sequence">
+      <div class="step-node">
+        <span class="node-title">Luxe Storefront</span>
+        <span class="node-route">/luxe or /reseller-home</span>
+        <span class="step-action-tag">Search / Browse</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Category / Search</span>
+        <span class="node-route">/explorer or /sarees</span>
+        <span class="step-action-tag">Filter Category</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Product Details</span>
+        <span class="node-route">/product</span>
+        <span class="step-action-tag">Select Size & Color</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Shopping Cart</span>
+        <span class="node-route">/cart</span>
+        <span class="step-action-tag">Click Checkout</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Address Selection</span>
+        <span class="node-route">/address</span>
+        <span class="step-action-tag">Confirm Delivery Info</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Payment Gateway</span>
+        <span class="node-route">/payment</span>
+        <span class="step-action-tag">UPI / COD / Card</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Order Dashboard</span>
+        <span class="node-route">/user-dashboard</span>
+        <span class="step-action-tag">Track Delivery</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Route Table Module 2 -->
+  <div class="avoid-break">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25px;">#</th>
+          <th style="width: 170px;">Route & URL</th>
+          <th style="width: 130px;">Screen Title</th>
+          <th>Screen Purpose & Outgoing Navigation Triggers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><span class="route-pill">/luxe</span></td>
+          <td class="screen-name">✨ Flutter Luxe Theme</td>
+          <td>Premium animated customer landing page with curated banners, trending collections, and quick category jumps.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><span class="route-pill">/explorer</span> / <span class="route-pill">/categories</span></td>
+          <td class="screen-name">🗂️ Categories Explorer</td>
+          <td>Multi-tier category browser (Women Ethnic, Western, Men, Kids, Home, Gadgets). Clicking a category navigates to listing.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><span class="route-pill">/search</span></td>
+          <td class="screen-name">🔍 Search Results</td>
+          <td>Dynamic keyword query view with price, rating, brand, and discount filters. Items link directly to <code>/product</code>.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><span class="route-pill">/sarees</span></td>
+          <td class="screen-name">🥻 Sarees Category Listing</td>
+          <td>Specialized ethnic wear showcase with fabric tags (Kanjivaram, Georgette, Silk). Products link to <code>/product</code>.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><span class="route-pill">/western</span></td>
+          <td class="screen-name">👗 Women Western Category</td>
+          <td>Western apparel catalog with denim, dresses, tops, and size selector. Links to product details.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><span class="route-pill">/spotlight</span></td>
+          <td class="screen-name">🌟 Curated Spotlight</td>
+          <td>Curated editor's picks, seasonal trends, and influencer-endorsed bestsellers.</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><span class="route-pill">/flash</span></td>
+          <td class="screen-name">⚡ Flash Sale Landing</td>
+          <td>Countdown timer sale with high-urgency deals, stock meters, and instant "Buy Now" triggers.</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><span class="route-pill">/product</span></td>
+          <td class="screen-name">🏷️ Product Detail</td>
+          <td>Image gallery, pricing, size charts, return policy, and supplier information. CTAs: <em>Add to Cart</em> (<code>/cart</code>) or <em>Reviews</em>.</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><span class="route-pill">/reviews</span></td>
+          <td class="screen-name">⭐ Ratings & Reviews</td>
+          <td>Customer rating breakdown, verified buyer photos, and review filters. Action: <em>Write a Review</em> ➔ <code>/write-review</code>.</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td><span class="route-pill">/write-review</span></td>
+          <td class="screen-name">✍️ Write a Review</td>
+          <td>Interactive 5-star rating input, image uploader, and feedback text box. Submitting returns back to <code>/reviews</code>.</td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td><span class="route-pill">/wishlist</span></td>
+          <td class="screen-name">❤️ User Wishlist</td>
+          <td>Saved favorites list. Supports quick "Move to Cart" (<code>/cart</code>) and real-time price change notifications.</td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td><span class="route-pill">/cart</span></td>
+          <td class="screen-name">🛒 Shopping Cart</td>
+          <td>Cart items, quantity adjusters, coupon code input, and order total calculation. CTA: <em>Proceed to Checkout</em> ➔ <code>/address</code>.</td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td><span class="route-pill">/address</span></td>
+          <td class="screen-name">📍 Checkout Address</td>
+          <td>Saved addresses selector, new address entry (Pincode, City, State, Landmark). CTA: <em>Continue to Payment</em> ➔ <code>/payment</code>.</td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td><span class="route-pill">/payment</span></td>
+          <td class="screen-name">💳 Checkout Payment</td>
+          <td>Payment method selector: UPI (Google Pay / PhonePe / Paytm), Debit/Credit Cards, NetBanking, and Cash on Delivery (COD).</td>
+        </tr>
+        <tr>
+          <td>15</td>
+          <td><span class="route-pill">/user-dashboard</span></td>
+          <td class="screen-name">📊 Curator Web Dashboard</td>
+          <td>Customer account hub: Past orders, active shipments, delivery status tracking, refund requests, and support links.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PAGE 4: MODULE 3 - LOGISTICS & FLEET ==================== -->
+  <div class="section-title">
+    <span class="badge badge-logistics">MODULE 3</span>
+    <span>Logistics & Delivery Fleet Management (9 Screens)</span>
+  </div>
+
+  <p style="font-size: 10px; color: #475569; margin-bottom: 10px;">
+    <strong>Target Persona:</strong> Delivery Executives, Courier Partners, Fleet Managers, Logistics Dispatchers.<br>
+    <strong>Core Mission:</strong> Receive package pickup notices, accept delivery tasks, navigate turn-by-turn with GPS map integration, verify OTP deliveries, and monitor daily earnings.
+  </p>
+
+  <!-- Flow Visual 3 -->
+  <div class="flow-box blue avoid-break">
+    <div class="flow-title">
+      <span>🛵 Driver & Logistics Workflow: Task Acceptance to Package Handover</span>
+    </div>
+    <div class="step-sequence">
+      <div class="step-node">
+        <span class="node-title">Driver Console</span>
+        <span class="node-route">/driver-dashboard</span>
+        <span class="step-action-tag">Toggle "Online"</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Available Tasks</span>
+        <span class="node-route">/available-tasks</span>
+        <span class="step-action-tag">Accept Assignment</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Order Details</span>
+        <span class="node-route">/order-driver</span>
+        <span class="step-action-tag">Scan Package Barcode</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Active Delivery</span>
+        <span class="node-route">/active-delivery</span>
+        <span class="step-action-tag">Live GPS Route Map</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Delivery OTP</span>
+        <span class="node-route">Doorstep Confirm</span>
+        <span class="step-action-tag">Handover Package</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Delivery History</span>
+        <span class="node-route">/delivery-history</span>
+        <span class="step-action-tag">Mark Completed</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Driver Earnings</span>
+        <span class="node-route">/driver-earnings</span>
+        <span class="step-action-tag">Payout Calculated</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Route Table Module 3 -->
+  <div class="avoid-break">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25px;">#</th>
+          <th style="width: 170px;">Route & URL</th>
+          <th style="width: 130px;">Screen Title</th>
+          <th>Screen Purpose & Outgoing Navigation Triggers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><span class="route-pill">/driver-dashboard</span></td>
+          <td class="screen-name">🛵 Driver Dashboard</td>
+          <td>Mobile-first console with online/offline toggle, today's deliveries counter, trip meter, and direct link to <code>/available-tasks</code>.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><span class="route-pill">/available-tasks</span></td>
+          <td class="screen-name">📦 Available Tasks</td>
+          <td>Nearby pending delivery pool with distance, payout per drop, and pickup hub. Accepting opens <code>/order-driver</code>.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><span class="route-pill">/order-driver</span></td>
+          <td class="screen-name">📋 Order Details Driver</td>
+          <td>Customer name, delivery address, COD amount to collect, package weight. CTA: <em>Start Delivery</em> ➔ <code>/active-delivery</code>.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><span class="route-pill">/active-delivery</span></td>
+          <td class="screen-name">🗺️ Active Delivery Map</td>
+          <td>Live GPS tracking map, estimated time of arrival (ETA), turn-by-turn route, and call customer button.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><span class="route-pill">/delivery-history</span></td>
+          <td class="screen-name">📜 Delivery History</td>
+          <td>Archive of completed, returned, and rescheduled parcel drop-offs with customer signatures and timestamps.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><span class="route-pill">/driver-earnings</span></td>
+          <td class="screen-name">💰 Driver Earnings</td>
+          <td>Daily and weekly earnings report, petrol incentive allowance, peak-hour bonuses, and withdrawal requests.</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><span class="route-pill">/rider-express</span></td>
+          <td class="screen-name">⚡ Rider Express</td>
+          <td>Ultra-fast express delivery console designed for same-day and 2-hour intra-city hyperlocal dispatches.</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><span class="route-pill">/meesho-velocity</span></td>
+          <td class="screen-name">🚀 Meesho Velocity</td>
+          <td>High-priority freight tracking console for hub-to-hub trunk line transfers and transit hub logistics.</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><span class="route-pill">/swiftroute</span></td>
+          <td class="screen-name">🧭 SwiftRoute AI</td>
+          <td>AI-driven smart routing engine that sequences multiple order drops to minimize fuel consumption and transit delays.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PAGE 5: MODULE 4 - SUPPLIER HUB ==================== -->
+  <div class="section-title">
+    <span class="badge badge-supplier">MODULE 4</span>
+    <span>Supplier & Seller Hub (9 Screens)</span>
+  </div>
+
+  <p style="font-size: 10px; color: #475569; margin-bottom: 10px;">
+    <strong>Target Persona:</strong> Direct Manufacturers, Brands, Sellers, Warehouse Managers.<br>
+    <strong>Core Mission:</strong> Manage catalog products, inventory stock counts, process and pack new customer orders, print shipping labels, and track supplier payouts.
+  </p>
+
+  <!-- Flow Visual 4 -->
+  <div class="flow-box green avoid-break">
+    <div class="flow-title">
+      <span>🏬 Supplier Lifecycle: Product Listing to Order Dispatch</span>
+    </div>
+    <div class="step-sequence">
+      <div class="step-node">
+        <span class="node-title">Structure Flow</span>
+        <span class="node-route">/structure-flow</span>
+        <span class="step-action-tag">Select Operations</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Add Product</span>
+        <span class="node-route">/add-product</span>
+        <span class="step-action-tag">Set Base Price</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Inventory Stock</span>
+        <span class="node-route">/supplier-inventory</span>
+        <span class="step-action-tag">Update Quantities</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Orders List</span>
+        <span class="node-route">/supplier-orders</span>
+        <span class="step-action-tag">Print Shipping Label</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Dispatch Ready</span>
+        <span class="node-route">Logistics Handover</span>
+        <span class="step-action-tag">Driver Picks Up</span>
+      </div>
+      <span class="step-arrow">➔</span>
+      <div class="step-node">
+        <span class="node-title">Seller Dashboard</span>
+        <span class="node-route">/seller-dashboard</span>
+        <span class="step-action-tag">Revenue & Settlements</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Route Table Module 4 -->
+  <div class="avoid-break">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25px;">#</th>
+          <th style="width: 170px;">Route & URL</th>
+          <th style="width: 130px;">Screen Title</th>
+          <th>Screen Purpose & Outgoing Navigation Triggers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><span class="route-pill">/structure-flow</span></td>
+          <td class="screen-name">🏬 Structure Flow Hub</td>
+          <td>Supplier operational cockpit with interactive shortcuts to Inventory, New Products, and Orders.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><span class="route-pill">/supplier-dashboard-1</span></td>
+          <td class="screen-name">📉 Supplier Dashboard 1</td>
+          <td>Order intake summary, pending dispatches, SLA breach alerts. Action: <em>Ship Now</em> ➔ <code>/supplier-orders</code>.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><span class="route-pill">/supplier-dashboard-2</span></td>
+          <td class="screen-name">📈 Supplier Dashboard 2</td>
+          <td>Advanced seller metrics: top-selling SKUs, regional demand maps, return-to-origin (RTO) percentage, and ad spend.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><span class="route-pill">/supplier-inventory</span></td>
+          <td class="screen-name">📦 Inventory Management</td>
+          <td>Stock tracking table by variant (Size, Color), low stock triggers, price editing. CTA: <em>Add Product</em> ➔ <code>/add-product</code>.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><span class="route-pill">/supplier-orders</span></td>
+          <td class="screen-name">📑 Supplier Orders List</td>
+          <td>Tabbed order fulfillment (New, In-Packing, Ready to Ship, Shipped). Generates manifest and packaging slips.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><span class="route-pill">/add-product</span></td>
+          <td class="screen-name">➕ Add New Product</td>
+          <td>Catalog creation wizard: upload photos, title, SKU, GST rate, HSN code, variants, and supplier tier pricing.</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><span class="route-pill">/add-category</span></td>
+          <td class="screen-name">🏷️ Add Category</td>
+          <td>Supplier custom taxonomy creator: add subcategories and attribute sets for structured product listings.</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><span class="route-pill">/supplier-profile</span></td>
+          <td class="screen-name">👤 Supplier Profile</td>
+          <td>GSTIN verification, pickup warehouse address, signature upload, bank account verification, and logout.</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><span class="route-pill">/seller-dashboard</span></td>
+          <td class="screen-name">💻 Seller Web Dashboard</td>
+          <td>Desktop-optimized multi-panel console unifying sales, inventory health, marketing campaigns, and payment settlements.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- ==================== PAGE 6: MODULE 5 & MODULE 6 ==================== -->
+  <div class="section-title">
+    <span class="badge badge-admin">MODULE 5</span>
+    <span>Admin Panel & Support Operations (6 Screens)</span>
+  </div>
+
+  <p style="font-size: 10px; color: #475569; margin-bottom: 8px;">
+    <strong>Target Persona:</strong> Platform Administrators, Catalog Auditors, Customer Support Agents.<br>
+    <strong>Core Mission:</strong> Moderate product listings, launch banner marketing campaigns, review platform analytics, and resolve buyer/reseller tickets.
+  </p>
+
+  <div class="avoid-break">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25px;">#</th>
+          <th style="width: 170px;">Route & URL</th>
+          <th style="width: 130px;">Screen Title</th>
+          <th>Screen Purpose & Outgoing Navigation Triggers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><span class="route-pill">/admin-panel</span></td>
+          <td class="screen-name">🛡️ Admin Web Panel</td>
+          <td>Central administrative dashboard with system health, active users, catalog moderation, and switch to seller view.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><span class="route-pill">/admin-catalog</span></td>
+          <td class="screen-name">📁 Admin Catalog</td>
+          <td>Quality check (QC) queue: approve, reject, or request changes for supplier product submissions before public display.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><span class="route-pill">/campaign-flow</span></td>
+          <td class="screen-name">📢 Campaign Creation</td>
+          <td>Marketing engine: create discount sales, banner promotions, push notifications, and festival discount events.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><span class="route-pill">/admin-analytics</span></td>
+          <td class="screen-name">📊 Performance Analytics</td>
+          <td>Executive analytics: Gross Merchandise Value (GMV), net margins, active resellers count, and logistics SLA compliance.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><span class="route-pill">/support-center</span></td>
+          <td class="screen-name">🎧 Support Center</td>
+          <td>Help desk hub with FAQ categories, instant bot support, and live agent chat launcher ➔ <code>/conversation</code>.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><span class="route-pill">/raise-ticket</span></td>
+          <td class="screen-name">🎫 Raise A Ticket</td>
+          <td>Formal dispute submission form: select order ID, upload damage evidence photos, and receive ticket tracking ID.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title" style="margin-top: 20px;">
+    <span class="badge badge-theme">MODULE 6</span>
+    <span>Design Ecosystem & Theme Variations (5 Screens)</span>
+  </div>
+
+  <p style="font-size: 10px; color: #475569; margin-bottom: 8px;">
+    <strong>Target Persona:</strong> UI/UX Designers, Product Managers, White-label Brand Partners.<br>
+    <strong>Core Mission:</strong> Showcase multi-theme styling, bespoke color palettes, layout paradigms, and next-gen commerce visual systems.
+  </p>
+
+  <div class="avoid-break">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25px;">#</th>
+          <th style="width: 170px;">Route & URL</th>
+          <th style="width: 130px;">Screen Title</th>
+          <th>Design Philosophy & Core Visual Features</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><span class="route-pill">/digital-curator</span></td>
+          <td class="screen-name">🎨 Digital Curator</td>
+          <td>Minimalist luxury theme tailored for high-end boutique brands with glassmorphism and editorial typography.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><span class="route-pill">/petal-collective</span></td>
+          <td class="screen-name">🌸 Petal Collective</td>
+          <td>Soft pastel aesthetic customized for beauty, skincare, and women's fashion with gentle micro-interactions.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><span class="route-pill">/gilded-pulse</span></td>
+          <td class="screen-name">👑 Gilded Pulse</td>
+          <td>Warm metallic and golden accents for premium jewelry, watches, and festival wedding collections.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><span class="route-pill">/social-commerce-luxe</span></td>
+          <td class="screen-name">💎 Social Commerce Luxe</td>
+          <td>High-conversion social commerce theme blending video feeds, live shopping ribbons, and instant buy triggers.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><span class="route-pill">/signal-core</span></td>
+          <td class="screen-name">⚡ Signal Core</td>
+          <td>High-tech dark theme designed for electronics, modern gadgets, and urban streetwear with cyberpunk accents.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- End to End Lifecycle -->
+  <div class="flow-box orange avoid-break" style="margin-top: 14px;">
+    <div class="flow-title">
+      <span>🌐 Complete Cross-Module Business Lifecycle (End-to-End Handshake)</span>
+    </div>
+    <div style="font-size: 9.5px; color: #334155; line-height: 1.6;">
+      <strong>1. Supplier (Mod 4):</strong> Lists product on <code>/add-product</code> ➔ Verified by Admin on <code>/admin-catalog</code> (Mod 5).<br>
+      <strong>2. Reseller (Mod 1):</strong> Discovers product on <code>/reseller-home</code>, sets margin on <code>/share-earn-config</code>, and shares to buyers.<br>
+      <strong>3. Customer (Mod 2):</strong> Discovers item on <code>/product</code>, checks <code>/reviews</code>, and completes checkout via <code>/payment</code>.<br>
+      <strong>4. Supplier (Mod 4):</strong> Receives order on <code>/supplier-orders</code>, prints label, and packs parcel for courier pickup.<br>
+      <strong>5. Driver (Mod 3):</strong> Picks up parcel via <code>/available-tasks</code>, delivers via <code>/active-delivery</code>, confirms OTP delivery.<br>
+      <strong>6. Fintech (Mod 1):</strong> Profit margin instantly credited to Reseller <code>/my-wallet</code> ➔ Withdrawn via <code>/withdraw-earnings</code>.
+    </div>
+  </div>
+
+</body>
+</html>

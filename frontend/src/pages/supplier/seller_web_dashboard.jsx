@@ -94,7 +94,7 @@ const SIDEBAR_ITEMS = [
   { id: 'profile', label: 'Supplier Profile', icon: 'storefront', path: '/supplier-profile' },
 ];
 
-export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders }) {
+export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders, onBack }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [chartView, setChartView] = useState('monthly'); // 'weekly' | 'monthly'
   const [statusFilter, setStatusFilter] = useState('All');
@@ -161,7 +161,16 @@ export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders })
 
       {/* ===================== Mobile Top Bar with Hamburger Menu ===================== */}
       <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => (onBack ? onBack() : onNavigate ? onNavigate('/admin-panel') : window.history.back())}
+            className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 cursor-pointer transition-colors"
+            title="Back to Admin Panel"
+            aria-label="Back"
+          >
+            <span className="material-symbols-outlined text-xl">arrow_back</span>
+          </button>
           <button
             type="button"
             onClick={() => setIsMobileMenuOpen(true)}
@@ -342,7 +351,16 @@ export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders })
         <main className="flex-1 flex flex-col min-w-0 md:pl-64">
           {/* TopNavBar */}
           <header className="flex justify-between items-center px-4 sm:px-8 py-3 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-xs sticky top-0 z-30 border-b border-slate-200/60">
-            <div className="flex items-center gap-4 flex-1">
+            <div className="flex items-center gap-3 flex-1">
+              <button
+                type="button"
+                onClick={() => (onBack ? onBack() : onNavigate ? onNavigate('/admin-panel') : window.history.back())}
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-700 dark:text-slate-300 cursor-pointer shrink-0 transition-colors flex items-center justify-center"
+                aria-label="Back to Admin Panel"
+                title="Back to Admin Panel"
+              >
+                <span className="material-symbols-outlined text-2xl">arrow_back</span>
+              </button>
               <div className="relative w-full max-w-md hidden sm:block">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
                   search

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Module 4: Supplier Hub & Merchant Operations - Navigation Blueprint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #059669;
+      --primary-gradient: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      --bg: #ffffff;
+      --surface: #f8fafc;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --code-bg: #f1f5f9;
+      --code-text: #0284c7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: var(--text-main); line-height: 1.5; padding: 2rem 1rem; }
+    .page-container { max-width: 1100px; margin: 0 auto; background: #ffffff; border-radius: 1.25rem; box-shadow: 0 20px 40px -15px rgba(0,0,0,0.08); padding: 3rem; border: 1px solid var(--card-border); }
+    .print-bar { position: sticky; top: 1rem; z-index: 100; display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: #ffffff; padding: 1rem 1.75rem; border-radius: 1rem; margin-bottom: 2rem; }
+    .btn-save-pdf { background: var(--primary-gradient); color: #ffffff; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1rem; padding: 0.7rem 1.5rem; border-radius: 9999px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
+    .doc-header { text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 2rem; margin-bottom: 2.5rem; }
+    .badge { display: inline-block; padding: 0.35rem 1rem; background: #d1fae5; color: #047857; border-radius: 9999px; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.75rem; }
+    h1 { font-family: 'Outfit', sans-serif; font-size: 2.3rem; font-weight: 900; color: #0f172a; margin-bottom: 0.5rem; }
+    .doc-subtitle { color: var(--text-muted); font-size: 1.05rem; max-width: 700px; margin: 0 auto; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2.5rem; }
+    .stat-box { background: #f8fafc; border: 1px solid var(--card-border); border-radius: 0.75rem; padding: 1.25rem 1rem; text-align: center; }
+    .stat-val { font-family: 'Outfit', sans-serif; font-size: 1.85rem; font-weight: 900; color: #059669; }
+    .stat-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+    .flow-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 2rem; }
+    .flow-pill { background: #ffffff; border: 1px solid #cbd5e1; padding: 0.45rem 0.85rem; border-radius: 0.5rem; font-size: 0.82rem; font-weight: 700; font-family: 'Outfit', sans-serif; color: #0f172a; display: inline-flex; align-items: center; gap: 0.35rem; }
+    .flow-arrow { color: #059669; font-weight: 900; font-size: 0.95rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 1rem; }
+    th { background: #f8fafc; color: #0f172a; text-align: left; padding: 0.8rem; font-family: 'Outfit', sans-serif; font-weight: 800; border-bottom: 2px solid #cbd5e1; }
+    td { padding: 0.8rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    tr:nth-child(even) td { background: #fafcff; }
+    .code-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; background: var(--code-bg); color: var(--code-text); padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-weight: 700; white-space: nowrap; }
+    .action-badge { display: inline-block; background: #d1fae5; color: #047857; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 0.3rem; font-size: 0.78rem; }
+    .back-flow-badge { display: inline-block; background: #f0fdf4; color: #166534; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; }
+    @media print {
+      body { background: #ffffff !important; padding: 0 !important; color: #000000 !important; }
+      .page-container { max-width: 100% !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+      .print-bar { display: none !important; }
+      table { font-size: 8pt !important; }
+      th, td { padding: 4pt 6pt !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-container">
+    <div class="print-bar">
+      <div>
+        <strong style="font-size:1.1rem; display:block;">🏬 Module 4: Supplier Hub &amp; Merchant Operations</strong>
+        <span style="font-size:0.85rem; color:#94a3b8;">9 Screens • Page-to-Page Navigation Map</span>
+      </div>
+      <button class="btn-save-pdf" onclick="window.print()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+        </svg>
+        Save as PDF
+      </button>
+    </div>
+
+    <header class="doc-header">
+      <div class="badge">Module 4 Architecture</div>
+      <h1>Supplier Hub &amp; Merchant Operations</h1>
+      <p class="doc-subtitle">
+        Manufacturer and supplier merchant management: SKU catalog stock levels, new product &amp; category creation, order manifest generation, shipping labels, and merchant enterprise portal.
+      </p>
+    </header>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val">9</div><div class="stat-label">Screens</div></div>
+      <div class="stat-box"><div class="stat-val">Real-Time</div><div class="stat-label">Stock Adjustments</div></div>
+      <div class="stat-box"><div class="stat-val">1-Click</div><div class="stat-label">Manifest Export</div></div>
+      <div class="stat-box"><div class="stat-val">100%</div><div class="stat-label">Route Connected</div></div>
+    </div>
+
+    <h2 style="font-family:'Outfit',sans-serif; font-size:1.2rem; margin-bottom:0.75rem; color:#0f172a;">🔄 Complete Supplier &amp; Merchant Journey</h2>
+    <div class="flow-chain">
+      <div class="flow-pill">📉 Supplier Home <span class="code-badge">/supplier-dashboard-1</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">📦 Inventory <span class="code-badge">/supplier-inventory</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">➕ Add Product <span class="code-badge">/add-product</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">🏷️ Add Category <span class="code-badge">/add-category</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">📑 Orders List <span class="code-badge">/supplier-orders</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">💻 Seller Web Dashboard <span class="code-badge">/seller-dashboard</span></div>
+    </div>
+
+    <h2 style="font-family:'Outfit',sans-serif; font-size:1.2rem; margin-bottom:0.75rem; color:#0f172a;">📑 Detailed Page-to-Page Navigation Table</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>From Screen</th>
+          <th>Trigger / Button Action</th>
+          <th>Target Route</th>
+          <th>Destination Component</th>
+          <th>Back / Return Target</th>
+          <th>Description &amp; Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Supplier Dashboard 1</strong></td>
+          <td><span class="action-badge">"Advanced Analytics"</span></td>
+          <td><span class="code-badge">/supplier-dashboard-2</span></td>
+          <td><code>SupplierDashboard2</code></td>
+          <td><span class="back-flow-badge">/supplier-dashboard-1</span></td>
+          <td>Sales velocity, return percentages, and stock aging metrics</td>
+        </tr>
+        <tr>
+          <td><strong>Supplier Dashboard</strong></td>
+          <td><span class="action-badge">"Manage Inventory"</span></td>
+          <td><span class="code-badge">/supplier-inventory</span></td>
+          <td><code>SupplierInventoryManagement</code></td>
+          <td><span class="back-flow-badge">/supplier-dashboard-1</span></td>
+          <td>SKU stock level adjustments and in-stock / out-of-stock toggles</td>
+        </tr>
+        <tr>
+          <td><strong>Supplier Inventory</strong></td>
+          <td><span class="action-badge">"Add New Product"</span></td>
+          <td><span class="code-badge">/add-product</span></td>
+          <td><code>AddNewProductSupplier</code></td>
+          <td><span class="back-flow-badge">/supplier-inventory</span></td>
+          <td>Image upload, price, GST tax slab, SKU variants, descriptions</td>
+        </tr>
+        <tr>
+          <td><strong>Supplier Inventory</strong></td>
+          <td><span class="action-badge">"Add Category"</span></td>
+          <td><span class="code-badge">/add-category</span></td>
+          <td><code>AddCategorySupplier</code></td>
+          <td><span class="back-flow-badge">/supplier-inventory</span></td>
+          <td>Create new custom taxonomy hierarchy for products</td>
+        </tr>
+        <tr>
+          <td><strong>Supplier Dashboard</strong></td>
+          <td><span class="action-badge">"Ship Now" / "Orders"</span></td>
+          <td><span class="code-badge">/supplier-orders</span></td>
+          <td><code>SupplierOrdersList</code></td>
+          <td><span class="back-flow-badge">/supplier-dashboard-1</span></td>
+          <td>Generate courier manifest and print shipping labels</td>
+        </tr>
+        <tr>
+          <td><strong>Supplier Dashboard</strong></td>
+          <td><span class="action-badge">"My Seller Profile"</span></td>
+          <td><span class="code-badge">/supplier-profile</span></td>
+          <td><code>SupplierProfile</code></td>
+          <td><span class="back-flow-badge">/supplier-dashboard-1</span></td>
+          <td>GSTIN, business registration, bank account &amp; pickup address</td>
+        </tr>
+        <tr>
+          <td><strong>Supplier Hub</strong></td>
+          <td><span class="action-badge">"Switch to Web Portal"</span></td>
+          <td><span class="code-badge">/seller-dashboard</span></td>
+          <td><code>SellerWebDashboard</code></td>
+          <td><span class="back-flow-badge">/supplier-dashboard-1</span></td>
+          <td>Full-featured desktop portal for high-volume merchants</td>
+        </tr>
+        <tr>
+          <td><strong>Supplier Hub</strong></td>
+          <td><span class="action-badge">"Structure Flow Hub"</span></td>
+          <td><span class="code-badge">/structure-flow</span></td>
+          <td><code>StructureFlow</code></td>
+          <td><span class="back-flow-badge">/supplier-dashboard-1</span></td>
+          <td>Modular ERP interface for supplier supply chain management</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

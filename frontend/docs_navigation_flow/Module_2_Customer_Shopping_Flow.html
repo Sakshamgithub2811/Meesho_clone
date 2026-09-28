@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Module 2: Customer Shopping & Checkout - Navigation Blueprint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-gradient: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+      --bg: #ffffff;
+      --surface: #f8fafc;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --code-bg: #f1f5f9;
+      --code-text: #0284c7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: var(--text-main); line-height: 1.5; padding: 2rem 1rem; }
+    .page-container { max-width: 1100px; margin: 0 auto; background: #ffffff; border-radius: 1.25rem; box-shadow: 0 20px 40px -15px rgba(0,0,0,0.08); padding: 3rem; border: 1px solid var(--card-border); }
+    .print-bar { position: sticky; top: 1rem; z-index: 100; display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: #ffffff; padding: 1rem 1.75rem; border-radius: 1rem; margin-bottom: 2rem; }
+    .btn-save-pdf { background: var(--primary-gradient); color: #ffffff; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1rem; padding: 0.7rem 1.5rem; border-radius: 9999px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
+    .doc-header { text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 2rem; margin-bottom: 2.5rem; }
+    .badge { display: inline-block; padding: 0.35rem 1rem; background: #dbeafe; color: #1d4ed8; border-radius: 9999px; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.75rem; }
+    h1 { font-family: 'Outfit', sans-serif; font-size: 2.3rem; font-weight: 900; color: #0f172a; margin-bottom: 0.5rem; }
+    .doc-subtitle { color: var(--text-muted); font-size: 1.05rem; max-width: 700px; margin: 0 auto; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2.5rem; }
+    .stat-box { background: #f8fafc; border: 1px solid var(--card-border); border-radius: 0.75rem; padding: 1.25rem 1rem; text-align: center; }
+    .stat-val { font-family: 'Outfit', sans-serif; font-size: 1.85rem; font-weight: 900; color: #2563eb; }
+    .stat-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+    .flow-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 2rem; }
+    .flow-pill { background: #ffffff; border: 1px solid #cbd5e1; padding: 0.45rem 0.85rem; border-radius: 0.5rem; font-size: 0.82rem; font-weight: 700; font-family: 'Outfit', sans-serif; color: #0f172a; display: inline-flex; align-items: center; gap: 0.35rem; }
+    .flow-arrow { color: #2563eb; font-weight: 900; font-size: 0.95rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 1rem; }
+    th { background: #f8fafc; color: #0f172a; text-align: left; padding: 0.8rem; font-family: 'Outfit', sans-serif; font-weight: 800; border-bottom: 2px solid #cbd5e1; }
+    td { padding: 0.8rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    tr:nth-child(even) td { background: #fafcff; }
+    .code-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; background: var(--code-bg); color: var(--code-text); padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-weight: 700; white-space: nowrap; }
+    .action-badge { display: inline-block; background: #eff6ff; color: #2563eb; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 0.3rem; font-size: 0.78rem; }
+    .back-flow-badge { display: inline-block; background: #f0fdf4; color: #166534; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; }
+    @media print {
+      body { background: #ffffff !important; padding: 0 !important; color: #000000 !important; }
+      .page-container { max-width: 100% !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+      .print-bar { display: none !important; }
+      table { font-size: 8pt !important; }
+      th, td { padding: 4pt 6pt !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-container">
+    <div class="print-bar">
+      <div>
+        <strong style="font-size:1.1rem; display:block;">🛒 Module 2: Customer Shopping &amp; Checkout Flow</strong>
+        <span style="font-size:0.85rem; color:#94a3b8;">15 Screens • Page-to-Page Navigation Map</span>
+      </div>
+      <button class="btn-save-pdf" onclick="window.print()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+        </svg>
+        Save as PDF
+      </button>
+    </div>
+
+    <header class="doc-header">
+      <div class="badge">Module 2 Architecture</div>
+      <h1>Customer Shopping &amp; Checkout Flow</h1>
+      <p class="doc-subtitle">
+        Discovery feed, multi-level category taxonomy, filtered faceted search, high-resolution product visualizer, verified customer reviews, interactive shopping bag, and checkout gateway.
+      </p>
+    </header>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val">15</div><div class="stat-label">Screens</div></div>
+      <div class="stat-box"><div class="stat-val">Multi-Tier</div><div class="stat-label">Category Search</div></div>
+      <div class="stat-box"><div class="stat-val">Fast COD</div><div class="stat-label">Checkout Flow</div></div>
+      <div class="stat-box"><div class="stat-val">100%</div><div class="stat-label">Route Connected</div></div>
+    </div>
+
+    <h2 style="font-family:'Outfit',sans-serif; font-size:1.2rem; margin-bottom:0.75rem; color:#0f172a;">🔄 Complete Customer Shopping Flow</h2>
+    <div class="flow-chain">
+      <div class="flow-pill">🗂️ Categories <span class="code-badge">/explorer</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">🥻 Sarees Listing <span class="code-badge">/sarees</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">🏷️ Product Detail <span class="code-badge">/product</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">🛒 Cart <span class="code-badge">/cart</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">📍 Address <span class="code-badge">/address</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">💳 Payment <span class="code-badge">/payment</span></div>
+    </div>
+
+    <h2 style="font-family:'Outfit',sans-serif; font-size:1.2rem; margin-bottom:0.75rem; color:#0f172a;">📑 Detailed Page-to-Page Navigation Table</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>From Screen</th>
+          <th>Trigger / Button Action</th>
+          <th>Target Route</th>
+          <th>Destination Component</th>
+          <th>Back / Return Target</th>
+          <th>Description &amp; Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Any Shopping Page</strong></td>
+          <td><span class="action-badge">Search Bar Query</span></td>
+          <td><span class="code-badge">/search</span></td>
+          <td><code>SearchResults</code></td>
+          <td><span class="back-flow-badge">/explorer</span></td>
+          <td>Live search with price, rating, fabric &amp; discount filters</td>
+        </tr>
+        <tr>
+          <td><strong>Bottom Nav</strong></td>
+          <td><span class="action-badge">"Categories" Tab</span></td>
+          <td><span class="code-badge">/explorer</span></td>
+          <td><code>SearchCategoriesExplorer</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Multi-tier category browser (Ethnic, Western, Kids, Home)</td>
+        </tr>
+        <tr>
+          <td><strong>Categories Explorer</strong></td>
+          <td><span class="action-badge">"Sarees &amp; Ethnic" Card</span></td>
+          <td><span class="code-badge">/sarees</span></td>
+          <td><code>SareesCategoryListing</code></td>
+          <td><span class="back-flow-badge">/explorer</span></td>
+          <td>Banarasi, Kanjivaram, Cotton, Chiffon collection</td>
+        </tr>
+        <tr>
+          <td><strong>Categories Explorer</strong></td>
+          <td><span class="action-badge">"Western Wear" Card</span></td>
+          <td><span class="code-badge">/western</span></td>
+          <td><code>WomenWesternCategory</code></td>
+          <td><span class="back-flow-badge">/explorer</span></td>
+          <td>Dresses, tops, jumpsuits, denim collection</td>
+        </tr>
+        <tr>
+          <td><strong>Category Listings</strong></td>
+          <td><span class="action-badge">Click Any Product Card</span></td>
+          <td><span class="code-badge">/product</span></td>
+          <td><code>ProductDetail</code></td>
+          <td><span class="back-flow-badge">/sarees</span></td>
+          <td>Photo gallery, size selection, delivery estimate, COD check</td>
+        </tr>
+        <tr>
+          <td><strong>Product Detail</strong></td>
+          <td><span class="action-badge">"Add to Cart" / "Buy Now"</span></td>
+          <td><span class="code-badge">/cart</span></td>
+          <td><code>ShoppingCart</code></td>
+          <td><span class="back-flow-badge">/product</span></td>
+          <td>Quantity selector, promo coupons, pricing breakdown</td>
+        </tr>
+        <tr>
+          <td><strong>Product Detail</strong></td>
+          <td><span class="action-badge">Wishlist Heart Icon</span></td>
+          <td><span class="code-badge">/wishlist</span></td>
+          <td><code>UserWishlist</code></td>
+          <td><span class="back-flow-badge">/product</span></td>
+          <td>Saved items grid with 1-click move to cart</td>
+        </tr>
+        <tr>
+          <td><strong>Product Detail</strong></td>
+          <td><span class="action-badge">"View Ratings &amp; Reviews"</span></td>
+          <td><span class="code-badge">/reviews</span></td>
+          <td><code>RatingsReviews</code></td>
+          <td><span class="back-flow-badge">/product</span></td>
+          <td>Verified customer photo reviews and ratings breakdown</td>
+        </tr>
+        <tr>
+          <td><strong>Ratings &amp; Reviews</strong></td>
+          <td><span class="action-badge">"Write a Review"</span></td>
+          <td><span class="code-badge">/write-review</span></td>
+          <td><code>WriteAReview</code></td>
+          <td><span class="back-flow-badge">/reviews</span></td>
+          <td>5-star rating selector, photo upload, review submission</td>
+        </tr>
+        <tr>
+          <td><strong>Shopping Cart</strong></td>
+          <td><span class="action-badge">"Proceed to Checkout"</span></td>
+          <td><span class="code-badge">/address</span></td>
+          <td><code>CheckoutAddressSelection</code></td>
+          <td><span class="back-flow-badge">/cart</span></td>
+          <td>Add new address or choose saved delivery location</td>
+        </tr>
+        <tr>
+          <td><strong>Address Selection</strong></td>
+          <td><span class="action-badge">"Proceed to Payment"</span></td>
+          <td><span class="code-badge">/payment</span></td>
+          <td><code>CheckoutPayment</code></td>
+          <td><span class="back-flow-badge">/address</span></td>
+          <td>UPI (GPay/PhonePe), Credit/Debit Cards, NetBanking, COD</td>
+        </tr>
+        <tr>
+          <td><strong>Reseller Home</strong></td>
+          <td><span class="action-badge">"Flash Sale" Banner</span></td>
+          <td><span class="code-badge">/flash</span></td>
+          <td><code>FlashSaleLandingPage</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Limited time countdown flash deals up to 80% off</td>
+        </tr>
+        <tr>
+          <td><strong>Reseller Home</strong></td>
+          <td><span class="action-badge">"Curated Spotlight"</span></td>
+          <td><span class="code-badge">/spotlight</span></td>
+          <td><code>CuratedSpotlight</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Influencer lookbooks and handpicked weekly bestsellers</td>
+        </tr>
+        <tr>
+          <td><strong>Reseller Home</strong></td>
+          <td><span class="action-badge">"Luxe Theme"</span></td>
+          <td><span class="code-badge">/luxe</span></td>
+          <td><code>HomeScreenFlutterLuxe</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Luxury boutique edition of the home experience</td>
+        </tr>
+        <tr>
+          <td><strong>Header Profile</strong></td>
+          <td><span class="action-badge">"My Dashboard"</span></td>
+          <td><span class="code-badge">/user-dashboard</span></td>
+          <td><code>UserWebDashboard</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Desktop-optimized multi-pane consumer overview</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

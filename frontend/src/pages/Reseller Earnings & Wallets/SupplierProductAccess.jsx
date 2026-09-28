@@ -433,8 +433,12 @@ const SUPPLIER_PRODUCTS = [
 
 const CATEGORIES = ['All', 'Women Ethnic', 'Western Wear', 'Gadgets', 'Electronics', 'Footwear', 'Home & Living'];
 
-export default function SupplierProductAccess() {
+export default function SupplierProductAccess({ onNavigate, onBack }) {
   const navigate = useNavigate();
+  const handleNav = (target) => {
+    if (onNavigate) onNavigate(target);
+    else navigate(target.startsWith('/') ? target : `/${target}`);
+  };
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [session, setSession] = useState(() => {
     try {
@@ -816,6 +820,14 @@ export default function SupplierProductAccess() {
           {/* Left: Menu & Brand Logo */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
+              onClick={() => (onBack ? onBack() : handleNav('/admin-panel'))}
+              aria-label="Back"
+              title="Back to Admin Panel"
+              className="p-1 sm:p-1.5 hover:bg-gray-100 rounded-xl transition cursor-pointer text-gray-700 active:scale-95 shrink-0 flex items-center justify-center"
+            >
+              <span className="material-symbols-outlined text-xl sm:text-2xl">arrow_back</span>
+            </button>
+            <button
               onClick={() => setIsDrawerOpen(true)}
               aria-label="Open Navigation Menu"
               className="p-1 sm:p-1.5 hover:bg-gray-100 rounded-xl transition cursor-pointer text-gray-700 active:scale-95 shrink-0"
@@ -885,6 +897,16 @@ export default function SupplierProductAccess() {
               </div>
               <span className="material-symbols-outlined text-xs text-purple-600 shrink-0">tune</span>
             </div>
+
+            {/* Back to Admin Console button */}
+            <button
+              onClick={() => handleNav('/admin-panel')}
+              title="Return to Admin Console"
+              className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer shrink-0"
+            >
+              <span className="material-symbols-outlined text-sm text-rose-400">shield_person</span>
+              <span>Admin Panel</span>
+            </button>
 
             {/* Logout Button */}
             <button

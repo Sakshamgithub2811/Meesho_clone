@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Module 3: Logistics & Driver Operations - Navigation Blueprint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #d97706;
+      --primary-gradient: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+      --bg: #ffffff;
+      --surface: #f8fafc;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --code-bg: #f1f5f9;
+      --code-text: #0284c7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: var(--text-main); line-height: 1.5; padding: 2rem 1rem; }
+    .page-container { max-width: 1100px; margin: 0 auto; background: #ffffff; border-radius: 1.25rem; box-shadow: 0 20px 40px -15px rgba(0,0,0,0.08); padding: 3rem; border: 1px solid var(--card-border); }
+    .print-bar { position: sticky; top: 1rem; z-index: 100; display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: #ffffff; padding: 1rem 1.75rem; border-radius: 1rem; margin-bottom: 2rem; }
+    .btn-save-pdf { background: var(--primary-gradient); color: #ffffff; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1rem; padding: 0.7rem 1.5rem; border-radius: 9999px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
+    .doc-header { text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 2rem; margin-bottom: 2.5rem; }
+    .badge { display: inline-block; padding: 0.35rem 1rem; background: #fef3c7; color: #b45309; border-radius: 9999px; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.75rem; }
+    h1 { font-family: 'Outfit', sans-serif; font-size: 2.3rem; font-weight: 900; color: #0f172a; margin-bottom: 0.5rem; }
+    .doc-subtitle { color: var(--text-muted); font-size: 1.05rem; max-width: 700px; margin: 0 auto; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2.5rem; }
+    .stat-box { background: #f8fafc; border: 1px solid var(--card-border); border-radius: 0.75rem; padding: 1.25rem 1rem; text-align: center; }
+    .stat-val { font-family: 'Outfit', sans-serif; font-size: 1.85rem; font-weight: 900; color: #d97706; }
+    .stat-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+    .flow-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 2rem; }
+    .flow-pill { background: #ffffff; border: 1px solid #cbd5e1; padding: 0.45rem 0.85rem; border-radius: 0.5rem; font-size: 0.82rem; font-weight: 700; font-family: 'Outfit', sans-serif; color: #0f172a; display: inline-flex; align-items: center; gap: 0.35rem; }
+    .flow-arrow { color: #d97706; font-weight: 900; font-size: 0.95rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 1rem; }
+    th { background: #f8fafc; color: #0f172a; text-align: left; padding: 0.8rem; font-family: 'Outfit', sans-serif; font-weight: 800; border-bottom: 2px solid #cbd5e1; }
+    td { padding: 0.8rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    tr:nth-child(even) td { background: #fafcff; }
+    .code-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; background: var(--code-bg); color: var(--code-text); padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-weight: 700; white-space: nowrap; }
+    .action-badge { display: inline-block; background: #fef3c7; color: #b45309; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 0.3rem; font-size: 0.78rem; }
+    .back-flow-badge { display: inline-block; background: #f0fdf4; color: #166534; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; }
+    @media print {
+      body { background: #ffffff !important; padding: 0 !important; color: #000000 !important; }
+      .page-container { max-width: 100% !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+      .print-bar { display: none !important; }
+      table { font-size: 8pt !important; }
+      th, td { padding: 4pt 6pt !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-container">
+    <div class="print-bar">
+      <div>
+        <strong style="font-size:1.1rem; display:block;">🛵 Module 3: Logistics &amp; Driver Fleet Operations</strong>
+        <span style="font-size:0.85rem; color:#94a3b8;">9 Screens • Page-to-Page Navigation Map</span>
+      </div>
+      <button class="btn-save-pdf" onclick="window.print()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+        </svg>
+        Save as PDF
+      </button>
+    </div>
+
+    <header class="doc-header">
+      <div class="badge">Module 3 Architecture</div>
+      <h1>Logistics, Fleet &amp; Driver Operations</h1>
+      <p class="doc-subtitle">
+        Warehouse packet fulfillment, proximity-based task dispatching, live GPS turn-by-turn navigation, customer OTP handoff verification, and rider earnings ledger.
+      </p>
+    </header>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val">9</div><div class="stat-label">Screens</div></div>
+      <div class="stat-box"><div class="stat-val">Live GPS</div><div class="stat-label">Map Routing</div></div>
+      <div class="stat-box"><div class="stat-val">Instant</div><div class="stat-label">OTP Verification</div></div>
+      <div class="stat-box"><div class="stat-val">100%</div><div class="stat-label">Route Connected</div></div>
+    </div>
+
+    <h2 style="font-family:'Outfit',sans-serif; font-size:1.2rem; margin-bottom:0.75rem; color:#0f172a;">🔄 Complete Rider Delivery Workflow</h2>
+    <div class="flow-chain">
+      <div class="flow-pill">🛵 Driver Home <span class="code-badge">/driver-dashboard</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">📦 Available Tasks <span class="code-badge">/available-tasks</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">📋 Order Details <span class="code-badge">/order-driver</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">🗺️ Live Delivery Map <span class="code-badge">/active-delivery</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">📜 Delivery History <span class="code-badge">/delivery-history</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">💰 Driver Earnings <span class="code-badge">/driver-earnings</span></div>
+    </div>
+
+    <h2 style="font-family:'Outfit',sans-serif; font-size:1.2rem; margin-bottom:0.75rem; color:#0f172a;">📑 Detailed Page-to-Page Navigation Table</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>From Screen</th>
+          <th>Trigger / Button Action</th>
+          <th>Target Route</th>
+          <th>Destination Component</th>
+          <th>Back / Return Target</th>
+          <th>Description &amp; Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Driver Dashboard</strong></td>
+          <td><span class="action-badge">"Find Pickups" / "New Tasks"</span></td>
+          <td><span class="code-badge">/available-tasks</span></td>
+          <td><code>AvailableTasks</code></td>
+          <td><span class="back-flow-badge">/driver-dashboard</span></td>
+          <td>List of nearby pending warehouse packages &amp; customer drops</td>
+        </tr>
+        <tr>
+          <td><strong>Available Tasks</strong></td>
+          <td><span class="action-badge">"Accept Task" / Click Order</span></td>
+          <td><span class="code-badge">/order-driver</span></td>
+          <td><code>OrderDetailsDriver</code></td>
+          <td><span class="back-flow-badge">/available-tasks</span></td>
+          <td>Customer contact, packet barcode, COD amount to collect</td>
+        </tr>
+        <tr>
+          <td><strong>Order Details Driver</strong></td>
+          <td><span class="action-badge">"Start Ride" / "Navigate"</span></td>
+          <td><span class="code-badge">/active-delivery</span></td>
+          <td><code>ActiveDeliveryMobile</code></td>
+          <td><span class="back-flow-badge">/order-driver</span></td>
+          <td>Turn-by-turn navigation map with customer OTP verification</td>
+        </tr>
+        <tr>
+          <td><strong>Driver Dashboard</strong></td>
+          <td><span class="action-badge">"Completed Trips"</span></td>
+          <td><span class="code-badge">/delivery-history</span></td>
+          <td><code>DeliveryHistoryMobile</code></td>
+          <td><span class="back-flow-badge">/driver-dashboard</span></td>
+          <td>Log of delivered orders with timestamps and signatures</td>
+        </tr>
+        <tr>
+          <td><strong>Driver Dashboard</strong></td>
+          <td><span class="action-badge">"My Earnings" / "Payouts"</span></td>
+          <td><span class="code-badge">/driver-earnings</span></td>
+          <td><code>DriverEarningsMobile</code></td>
+          <td><span class="back-flow-badge">/driver-dashboard</span></td>
+          <td>Daily incentives, distance bonus, weekly payout summary</td>
+        </tr>
+        <tr>
+          <td><strong>Logistics Switcher</strong></td>
+          <td><span class="action-badge">"Rider Express Mode"</span></td>
+          <td><span class="code-badge">/rider-express</span></td>
+          <td><code>RiderExpressDashboard</code></td>
+          <td><span class="back-flow-badge">/driver-dashboard</span></td>
+          <td>Ultra-fast 10-minute instant delivery logistics dashboard</td>
+        </tr>
+        <tr>
+          <td><strong>Logistics Switcher</strong></td>
+          <td><span class="action-badge">"Velocity Dispatch"</span></td>
+          <td><span class="code-badge">/meesho-velocity</span></td>
+          <td><code>MeeshoVelocity</code></td>
+          <td><span class="back-flow-badge">/driver-dashboard</span></td>
+          <td>AI-driven automated order batching &amp; hub sorting engine</td>
+        </tr>
+        <tr>
+          <td><strong>Logistics Switcher</strong></td>
+          <td><span class="action-badge">"AI Smart Route"</span></td>
+          <td><span class="code-badge">/swiftroute</span></td>
+          <td><code>SwiftRoute</code></td>
+          <td><span class="back-flow-badge">/driver-dashboard</span></td>
+          <td>Multi-drop route optimizer saving fuel and travel time</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

@@ -31,3 +31,6 @@ stitch_meesho_clone_design_prd/
 
 # Generated PDF flows
 pdf_navigation_flows/
+
+# Duplicate directory ignore
+frontend/frontend/

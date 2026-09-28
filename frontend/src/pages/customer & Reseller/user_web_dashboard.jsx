@@ -277,6 +277,13 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
         {/* Bottom Shortcuts */}
         <div className="pt-4 border-t border-slate-100 space-y-1">
           <button
+            onClick={() => handleNav('/admin-panel')}
+            className="w-full text-left rounded-2xl px-4 py-2.5 flex items-center space-x-3 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer text-xs font-bold"
+          >
+            <span className="material-symbols-outlined text-lg">admin_panel_settings</span>
+            <span>Admin Console</span>
+          </button>
+          <button
             onClick={() => onNavigate('reseller')}
             className="w-full text-left rounded-2xl px-4 py-2.5 flex items-center space-x-3 text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer text-xs font-bold"
           >
@@ -300,9 +307,10 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
               <button
-                onClick={() => (onBack ? onBack() : onNavigate('reseller'))}
-                className="lg:hidden p-1.5 -ml-1 hover:bg-slate-100 rounded-full text-slate-700 cursor-pointer shrink-0"
+                onClick={() => (onBack ? onBack() : handleNav('/admin-panel'))}
+                className="p-1.5 -ml-1 hover:bg-slate-100 rounded-full text-slate-700 cursor-pointer shrink-0 transition-colors flex items-center justify-center"
                 aria-label="Back"
+                title="Go back"
               >
                 <span className="material-symbols-outlined text-2xl">arrow_back</span>
               </button>
@@ -313,6 +321,14 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
 
             {/* Quick Actions, Wishlist, Notification & Profile */}
             <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              <button
+                onClick={() => handleNav('/admin-panel')}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-2 sm:py-2.5 rounded-2xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer shadow-sm"
+                title="Back to Admin Console"
+              >
+                <span className="material-symbols-outlined text-sm text-rose-400">admin_panel_settings</span>
+                <span>Admin Console</span>
+              </button>
               <button
                 onClick={() => handleNav('explorer')}
                 className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-gradient-to-r from-[#FF3F6C] to-[#b90041] text-white font-black text-xs sm:text-sm shadow-md shadow-pink-500/25 hover:opacity-95 hover:scale-105 active:scale-95 transition-all cursor-pointer"

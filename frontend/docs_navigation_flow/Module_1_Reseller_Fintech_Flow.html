@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Module 1: Reseller & Fintech Ecosystem - Navigation Blueprint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #9f0038;
+      --primary-gradient: linear-gradient(135deg, #9f0038 0%, #e11d48 100%);
+      --bg: #ffffff;
+      --surface: #f8fafc;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --code-bg: #f1f5f9;
+      --code-text: #0284c7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: var(--text-main); line-height: 1.5; padding: 2rem 1rem; }
+    .page-container { max-width: 1100px; margin: 0 auto; background: #ffffff; border-radius: 1.25rem; box-shadow: 0 20px 40px -15px rgba(0,0,0,0.08); padding: 3rem; border: 1px solid var(--card-border); }
+    .print-bar { position: sticky; top: 1rem; z-index: 100; display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: #ffffff; padding: 1rem 1.75rem; border-radius: 1rem; margin-bottom: 2rem; }
+    .btn-save-pdf { background: var(--primary-gradient); color: #ffffff; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1rem; padding: 0.7rem 1.5rem; border-radius: 9999px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
+    .doc-header { text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 2rem; margin-bottom: 2.5rem; }
+    .badge { display: inline-block; padding: 0.35rem 1rem; background: #ffe4e6; color: #9f0038; border-radius: 9999px; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.75rem; }
+    h1 { font-family: 'Outfit', sans-serif; font-size: 2.3rem; font-weight: 900; color: #0f172a; margin-bottom: 0.5rem; }
+    .doc-subtitle { color: var(--text-muted); font-size: 1.05rem; max-width: 700px; margin: 0 auto; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2.5rem; }
+    .stat-box { background: #f8fafc; border: 1px solid var(--card-border); border-radius: 0.75rem; padding: 1.25rem 1rem; text-align: center; }
+    .stat-val { font-family: 'Outfit', sans-serif; font-size: 1.85rem; font-weight: 900; color: #9f0038; }
+    .stat-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+    .flow-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 2rem; }
+    .flow-pill { background: #ffffff; border: 1px solid #cbd5e1; padding: 0.45rem 0.85rem; border-radius: 0.5rem; font-size: 0.82rem; font-weight: 700; font-family: 'Outfit', sans-serif; color: #0f172a; display: inline-flex; align-items: center; gap: 0.35rem; }
+    .flow-arrow { color: #e11d48; font-weight: 900; font-size: 0.95rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 1rem; }
+    th { background: #f8fafc; color: #0f172a; text-align: left; padding: 0.8rem; font-family: 'Outfit', sans-serif; font-weight: 800; border-bottom: 2px solid #cbd5e1; }
+    td { padding: 0.8rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    tr:nth-child(even) td { background: #fafcff; }
+    .code-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; background: var(--code-bg); color: var(--code-text); padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-weight: 700; white-space: nowrap; }
+    .action-badge { display: inline-block; background: #fff1f2; color: #e11d48; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 0.3rem; font-size: 0.78rem; }
+    .back-flow-badge { display: inline-block; background: #f0fdf4; color: #166534; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; }
+    @media print {
+      body { background: #ffffff !important; padding: 0 !important; color: #000000 !important; }
+      .page-container { max-width: 100% !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+      .print-bar { display: none !important; }
+      table { font-size: 8pt !important; }
+      th, td { padding: 4pt 6pt !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-container">
+    <div class="print-bar">
+      <div>
+        <strong style="font-size:1.1rem; display:block;">🛍️ Module 1: Reseller &amp; Fintech Flow Blueprint</strong>
+        <span style="font-size:0.85rem; color:#94a3b8;">18 Screens • Page-to-Page Navigation Map</span>
+      </div>
+      <button class="btn-save-pdf" onclick="window.print()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+        </svg>
+        Save as PDF
+      </button>
+    </div>
+
+    <header class="doc-header">
+      <div class="badge">Module 1 Architecture</div>
+      <h1>Reseller &amp; Fintech Ecosystem</h1>
+      <p class="doc-subtitle">
+        User authentication, zero-inventory catalog reselling, WhatsApp product sharing with custom profit margins, real-time commission tracking, fintech wallet, and UPI bank payouts.
+      </p>
+    </header>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val">18</div><div class="stat-label">Screens</div></div>
+      <div class="stat-box"><div class="stat-val">Zero</div><div class="stat-label">Investment Model</div></div>
+      <div class="stat-box"><div class="stat-val">Instant</div><div class="stat-label">UPI Withdrawals</div></div>
+      <div class="stat-box"><div class="stat-val">100%</div><div class="stat-label">Route Connected</div></div>
+    </div>
+
+    <h2 style="font-family:'Outfit',sans-serif; font-size:1.2rem; margin-bottom:0.75rem; color:#0f172a;">🔄 Complete Primary User Journey Flow</h2>
+    <div class="flow-chain">
+      <div class="flow-pill">🔐 Login <span class="code-badge">/</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">🛍️ Reseller Home <span class="code-badge">/reseller-home</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">🔗 Margin Config <span class="code-badge">/share-earn-config</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">💰 Resell &amp; Earn <span class="code-badge">/resell-earn</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">📈 Earnings <span class="code-badge">/earnings-dashboard-1</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">👛 Wallet <span class="code-badge">/my-wallet</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">🏦 Withdraw <span class="code-badge">/withdraw-earnings</span></div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-pill">✅ Receipt <span class="code-badge">/payout-confirmation</span></div>
+    </div>
+
+    <h2 style="font-family:'Outfit',sans-serif; font-size:1.2rem; margin-bottom:0.75rem; color:#0f172a;">📑 Detailed Page-to-Page Navigation Table</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>From Screen</th>
+          <th>Trigger / Button Action</th>
+          <th>Target Route</th>
+          <th>Destination Component</th>
+          <th>Back / Return Target</th>
+          <th>Description &amp; Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Login / Sign Up</strong></td>
+          <td><span class="action-badge">"Continue" / "Enter Catalog"</span></td>
+          <td><span class="code-badge">/reseller-home</span></td>
+          <td><code>HomeUserReseller</code></td>
+          <td><span class="back-flow-badge">-</span></td>
+          <td>Submits 10-digit mobile number or OTP to access reseller catalog</td>
+        </tr>
+        <tr>
+          <td><strong>Reseller Home</strong></td>
+          <td><span class="action-badge">"Share &amp; Earn" / Share Icon</span></td>
+          <td><span class="code-badge">/share-earn-config</span></td>
+          <td><code>ShareEarnConfig</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Configure custom resale margin before sharing to WhatsApp/socials</td>
+        </tr>
+        <tr>
+          <td><strong>Share &amp; Earn Config</strong></td>
+          <td><span class="action-badge">"Generate Link" / "Share"</span></td>
+          <td><span class="code-badge">/resell-earn</span></td>
+          <td><code>ResellEarn</code></td>
+          <td><span class="back-flow-badge">/share-earn-config</span></td>
+          <td>Live shared product tracker and customer link order stats</td>
+        </tr>
+        <tr>
+          <td><strong>Reseller Home</strong></td>
+          <td><span class="action-badge">Bottom Nav: "Earnings"</span></td>
+          <td><span class="code-badge">/earnings-dashboard-1</span></td>
+          <td><code>EarningsDashboard1</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Weekly earned margins, pending payouts, order stats</td>
+        </tr>
+        <tr>
+          <td><strong>Earnings Dashboard 1</strong></td>
+          <td><span class="action-badge">"Detailed Analytics"</span></td>
+          <td><span class="code-badge">/earnings-dashboard-2</span></td>
+          <td><code>EarningsDashboard2</code></td>
+          <td><span class="back-flow-badge">/earnings-dashboard-1</span></td>
+          <td>Conversion metrics, customer retention graphs and product leaderboards</td>
+        </tr>
+        <tr>
+          <td><strong>Earnings Dashboard 1</strong></td>
+          <td><span class="action-badge">"Open Wallet" / "Balance"</span></td>
+          <td><span class="code-badge">/my-wallet</span></td>
+          <td><code>MyWalletFintechStyle</code></td>
+          <td><span class="back-flow-badge">/earnings-dashboard-1</span></td>
+          <td>Available cash balance, cashback rewards, coins and bank linkage</td>
+        </tr>
+        <tr>
+          <td><strong>Earnings Dashboard</strong></td>
+          <td><span class="action-badge">"Reseller Wallet Mode"</span></td>
+          <td><span class="code-badge">/reseller-wallet</span></td>
+          <td><code>ResellerWallet</code></td>
+          <td><span class="back-flow-badge">/earnings-dashboard-1</span></td>
+          <td>Alternative reseller commission wallet view</td>
+        </tr>
+        <tr>
+          <td><strong>My Wallet</strong></td>
+          <td><span class="action-badge">"Withdraw Funds"</span></td>
+          <td><span class="code-badge">/withdraw-earnings</span></td>
+          <td><code>WithdrawEarnings</code></td>
+          <td><span class="back-flow-badge">/my-wallet</span></td>
+          <td>Choose bank account or UPI ID to initiate transfer</td>
+        </tr>
+        <tr>
+          <td><strong>Withdraw Earnings</strong></td>
+          <td><span class="action-badge">"Confirm Transfer"</span></td>
+          <td><span class="code-badge">/payout-confirmation</span></td>
+          <td><code>PayoutConfirmation</code></td>
+          <td><span class="back-flow-badge">/my-wallet</span></td>
+          <td>Transaction success receipt with reference ID</td>
+        </tr>
+        <tr>
+          <td><strong>My Wallet</strong></td>
+          <td><span class="action-badge">"Payout Settings"</span></td>
+          <td><span class="code-badge">/payout-settings</span></td>
+          <td><code>PayoutSettings</code></td>
+          <td><span class="back-flow-badge">/my-wallet</span></td>
+          <td>Manage bank accounts and UPI VPA IDs</td>
+        </tr>
+        <tr>
+          <td><strong>Reseller Home</strong></td>
+          <td><span class="action-badge">Bottom Nav: "Profile"</span></td>
+          <td><span class="code-badge">/refer-earn</span></td>
+          <td><code>ReferEarn</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Earn ₹250 per successful friend referral</td>
+        </tr>
+        <tr>
+          <td><strong>Refer &amp; Earn</strong></td>
+          <td><span class="action-badge">"Affiliate Program"</span></td>
+          <td><span class="code-badge">/affiliate-program</span></td>
+          <td><code>AffiliateProgram</code></td>
+          <td><span class="back-flow-badge">/refer-earn</span></td>
+          <td>Tiered commission structures and creator bonuses</td>
+        </tr>
+        <tr>
+          <td><strong>Affiliate Program</strong></td>
+          <td><span class="action-badge">"Open Affiliate Panel"</span></td>
+          <td><span class="code-badge">/affiliate-panel</span></td>
+          <td><code>AffiliateProgramPanel</code></td>
+          <td><span class="back-flow-badge">/affiliate-program</span></td>
+          <td>Custom affiliate link generator and royalty tracking</td>
+        </tr>
+        <tr>
+          <td><strong>Reseller Home</strong></td>
+          <td><span class="action-badge">"Community" Tab</span></td>
+          <td><span class="code-badge">/community-hub</span></td>
+          <td><code>CommunityHub</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Top reseller forums, discussions &amp; live masterclasses</td>
+        </tr>
+        <tr>
+          <td><strong>Community Hub</strong></td>
+          <td><span class="action-badge">"Chat with Reseller"</span></td>
+          <td><span class="code-badge">/conversation</span></td>
+          <td><code>ConversationScreen</code></td>
+          <td><span class="back-flow-badge">/community-hub</span></td>
+          <td>1-on-1 direct chat with top community sellers</td>
+        </tr>
+        <tr>
+          <td><strong>Reseller Home</strong></td>
+          <td><span class="action-badge">Chat Icon (Top Right)</span></td>
+          <td><span class="code-badge">/messenger</span></td>
+          <td><code>MeeshoMessengerChatHub</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>All customer messaging threads and inquiry logs</td>
+        </tr>
+        <tr>
+          <td><strong>Reseller Home</strong></td>
+          <td><span class="action-badge">Bell Icon (Top Right)</span></td>
+          <td><span class="code-badge">/notifications</span></td>
+          <td><code>NotificationCenter</code></td>
+          <td><span class="back-flow-badge">/reseller-home</span></td>
+          <td>Order updates, flash deal alerts, commission credited</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

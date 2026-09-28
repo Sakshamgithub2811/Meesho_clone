@@ -3,8 +3,12 @@ import { useNavigate } from "react-router-dom";
 import NavDrawer from "../../components/NavDrawer";
 import AppBottomNav from "../../components/AppBottomNav";
 
-const EarningsDashboard2 = () => {
+const EarningsDashboard2 = ({ onNavigate, onBack }) => {
   const navigate = useNavigate();
+  const handleNav = (target) => {
+    if (onNavigate) onNavigate(target);
+    else navigate(target.startsWith("/") ? target : `/${target}`);
+  };
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   return (
@@ -12,7 +16,16 @@ const EarningsDashboard2 = () => {
       {/* TopAppBar - Full Width across Desktop and Mobile */}
       <header className="bg-white dark:bg-slate-900 relative w-full shadow-sm dark:shadow-none border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center justify-between px-4 sm:px-6 md:px-10 lg:px-16 h-16 w-full">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => (onBack ? onBack() : handleNav("/admin-panel"))}
+              className="text-slate-700 dark:text-slate-300 hover:text-rose-600 active:scale-95 transition-transform cursor-pointer p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
+              aria-label="Back to Admin Panel"
+              title="Back to Admin Panel"
+            >
+              <span className="material-symbols-outlined text-2xl">arrow_back</span>
+            </button>
             <button
               type="button"
               onClick={() => setIsDrawerOpen(true)}
@@ -22,17 +35,28 @@ const EarningsDashboard2 = () => {
               <span className="material-symbols-outlined text-2xl">menu</span>
             </button>
             <h1 className="text-rose-600 dark:text-rose-400 font-extrabold tracking-tight font-headline text-lg sm:text-xl">
-              My Business
+              Earnings Dashboard
             </h1>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/notifications")}
-            className="text-slate-700 dark:text-slate-300 hover:text-rose-600 active:scale-95 transition-transform cursor-pointer p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
-            aria-label="Notifications"
-          >
-            <span className="material-symbols-outlined text-2xl">notifications</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleNav("/admin-panel")}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer"
+              title="Return to Admin Console"
+            >
+              <span className="material-symbols-outlined text-sm text-rose-400">admin_panel_settings</span>
+              <span>Admin Console</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/notifications")}
+              className="text-slate-700 dark:text-slate-300 hover:text-rose-600 active:scale-95 transition-transform cursor-pointer p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+              aria-label="Notifications"
+            >
+              <span className="material-symbols-outlined text-2xl">notifications</span>
+            </button>
+          </div>
         </div>
       </header>
 

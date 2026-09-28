@@ -112,7 +112,7 @@ const SUPPLIERS_DATA = [
   },
 ];
 
-export function PerformanceAnalyticsDashboardAdmin({ onNavigate }) {
+export function PerformanceAnalyticsDashboardAdmin({ onNavigate, onBack }) {
   const [timeframe, setTimeframe] = useState('30days');
   const [supplierSearch, setSupplierSearch] = useState('');
   const [toastMessage, setToastMessage] = useState(null);
@@ -155,17 +155,28 @@ export function PerformanceAnalyticsDashboardAdmin({ onNavigate }) {
       {/* TopAppBar */}
       <header className="sticky top-0 w-full z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xs font-['Plus_Jakarta_Sans',sans-serif]">
         <div className="flex justify-between items-center px-6 py-3 border-b border-slate-200/70">
-          <div className="flex items-center gap-8">
-            <div
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => onNavigate && onNavigate('dashboard')}
-            >
-              <span className="text-xl font-bold tracking-tight text-[#FF3F6C]">
-                Digital Curator Admin
-              </span>
-              <span className="text-[10px] bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full uppercase">
-                Analytics
-              </span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => (onBack ? onBack() : onNavigate ? onNavigate('/admin-panel') : window.history.back())}
+                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-700 cursor-pointer shrink-0 transition-colors flex items-center justify-center"
+                aria-label="Back to Admin Panel"
+                title="Back to Admin Panel"
+              >
+                <span className="material-symbols-outlined text-2xl">arrow_back</span>
+              </button>
+              <div
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => onNavigate && onNavigate('/admin-panel')}
+              >
+                <span className="text-xl font-bold tracking-tight text-[#FF3F6C]">
+                  Digital Curator Admin
+                </span>
+                <span className="text-[10px] bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full uppercase">
+                  Analytics
+                </span>
+              </div>
             </div>
 
             <div className="hidden md:flex items-center bg-slate-100 px-4 py-2 rounded-xl gap-2 w-80">
@@ -226,11 +237,11 @@ export function PerformanceAnalyticsDashboardAdmin({ onNavigate }) {
           <nav className="flex-1 space-y-1.5 px-2">
             <button
               type="button"
-              onClick={() => onNavigate && onNavigate('dashboard')}
+              onClick={() => onNavigate && onNavigate('/admin-panel')}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl hover:translate-x-1 transition-all cursor-pointer font-medium text-left"
             >
               <span className="material-symbols-outlined text-xl">dashboard</span>
-              <span>Dashboard</span>
+              <span>Overview Dashboard</span>
             </button>
 
             <button

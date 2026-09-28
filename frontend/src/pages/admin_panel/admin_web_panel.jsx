@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const INITIAL_VERIFICATIONS = [
   {
@@ -40,24 +41,27 @@ const SIDEBAR_NAV = [
       { id: 'affiliate-kyc', label: 'Affiliate KYC 🤝', icon: 'loyalty', path: '/admin-affiliate-kyc' },
     ],
   },
-  { id: 'products', label: 'Products', icon: 'inventory_2' },
+  { id: 'products', label: 'Products', icon: 'inventory_2', path: '/supplier-products' },
   { id: 'orders', label: 'Orders', icon: 'shopping_cart' },
   { id: 'returns', label: 'Returns & Refunds 🔄', icon: 'assignment_return' },
-  { id: 'analytics', label: 'Analytics', icon: 'insights' },
+  { id: 'analytics', label: 'Analytics', icon: 'insights', path: '/admin-analytics' },
   { id: 'wishlist', label: 'Wishlist', icon: 'favorite' },
-  { id: 'earnings', label: 'Earnings', icon: 'payments' },
-  { id: 'users', label: 'Users', icon: 'group' },
-  { id: 'sellers', label: 'Sellers', icon: 'storefront' },
+  { id: 'earnings', label: 'Earnings', icon: 'payments', path: '/earnings-dashboard-1' },
+  { id: 'users', label: 'Users', icon: 'group', path: '/user-dashboard' },
+  { id: 'sellers', label: 'Sellers', icon: 'storefront', path: '/seller-dashboard' },
   { id: 'finance', label: 'Finance', icon: 'account_balance' },
 ];
 
-export function AdminWebPanel({ onNavigate, onSwitchView }) {
+export function AdminWebPanel({ onNavigate, onSwitchView, onLogout }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeRange, setTimeRange] = useState('30days');
   const [verifications, setVerifications] = useState(INITIAL_VERIFICATIONS);
   const [toastMessage, setToastMessage] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isKycMenuOpen, setIsKycMenuOpen] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -74,6 +78,29 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
     }
   };
 
+  const handleLogout = () => {
+    setIsLoggingOut(true);
+    showToast('Admin logged out successfully. Redirecting...');
+    try {
+      localStorage.removeItem('meesho_admin_token');
+      localStorage.removeItem('meesho_admin_session');
+      localStorage.removeItem('admin_user');
+      localStorage.removeItem('isLoggedIn');
+      sessionStorage.clear();
+    } catch (e) {
+      console.error('Error during logout:', e);
+    }
+    setTimeout(() => {
+      if (onLogout) {
+        onLogout();
+      } else if (onNavigate) {
+        onNavigate('/login');
+      } else {
+        navigate('/login');
+      }
+    }, 450);
+  };
+
   return (
     <div className="bg-[#f8f9fb] text-[#191c1e] min-h-screen flex flex-col font-['Inter',sans-serif] antialiased">
       {/* Toast Alert */}
@@ -81,6 +108,48 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
         <div className="fixed top-20 right-6 z-50 bg-[#006a34] text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-bounce">
           <span className="material-symbols-outlined text-xl">verified</span>
           <span className="text-sm font-semibold">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined text-2xl">logout</span>
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-black text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">Log out of Admin Panel?</h3>
+              <p className="text-xs text-slate-500">You will need to sign in again to access administrative features.</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isLoggingOut}
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  handleLogout();
+                }}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-rose-600/20 flex items-center justify-center gap-1.5"
+              >
+                {isLoggingOut ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Logging out...</span>
+                  </>
+                ) : (
+                  <span>Yes, Log Out</span>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -210,6 +279,30 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
                           if (onNavigate) onNavigate('/admin-returns');
                           return;
                         }
+                        if (item.id === 'products') {
+                          if (onNavigate) onNavigate('/supplier-products');
+                          return;
+                        }
+                        if (item.id === 'analytics') {
+                          if (onNavigate) onNavigate('/admin-analytics');
+                          return;
+                        }
+                        if (item.id === 'earnings') {
+                          if (onNavigate) onNavigate('/earnings-dashboard-1');
+                          return;
+                        }
+                        if (item.id === 'users') {
+                          if (onNavigate) onNavigate('/user-dashboard');
+                          return;
+                        }
+                        if (item.id === 'sellers') {
+                          if (onNavigate) onNavigate('/seller-dashboard');
+                          return;
+                        }
+                        if (item.path) {
+                          if (onNavigate) onNavigate(item.path);
+                          return;
+                        }
                         setActiveTab(item.id);
                         if (onNavigate) onNavigate(item.id);
                       }}
@@ -232,12 +325,35 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
                 type="button"
                 onClick={() => {
                   setIsMobileMenuOpen(false);
+                  if (onNavigate) onNavigate('/admin-support');
+                }}
+                className="w-full py-2.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all"
+              >
+                <span className="material-symbols-outlined text-sm">support_agent</span>
+                <span>Admin Support Desk</span>
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
                   if (onNavigate) onNavigate('/admin-returns');
                 }}
                 className="w-full py-2.5 bg-rose-600 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <span>Open Returns &amp; SPF Hub</span>
                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setShowLogoutModal(true);
+                }}
+                className="w-full py-2.5 bg-slate-850 hover:bg-slate-800 text-rose-400 border border-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">logout</span>
+                <span>Logout</span>
               </button>
             </div>
           </div>
@@ -327,6 +443,30 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
                       if (onNavigate) onNavigate('/admin-returns');
                       return;
                     }
+                    if (item.id === 'products') {
+                      if (onNavigate) onNavigate('/supplier-products');
+                      return;
+                    }
+                    if (item.id === 'analytics') {
+                      if (onNavigate) onNavigate('/admin-analytics');
+                      return;
+                    }
+                    if (item.id === 'earnings') {
+                      if (onNavigate) onNavigate('/earnings-dashboard-1');
+                      return;
+                    }
+                    if (item.id === 'users') {
+                      if (onNavigate) onNavigate('/user-dashboard');
+                      return;
+                    }
+                    if (item.id === 'sellers') {
+                      if (onNavigate) onNavigate('/seller-dashboard');
+                      return;
+                    }
+                    if (item.path) {
+                      if (onNavigate) onNavigate(item.path);
+                      return;
+                    }
                     setActiveTab(item.id);
                     if (onNavigate) onNavigate(item.id);
                   }}
@@ -354,16 +494,16 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
             <div className="space-y-1">
               <button
                 type="button"
-                onClick={() => showToast('Opening Admin Support Desk...')}
-                className="w-full flex items-center px-4 py-2 text-slate-400 hover:text-slate-600 transition-colors text-sm font-semibold cursor-pointer rounded-lg text-left"
+                onClick={() => (onNavigate ? onNavigate('/admin-support') : showToast('Opening Admin Support Desk...'))}
+                className="w-full flex items-center px-4 py-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-900 transition-colors text-sm font-semibold cursor-pointer rounded-lg text-left"
               >
-                <span className="material-symbols-outlined mr-3 text-lg">help</span>
-                Support
+                <span className="material-symbols-outlined mr-3 text-lg">support_agent</span>
+                Support Desk
               </button>
               <button
                 type="button"
-                onClick={() => showToast('Admin logged out.')}
-                className="w-full flex items-center px-4 py-2 text-slate-400 hover:text-slate-600 transition-colors text-sm font-semibold cursor-pointer rounded-lg text-left"
+                onClick={() => setShowLogoutModal(true)}
+                className="w-full flex items-center px-4 py-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-900 transition-colors text-sm font-semibold cursor-pointer rounded-lg text-left"
               >
                 <span className="material-symbols-outlined mr-3 text-lg">logout</span>
                 Logout
@@ -385,7 +525,7 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
               </p>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div className="bg-[#e7e8ea] rounded-full px-4 py-2 flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                 <span className="text-xs font-bold text-slate-700">Live Environment</span>
@@ -398,19 +538,40 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
               >
                 <span className="material-symbols-outlined">notifications</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(true)}
+                title="Log out of Admin Panel"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">logout</span>
+                <span className="hidden sm:inline">Logout</span>
+              </button>
             </div>
           </header>
 
           {/* Bento Grid: Platform Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
             {/* Active Users */}
-            <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-100 relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div
+              onClick={() => onNavigate && onNavigate('/user-dashboard')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && onNavigate && onNavigate('/user-dashboard')}
+              className="bg-white p-6 rounded-2xl shadow-xs border border-slate-100 relative overflow-hidden group hover:shadow-md hover:border-rose-200 transition-all cursor-pointer"
+              title="Click to view User Profile & Dashboard"
+            >
               <div className="absolute -right-2 -top-2 opacity-5 transition-transform group-hover:scale-110 duration-500 pointer-events-none">
                 <span className="material-symbols-outlined text-8xl">group</span>
               </div>
-              <p className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">
-                Active Users
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Active Users
+                </p>
+                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full flex items-center gap-0.5 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                  View Profile <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                </span>
+              </div>
               <div className="flex items-end gap-2">
                 <h3 className="text-3xl font-black text-[#191c1e] font-['Plus_Jakarta_Sans',sans-serif]">
                   1.2M
@@ -423,13 +584,25 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
             </div>
 
             {/* Verified Sellers */}
-            <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-100 relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div
+              onClick={() => onNavigate && onNavigate('/seller-dashboard')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && onNavigate && onNavigate('/seller-dashboard')}
+              className="bg-white p-6 rounded-2xl shadow-xs border border-slate-100 relative overflow-hidden group hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer"
+              title="Click to view Seller Dashboard"
+            >
               <div className="absolute -right-2 -top-2 opacity-5 transition-transform group-hover:scale-110 duration-500 pointer-events-none">
                 <span className="material-symbols-outlined text-8xl">verified</span>
               </div>
-              <p className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">
-                Verified Sellers
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Verified Sellers
+                </p>
+                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full flex items-center gap-0.5 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  View Sellers <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                </span>
+              </div>
               <div className="flex items-end gap-2">
                 <h3 className="text-3xl font-black text-[#191c1e] font-['Plus_Jakarta_Sans',sans-serif]">
                   42.5K
@@ -442,13 +615,25 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
             </div>
 
             {/* Total GMV */}
-            <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-100 relative overflow-hidden group hover:shadow-md transition-shadow">
+            <div
+              onClick={() => onNavigate && onNavigate('/earnings-dashboard-1')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && onNavigate && onNavigate('/earnings-dashboard-1')}
+              className="bg-white p-6 rounded-2xl shadow-xs border border-slate-100 relative overflow-hidden group hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer"
+              title="Click to view Earnings Dashboard"
+            >
               <div className="absolute -right-2 -top-2 opacity-5 transition-transform group-hover:scale-110 duration-500 pointer-events-none">
                 <span className="material-symbols-outlined text-8xl">account_balance_wallet</span>
               </div>
-              <p className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">
-                Total GMV (MTD)
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Total GMV (MTD)
+                </p>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-0.5 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                  View Earnings <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                </span>
+              </div>
               <div className="flex items-end gap-2">
                 <h3 className="text-3xl font-black text-[#191c1e] font-['Plus_Jakarta_Sans',sans-serif]">
                   $8.4M
@@ -527,14 +712,25 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
                     {timeRange === '30days' ? '30 days' : '6 months'}.
                   </p>
                 </div>
-                <select
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value)}
-                  className="bg-[#f2f4f6] text-xs font-bold text-slate-700 rounded-lg px-3 py-2 border-none outline-none cursor-pointer"
-                >
-                  <option value="30days">Last 30 Days</option>
-                  <option value="6months">Last 6 Months</option>
-                </select>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate && onNavigate('/admin-analytics')}
+                    className="text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Open Detailed Performance Analytics Dashboard"
+                  >
+                    <span>Full Analytics</span>
+                    <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                  </button>
+                  <select
+                    value={timeRange}
+                    onChange={(e) => setTimeRange(e.target.value)}
+                    className="bg-[#f2f4f6] text-xs font-bold text-slate-700 rounded-lg px-3 py-2 border-none outline-none cursor-pointer"
+                  >
+                    <option value="30days">Last 30 Days</option>
+                    <option value="6months">Last 6 Months</option>
+                  </select>
+                </div>
               </div>
 
               {/* Minimalist SVG Trend Chart */}
@@ -602,10 +798,17 @@ export function AdminWebPanel({ onNavigate, onSwitchView }) {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-xs text-slate-400 font-bold">Active Support Tickets</span>
-                    <span className="text-xs text-rose-400 font-bold">14 Urgent</span>
+                <div
+                  onClick={() => onNavigate && onNavigate('/admin-support')}
+                  className="pt-4 border-t border-slate-800 cursor-pointer group hover:bg-slate-900/60 p-2.5 -mx-1 rounded-xl transition-all"
+                  title="Click to open Admin Support Desk"
+                >
+                  <div className="flex justify-between mb-2 items-center">
+                    <span className="text-xs text-slate-400 font-bold group-hover:text-rose-300 transition-colors flex items-center gap-1.5">
+                      <span>Active Support Tickets</span>
+                      <span className="material-symbols-outlined text-xs group-hover:translate-x-0.5 transition-transform">open_in_new</span>
+                    </span>
+                    <span className="text-xs text-rose-400 font-bold bg-rose-500/20 px-2 py-0.5 rounded-full border border-rose-500/30">14 Urgent</span>
                   </div>
                   <div className="flex gap-1.5">
                     <div className="h-2 flex-1 rounded-full bg-rose-500"></div>
