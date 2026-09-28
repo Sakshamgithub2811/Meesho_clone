@@ -228,7 +228,7 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
               { id: affiliateNavTitle, icon: affiliateNavIcon, badge: affiliateNavBadge, action: () => handleNav(affiliateApp ? '/affiliate-kyc-status' : 'affiliate-kyc'), highlight: !affiliateApp || affiliateNavBadge === 'REVIEW' },
               { id: dropshipperNavTitle, icon: dropshipperNavIcon, badge: dropshipperNavBadge, action: () => handleNav('/dropshipper-register') },
               { id: 'Products', icon: 'inventory_2', action: () => handleNav('explorer') },
-              { id: 'Orders', icon: 'shopping_cart', action: () => handleNav('cart') },
+              { id: 'Orders', icon: 'shopping_bag', action: () => handleNav('/orders') },
               { id: 'Wishlist', icon: 'favorite', action: () => handleNav('wishlist') },
               { id: 'Sarees Store', icon: 'styler', action: () => handleNav('sarees') },
               { id: 'Flash Drops', icon: 'bolt', action: () => handleNav('flash') },
@@ -652,7 +652,7 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
         {/* Stats Bento Grid */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div
-            onClick={() => onNavigate('cart')}
+            onClick={() => handleNav('/orders')}
             className="bg-white p-3.5 sm:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between cursor-pointer hover:border-pink-300 transition-all group"
           >
             <div className="flex items-center justify-between mb-3">
@@ -670,7 +670,7 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
           </div>
 
           <div
-            onClick={() => onNavigate('cart')}
+            onClick={() => handleNav('/orders')}
             className="bg-white p-3.5 sm:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between cursor-pointer hover:border-indigo-300 transition-all group"
           >
             <div className="flex items-center justify-between mb-3">
@@ -782,10 +782,10 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <h2 className="text-base font-extrabold text-[#191c1e]">Recent Reseller Orders</h2>
               <button
-                onClick={() => onNavigate('cart')}
+                onClick={() => handleNav('/orders')}
                 className="text-xs font-bold text-[#4d41df] hover:underline cursor-pointer"
               >
-                View Full Cart / Orders ➔
+                View All Orders ➔
               </button>
             </div>
 
