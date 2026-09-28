@@ -478,8 +478,8 @@ function AppRoutes() {
   const handleNav = (pathOrId) => {
     const routeMap = {
       // Customer
-      reseller: '/',
-      home: '/',
+      reseller: '/reseller-home',
+      home: '/reseller-home',
       cart: '/cart',
       wishlist: '/wishlist',
       checkout: '/address',
@@ -497,6 +497,11 @@ function AppRoutes() {
       flash: '/flash',
       luxe: '/luxe',
       user_dashboard: '/user-dashboard',
+      'user-dashboard': '/user-dashboard',
+      '/user-dashboard': '/user-dashboard',
+      dashboard: '/user-dashboard',
+      'user-web-dashboard': '/user-dashboard',
+      userWebDashboard: '/user-dashboard',
       orders: '/orders',
       'my-orders': '/orders',
       return_request: '/return-request',
@@ -667,6 +672,8 @@ function AppRoutes() {
         <Route path="/reviews" element={<RatingsReviews onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/write-review" element={<WriteAReview onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/user-dashboard" element={<UserWebDashboard onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/user_dashboard" element={<UserWebDashboard onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/dashboard" element={<UserWebDashboard onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/orders" element={<CustomerOrders onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/return-request" element={<ReturnRequest onNavigate={handleNav} onBack={handleBack} />} />
 

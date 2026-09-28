@@ -311,8 +311,17 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
               </h1>
             </div>
 
-            {/* Quick Profile & Notification Icons */}
+            {/* Quick Actions, Wishlist, Notification & Profile */}
             <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              <button
+                onClick={() => handleNav('explorer')}
+                className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-gradient-to-r from-[#FF3F6C] to-[#b90041] text-white font-black text-xs sm:text-sm shadow-md shadow-pink-500/25 hover:opacity-95 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                title="Find Products"
+              >
+                <span className="material-symbols-outlined text-base sm:text-lg">add_shopping_cart</span>
+                <span>Find Products</span>
+              </button>
+
               <button
                 onClick={() => onNavigate('wishlist')}
                 className="p-2 sm:p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -341,92 +350,6 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
             <p className="text-[#b90041] font-bold text-xs md:text-sm">
               You have earned <span className="underline">₹4,250</span> in reseller margins this month.
             </p>
-
-            {/* Header Action CTAs */}
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
-              {/* Affiliate Action CTA */}
-              <button
-                onClick={() => handleNav(affiliateApp ? '/affiliate-kyc-status' : 'affiliate-kyc')}
-                className={`w-full sm:w-auto min-h-[38px] flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer ${
-                  affiliateApp?.status === 'Approved' || affiliateApp?.status === 'APPROVED'
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
-                    : affiliateApp?.status === 'Rejected' || affiliateApp?.status === 'REJECTED'
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
-                    : affiliateApp?.status === 'Under Review' || affiliateApp?.status === 'Pending' || affiliateApp?.status === 'PENDING_ADMIN_APPROVAL' || affiliateApp?.status === 'Pending Review'
-                    ? 'bg-gradient-to-r from-[#FF3F6C] to-[#b90041] hover:opacity-95 text-white shadow-pink-500/20'
-                    : 'bg-gradient-to-r from-[#FF3F6C] to-[#b90041] hover:opacity-95 text-white shadow-pink-500/20'
-                }`}
-                title={
-                  affiliateApp?.status === 'Approved' || affiliateApp?.status === 'APPROVED'
-                    ? 'Affiliate Partner Approved'
-                    : affiliateApp?.status === 'Under Review' || affiliateApp?.status === 'Pending' || affiliateApp?.status === 'PENDING_ADMIN_APPROVAL' || affiliateApp?.status === 'Pending Review'
-                    ? 'Affiliate KYC Under Review'
-                    : affiliateApp?.status === 'Rejected' || affiliateApp?.status === 'REJECTED'
-                    ? 'Affiliate KYC Action Needed'
-                    : 'Become an Affiliate & Submit KYC'
-                }
-              >
-                <span className="material-symbols-outlined text-base">
-                  {affiliateApp?.status === 'Approved' || affiliateApp?.status === 'APPROVED'
-                    ? 'verified'
-                    : affiliateApp?.status === 'Rejected' || affiliateApp?.status === 'REJECTED'
-                    ? 'warning'
-                    : affiliateApp?.status === 'Under Review' || affiliateApp?.status === 'Pending' || affiliateApp?.status === 'PENDING_ADMIN_APPROVAL' || affiliateApp?.status === 'Pending Review'
-                    ? 'hourglass_top'
-                    : 'loyalty'}
-                </span>
-                <span>
-                  {affiliateApp?.status === 'Approved' || affiliateApp?.status === 'APPROVED'
-                    ? 'Affiliate Approved ✓'
-                    : affiliateApp?.status === 'Rejected' || affiliateApp?.status === 'REJECTED'
-                    ? 'Affiliate KYC Action ⚠️'
-                    : affiliateApp?.status === 'Under Review' || affiliateApp?.status === 'Pending' || affiliateApp?.status === 'PENDING_ADMIN_APPROVAL' || affiliateApp?.status === 'Pending Review'
-                    ? 'Affiliate KYC In Review ⏳'
-                    : 'Become an Affiliate'}
-                </span>
-              </button>
-
-              {/* Dropshipper Action CTA */}
-              <button
-                onClick={() => handleNav('/dropshipper-register')}
-                className={`w-full sm:w-auto min-h-[38px] flex items-center justify-center gap-1.5 px-4 py-2 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer ${
-                  dropshipperApp?.status === 'Approved'
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
-                    : dropshipperApp?.status === 'Rejected'
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
-                    : dropshipperApp?.status === 'Under Review' || dropshipperApp?.status === 'Pending Review'
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20'
-                    : 'bg-gradient-to-r from-[#b90041] to-[#df2457] hover:opacity-95 text-white shadow-pink-500/20'
-                }`}
-              >
-                <span className="material-symbols-outlined text-base">
-                  {dropshipperApp?.status === 'Approved'
-                    ? 'verified'
-                    : dropshipperApp?.status === 'Rejected'
-                    ? 'warning'
-                    : dropshipperApp?.status === 'Under Review' || dropshipperApp?.status === 'Pending Review'
-                    ? 'hourglass_top'
-                    : 'rocket_launch'}
-                </span>
-                <span>
-                  {dropshipperApp?.status === 'Approved'
-                    ? 'Dropshipper Approved ✓'
-                    : dropshipperApp?.status === 'Rejected'
-                    ? 'KYC Action Needed ⚠️'
-                    : dropshipperApp?.status === 'Under Review' || dropshipperApp?.status === 'Pending Review'
-                    ? 'KYC In Review ⏳'
-                    : 'Become a Dropshipper'}
-                </span>
-              </button>
-
-              <button
-                onClick={() => handleNav('explorer')}
-                className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-pink-50 text-[#b90041] font-bold text-xs hover:bg-pink-100 transition-colors cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
-                <span>Find Products</span>
-              </button>
-            </div>
           </div>
         </header>
 
@@ -516,29 +439,60 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
             </div>
           </section>
         ) : (
-          <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-[#8a0030] to-[#b90041] p-4 sm:p-7 text-white shadow-xl shadow-rose-950/10 border border-rose-900/40">
-            <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-              <div className="space-y-2 max-w-2xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-bold text-rose-200 border border-white/15 max-w-full">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-                  <span className="truncate">Dropshipping Model • 0 Inventory Needed</span>
+          <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#17051d] via-[#4a0827] to-[#990038] p-5 sm:p-7 text-white shadow-2xl shadow-rose-950/25 border border-rose-500/30 ring-1 ring-white/10 group transition-all duration-300 hover:border-rose-400/50">
+            {/* Ambient Multi-layer Mesh Glow */}
+            <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-80 h-80 bg-gradient-to-br from-[#FF3F6C]/25 to-rose-600/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute left-1/3 bottom-0 -translate-y-2 w-48 h-48 bg-purple-600/15 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none opacity-40" />
+
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+              <div className="space-y-3 max-w-2xl">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-black text-rose-200 border border-white/20 shadow-xs">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                  </span>
+                  <span className="tracking-wider uppercase text-[10px]">Dropshipping Engine • 0 Inventory &amp; Capital</span>
                 </div>
-                <h2 className="text-lg sm:text-2xl lg:text-3xl font-black tracking-tight leading-snug sm:leading-tight font-['Plus_Jakarta_Sans',sans-serif]">
-                  Launch Your Connected Dropshipping Store 🚀
+
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight leading-tight font-['Plus_Jakarta_Sans',sans-serif]">
+                  Launch Your Connected Dropshipping Store <span className="inline-block animate-bounce text-2xl sm:text-3xl">🚀</span>
                 </h2>
+
                 <p className="text-xs sm:text-sm text-slate-200 font-medium leading-relaxed">
-                  Connect your website (Shopify, WooCommerce or Custom Domain), sync supplier products with 1-click, and let suppliers pack &amp; deliver directly to your customers with white-label branding.
+                  Connect your storefront (Shopify, WooCommerce or Custom Domain), sync supplier products with 1-click, and let verified suppliers pack &amp; deliver directly to your customers with white-label branding.
                 </p>
+
+                {/* Micro-feature value badges */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/25 backdrop-blur-md border border-white/15 text-[11px] font-bold text-slate-200">
+                    <span className="material-symbols-outlined text-sm text-emerald-400">verified</span>
+                    <span>100% White-Label Packaging</span>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/25 backdrop-blur-md border border-white/15 text-[11px] font-bold text-slate-200">
+                    <span className="material-symbols-outlined text-sm text-amber-300">sync_saved_locally</span>
+                    <span>1-Click Catalog Auto-Sync</span>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/25 backdrop-blur-md border border-white/15 text-[11px] font-bold text-slate-200">
+                    <span className="material-symbols-outlined text-sm text-pink-300">local_shipping</span>
+                    <span>Direct Doorstep Delivery</span>
+                  </div>
+                </div>
               </div>
+
               <div className="flex flex-wrap items-center gap-3 shrink-0 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => handleNav('/dropshipper-register')}
-                  className="w-full sm:w-auto min-h-[44px] px-5 py-3 rounded-2xl bg-white text-[#b90041] hover:bg-rose-50 font-black text-xs sm:text-sm shadow-lg shadow-black/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto min-h-[48px] px-6 py-3.5 rounded-2xl bg-white text-[#990038] hover:bg-rose-50 font-black text-xs sm:text-sm shadow-xl shadow-black/25 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer group"
                 >
-                  <span className="material-symbols-outlined text-lg">rocket_launch</span>
+                  <span className="material-symbols-outlined text-xl text-[#b90041] group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform">
+                    rocket_launch
+                  </span>
                   <span>Become a Dropshipper</span>
+                  <span className="material-symbols-outlined text-base opacity-60 group-hover:translate-x-1 transition-transform">
+                    arrow_forward
+                  </span>
                 </button>
               </div>
             </div>
@@ -631,33 +585,67 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
             </div>
           </section>
         ) : (
-          <section className="rounded-3xl bg-gradient-to-r from-[#1c1724] via-[#2a1727] to-[#120e18] p-5 sm:p-6 text-white border border-pink-500/20 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#FF3F6C] to-[#b90041] text-white flex items-center justify-center shrink-0 shadow-lg shadow-[#FF3F6C]/30">
-                <span className="material-symbols-outlined text-2xl">loyalty</span>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="font-['Plus_Jakarta_Sans'] font-extrabold text-base sm:text-lg text-white">
-                    Become an Affiliate
-                  </h2>
-                  <span className="bg-[#FF3F6C] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
-                    Earn Commission
-                  </span>
+          <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#170a26] via-[#320a2b] to-[#6e0034] p-5 sm:p-7 text-white shadow-2xl shadow-pink-950/20 border border-pink-500/30 ring-1 ring-white/10 group transition-all duration-300 hover:border-pink-400/50">
+            {/* Ambient Multi-layer Mesh Glow */}
+            <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-80 h-80 bg-gradient-to-br from-[#FF3F6C]/25 to-pink-600/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute left-1/4 bottom-0 -translate-y-2 w-48 h-48 bg-purple-600/15 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none opacity-40" />
+
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4.5 max-w-2xl">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-gradient-to-tr from-[#FF3F6C] via-[#df2457] to-[#b90041] text-white flex items-center justify-center shrink-0 shadow-xl shadow-[#FF3F6C]/35 ring-4 ring-white/10 group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-2xl sm:text-3xl text-white">loyalty</span>
                 </div>
-                <p className="text-slate-300 text-xs mt-0.5 max-w-xl">
-                  Submit your KYC details for Admin verification and approval. Once approved by Admin, start earning commissions on every order!
-                </p>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="bg-gradient-to-r from-pink-500/30 to-rose-500/20 border border-pink-400/40 text-pink-200 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full backdrop-blur-sm">
+                      High Commission Partner
+                    </span>
+                    <span className="bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1 backdrop-blur-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Earn up to 15% Payout
+                    </span>
+                  </div>
+
+                  <h3 className="font-['Plus_Jakarta_Sans'] font-black text-lg sm:text-2xl text-white tracking-tight leading-snug">
+                    Become an Affiliate Partner <span className="text-pink-300 font-normal">✦</span>
+                  </h3>
+
+                  <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed">
+                    Submit your KYC details for fast-track Admin verification. Once approved, share curated Meesho product referral links and earn guaranteed commissions directly into your bank account!
+                  </p>
+
+                  {/* Micro-feature value badges */}
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/25 backdrop-blur-md border border-white/15 text-[11px] font-bold text-slate-200">
+                      <span className="material-symbols-outlined text-sm text-pink-300">payments</span>
+                      <span>Weekly Direct Bank Payouts</span>
+                    </div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/25 backdrop-blur-md border border-white/15 text-[11px] font-bold text-slate-200">
+                      <span className="material-symbols-outlined text-sm text-amber-300">link</span>
+                      <span>Instant Referral Link Hub</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 shrink-0 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => handleNav('affiliate-kyc')}
+                  className="w-full sm:w-auto min-h-[48px] px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#FF3F6C] via-[#ea1d5d] to-[#b90041] hover:brightness-110 text-white font-black text-xs sm:text-sm shadow-xl shadow-[#FF3F6C]/35 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0 border border-white/20 group"
+                >
+                  <span className="material-symbols-outlined text-lg group-hover:scale-110 transition-transform">
+                    how_to_reg
+                  </span>
+                  <span>Become an Affiliate</span>
+                  <span className="material-symbols-outlined text-base opacity-70 group-hover:translate-x-1 transition-transform">
+                    arrow_forward
+                  </span>
+                </button>
               </div>
             </div>
-
-            <button
-              onClick={() => handleNav('affiliate-kyc')}
-              className="w-full sm:w-auto bg-gradient-to-r from-[#FF3F6C] to-[#b90041] hover:opacity-95 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-[#FF3F6C]/30 transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 shrink-0"
-            >
-              <span className="material-symbols-outlined text-base">how_to_reg</span>
-              <span>Become an Affiliate</span>
-            </button>
           </section>
         )}
 

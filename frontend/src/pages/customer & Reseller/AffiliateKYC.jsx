@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
+import BankAutocompleteSelect from '../../components/BankAutocompleteSelect';
 import { getAffiliateApp, saveAffiliateApp } from '../../services/affiliateSessionStore';
 
 export default function AffiliateKYC({ onNavigate, onBack }) {
@@ -8,14 +9,31 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
   const location = useLocation();
 
   const handleGoBack = () => {
-    if (onBack) onBack();
-    else if (onNavigate) onNavigate('user-dashboard');
-    else navigate('/user-dashboard');
+    if (onNavigate) {
+      try {
+        onNavigate('/user-dashboard');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    navigate('/user-dashboard');
+    if (window.location.pathname !== '/user-dashboard') {
+      window.location.href = '/user-dashboard';
+    }
   };
 
   const handleGoHome = () => {
-    if (onNavigate) onNavigate('user-dashboard');
-    else navigate('/user-dashboard');
+    if (onNavigate) {
+      try {
+        onNavigate('/user-dashboard');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    navigate('/user-dashboard');
+    if (window.location.pathname !== '/user-dashboard') {
+      window.location.href = '/user-dashboard';
+    }
   };
 
   // Step state: 1: Personal, 2: Govt ID, 3: Bank Details, 4: Review & Declarations
@@ -908,21 +926,19 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Bank Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. HDFC Bank / State Bank of India"
-                      value={formData.bankName}
-                      onChange={(e) => handleInputChange('bankName', e.target.value)}
-                      className={`w-full px-3.5 py-2.5 rounded-xl border text-xs bg-slate-50/50 focus:bg-white focus:outline-none transition-colors ${
-                        errors.bankName ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:border-[#FF3F6C]'
-                      }`}
-                    />
-                    {errors.bankName && <p className="text-[10px] text-red-500 mt-1">{errors.bankName}</p>}
-                  </div>
+                  <BankAutocompleteSelect
+                    label="Bank Name"
+                    required
+                    value={formData.bankName}
+                    onChange={(val) => handleInputChange('bankName', val)}
+                    onSelectBank={(bank) => {
+                      if (!formData.ifscCode && bank.code) {
+                        handleInputChange('ifscCode', bank.code);
+                      }
+                    }}
+                    error={errors.bankName}
+                    placeholder="Search or type bank (e.g. HDFC, SBI, ICICI)"
+                  />
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">

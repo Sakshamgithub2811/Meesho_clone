@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
+import BankAutocompleteSelect from '../../components/BankAutocompleteSelect';
 
 export default function PayoutSettings() {
   const navigate = useNavigate();
@@ -243,17 +244,18 @@ export default function PayoutSettings() {
               </button>
             </div>
             <form onSubmit={handleSaveBank} className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">Bank Name</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. State Bank of India"
-                  value={newBank.bankName}
-                  onChange={(e) => setNewBank(prev => ({ ...prev, bankName: e.target.value }))}
-                  className="w-full mt-1 p-3 bg-surface-container-low border border-gray-200 rounded-xl text-sm outline-none focus:border-primary transition-colors"
-                />
-              </div>
+              <BankAutocompleteSelect
+                label="Bank Name"
+                required
+                value={newBank.bankName}
+                onChange={(val) => setNewBank(prev => ({ ...prev, bankName: val }))}
+                onSelectBank={(bank) => {
+                  if (!newBank.ifsc && bank.code) {
+                    setNewBank(prev => ({ ...prev, ifsc: bank.code }));
+                  }
+                }}
+                placeholder="Search or select bank (e.g. HDFC, SBI, ICICI)"
+              />
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase">Account Number</label>
                 <input

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
+import BankAutocompleteSelect from '../../components/BankAutocompleteSelect';
 import { getDropshipperApp, saveDropshipperApp, subscribeDropshipperApp } from '../../services/dropshipperSessionStore';
 
 export default function DropshipperKYCRegister({ onNavigate = () => {}, onBack }) {
@@ -1302,18 +1303,18 @@ export default function DropshipperKYCRegister({ onNavigate = () => {}, onBack }
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Bank Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.bankName}
-                    onChange={(e) => handleInputChange('bankName', e.target.value)}
-                    placeholder="e.g. HDFC Bank, SBI, ICICI"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#b90041]/20 focus:border-[#b90041] outline-none transition-all"
-                  />
-                </div>
+                <BankAutocompleteSelect
+                  label="Bank Name"
+                  required
+                  value={formData.bankName}
+                  onChange={(val) => handleInputChange('bankName', val)}
+                  onSelectBank={(bank) => {
+                    if (!formData.ifscCode && bank.code) {
+                      handleInputChange('ifscCode', bank.code);
+                    }
+                  }}
+                  placeholder="Search or type bank (e.g. HDFC, SBI, ICICI)"
+                />
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">

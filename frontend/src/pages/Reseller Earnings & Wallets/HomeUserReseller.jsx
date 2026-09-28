@@ -150,7 +150,7 @@ export default function HomeUserReseller() {
               <span className="material-symbols-outlined text-2xl">menu</span>
             </button>
             <span 
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/reseller-home')}
               className="text-base sm:text-xl md:text-2xl font-black text-[#FF3F6C] font-headline tracking-tight cursor-pointer whitespace-nowrap"
             >
               The Digital Curator
@@ -174,7 +174,7 @@ export default function HomeUserReseller() {
             <button onClick={() => navigate('/notifications')} className="text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" title="Notifications">
               <span className="material-symbols-outlined">notifications</span>
             </button>
-            <button onClick={() => navigate('/resell-earn')} className="text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" title="Orders & Cart">
+            <button onClick={() => navigate('/cart')} className="text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" title="Shopping Cart">
               <span className="material-symbols-outlined">shopping_bag</span>
             </button>
           </div>
@@ -204,7 +204,10 @@ export default function HomeUserReseller() {
             className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-2 scroll-smooth"
           >
             {/* Card 1: Flash Sale (Pink / Magenta) */}
-            <div className="min-w-[85%] md:min-w-[100%] snap-center shrink-0">
+            <div 
+              onClick={() => navigate('/flash')}
+              className="min-w-[85%] md:min-w-[100%] snap-center shrink-0 cursor-pointer"
+            >
               <div className="h-48 md:h-80 rounded-3xl bg-gradient-to-br from-primary to-primary-container relative overflow-hidden flex items-center px-8 text-white">
                 <div className="relative z-10 max-w-xs md:max-w-md">
                   <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-3 inline-block">
@@ -217,7 +220,10 @@ export default function HomeUserReseller() {
                     Curated ethnic wear for the festive season.
                   </p>
                   <button 
-                    onClick={() => navigate('/share-earn-config')} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/flash');
+                    }} 
                     className="mt-6 bg-white text-primary px-6 py-2 rounded-xl font-bold text-sm shadow-xl active:scale-95 transition-transform hover:bg-opacity-95 cursor-pointer"
                   >
                     Shop Now
@@ -237,7 +243,10 @@ export default function HomeUserReseller() {
             </div>
 
             {/* Card 2: Become a Reseller (Blue / Purple) */}
-            <div className="min-w-[85%] md:min-w-[100%] snap-center shrink-0">
+            <div 
+              onClick={() => navigate('/dropshipper-register')}
+              className="min-w-[85%] md:min-w-[100%] snap-center shrink-0 cursor-pointer"
+            >
               <div className="h-48 md:h-80 rounded-3xl bg-gradient-to-br from-secondary to-secondary-container relative overflow-hidden flex items-center px-8 text-white">
                 <div className="relative z-10 max-w-xs md:max-w-md">
                   <h2 className="text-3xl md:text-5xl font-black font-headline leading-tight">
@@ -247,7 +256,10 @@ export default function HomeUserReseller() {
                     Start your business with zero investment.
                   </p>
                   <button 
-                    onClick={() => navigate('/resell-earn')} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/dropshipper-register');
+                    }} 
                     className="mt-6 bg-white text-secondary px-6 py-2 rounded-xl font-bold text-sm shadow-xl active:scale-95 transition-transform hover:bg-opacity-95 cursor-pointer"
                   >
                     Join Now
@@ -350,7 +362,7 @@ export default function HomeUserReseller() {
                     key={p.id} 
                     className="bg-surface-container-lowest rounded-2xl p-3 border border-outline-variant/10 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
                   >
-                    <div onClick={() => navigate('/resell-earn')} className="cursor-pointer">
+                    <div onClick={() => navigate('/product')} className="cursor-pointer" title="View Product Details">
                       <div className="aspect-[3/4] rounded-xl overflow-hidden relative mb-3 bg-surface-container-high">
                         <img 
                           src={p.image} 
@@ -436,7 +448,11 @@ export default function HomeUserReseller() {
             </div>
 
             {/* Weekly Mission Card */}
-            <div className="h-64 bg-[#4D41DF] rounded-3xl p-8 flex flex-col justify-between text-white overflow-hidden relative group shadow-lg shadow-[#4D41DF]/20">
+            <div 
+              onClick={() => navigate('/earnings-dashboard-1')}
+              className="h-64 bg-[#4D41DF] rounded-3xl p-8 flex flex-col justify-between text-white overflow-hidden relative group shadow-lg shadow-[#4D41DF]/20 cursor-pointer hover:shadow-2xl transition-all active:scale-[0.99]"
+              title="View Earnings & Missions Dashboard"
+            >
               <div className="relative z-10">
                 <span className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-70">Weekly Mission</span>
                 <h3 className="text-2xl font-black font-headline mt-1 text-white">Earn Bonus ₹5,000</h3>

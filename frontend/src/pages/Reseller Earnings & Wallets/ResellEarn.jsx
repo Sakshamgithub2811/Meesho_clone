@@ -47,7 +47,7 @@ export default function ResellAndEarn({ onBack }) {
               </svg>
             </button>
             <span 
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/reseller-home')}
               className="text-xl sm:text-2xl font-black text-[#FF3F6C] font-['Plus_Jakarta_Sans',sans-serif] tracking-tight cursor-pointer"
             >
               The Digital Curator

@@ -197,7 +197,10 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
 
       {/* TopAppBar */}
       <header className="sticky top-0 z-40 flex items-center justify-between px-4 sm:px-6 py-3.5 w-full bg-white/80 backdrop-blur-md border-b border-slate-100 shadow-sm transition-all">
-        <div className="flex items-center gap-3">
+        <div 
+          onClick={() => onNavigate && onNavigate('reseller')} 
+          className="flex items-center gap-3 cursor-pointer select-none"
+        >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#b90041] to-[#FF3F6C] flex items-center justify-center text-white shadow-md shadow-[#FF3F6C]/30">
             <span className="material-symbols-outlined text-lg">interests</span>
           </div>
@@ -239,8 +242,8 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => showToast('Notifications up to date!')}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-[#191C1E] hover:bg-slate-100 active:scale-95 transition-all relative"
+            onClick={() => onNavigate ? onNavigate('notifications') : showToast('Notifications up to date!')}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[#191C1E] hover:bg-slate-100 active:scale-95 transition-all relative cursor-pointer"
             title="Notifications"
           >
             <span className="material-symbols-outlined text-xl">notifications</span>
@@ -248,8 +251,8 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
           </button>
           <button
             type="button"
-            onClick={() => showToast('Shopping bag: 3 items reserved')}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-[#191C1E] hover:bg-slate-100 active:scale-95 transition-all relative"
+            onClick={() => onNavigate ? onNavigate('cart') : showToast('Opening shopping bag...')}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[#191C1E] hover:bg-slate-100 active:scale-95 transition-all relative cursor-pointer"
             title="Bag"
           >
             <span className="material-symbols-outlined text-xl">shopping_bag</span>
@@ -305,8 +308,9 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveCategory('women');
-                        showToast('Viewing festive ethnic curation');
+                        if (onNavigate) {
+                          onNavigate('flash');
+                        }
                       }}
                       className="bg-white text-[#b90041] px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-xl active:scale-95 transition-all hover:bg-rose-50 cursor-pointer"
                     >
@@ -315,7 +319,7 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
                     <button
                       type="button"
                       onClick={() => setActiveSlide(1)}
-                      className="text-white/80 hover:text-white text-xs font-semibold underline underline-offset-4"
+                      className="text-white/80 hover:text-white text-xs font-semibold underline underline-offset-4 cursor-pointer"
                     >
                       Next Offer →
                     </button>
@@ -344,7 +348,11 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
                   <div className="mt-5 flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => showToast('Welcome to Reseller Onboarding!')}
+                      onClick={() => {
+                        if (onNavigate) {
+                          onNavigate('dropshipper-register');
+                        }
+                      }}
                       className="bg-white text-[#4d41df] px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-xl active:scale-95 transition-all hover:bg-indigo-50 cursor-pointer"
                     >
                       Join Now
@@ -352,7 +360,7 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
                     <button
                       type="button"
                       onClick={() => setActiveSlide(0)}
-                      className="text-white/80 hover:text-white text-xs font-semibold underline underline-offset-4"
+                      className="text-white/80 hover:text-white text-xs font-semibold underline underline-offset-4 cursor-pointer"
                     >
                       ← Flash Sale
                     </button>
@@ -480,7 +488,11 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
                     key={prod.id}
                     className="group bg-white rounded-3xl p-2.5 sm:p-3 border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
                   >
-                    <div>
+                    <div 
+                      onClick={() => onNavigate && onNavigate('product')}
+                      className="cursor-pointer"
+                      title="View Product Details"
+                    >
                       {/* Product Image Frame */}
                       <div className="relative overflow-hidden rounded-2xl aspect-[3/4] mb-3 bg-slate-100">
                         <img

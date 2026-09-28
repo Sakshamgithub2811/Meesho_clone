@@ -7,12 +7,29 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
   const navigate = useNavigate();
 
   const handleNav = (target) => {
-    if (onNavigate) onNavigate(target);
-    else navigate(target.startsWith('/') ? target : `/${target}`);
+    if (onNavigate) {
+      try {
+        onNavigate(target);
+      } catch (e) {
+        console.error('onNavigate error', e);
+      }
+    }
+    navigate(target.startsWith('/') ? target : `/${target}`);
   };
 
-  const handleGoBack = () => {
-    handleNav('/user-dashboard');
+  const handleGoBack = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (onNavigate) {
+      try {
+        onNavigate('/user-dashboard');
+      } catch (err) {
+        console.error('onNavigate error', err);
+      }
+    }
+    navigate('/user-dashboard');
+    if (window.location.pathname !== '/user-dashboard') {
+      window.location.href = '/user-dashboard';
+    }
   };
 
   // Live synced affiliate app state
@@ -127,6 +144,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={handleGoBack}
               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer border border-white/10"
               title="Back to Dashboard"

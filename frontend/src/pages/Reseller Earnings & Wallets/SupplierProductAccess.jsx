@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
@@ -436,15 +436,29 @@ const CATEGORIES = ['All', 'Women Ethnic', 'Western Wear', 'Gadgets', 'Electroni
 export default function SupplierProductAccess() {
   const navigate = useNavigate();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [session] = useState(() => {
+  const [session, setSession] = useState(() => {
     try {
       const saved = localStorage.getItem('meesho_dropshipper_session');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          parsed.brandName?.toLowerCase().includes('sharma') ||
+          parsed.storeUrl?.toLowerCase().includes('sharma') ||
+          parsed.name?.toLowerCase().includes('rajesh')
+        ) {
+          parsed.name = 'Aura Trends';
+          parsed.brandName = 'Aura Trends';
+          parsed.storeUrl = 'https://auratrends.shop';
+          parsed.platform = 'Shopify';
+          localStorage.setItem('meesho_dropshipper_session', JSON.stringify(parsed));
+        }
+        return parsed;
+      }
       const app = getDropshipperApp();
       return {
         dropshipperId: app?.id || 'DSP-KYC-9421',
-        name: app?.brandName || 'Aura Trends Luxe',
-        proprietor: app?.proprietorName || 'Sarah James',
+        name: app?.brandName || 'Aura Trends',
+        proprietor: app?.proprietorName || 'Aura Trends',
         tier: 'Tier 1 Verified Dropshipper',
         platform: 'Shopify',
         storeUrl: 'https://auratrends.shop',
@@ -452,14 +466,15 @@ export default function SupplierProductAccess() {
     } catch {
       return {
         dropshipperId: 'DSP-KYC-9421',
-        name: 'Aura Trends Luxe',
-        proprietor: 'Sarah James',
+        name: 'Aura Trends',
+        proprietor: 'Aura Trends',
         tier: 'Tier 1 Verified Dropshipper',
         platform: 'Shopify',
         storeUrl: 'https://auratrends.shop',
       };
     }
   });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [stockFilter, setStockFilter] = useState('all'); // 'all' | 'in_stock' | 'low_stock' | 'fast_dispatch'
@@ -473,35 +488,53 @@ export default function SupplierProductAccess() {
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
 
-  // Single Connected Store Integration states: Aura Trends Luxe (Shopify)
+  // Single Connected Store Integration states
   const [connectedStore, setConnectedStore] = useState(() => {
     try {
       const app = getDropshipperApp();
       const sessionSaved = localStorage.getItem('meesho_dropshipper_session');
       const sessionObj = sessionSaved ? JSON.parse(sessionSaved) : null;
       const storeSaved = localStorage.getItem('meesho_connected_store');
-      if (storeSaved) return JSON.parse(storeSaved);
+      const parsedStoreSaved = storeSaved ? JSON.parse(storeSaved) : null;
 
-      return {
+      let rawUrl = sessionObj?.storeUrl || parsedStoreSaved?.storeUrl || 'https://auratrends.shop';
+      if (rawUrl.toLowerCase().includes('sharma') || rawUrl.toLowerCase().includes('sharmadirect')) {
+        rawUrl = 'https://auratrends.shop';
+      }
+      const cleanUrl = rawUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') || 'auratrends.shop';
+      const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://${cleanUrl}`;
+
+      let storeBrand = sessionObj?.brandName || parsedStoreSaved?.storeName || app?.brandName || 'Aura Trends';
+      if (storeBrand.toLowerCase().includes('sharma')) {
+        storeBrand = 'Aura Trends';
+      }
+
+      const storeObj = {
         isConnected: true,
-        storeName: sessionObj?.brandName || app?.brandName || 'Aura Trends Luxe',
-        storeUrl: 'auratrends.shop',
-        fullStoreUrl: 'https://auratrends.shop',
-        platform: 'Shopify',
-        capacity: '50 - 200 orders/month',
+        storeName: storeBrand,
+        storeUrl: cleanUrl,
+        fullStoreUrl: fullUrl,
+        platform: sessionObj?.platform === 'WooCommerce' && cleanUrl.includes('auratrends') ? 'Shopify' : (sessionObj?.platform || parsedStoreSaved?.platform || 'Shopify'),
+        capacity: sessionObj?.capacity || parsedStoreSaved?.capacity || '50 - 200 orders/month',
         pan: app?.panNumber || sessionObj?.pan || 'ABCDE1234F',
         aadhaar: app?.aadhaarNumber || sessionObj?.aadhaar || '4829 1920 3810',
         gstin: app?.gstin || sessionObj?.gstin || '29ABCDE1234F1Z5',
-        proprietor: app?.proprietorName || 'Sarah James',
-        defaultMargin: 45, // 45% default profit margin
+        proprietor: sessionObj?.name || parsedStoreSaved?.proprietor || app?.proprietorName || 'Aura Trends',
+        defaultMargin: parsedStoreSaved?.defaultMargin || 45, // 45% default profit margin
         autoSyncStock: true,
         autoSyncPrice: true,
         lastSyncTime: 'Just now',
       };
+
+      if (parsedStoreSaved && (parsedStoreSaved.storeName?.toLowerCase().includes('sharma') || parsedStoreSaved.storeUrl?.toLowerCase().includes('sharma'))) {
+        localStorage.setItem('meesho_connected_store', JSON.stringify(storeObj));
+      }
+
+      return storeObj;
     } catch {
       return {
         isConnected: true,
-        storeName: 'Aura Trends Luxe',
+        storeName: 'Aura Trends',
         storeUrl: 'auratrends.shop',
         fullStoreUrl: 'https://auratrends.shop',
         platform: 'Shopify',
@@ -509,7 +542,7 @@ export default function SupplierProductAccess() {
         pan: 'ABCDE1234F',
         aadhaar: '4829 1920 3810',
         gstin: '29ABCDE1234F1Z5',
-        proprietor: 'Sarah James',
+        proprietor: 'Aura Trends',
         defaultMargin: 45,
         autoSyncStock: true,
         autoSyncPrice: true,
@@ -517,6 +550,38 @@ export default function SupplierProductAccess() {
       };
     }
   });
+
+  // Auto-clean any legacy or mock Sharma data on mount
+  useEffect(() => {
+    try {
+      const sess = localStorage.getItem('meesho_dropshipper_session');
+      if (sess) {
+        const p = JSON.parse(sess);
+        if (p.brandName?.toLowerCase().includes('sharma') || p.storeUrl?.toLowerCase().includes('sharma') || p.name?.toLowerCase().includes('rajesh')) {
+          p.name = 'Aura Trends';
+          p.brandName = 'Aura Trends';
+          p.storeUrl = 'https://auratrends.shop';
+          p.platform = 'Shopify';
+          localStorage.setItem('meesho_dropshipper_session', JSON.stringify(p));
+          setSession(p);
+        }
+      }
+      const st = localStorage.getItem('meesho_connected_store');
+      if (st) {
+        const sp = JSON.parse(st);
+        if (sp.storeName?.toLowerCase().includes('sharma') || sp.storeUrl?.toLowerCase().includes('sharma')) {
+          sp.storeName = 'Aura Trends';
+          sp.storeUrl = 'auratrends.shop';
+          sp.fullStoreUrl = 'https://auratrends.shop';
+          sp.platform = 'Shopify';
+          localStorage.setItem('meesho_connected_store', JSON.stringify(sp));
+          setConnectedStore((prev) => ({ ...prev, ...sp }));
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   const [syncedProducts, setSyncedProducts] = useState(() => {
     try {
@@ -747,48 +812,81 @@ export default function SupplierProductAccess() {
 
       {/* 1. TOP HEADER & PORTAL STATUS BAR */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-xs">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-2">
+          {/* Left: Menu & Brand Logo */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               onClick={() => setIsDrawerOpen(true)}
               aria-label="Open Navigation Menu"
-              className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-xl transition cursor-pointer text-gray-700 active:scale-95 shrink-0"
+              className="p-1 sm:p-1.5 hover:bg-gray-100 rounded-xl transition cursor-pointer text-gray-700 active:scale-95 shrink-0"
             >
-              <span className="material-symbols-outlined text-2xl">menu</span>
+              <span className="material-symbols-outlined text-xl sm:text-2xl">menu</span>
             </button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="text-base sm:text-xl font-extrabold text-[#FF3F6C] font-['Plus_Jakarta_Sans'] tracking-tight whitespace-nowrap">
-                  Meesho Direct
-                </span>
-                <span className="bg-[#b90041]/10 text-[#b90041] text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full border border-[#b90041]/20 uppercase tracking-wide whitespace-nowrap">
-                  B2B <span className="hidden sm:inline">Supplier Access</span>
-                </span>
-              </div>
-              <p className="text-[11px] text-gray-500 font-medium hidden md:block">
-                Direct factory supplier prices, live inventory & SKU access for verified dropshippers
-              </p>
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <span className="text-base sm:text-xl font-extrabold text-[#FF3F6C] font-['Plus_Jakarta_Sans'] tracking-tight whitespace-nowrap">
+                Meesho Direct
+              </span>
+              <span className="bg-[#b90041]/10 text-[#b90041] text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full border border-[#b90041]/20 uppercase tracking-wide whitespace-nowrap">
+                B2B <span className="hidden sm:inline">Supplier Access</span>
+              </span>
             </div>
           </div>
 
-          {/* Dropshipper Session Status Chip & Action Icons */}
+          {/* Right: Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* User Session Chip (Compact on mobile) */}
             <div
               onClick={() => setProfileModalOpen(true)}
               title="Click to View Verified Dropshipper Account Details"
-              className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl px-2 sm:px-2.5 py-1 flex items-center gap-1.5 sm:gap-2 shadow-xs cursor-pointer transition active:scale-95"
+              className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl px-2 py-1 flex items-center gap-1.5 shadow-xs cursor-pointer transition active:scale-95 shrink-0"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
               <div className="text-left leading-tight">
-                <div className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider truncate max-w-[85px] sm:max-w-[130px]">
-                  {session?.name || 'Verified Portal'}
+                <div className="text-[10px] sm:text-xs text-emerald-800 font-bold uppercase tracking-wider truncate max-w-[75px] xs:max-w-[100px] sm:max-w-[140px]">
+                  {session?.name || 'Aura Trends'}
                 </div>
-                <div className="text-[9px] text-emerald-600 font-mono hidden xs:block">
-                  {session?.dropshipperId || 'DS-ID: #89420'} • {session?.tier || 'Tier 1'}
+                <div className="text-[8px] text-emerald-600 font-mono hidden md:block">
+                  {session?.dropshipperId || 'DS-ID: #89420'}
                 </div>
               </div>
             </div>
 
+            {/* Store Products Live Catalog Button */}
+            <button
+              onClick={() => setStoreCatalogOpen(true)}
+              title={`View all products live on ${connectedStore.storeName} (${connectedStore.platform})`}
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer shrink-0"
+            >
+              <span className="material-symbols-outlined text-sm">storefront</span>
+              <span className="hidden md:inline">Store Products</span>
+              <span className="bg-emerald-950/40 text-white text-[10px] font-mono px-1.5 py-0.2 rounded-full border border-emerald-400/30">
+                {Object.keys(syncedProducts).length}
+              </span>
+            </button>
+
+            {/* Connected Store Chip - Hidden on small mobile screens to prevent overflow, visible on lg screens */}
+            <div
+              onClick={() => setStoreSettingsOpen(true)}
+              title={`Configure ${connectedStore.storeName} (${connectedStore.platform}) Store`}
+              className="hidden lg:flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 border border-purple-200/90 rounded-xl px-2 sm:px-2.5 py-1 shadow-xs cursor-pointer transition active:scale-95 shrink-0"
+            >
+              <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold text-[10px] shadow-xs shrink-0">
+                <span className="material-symbols-outlined text-xs">storefront</span>
+              </div>
+              <div className="text-left leading-tight">
+                <div className="text-[10px] text-purple-950 font-black flex items-center gap-1">
+                  <span className="truncate max-w-[95px] sm:max-w-[135px]">{connectedStore.storeName || 'Aura Trends'}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                </div>
+                <div className="text-[9px] text-purple-700 font-mono flex items-center gap-1">
+                  <span className="bg-purple-200/80 text-purple-950 text-[8px] font-extrabold px-1 rounded">{connectedStore.platform || 'Shopify'}</span>
+                  <span className="truncate max-w-[80px] sm:max-w-[110px]">{connectedStore.storeUrl || 'auratrends.shop'}</span>
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-xs text-purple-600 shrink-0">tune</span>
+            </div>
+
+            {/* Logout Button */}
             <button
               onClick={() => {
                 if (window.confirm('Are you sure you want to switch or log out of your dropshipper account?')) {
@@ -797,97 +895,60 @@ export default function SupplierProductAccess() {
                 }
               }}
               title="Logout / Switch Account"
-              className="p-1 sm:p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-xl transition cursor-pointer"
+              className="p-1 sm:p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-xl transition cursor-pointer shrink-0"
             >
-              <span className="material-symbols-outlined text-lg">logout</span>
-            </button>
-
-            {/* Store Products Live Catalog Button */}
-            <button
-              onClick={() => setStoreCatalogOpen(true)}
-              title={`View all products live on ${connectedStore.storeName} (Shopify)`}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer shrink-0"
-            >
-              <span className="material-symbols-outlined text-sm">storefront</span>
-              <span className="hidden sm:inline">Store Products</span>
-              <span className="bg-emerald-950/40 text-white text-[10px] font-mono px-1.5 py-0.2 rounded-full border border-emerald-400/30">
-                {Object.keys(syncedProducts).length}
-              </span>
-            </button>
-
-            {/* Single Connected Store Status Chip - Aura Trends Luxe (Shopify) */}
-            <div
-              onClick={() => setStoreSettingsOpen(true)}
-              title="Click to Configure Aura Trends Luxe Shopify Store & 1-Click Sync"
-              className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 border border-purple-200/90 rounded-xl px-2 sm:px-2.5 py-1 shadow-xs cursor-pointer transition active:scale-95"
-            >
-              <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold text-[10px] shadow-xs shrink-0">
-                <span className="material-symbols-outlined text-xs">storefront</span>
-              </div>
-              <div className="text-left leading-tight">
-                <div className="text-[10px] text-purple-950 font-black flex items-center gap-1">
-                  <span className="truncate max-w-[85px] sm:max-w-[125px]">{connectedStore.storeName}</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-                </div>
-                <div className="text-[9px] text-purple-700 font-mono flex items-center gap-1">
-                  <span className="bg-purple-200/80 text-purple-950 text-[8px] font-extrabold px-1 rounded">Shopify</span>
-                  <span className="truncate max-w-[65px] sm:max-w-[95px]">{connectedStore.storeUrl}</span>
-                </div>
-              </div>
-              <span className="material-symbols-outlined text-xs text-purple-600 shrink-0">tune</span>
-            </div>
-
-            <button
-              onClick={() => navigate('/share-earn-config')}
-              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 bg-[#b90041] hover:bg-[#a00037] text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-sm">tune</span>
-              <span>Margin Calculator</span>
+              <span className="material-symbols-outlined text-base sm:text-lg">logout</span>
             </button>
           </div>
         </div>
 
         {/* 2. STATS & ACCESS OVERVIEW STRIP */}
-        <div className="bg-gradient-to-r from-gray-900 via-gray-850 to-gray-900 text-white px-3 sm:px-6 py-2">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 text-xs">
-            <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-4 text-gray-300 text-[11px] sm:text-xs">
+        <div className="bg-gradient-to-r from-gray-900 via-gray-850 to-gray-900 text-white px-3 sm:px-6 py-2 border-t border-gray-800">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-1.5 sm:gap-2.5 text-xs">
+            <div className="flex items-center flex-wrap gap-2 sm:gap-3 text-gray-300 text-[11px] sm:text-xs">
               <div className="flex items-center gap-1 shrink-0">
                 <span className="material-symbols-outlined text-emerald-400 text-sm">verified</span>
                 <span>Suppliers: <strong className="text-white">1,240+</strong></span>
               </div>
-              <div className="hidden md:flex items-center gap-1 shrink-0">
+              <div className="hidden sm:flex items-center gap-1 shrink-0">
                 <span className="material-symbols-outlined text-blue-400 text-sm">inventory</span>
                 <span>Live SKUs: <strong className="text-white">85,000+</strong></span>
               </div>
               {/* 2-Way Auto Sync Live Indicator & Store Catalog Click */}
               <div
                 onClick={() => setStoreCatalogOpen(true)}
-                className="flex items-center gap-1.5 bg-gray-800/90 hover:bg-gray-750 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg border border-gray-700 text-[10px] sm:text-[11px] shrink-0 cursor-pointer transition active:scale-95"
-                title={`Click to view all live products on ${connectedStore.storeName} (Shopify)`}
+                className="flex items-center gap-1.5 bg-gray-800/90 hover:bg-gray-750 px-2 sm:px-2.5 py-1 rounded-lg border border-gray-700 text-[10px] sm:text-[11px] cursor-pointer transition active:scale-95 shrink-0 max-w-full"
+                title={`Click to view all live products on ${connectedStore.storeName} (${connectedStore.platform})`}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                <span>Sync to <strong className="text-emerald-300 font-bold">{connectedStore.storeName}</strong>:</span>
-                <span className="text-emerald-400 font-semibold">Active</span>
-                <span className="text-gray-300 underline font-semibold">({Object.keys(syncedProducts).length} on Shopify)</span>
-                <span className="material-symbols-outlined text-xs text-emerald-300">open_in_new</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
+                <span className="truncate max-w-[130px] sm:max-w-none">
+                  Sync to <strong className="text-emerald-300 font-bold">{connectedStore.storeName}</strong>:
+                </span>
+                <span className="text-emerald-400 font-semibold shrink-0">Active</span>
+                <span className="text-gray-300 font-semibold shrink-0">
+                  ({Object.keys(syncedProducts).length} on {connectedStore.platform})
+                </span>
+                <span className="material-symbols-outlined text-xs text-emerald-300 shrink-0">open_in_new</span>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleSimulateStockAutoSync();
                   }}
-                  className="text-[9px] sm:text-[10px] text-pink-300 hover:text-white underline cursor-pointer ml-1"
+                  className="text-[9px] sm:text-[10px] text-pink-300 hover:text-white underline cursor-pointer ml-0.5 shrink-0"
                   title="Simulate real-time supplier inventory event"
                 >
                   Test
                 </button>
               </div>
             </div>
-            <div className="flex items-center justify-between sm:justify-end gap-3 text-gray-400 text-[10px] sm:text-[11px] pt-1 sm:pt-0 border-t border-gray-800 sm:border-0">
-              <span>Platform: <strong className="text-white">{connectedStore.platform} ({connectedStore.capacity})</strong></span>
+            <div className="flex items-center justify-between md:justify-end gap-2 text-gray-400 text-[10px] sm:text-[11px] pt-1 md:pt-0 border-t md:border-0 border-gray-800">
+              <span className="truncate">
+                Platform: <strong className="text-white">{connectedStore.platform}</strong> ({connectedStore.capacity})
+              </span>
               <button
                 onClick={() => setStoreSettingsOpen(true)}
-                className="text-pink-300 hover:text-white underline cursor-pointer shrink-0"
+                className="text-pink-300 hover:text-white underline cursor-pointer shrink-0 font-medium ml-2"
               >
                 Store Settings →
               </button>
@@ -2199,6 +2260,17 @@ export default function SupplierProductAccess() {
               <button
                 onClick={() => {
                   setStoreSettingsOpen(false);
+                  try {
+                    localStorage.setItem('meesho_connected_store', JSON.stringify(connectedStore));
+                    const sess = localStorage.getItem('meesho_dropshipper_session');
+                    if (sess) {
+                      const p = JSON.parse(sess);
+                      p.brandName = connectedStore.storeName;
+                      p.storeUrl = connectedStore.fullStoreUrl;
+                      localStorage.setItem('meesho_dropshipper_session', JSON.stringify(p));
+                      setSession((prev) => ({ ...prev, brandName: connectedStore.storeName, storeUrl: connectedStore.fullStoreUrl }));
+                    }
+                  } catch (e) {}
                   triggerToast('✅ Store settings saved successfully!');
                 }}
                 className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
