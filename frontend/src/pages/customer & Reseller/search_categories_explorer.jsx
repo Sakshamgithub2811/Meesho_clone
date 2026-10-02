@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 
 export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBack }) {
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState('ethnic');
   const [searchQuery, setSearchQuery] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -14,7 +16,10 @@ export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBac
   };
 
   const handleSearchSubmit = (e) => {
-    if (e.key === 'Enter') {
+    if (e) e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
       onNavigate('search');
     }
   };
@@ -524,10 +529,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBac
 
           <div className="flex-1 min-w-0 max-w-2xl">
             <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                onNavigate('search');
-              }}
+              onSubmit={handleSearchSubmit}
               className="w-full"
             >
               <div className="bg-[#f2f4f6] hover:bg-slate-200/60 focus-within:bg-white flex items-center px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full gap-2 border border-slate-200/60 focus-within:border-pink-400 focus-within:ring-2 focus-within:ring-[#FF3F6C]/20 transition-all shadow-inner h-9 sm:h-10">
@@ -535,6 +537,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBac
                   type="submit"
                   className="text-slate-400 hover:text-[#FF3F6C] flex items-center shrink-0 cursor-pointer transition-colors"
                   title="Search"
+                  aria-label="Submit search"
                 >
                   <span className="material-symbols-outlined text-lg sm:text-xl">search</span>
                 </button>

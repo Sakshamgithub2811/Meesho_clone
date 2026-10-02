@@ -1,14 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 
 export default function SearchResults({ onNavigate = () => {}, onBack }) {
-  const [searchQuery, setSearchQuery] = useState('Floral Kurtas');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const urlQuery = searchParams.get('q') || '';
+  const [searchQuery, setSearchQuery] = useState(urlQuery || 'Kurta');
   const [selectedSort, setSelectedSort] = useState('Popularity');
   const [activeFilter, setActiveFilter] = useState('All');
   const [wishlist, setWishlist] = useState(new Set([1, 4]));
   const [cartCount, setCartCount] = useState(2);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q !== null) {
+      setSearchQuery(q);
+    }
+  }, [searchParams]);
+
+  const handleSearchSubmit = (override) => {
+    const q = (override !== undefined ? override : searchQuery).trim();
+    if (q) {
+      setSearchParams({ q });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
@@ -95,7 +115,7 @@ export default function SearchResults({ onNavigate = () => {}, onBack }) {
     },
     {
       id: 4,
-      title: 'Midnight Bloom Anarkali',
+      title: 'Midnight Bloom Anarkali Kurta',
       price: 1599,
       originalPrice: 3199,
       discount: '50% OFF',
@@ -151,7 +171,7 @@ export default function SearchResults({ onNavigate = () => {}, onBack }) {
     },
     {
       id: 8,
-      title: 'Luxe Chiffon Embroidered Dupatta Suit',
+      title: 'Luxe Chiffon Embroidered Dupatta Suit Kurta',
       price: 1699,
       originalPrice: 3299,
       discount: '48% OFF',
@@ -167,13 +187,28 @@ export default function SearchResults({ onNavigate = () => {}, onBack }) {
 
   const filterOptions = ['All', 'Under ₹1000', 'Silk', 'Cotton', 'Chiffon', 'High Margin'];
 
+  const normalize = (text) => (text || '').toLowerCase().replace(/kurtas?|kurti/g, 'kurt').replace(/sarees?/g, 'saree').trim();
+
   const filteredProducts = products.filter((p) => {
+    const q = normalize(searchQuery);
+    const matchesSearch = !q || 
+      normalize(p.title).includes(q) || 
+      normalize(p.category).includes(q) || 
+      normalize(p.badge).includes(q);
+
+    if (!matchesSearch) return false;
+
     if (activeFilter === 'Under ₹1000') return p.price < 1000;
     if (activeFilter === 'Silk') return p.category === 'Silk';
     if (activeFilter === 'Cotton') return p.category === 'Cotton';
     if (activeFilter === 'Chiffon') return p.category === 'Chiffon';
     if (activeFilter === 'High Margin') return p.resellMargin >= 180;
     return true;
+  }).sort((a, b) => {
+    if (selectedSort === 'Price: Low to High') return a.price - b.price;
+    if (selectedSort === 'Price: High to Low') return b.price - a.price;
+    if (selectedSort === 'Rating') return b.rating - a.rating;
+    return 0; // Popularity
   });
 
   return (
@@ -191,7 +226,7 @@ export default function SearchResults({ onNavigate = () => {}, onBack }) {
         <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3.5 gap-4">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => (onBack ? onBack() : onNavigate('explorer'))}
+              onClick={() => (onBack ? onBack() : onNavigate('reseller'))}
               className="hover:bg-slate-100 transition-colors rounded-full p-2 active:scale-95 duration-150 cursor-pointer text-[#FF3F6C]"
               title="Go Back"
             >
@@ -206,24 +241,48 @@ export default function SearchResults({ onNavigate = () => {}, onBack }) {
           </div>
 
           <div className="flex-1 max-w-2xl relative">
-            <div className="bg-[#f2f4f6] hover:bg-slate-200/60 focus-within:bg-white flex items-center px-3.5 py-2.5 rounded-full gap-2 border border-transparent focus-within:border-pink-300 transition-all shadow-inner">
-              <span className="material-symbols-outlined text-slate-400 text-lg">search</span>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSearchSubmit();
+              }}
+              className="bg-[#f2f4f6] hover:bg-slate-200/60 focus-within:bg-white flex items-center px-3.5 py-1.5 rounded-full gap-2 border border-transparent focus-within:border-pink-300 transition-all shadow-inner"
+            >
+              <button 
+                type="submit"
+                className="text-slate-400 hover:text-[#FF3F6C] flex items-center cursor-pointer transition-colors"
+                title="Search"
+                aria-label="Submit search"
+              >
+                <span className="material-symbols-outlined text-lg">search</span>
+              </button>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearchSubmit();
+                  }
+                }}
                 placeholder="Search sarees, kurtas, western dresses, jewelry..."
                 className="w-full bg-transparent text-xs md:text-sm font-medium text-[#191c1e] focus:outline-none placeholder:text-slate-400"
               />
               {searchQuery && (
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchParams({});
+                  }}
+                  className="text-slate-400 hover:text-slate-600 text-xs font-bold p-1 cursor-pointer"
+                  title="Clear"
                 >
                   ✕
                 </button>
               )}
-            </div>
+            </form>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -290,116 +349,152 @@ export default function SearchResults({ onNavigate = () => {}, onBack }) {
         </section>
 
         {/* Product Grid: 2 cols on mobile, 3 on md, 4 on lg, 5 on xl */}
-        <section className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
-          {filteredProducts.map((product) => {
-            const isFav = wishlist.has(product.id);
-            return (
-              <div
-                key={product.id}
-                onClick={() => onNavigate('product')}
-                className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-slate-100 hover:border-pink-200 group transition-all duration-300 flex flex-col cursor-pointer transform hover:-translate-y-1"
-              >
-                {/* Image Container */}
-                <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
-                  <img
-                    src={product.image}
-                    alt={product.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
+        {filteredProducts.length === 0 ? (
+          <div className="col-span-full py-16 text-center flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-100 p-8 shadow-sm my-4">
+            <span className="material-symbols-outlined text-6xl text-slate-300 mb-3">search_off</span>
+            <h3 className="text-base font-bold text-slate-800">No products found matching "{searchQuery}"</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm">
+              We couldn't find any items matching your search. Try checking your spelling or search for popular terms below.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2 mt-4">
+              {['Kurta', 'Kurti', 'Saree', 'Anarkali', 'Cotton', 'Silk', 'Chiffon'].map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery(tag);
+                    handleSearchSubmit(tag);
+                  }}
+                  className="text-xs font-semibold px-3.5 py-1.5 rounded-full bg-pink-50 hover:bg-pink-100 text-[#FF3F6C] transition-colors cursor-pointer"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setSearchParams({});
+                setActiveFilter('All');
+              }}
+              className="mt-4 text-xs font-bold text-slate-600 hover:text-[#FF3F6C] underline cursor-pointer"
+            >
+              Clear all filters & see all products
+            </button>
+          </div>
+        ) : (
+          <section className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
+            {filteredProducts.map((product) => {
+              const isFav = wishlist.has(product.id);
+              return (
+                <div
+                  key={product.id}
+                  onClick={() => onNavigate('product')}
+                  className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-slate-100 hover:border-pink-200 group transition-all duration-300 flex flex-col cursor-pointer transform hover:-translate-y-1"
+                >
+                  {/* Image Container */}
+                  <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
+                    <img
+                      src={product.image}
+                      alt={product.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
 
-                  {/* Wishlist Heart */}
-                  <button
-                    onClick={(e) => toggleWishlist(e, product.id)}
-                    className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm p-1.5 rounded-full shadow-md cursor-pointer hover:scale-110 active:scale-95 transition-all"
-                    title="Add to Wishlist"
-                  >
-                    <span
-                      className={`material-symbols-outlined text-lg ${
-                        isFav ? 'text-[#FF3F6C]' : 'text-slate-400'
-                      }`}
-                      style={isFav ? { fontVariationSettings: "'FILL' 1" } : {}}
+                    {/* Wishlist Heart */}
+                    <button
+                      onClick={(e) => toggleWishlist(e, product.id)}
+                      className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm p-1.5 rounded-full shadow-md cursor-pointer hover:scale-110 active:scale-95 transition-all"
+                      title="Add to Wishlist"
                     >
-                      favorite
-                    </span>
-                  </button>
-
-                  {/* Badge */}
-                  {product.badge && (
-                    <div className="absolute bottom-2 left-2 bg-[#FF3F6C]/90 backdrop-blur-md px-2.5 py-0.5 rounded-md text-[9px] font-extrabold text-white uppercase tracking-wider shadow-sm">
-                      {product.badge}
-                    </div>
-                  )}
-                </div>
-
-                {/* Details */}
-                <div className="p-3.5 flex flex-col flex-1 justify-between">
-                  <div>
-                    {/* Rating */}
-                    <div className="flex items-center gap-1 mb-1">
                       <span
-                        className="material-symbols-outlined text-amber-400 text-xs"
-                        style={{ fontVariationSettings: "'FILL' 1" }}
+                        className={`material-symbols-outlined text-lg ${
+                          isFav ? 'text-[#FF3F6C]' : 'text-slate-400'
+                        }`}
+                        style={isFav ? { fontVariationSettings: "'FILL' 1" } : {}}
                       >
-                        star
+                        favorite
                       </span>
-                      <span className="text-[10.5px] font-extrabold text-[#191c1e]">
-                        {product.rating}
-                      </span>
-                      <span className="text-[10px] text-slate-400">({product.reviews})</span>
-                    </div>
+                    </button>
 
-                    <h3 className="text-xs md:text-sm font-bold text-[#191c1e] line-clamp-1 leading-tight mb-1 group-hover:text-[#FF3F6C] transition-colors">
-                      {product.title}
-                    </h3>
-
-                    {/* Price */}
-                    <div className="flex items-baseline gap-1.5 mb-2.5">
-                      <span className="text-sm md:text-base font-extrabold text-[#191c1e]">
-                        ₹{product.price}
-                      </span>
-                      <span className="text-[10px] text-slate-400 line-through">
-                        ₹{product.originalPrice}
-                      </span>
-                      <span className="text-[10px] font-bold text-[#FF3F6C]">
-                        {product.discount}
-                      </span>
-                    </div>
+                    {/* Badge */}
+                    {product.badge && (
+                      <div className="absolute bottom-2 left-2 bg-[#FF3F6C]/90 backdrop-blur-md px-2.5 py-0.5 rounded-md text-[9px] font-extrabold text-white uppercase tracking-wider shadow-sm">
+                        {product.badge}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
-                    {/* Resell Margin Highlight (WhatsApp Redirect) */}
-                    <div
-                      onClick={(e) => shareToWhatsapp(e, product)}
-                      title="Share product with margin on WhatsApp"
-                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl py-1.5 px-2.5 flex items-center justify-between cursor-pointer transition-colors border border-emerald-100"
-                    >
-                      <div className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-emerald-700 text-sm">
-                          payments
+                  {/* Details */}
+                  <div className="p-3.5 flex flex-col flex-1 justify-between">
+                    <div>
+                      {/* Rating */}
+                      <div className="flex items-center gap-1 mb-1">
+                        <span
+                          className="material-symbols-outlined text-amber-400 text-xs"
+                          style={{ fontVariationSettings: "'FILL' 1" }}
+                        >
+                          star
                         </span>
-                        <span className="text-[9.5px] font-extrabold uppercase tracking-tight">
-                          Resell & Earn ₹{product.resellMargin}
+                        <span className="text-[10.5px] font-extrabold text-[#191c1e]">
+                          {product.rating}
+                        </span>
+                        <span className="text-[10px] text-slate-400">({product.reviews})</span>
+                      </div>
+
+                      <h3 className="text-xs md:text-sm font-bold text-[#191c1e] line-clamp-1 leading-tight mb-1 group-hover:text-[#FF3F6C] transition-colors">
+                        {product.title}
+                      </h3>
+
+                      {/* Price */}
+                      <div className="flex items-baseline gap-1.5 mb-2.5">
+                        <span className="text-sm md:text-base font-extrabold text-[#191c1e]">
+                          ₹{product.price}
+                        </span>
+                        <span className="text-[10px] text-slate-400 line-through">
+                          ₹{product.originalPrice}
+                        </span>
+                        <span className="text-[10px] font-bold text-[#FF3F6C]">
+                          {product.discount}
                         </span>
                       </div>
-                      <span className="material-symbols-outlined text-emerald-700 text-sm">
-                        share
-                      </span>
                     </div>
 
-                    {/* Add to Cart Button */}
-                    <button
-                      onClick={(e) => addToCart(e, product)}
-                      className="w-full bg-[#FF3F6C] hover:bg-[#e02659] active:scale-95 text-white py-2 rounded-xl text-xs font-extrabold transition-all shadow-md shadow-pink-500/20 flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-sm">add_shopping_cart</span>
-                      Add to Cart
-                    </button>
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      {/* Resell Margin Highlight (WhatsApp Redirect) */}
+                      <div
+                        onClick={(e) => shareToWhatsapp(e, product)}
+                        title="Share product with margin on WhatsApp"
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl py-1.5 px-2.5 flex items-center justify-between cursor-pointer transition-colors border border-emerald-100"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span className="material-symbols-outlined text-emerald-700 text-sm">
+                            payments
+                          </span>
+                          <span className="text-[9.5px] font-extrabold uppercase tracking-tight">
+                            Resell & Earn ₹{product.resellMargin}
+                          </span>
+                        </div>
+                        <span className="material-symbols-outlined text-emerald-700 text-sm">
+                          share
+                        </span>
+                      </div>
+
+                      {/* Add to Cart Button */}
+                      <button
+                        onClick={(e) => addToCart(e, product)}
+                        className="w-full bg-[#FF3F6C] hover:bg-[#e02659] active:scale-95 text-white py-2 rounded-xl text-xs font-extrabold transition-all shadow-md shadow-pink-500/20 flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm">add_shopping_cart</span>
+                        Add to Cart
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </section>
+              );
+            })}
+          </section>
+        )}
       </main>
 
       {/* Universal Responsive Bottom Navigation Bar */}

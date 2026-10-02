@@ -75,6 +75,66 @@ const initialProducts = [
     margin: 280,
     tag: "TOP BRAND",
     image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=80"
+  },
+  {
+    id: 7,
+    title: "Embroidered Silk Anarkali Kurta Set",
+    category: "Women",
+    brand: "Libas",
+    price: 1249,
+    originalPrice: 2499,
+    discount: "50% OFF",
+    margin: 150,
+    tag: "BESTSELLER",
+    image: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80"
+  },
+  {
+    id: 8,
+    title: "Vintage Rose Floral Cotton Kurta",
+    category: "Women",
+    brand: "Anouk",
+    price: 899,
+    originalPrice: 1799,
+    discount: "50% OFF",
+    margin: 95,
+    tag: "TRENDING",
+    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80"
+  },
+  {
+    id: 9,
+    title: "Men's Classic Khadi Festive Kurta",
+    category: "Men",
+    brand: "FabIndia",
+    price: 999,
+    originalPrice: 1999,
+    discount: "50% OFF",
+    margin: 110,
+    tag: "HOT",
+    image: "https://images.unsplash.com/photo-1609357605129-26f69add5d6e?w=600&auto=format&fit=crop&q=80"
+  },
+  {
+    id: 10,
+    title: "Handblock Pure Cotton Kurti & Pant Set",
+    category: "Women",
+    brand: "Sangria",
+    price: 699,
+    originalPrice: 1599,
+    discount: "56% OFF",
+    margin: 85,
+    tag: "NEW",
+    image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600&auto=format&fit=crop&q=80"
+  },
+  {
+    id: 11,
+    title: "Kanjeevaram Banarasi Silk Saree",
+    category: "Women",
+    brand: "SareeMall",
+    price: 1899,
+    originalPrice: 4299,
+    discount: "56% OFF",
+    margin: 260,
+    tag: "TOP RATED",
+    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80"
   }
 ];
 
@@ -93,12 +153,24 @@ const categories = [
 export default function HomeUserReseller() {
   const navigate = useNavigate();
   const bannerRef = React.useRef(null);
+  const searchContainerRef = React.useRef(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [favorites, setFavorites] = useState([1]);
   const [activeNav, setActiveNav] = useState("home");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleBannerScroll = () => {
     if (bannerRef.current) {
@@ -125,9 +197,25 @@ export default function HomeUserReseller() {
     );
   };
 
+  const handleSearchSubmit = (overrideQuery) => {
+    const term = (overrideQuery !== undefined ? overrideQuery : searchQuery).trim();
+    setShowSuggestions(false);
+    if (term) {
+      navigate(`/search?q=${encodeURIComponent(term)}`);
+    } else {
+      navigate('/search');
+    }
+  };
+
+  const normalize = (text) => (text || '').toLowerCase().replace(/kurtas?|kurti/g, 'kurt').replace(/sarees?/g, 'saree').trim();
+
   const filteredProducts = initialProducts.filter(p => {
-    const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.brand && p.brand.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = normalize(searchQuery);
+    const titleNorm = normalize(p.title);
+    const brandNorm = normalize(p.brand);
+    const catNorm = normalize(p.category);
+
+    const matchesSearch = !q || titleNorm.includes(q) || brandNorm.includes(q) || catNorm.includes(q);
     const matchesCat = selectedCategory === "All" || 
       (selectedCategory.toLowerCase() === "brands" || selectedCategory.toLowerCase() === "brand"
         ? (p.category.toLowerCase() === "brands" || p.category.toLowerCase() === "brand" || !!p.brand)
@@ -138,7 +226,7 @@ export default function HomeUserReseller() {
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen">
       {/* TopAppBar */}
-      <header className="relative w-full bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800">
+      <header className="relative w-full bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 z-40">
         <div className="w-full px-3.5 sm:px-6 md:px-10 lg:px-16 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
@@ -157,17 +245,136 @@ export default function HomeUserReseller() {
             </span>
           </div>
 
-          <div className="flex-1 max-w-md mx-6 hidden md:block">
-            <div className="relative group">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+          {/* Desktop Search Bar with Working Search Button & Auto-Suggest */}
+          <div ref={searchContainerRef} className="flex-1 max-w-lg mx-4 lg:mx-6 hidden md:block relative">
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSearchSubmit();
+              }}
+              className="relative flex items-center"
+            >
+              <button 
+                type="submit"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#FF3F6C] transition-colors cursor-pointer flex items-center justify-center p-0.5 rounded-full"
+                title="Search"
+                aria-label="Submit search"
+              >
+                <span className="material-symbols-outlined text-[22px]">search</span>
+              </button>
+
               <input 
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-surface-container-high border-none rounded-xl py-2 pl-10 pr-4 focus:ring-2 focus:ring-primary transition-all text-sm outline-none" 
-                placeholder="Search for products..." 
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearchSubmit();
+                  }
+                }}
+                className="w-full bg-[#f2f4f6] dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-full py-2.5 pl-11 pr-10 focus:ring-2 focus:ring-[#FF3F6C] focus:bg-white dark:focus:bg-slate-900 transition-all text-sm outline-none text-slate-900 dark:text-white placeholder:text-slate-400 font-medium shadow-inner" 
+                placeholder="Search sarees, kurtas, jackets, sneakers..." 
                 type="text" 
               />
-            </div>
+
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setShowSuggestions(false);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-all text-xs cursor-pointer"
+                  title="Clear"
+                >
+                  <span className="material-symbols-outlined text-base">close</span>
+                </button>
+              )}
+            </form>
+
+            {/* Smart Suggestions & Live Preview Dropdown */}
+            {showSuggestions && (
+              <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                {/* Popular Keywords / Trends */}
+                <div className="mb-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 px-1">
+                    Popular Searches
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["Kurta", "Anarkali Kurti", "Saree", "Denim Jacket", "Sneakers", "Headphones"].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery(tag);
+                          handleSearchSubmit(tag);
+                        }}
+                        className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-[#FF3F6C]/10 hover:text-[#FF3F6C] text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[13px] text-slate-400">trending_up</span>
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Instant Matches Preview if user typed */}
+                {searchQuery.trim() && (
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 px-1">
+                      Matching Products
+                    </span>
+                    <div className="max-h-56 overflow-y-auto space-y-1">
+                      {filteredProducts.slice(0, 4).map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            setShowSuggestions(false);
+                            navigate('/product');
+                          }}
+                          className="flex items-center gap-3 p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors group"
+                        >
+                          <img
+                            src={item.image}
+                            alt={item.title}
+                            className="w-10 h-10 rounded-lg object-cover bg-slate-100 shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-[#FF3F6C]">
+                              {item.title}
+                            </p>
+                            <p className="text-[11px] text-slate-400">
+                              ₹{item.price} • <span className="text-[#FF3F6C] font-semibold">{item.discount}</span> • Margin ₹{item.margin}
+                            </p>
+                          </div>
+                          <span className="material-symbols-outlined text-slate-300 group-hover:text-[#FF3F6C] text-sm">
+                            chevron_right
+                          </span>
+                        </div>
+                      ))}
+                      {filteredProducts.length === 0 && (
+                        <p className="text-xs text-slate-400 py-2 px-1">
+                          No direct matches found in preview. Press search to browse all catalogs.
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSearchSubmit()}
+                      className="w-full mt-2 py-2 bg-[#FF3F6C]/10 hover:bg-[#FF3F6C]/20 text-[#FF3F6C] font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-sm">search</span>
+                      Search all catalog for "{searchQuery}"
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -182,18 +389,49 @@ export default function HomeUserReseller() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 pb-32">
-        {/* Mobile Search Anchor */}
+        {/* Mobile Search with Working Search Button */}
         <div className="md:hidden pt-2 pb-4">
-          <div className="relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSearchSubmit();
+            }}
+            className="relative flex items-center"
+          >
+            <button 
+              type="submit"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#FF3F6C] transition-colors cursor-pointer flex items-center justify-center p-0.5 rounded-full"
+              title="Search"
+              aria-label="Submit search"
+            >
+              <span className="material-symbols-outlined text-xl">search</span>
+            </button>
+
             <input 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface-container-high border-none rounded-2xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-primary outline-none" 
-              placeholder="Search products, brands and more" 
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSearchSubmit();
+                }
+              }}
+              className="w-full bg-[#f2f4f6] dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-2xl py-3 pl-11 pr-10 text-sm focus:ring-2 focus:ring-[#FF3F6C] focus:bg-white dark:focus:bg-slate-900 outline-none text-slate-900 dark:text-white placeholder:text-slate-400 font-medium" 
+              placeholder="Search products, brands and more..." 
               type="text" 
             />
-          </div>
+
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-all text-xs cursor-pointer"
+                title="Clear"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            )}
+          </form>
         </div>
 
         {/* Hero Carousel Section */}

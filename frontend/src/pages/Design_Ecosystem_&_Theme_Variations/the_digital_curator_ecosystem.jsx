@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 
 const CATEGORIES = [
@@ -136,8 +137,21 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState(new Set(['prod-1']));
   const [toastMsg, setToastMsg] = useState(null);
+  const navigate = useNavigate();
   const [activeSlide, setActiveSlide] = useState(0);
   const [shareCount, setShareCount] = useState(6);
+
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    const q = searchQuery.trim();
+    if (q) {
+      if (onNavigate) onNavigate(`search?q=${encodeURIComponent(q)}`);
+      else navigate(`/search?q=${encodeURIComponent(q)}`);
+    } else {
+      if (onNavigate) onNavigate('search');
+      else navigate('/search');
+    }
+  };
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -216,27 +230,39 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
 
         {/* Desktop Search */}
         <div className="flex-1 max-w-md mx-6 hidden md:block">
-          <div className="relative group">
-            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
-              search
-            </span>
+          <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+            <button
+              type="submit"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#FF3F6C] flex items-center cursor-pointer transition-colors p-0.5"
+              title="Search"
+              aria-label="Submit search"
+            >
+              <span className="material-symbols-outlined text-lg">search</span>
+            </button>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#f2f4f6] border border-transparent rounded-xl py-2 pl-10 pr-9 focus:ring-2 focus:ring-[#b90041] focus:bg-white transition-all text-sm outline-none placeholder:text-slate-400"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSearchSubmit();
+                }
+              }}
+              className="w-full bg-[#f2f4f6] border border-transparent rounded-full py-2 pl-10 pr-10 focus:ring-2 focus:ring-[#FF3F6C] focus:bg-white transition-all text-sm outline-none placeholder:text-slate-400 shadow-inner"
               placeholder="Search curated products, fabrics, styles..."
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                title="Clear"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             )}
-          </div>
+          </form>
         </div>
 
         <div className="flex items-center gap-3">
@@ -266,27 +292,39 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
       <main className="max-w-7xl mx-auto px-4 pb-32 pt-2">
         {/* Mobile Search Anchor */}
         <div className="md:hidden pt-2 pb-3">
-          <div className="relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-              search
-            </span>
+          <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+            <button
+              type="submit"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#FF3F6C] flex items-center cursor-pointer transition-colors"
+              title="Search"
+              aria-label="Submit search"
+            >
+              <span className="material-symbols-outlined text-lg">search</span>
+            </button>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#f2f4f6] border border-transparent rounded-2xl py-3 pl-12 pr-10 text-sm focus:ring-2 focus:ring-[#b90041] focus:bg-white outline-none shadow-sm transition-all"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSearchSubmit();
+                }
+              }}
+              className="w-full bg-[#f2f4f6] border border-transparent rounded-2xl py-3 pl-12 pr-10 text-sm focus:ring-2 focus:ring-[#FF3F6C] focus:bg-white outline-none shadow-sm transition-all"
               placeholder="Search products, brands and more"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                title="Clear"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             )}
-          </div>
+          </form>
         </div>
 
         {/* Hero Carousel Section */}
