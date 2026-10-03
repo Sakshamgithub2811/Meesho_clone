@@ -16,11 +16,8 @@ redisClient.on("error",(err)=>{
     console.log("👉 Tip: Make sure your local Redis server / Docker container is running on port 6379.");
 });
 
-try{
-    await redisClient.connect();
-}catch(error){
+redisClient.connect().catch(error => {
     console.warn("⚠️ Could not connect to local Redis. Server will continue running.");
-}
-
+});
 
 export default redisClient;
