@@ -1,51 +1,34 @@
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { readFileSync, existsSync } from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let firebaseApp = null;
-let auth = null;
+const serviceAccountPath = path.resolve(__dirname, "serviceAccountKey.json");
 
-const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
+if (!existsSync(serviceAccountPath)) {
+  console.error(`❌ Service account key not found at: ${serviceAccountPath}`);
+} else {
+  try {
+    const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, "utf-8"));
 
-try {
-  if (getApps().length > 0) {
-    firebaseApp = getApps()[0];
-    auth = getAuth(firebaseApp);
-  } else if (fs.existsSync(serviceAccountPath)) {
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-    firebaseApp = initializeApp({
-      credential: cert(serviceAccount),
-    });
-    auth = getAuth(firebaseApp);
-    console.log('✅ Firebase Admin SDK Initialized from serviceAccountKey.json! (Project: ' + serviceAccount.project_id + ')');
-  } else if (
-    process.env.FIREBASE_PROJECT_ID &&
-    process.env.FIREBASE_CLIENT_EMAIL &&
-    process.env.FIREBASE_PRIVATE_KEY
-  ) {
-    firebaseApp = initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      }),
-    });
-    auth = getAuth(firebaseApp);
-    console.log('✅ Firebase Admin SDK Initialized from .env variables! (Project: ' + process.env.FIREBASE_PROJECT_ID + ')');
-  } else {
-    console.log('ℹ️  Firebase credentials not configured yet.');
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert(serviceAccount),
+      });
+      console.log("🔥 Firebase Admin SDK initialized successfully!");
+    }
+  } catch (error) {
+    console.error("❌ Firebase Admin Initialization Error:", error.message);
   }
-} catch (error) {
-  console.warn('⚠️  Firebase Admin initialization warning:', error.message);
 }
 
-export default firebaseApp;
-export { auth };
+// Export auth helper for verifying tokens in middleware
+export const auth = getApps().length > 0 ? getAuth() : null;
+export default { auth }

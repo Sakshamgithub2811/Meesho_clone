@@ -1,0 +1,374 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────────────
+
+enum UserRole {
+  CUSTOMER
+  RESELLER
+  SUPPLIER
+  DRIVER
+  ADMIN
+}
+
+enum KYCStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum OrderStatus {
+  ORDERED
+  CONFIRMED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURN_REQUESTED
+  RETURNED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  COD
+  UPI
+  CARD
+  NETBANKING
+  WALLET
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// ── 1. User Profile (Firebase UID as PK) ───────────────────────
+
+model Profile {
+  id        String   @id // Firebase UID
+  email     String?  @unique
+  phone     String?  @unique
+  fullName  String?  @map("full_name")
+  avatarUrl String?  @map("avatar_url")
+  role      UserRole @default(CUSTOMER)
+
+  addresses       Address[]
+  orders          Order[]
+  cart            CartItem[]
+  wishlist        WishlistItem[]
+  reviews         Review[]
+  wallet          Wallet?
+  kycApplications KYCApplication[]
+  notifications   Notification[]
+  supportTickets  SupportTicket[]
+  referralsMade   Referral[]     @relation("Referrer")
+  referralsUsed   Referral[]     @relation("Referred")
+  deliveryTasks   DeliveryTask[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("profiles")
+}
+
+// ── 2. Address ─────────────────────────────────────────────────
+
+model Address {
+  id          String  @id @default(uuid())
+  userId      String  @map("user_id")
+  user        Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName    String  @map("full_name")
+  phone       String
+  pincode     String
+  addressLine String  @map("address_line")
+  city        String
+  state       String
+  isDefault   Boolean @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("addresses")
+}
+
+// ── 3. Product Categories ──────────────────────────────────────
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  imageUrl  String?   @map("image_url")
+  products  Product[]
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("categories")
+}
+
+// ── 4. Products ────────────────────────────────────────────────
+
+model Product {
+  id                 String   @id @default(uuid())
+  title              String
+  description        String?
+  price              Float
+  originalPrice      Float?   @map("original_price")
+  discountPercentage Int      @default(0) @map("discount_percentage")
+  rating             Float    @default(0)
+  reviewsCount       Int      @default(0) @map("reviews_count")
+  categorySlug       String   @map("category_slug")
+  category           Category @relation(fields: [categorySlug], references: [slug])
+  images             String[]
+  sizes              String[] @default(["S", "M", "L", "XL", "Free Size"])
+  stock              Int      @default(50)
+  isFreeDelivery     Boolean  @default(true) @map("is_free_delivery")
+  supplierName       String   @default("Verified Supplier") @map("supplier_name")
+  supplierId         String?  @map("supplier_id")
+
+  cartItems     CartItem[]
+  wishlistItems WishlistItem[]
+  reviews       Review[]
+  orderItems    OrderItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("products")
+}
+
+// ── 5. Cart Items ──────────────────────────────────────────────
+
+model CartItem {
+  id        String  @id @default(uuid())
+  userId    String  @map("user_id")
+  user      Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int     @default(1)
+  size      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, productId, size])
+  @@map("cart_items")
+}
+
+// ── 6. Wishlist Items ──────────────────────────────────────────
+
+model WishlistItem {
+  id        String  @id @default(uuid())
+  userId    String  @map("user_id")
+  user      Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, productId])
+  @@map("wishlist_items")
+}
+
+// ── 7. Orders ──────────────────────────────────────────────────
+
+model Order {
+  id              String        @id @default(uuid())
+  userId          String        @map("user_id")
+  user            Profile       @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  totalAmount     Float         @map("total_amount")
+  shippingAddress Json          @map("shipping_address")
+  paymentMethod   PaymentMethod @default(COD) @map("payment_method")
+  paymentStatus   PaymentStatus @default(PENDING) @map("payment_status")
+  orderStatus     OrderStatus   @default(ORDERED) @map("order_status")
+  deliveryTask    DeliveryTask?
+  returnRequest   ReturnRequest?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("orders")
+}
+
+// ── 8. Order Items ─────────────────────────────────────────────
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String  @map("order_id")
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+  size      String?
+
+  @@map("order_items")
+}
+
+// ── 9. Reviews ─────────────────────────────────────────────────
+
+model Review {
+  id        String  @id @default(uuid())
+  userId    String  @map("user_id")
+  user      Profile @relation(fields: [userId], references: [id])
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  rating    Int
+  title     String?
+  comment   String?
+  images    String[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, productId])
+  @@map("reviews")
+}
+
+// ── 10. Wallet ─────────────────────────────────────────────────
+
+model Wallet {
+  id      String  @id @default(uuid())
+  userId  String  @unique @map("user_id")
+  user    Profile @relation(fields: [userId], references: [id])
+  balance Float   @default(0)
+  pending Float   @default(0)
+
+  transactions WalletTransaction[]
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("wallets")
+}
+
+// ── 11. Wallet Transactions ────────────────────────────────────
+
+model WalletTransaction {
+  id          String  @id @default(uuid())
+  walletId    String  @map("wallet_id")
+  wallet      Wallet  @relation(fields: [walletId], references: [id])
+  amount      Float
+  type        String  // credit | debit | reversed
+  description String?
+  orderId     String? @map("order_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("wallet_transactions")
+}
+
+// ── 12. KYC Applications ───────────────────────────────────────
+
+model KYCApplication {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  user       Profile   @relation(fields: [userId], references: [id])
+  type       String    // dropshipper | affiliate
+  status     KYCStatus @default(PENDING)
+  documents  Json
+  adminNotes String?   @map("admin_notes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("kyc_applications")
+}
+
+// ── 13. Return Requests ────────────────────────────────────────
+
+model ReturnRequest {
+  id      String @id @default(uuid())
+  orderId String @unique @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id])
+  reason  String
+  status  String @default("requested") // requested | approved | picked_up | refunded | rejected
+  images  String[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("return_requests")
+}
+
+// ── 14. Notifications ──────────────────────────────────────────
+
+model Notification {
+  id     String  @id @default(uuid())
+  userId String  @map("user_id")
+  user   Profile @relation(fields: [userId], references: [id])
+  title  String
+  body   String
+  type   String  // order | promo | system | earning
+  isRead Boolean @default(false) @map("is_read")
+  data   Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+// ── 15. Support Tickets ────────────────────────────────────────
+
+model SupportTicket {
+  id          String       @id @default(uuid())
+  userId      String       @map("user_id")
+  user        Profile      @relation(fields: [userId], references: [id])
+  subject     String
+  description String
+  category    String
+  status      TicketStatus @default(OPEN)
+  priority    String       @default("normal")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("support_tickets")
+}
+
+// ── 16. Delivery Tasks ─────────────────────────────────────────
+
+model DeliveryTask {
+  id           String    @id @default(uuid())
+  orderId      String    @unique @map("order_id")
+  order        Order     @relation(fields: [orderId], references: [id])
+  driverId     String?   @map("driver_id")
+  driver       Profile?  @relation(fields: [driverId], references: [id])
+  status       String    @default("pending") // pending | assigned | picked_up | in_transit | delivered
+  pickupTime   DateTime? @map("pickup_time")
+  deliveryTime DateTime? @map("delivery_time")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("delivery_tasks")
+}
+
+// ── 17. Referrals ──────────────────────────────────────────────
+
+model Referral {
+  id           String  @id @default(uuid())
+  referrerId   String  @map("referrer_id")
+  referrer     Profile @relation("Referrer", fields: [referrerId], references: [id])
+  referredId   String  @map("referred_id")
+  referred     Profile @relation("Referred", fields: [referredId], references: [id])
+  code         String
+  rewardAmount Float   @default(0) @map("reward_amount")
+  isRedeemed   Boolean @default(false) @map("is_redeemed")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("referrals")
+}
