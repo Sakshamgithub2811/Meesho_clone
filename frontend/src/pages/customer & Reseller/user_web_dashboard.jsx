@@ -63,7 +63,7 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
 
   const handleShareProduct = (productName, profit) => {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(`Check out ${productName} on Meesho! Earn ₹${profit} profit!`);
+      navigator.clipboard.writeText(`Check out ${productName} on MShoppy! Earn ₹${profit} profit!`);
     }
     triggerToast(`Shared ${productName}! Earn ₹${profit} per resale 🚀`);
   };
@@ -166,14 +166,16 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
       <aside className="hidden lg:flex flex-col h-screen w-64 bg-white border-r border-slate-100 fixed left-0 top-0 z-40 py-6 px-3 space-y-2">
         <div
           onClick={() => onNavigate('reseller')}
-          className="px-4 mb-6 cursor-pointer flex items-center gap-2 group"
+          className="px-4 mb-6 cursor-pointer flex items-center gap-2.5 group"
         >
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#b90041] to-[#df2457] flex items-center justify-center text-white shadow-md shadow-pink-500/20">
-            <span className="material-symbols-outlined text-xl">storefront</span>
-          </div>
+          <img 
+            src="/mshoppy-logo.png" 
+            alt="MShoppy" 
+            className="w-10 h-10 rounded-2xl object-contain shadow-md shadow-pink-500/10" 
+          />
           <div>
             <h1 className="text-base font-extrabold text-[#b90041] group-hover:underline">
-              Curator Luxe
+              MShoppy
             </h1>
             <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">
               Digital Reseller Hub

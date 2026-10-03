@@ -201,11 +201,14 @@ export function CommunityHub({ onNavigate }) {
             >
               <span className="material-symbols-outlined text-xl">arrow_back</span>
             </button>
-            <div>
-              <h1 className="font-headline font-black text-xl tracking-tight text-[#FF3F6C]">
-                Meesho Community
-              </h1>
-              <p className="text-[10px] text-slate-400 font-medium">150,000+ Active Resellers</p>
+            <div className="flex items-center gap-2">
+              <img src="/mshoppy-logo.png" alt="MShoppy" className="w-8 h-8 rounded-lg object-contain shadow-xs" />
+              <div>
+                <h1 className="font-headline font-black text-xl tracking-tight text-[#FF3F6C]">
+                  MShoppy Community
+                </h1>
+                <p className="text-[10px] text-slate-400 font-medium">150,000+ Active Resellers</p>
+              </div>
             </div>
           </div>
 

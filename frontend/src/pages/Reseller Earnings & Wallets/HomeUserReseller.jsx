@@ -237,12 +237,19 @@ export default function HomeUserReseller() {
             >
               <span className="material-symbols-outlined text-2xl">menu</span>
             </button>
-            <span 
+            <div 
               onClick={() => navigate('/reseller-home')}
-              className="text-base sm:text-xl md:text-2xl font-black text-[#FF3F6C] font-headline tracking-tight cursor-pointer whitespace-nowrap"
+              className="flex items-center gap-2 cursor-pointer group select-none"
             >
-              The Digital Curator
-            </span>
+              <img 
+                src="/mshoppy-logo.png" 
+                alt="MShoppy" 
+                className="w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-xl shadow-xs transition-transform group-hover:scale-105" 
+              />
+              <span className="text-lg sm:text-2xl font-black text-[#FF3F6C] font-headline tracking-tight whitespace-nowrap">
+                MShoppy
+              </span>
+            </div>
           </div>
 
           {/* Desktop Search Bar with Working Search Button & Auto-Suggest */}

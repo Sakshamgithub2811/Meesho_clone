@@ -366,7 +366,7 @@ export default function CheckoutPayment({ onNavigate = () => {}, onBack }) {
             <div className="bg-emerald-50/70 border border-emerald-200 p-4 rounded-3xl text-xs space-y-1 text-emerald-900">
               <span className="font-extrabold flex items-center gap-1">
                 <span className="material-symbols-outlined text-base text-emerald-600">verified</span>
-                Meesho Trust Guarantee
+                MShoppy Trust Guarantee
               </span>
               <p className="text-emerald-800 text-[11px] leading-relaxed">
                 Free replacements &amp; easy 7-day doorstep returns if product doesn't match description.

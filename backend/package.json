@@ -1,0 +1,32 @@
+{
+  "name": "meesho-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Meesho SuperApp Social Commerce Platform",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "meesho",
+    "ecommerce",
+    "social-commerce",
+    "express",
+    "node"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "firebase-admin": "^14.5.0",
+    "morgan": "^1.10.0",
+    "redis": "^6.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

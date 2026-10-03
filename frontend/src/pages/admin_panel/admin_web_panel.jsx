@@ -164,8 +164,13 @@ export function AdminWebPanel({ onNavigate, onSwitchView, onLogout }) {
           >
             <span className="material-symbols-outlined text-2xl">menu</span>
           </button>
+          <img 
+            src="/mshoppy-logo.png" 
+            alt="MShoppy" 
+            className="w-7 h-7 rounded-lg object-contain shadow-xs" 
+          />
           <h1 className="text-sm font-black text-rose-600 font-['Plus_Jakarta_Sans',sans-serif]">
-            Admin Console
+            MShoppy Admin
           </h1>
         </div>
         <button
@@ -190,13 +195,20 @@ export function AdminWebPanel({ onNavigate, onSwitchView, onLogout }) {
           >
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-                <div>
-                  <h2 className="text-base font-black text-rose-500 font-['Plus_Jakarta_Sans',sans-serif]">
-                    Admin Console
-                  </h2>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                    Digital Curator Hub
-                  </p>
+                <div className="flex items-center gap-2.5">
+                  <img 
+                    src="/mshoppy-logo.png" 
+                    alt="MShoppy" 
+                    className="w-8 h-8 rounded-lg object-contain" 
+                  />
+                  <div>
+                    <h2 className="text-base font-black text-rose-500 font-['Plus_Jakarta_Sans',sans-serif]">
+                      MShoppy Admin
+                    </h2>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                      Central Management Hub
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -363,13 +375,20 @@ export function AdminWebPanel({ onNavigate, onSwitchView, onLogout }) {
       <div className="flex min-h-screen flex-1">
         {/* ===================== Sidebar Navigation Shell ===================== */}
         <aside className="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 z-40 bg-slate-50 dark:bg-slate-950 py-6 space-y-2 border-r border-slate-200/60 dark:border-slate-800">
-          <div className="px-6 mb-8">
-            <h1 className="text-lg font-black text-rose-600 font-['Plus_Jakarta_Sans',sans-serif]">
-              Management Console
-            </h1>
-            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mt-0.5">
-              Digital Curator Hub
-            </p>
+          <div className="px-6 mb-8 flex items-center gap-3">
+            <img 
+              src="/mshoppy-logo.png" 
+              alt="MShoppy" 
+              className="w-9 h-9 rounded-xl object-contain shadow-xs" 
+            />
+            <div>
+              <h1 className="text-base font-black text-rose-600 font-['Plus_Jakarta_Sans',sans-serif]">
+                MShoppy Admin
+              </h1>
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mt-0.5">
+                Central Management Hub
+              </p>
+            </div>
           </div>
 
           <nav className="flex-1 px-3 space-y-1 overflow-y-auto no-scrollbar">

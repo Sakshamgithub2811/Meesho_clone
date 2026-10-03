@@ -87,12 +87,19 @@ export default function HomeScreenFlutterLuxe({ onNavigate = () => {} }) {
           >
             arrow_back
           </button>
-          <span
+          <div
             onClick={() => onNavigate('reseller')}
-            className="font-extrabold italic text-2xl tracking-tight text-pink-600 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer group"
           >
-            The Curator Luxe
-          </span>
+            <img 
+              src="/mshoppy-logo.png" 
+              alt="MShoppy" 
+              className="w-8 h-8 rounded-xl object-contain shadow-xs" 
+            />
+            <span className="font-extrabold italic text-2xl tracking-tight text-pink-600">
+              MShoppy Luxe
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">

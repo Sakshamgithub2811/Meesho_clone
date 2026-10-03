@@ -56,7 +56,7 @@ export default function LoginPage() {
 
           <div>
             <h2 className="text-2xl font-extrabold text-[#4a2135]">
-              Welcome to The Atelier!
+              Welcome to MShoppy!
             </h2>
             <p className="text-sm text-[#7d4d62] mt-2">
               Logged in as <span className="font-bold text-[#b7004d]">{user}</span>
@@ -68,7 +68,7 @@ export default function LoginPage() {
               onClick={() => navigate('/reseller-home')}
               className="w-full bg-[#b7004d] hover:bg-[#990040] text-white font-extrabold py-3.5 rounded-[2rem] transition-colors cursor-pointer text-sm shadow-lg shadow-[#b7004d]/25 active:scale-95"
             >
-              Enter Reseller Catalog →
+              Enter MShoppy Reseller Catalog →
             </button>
 
             <button
@@ -93,14 +93,15 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#fff4f6]/90 z-10" />
         <img
           className="w-full h-full object-cover mix-blend-multiply opacity-80"
-          alt="The Atelier Community"
+          alt="MShoppy Community"
           src="https://lh3.googleusercontent.com/aida-public/AB6AXuA17Odz0VuEd9507iy5ggYedrO4p3lV7PTifqh_NIFIjMwYs7F7xvv7dJPF3VZ6Z11llVLVw5xtNaMn4qJcaZlijJ5VYBvw4lkhDG0GaD_3mqVC6fp_xGCsC_hT5Kl2Yvq85636Vd8iv-Nfvmw3A5Otx5SstITEeJ4evOSjB2EZqGwhDYhrJHL4AtEO6BSjDVRSWi-AhA3f8HCmXuKT-yo3NUOxOwpD4XR4x4e-hJLySUEWwuFS8o8Obusm8jNEjV35CWqYtkzkNNg"
         />
         {/* Floating Brand Chip */}
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-20">
-          <div className="bg-white/70 backdrop-blur-[20px] px-6 py-2 rounded-full border border-white/30 shadow-[0_12px_40px_rgba(74,33,53,0.06)]">
+          <div className="bg-white/80 backdrop-blur-[20px] px-6 py-2 rounded-full border border-white/40 shadow-[0_12px_40px_rgba(74,33,53,0.06)] flex items-center gap-2.5">
+            <img src="/mshoppy-logo.png" alt="MShoppy" className="w-7 h-7 rounded-lg object-contain" />
             <span className="text-[#b7004d] font-black tracking-tighter text-xl">
-              THE ATELIER
+              MSHOPPY
             </span>
           </div>
         </div>

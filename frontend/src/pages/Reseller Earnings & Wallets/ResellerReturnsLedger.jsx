@@ -190,7 +190,7 @@ export default function ResellerReturnsLedger({ onNavigate, onBack }) {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Meesho_Reseller_Margin_Reversals_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `MShoppy_Reseller_Margin_Reversals_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -199,7 +199,7 @@ export default function ResellerReturnsLedger({ onNavigate, onBack }) {
 
   // Copy WhatsApp Sizing Guide
   const handleCopySizeGuide = () => {
-    const guideText = `🛍️ *Meesho Sizing Guide for Kurti & Western Wear*:\n\n📏 *Bust Size Tips*:\n• S: 36 inches | M: 38 inches\n• L: 40 inches | XL: 42 inches | XXL: 44 inches\n\n💡 *Tip for perfect fit*: Please pick 1 size larger if you prefer relaxed ethnic fitting. 100% replacement available within 7 days!`;
+    const guideText = `🛍️ *MShoppy Sizing Guide for Kurti & Western Wear*:\n\n📏 *Bust Size Tips*:\n• S: 36 inches | M: 38 inches\n• L: 40 inches | XL: 42 inches | XXL: 44 inches\n\n💡 *Tip for perfect fit*: Please pick 1 size larger if you prefer relaxed ethnic fitting. 100% replacement available within 7 days!`;
     navigator.clipboard.writeText(guideText);
     showToast('📋 Copied WhatsApp Size Guide! Paste and send to customers to reduce returns.');
   };
@@ -386,7 +386,7 @@ export default function ResellerReturnsLedger({ onNavigate, onBack }) {
                 Why was my margin reversed?
               </h4>
               <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed">
-                As per Meesho Reseller Guidelines, if a buyer returns a product within the 7-day window, the profit margin is canceled. If you believe the customer kept the item or the return was invalid, you can raise an inquiry.
+                As per MShoppy Reseller Guidelines, if a buyer returns a product within the 7-day window, the profit margin is canceled. If you believe the customer kept the item or the return was invalid, you can raise an inquiry.
               </p>
             </div>
           </div>
@@ -430,7 +430,7 @@ export default function ResellerReturnsLedger({ onNavigate, onBack }) {
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
                 <strong className="text-slate-900 font-bold block">3. Encourage Size Exchange over Return</strong>
-                <p className="text-slate-500">If buyer has fit issues, guide them to request an Exchange in the Meesho app so your margin remains intact!</p>
+                <p className="text-slate-500">If buyer has fit issues, guide them to request an Exchange in the MShoppy app so your margin remains intact!</p>
               </div>
             </div>
           </section>
@@ -500,7 +500,7 @@ export default function ResellerReturnsLedger({ onNavigate, onBack }) {
               Margin Deductions Ledger ({filteredReversals.length})
             </h4>
             <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-              Linked with Meesho Returns Pipeline
+              Linked with MShoppy Returns Pipeline
             </span>
           </div>
 

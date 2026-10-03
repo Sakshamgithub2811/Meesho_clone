@@ -215,15 +215,13 @@ export default function TheDigitalCuratorEcosystem({ onNavigate }) {
           onClick={() => onNavigate && onNavigate('reseller')} 
           className="flex items-center gap-3 cursor-pointer select-none"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#b90041] to-[#FF3F6C] flex items-center justify-center text-white shadow-md shadow-[#FF3F6C]/30">
-            <span className="material-symbols-outlined text-lg">interests</span>
-          </div>
+          <img src="/mshoppy-logo.png" alt="MShoppy" className="w-9 h-9 rounded-xl object-contain shadow-xs" />
           <div>
             <span className="text-xl sm:text-2xl font-black text-[#FF3F6C] font-['Plus_Jakarta_Sans'] tracking-tight block leading-tight">
-              The Digital Curator
+              MShoppy
             </span>
             <span className="text-[10px] font-semibold text-slate-400 tracking-wider uppercase hidden sm:block">
-              Meesho Premier Ecosystem
+              MShoppy Premier Ecosystem
             </span>
           </div>
         </div>

@@ -205,9 +205,14 @@ export default function DropshipperLogin() {
       {/* Top Brand Bar */}
       <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 sm:gap-2 cursor-pointer min-w-0" onClick={() => navigate('/')}>
+          <div className="flex items-center gap-2 cursor-pointer min-w-0" onClick={() => navigate('/')}>
+            <img 
+              src="/mshoppy-logo.png" 
+              alt="MShoppy" 
+              className="w-8 h-8 rounded-xl object-contain shadow-xs" 
+            />
             <span className="text-lg sm:text-2xl font-black text-[#FF3F6C] font-['Plus_Jakarta_Sans'] tracking-tight whitespace-nowrap">
-              Meesho Direct
+              MShoppy Direct
             </span>
             <span className="bg-[#b90041]/20 text-[#FF6B8B] text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full border border-[#b90041]/40 uppercase tracking-wide whitespace-nowrap">
               B2B <span className="hidden sm:inline">Dropshipper </span>Portal
@@ -630,7 +635,7 @@ export default function DropshipperLogin() {
             {/* Legal & Terms notice */}
             <div className="mt-6 pt-5 border-t border-gray-800 text-center">
               <p className="text-[11px] text-gray-500 leading-relaxed">
-                By continuing, you agree to the Meesho Dropshipper Agreement &amp; B2B Terms of Service.
+                By continuing, you agree to the MShoppy Dropshipper Agreement &amp; B2B Terms of Service.
               </p>
             </div>
           </div>
@@ -671,7 +676,7 @@ export default function DropshipperLogin() {
                 {googleAuthMode === 'login' ? 'Sign in with Google' : 'Sign up with Google'}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                to continue to <strong className="text-slate-800">Meesho Direct B2B Portal</strong>
+                to continue to <strong className="text-slate-800">MShoppy Direct B2B Portal</strong>
               </p>
             </div>
 
@@ -808,7 +813,7 @@ export default function DropshipperLogin() {
             {/* Modal Footer */}
             <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                To continue, Google will share your name, email address, and profile picture with Meesho Direct B2B Portal.
+                To continue, Google will share your name, email address, and profile picture with MShoppy Direct B2B Portal.
               </p>
             </div>
           </div>
@@ -817,7 +822,7 @@ export default function DropshipperLogin() {
 
       {/* Footer */}
       <footer className="border-t border-gray-850 py-4 px-6 text-center text-xs text-gray-500">
-        <p>© 2026 Meesho B2B Network • Direct Supplier-to-Customer Fulfillment Engine</p>
+        <p>© 2026 MShoppy B2B Network • Direct Supplier-to-Customer Fulfillment Engine</p>
       </footer>
     </div>
   );

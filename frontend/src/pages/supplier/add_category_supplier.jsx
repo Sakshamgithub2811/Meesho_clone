@@ -164,7 +164,7 @@ export function AddCategorySupplier({ onBack, onSaveCategory }) {
                       Category Display Icon &amp; Thumbnail
                     </h3>
                     <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-                      This icon will appear on the Meesho Mobile App Categories Bar and the
+                      This icon will appear on the MShoppy Mobile App Categories Bar and the
                       Explorer navigation menu. Recommended size: 400x400 px PNG/JPG.
                     </p>
                   </div>

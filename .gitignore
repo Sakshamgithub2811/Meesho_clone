@@ -8,6 +8,14 @@ dist/
 dist-ssr/
 *.local
 
+# Environment Variables & Secrets
+.env
+*.env
+.env.*
+!.env.example
+*serviceAccount*.json
+serviceAccountKey.json
+
 # Logs
 logs/
 *.log

@@ -196,13 +196,13 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-slate-100 text-sm">Meesho Merchant Compliance Desk</span>
+                <span className="font-extrabold text-slate-100 text-sm">MShoppy Merchant Compliance Desk</span>
                 <span className="bg-pink-500/20 text-pink-300 text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-pink-500/30">
                   Official Verification
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                KYC submissions are verified and approved exclusively by the Meesho Admin Team. Applicants cannot self-approve.
+                KYC submissions are verified and approved exclusively by the MShoppy Admin Team. Applicants cannot self-approve.
               </p>
             </div>
           </div>
@@ -242,7 +242,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
                   Congratulations, {app.fullName || 'Sarah James'}! 🎉
                 </h2>
                 <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed font-medium">
-                  Your KYC documents and bank mandate have been fully authenticated by the Meesho merchant compliance
+                  Your KYC documents and bank mandate have been fully authenticated by the MShoppy merchant compliance
                   desk. You are now officially enrolled in the <strong>{app.tier || 'Gold Creator Partner'}</strong> tier with{' '}
                   <strong className="text-emerald-300 font-extrabold">{app.commissionRate || 15}% commission rate</strong>.
                 </p>
@@ -653,7 +653,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
                 <span className="material-symbols-outlined text-2xl">loyalty</span>
               </div>
               <h3 className="text-lg font-black text-slate-900 font-['Plus_Jakarta_Sans']">
-                Meesho Affiliate Program
+                MShoppy Affiliate Program
               </h3>
               <p className="text-xs text-slate-500">Official KYC Application Acknowledgment</p>
             </div>

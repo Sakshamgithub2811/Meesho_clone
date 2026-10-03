@@ -95,7 +95,7 @@ export default function ResellerWallet() {
       .join('\n');
 
     const fullContent =
-      `=========================================\nMEESHO RESELLER MONTHLY EARNINGS REPORT\nMonth: October 2023\nTotal Balance: ₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nPending Amount: ₹${pendingAmount.toFixed(2)}\nOrders Delivered: 184\n=========================================\n\n` +
+      `=========================================\nMSHOPPY RESELLER MONTHLY EARNINGS REPORT\nMonth: October 2023\nTotal Balance: ₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nPending Amount: ₹${pendingAmount.toFixed(2)}\nOrders Delivered: 184\n=========================================\n\n` +
       reportHeader +
       reportRows;
 
@@ -103,7 +103,7 @@ export default function ResellerWallet() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'Meesho_Earnings_Report_Oct2023.csv');
+    link.setAttribute('download', 'MShoppy_Earnings_Report_Oct2023.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

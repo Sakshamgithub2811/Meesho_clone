@@ -260,7 +260,7 @@ export default function SupplierRotLedger() {
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-extrabold tracking-wider text-blue-300 uppercase">
               <span className="material-symbols-outlined text-sm">info</span>
-              Supplier ROT Settlement Policy (Meesho Model)
+              Supplier ROT Settlement Policy (MShoppy Model)
             </div>
             <p className="text-xs text-slate-200 max-w-2xl leading-relaxed">
               <strong>Supplier Fault (Defect/Wrong SKU)</strong> hone par Reverse Freight aapke payout se debit hota hai. Agar customer ne <strong>Size/Fit</strong> ke kaaran return kiya hai, toh aap par <strong>₹0 ROT</strong> lagti hai. Swapped/damaged returns par aap <strong>SPF claim</strong> raise kar sakte hain.

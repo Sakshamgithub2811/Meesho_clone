@@ -284,12 +284,14 @@ export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders, o
         <aside className="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 z-40 bg-slate-50 dark:bg-slate-950 py-6 space-y-2 border-r border-slate-200/60 dark:border-slate-800">
           <div className="px-6 mb-6">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#FF3F6C] to-pink-600 flex items-center justify-center text-white font-black text-sm shadow-xs">
-                S
-              </div>
+              <img 
+                src="/mshoppy-logo.png" 
+                alt="MShoppy" 
+                className="w-8 h-8 rounded-lg object-contain shadow-xs" 
+              />
               <div>
                 <h1 className="text-base font-black text-[#FF3F6C] font-['Plus_Jakarta_Sans',sans-serif] tracking-tight leading-tight">
-                  Seller Console
+                  MShoppy Seller
                 </h1>
                 <p className="text-[9px] uppercase tracking-widest text-slate-400 font-bold mt-0.5">
                   Supplier &amp; Merchant Hub

@@ -1122,7 +1122,7 @@ export default function DropshipperSettlementTracking({ onNavigate, onBack }) {
               </div>
 
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800">
-                ⚠️ <strong>Note:</strong> Meesho Admin team verifies logistics CCTV and AWB call logs. Approved claims are refunded to your Reseller Wallet within 48 hours.
+                ⚠️ <strong>Note:</strong> MShoppy Admin team verifies logistics CCTV and AWB call logs. Approved claims are refunded to your Reseller Wallet within 48 hours.
               </div>
 
               {/* Submit Buttons */}

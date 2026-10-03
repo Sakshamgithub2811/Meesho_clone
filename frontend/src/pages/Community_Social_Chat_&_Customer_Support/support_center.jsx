@@ -57,7 +57,7 @@ export function SupportCenter({ onNavigate, onOpenChat }) {
 
   // Live Chat state
   const [chatMessages, setChatMessages] = useState([
-    { id: '1', sender: 'agent', text: 'Hello! I am Meesho Support Bot. How can I help with your reseller account or order today?' },
+    { id: '1', sender: 'agent', text: 'Hello! I am MShoppy Support Bot. How can I help with your reseller account or order today?' },
   ]);
   const [chatInput, setChatInput] = useState('');
 
@@ -476,7 +476,7 @@ export function SupportCenter({ onNavigate, onOpenChat }) {
                   <span className="material-symbols-outlined text-lg">support_agent</span>
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm leading-none">Meesho Reseller Happiness</h3>
+                  <h3 className="font-bold text-sm leading-none">MShoppy Reseller Happiness</h3>
                   <span className="text-[10px] text-pink-100 font-semibold">Active Specialist Online</span>
                 </div>
               </div>

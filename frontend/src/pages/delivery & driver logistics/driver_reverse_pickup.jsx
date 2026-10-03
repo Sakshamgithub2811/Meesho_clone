@@ -160,7 +160,7 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
     },
     fake_product: {
       title: 'Different / Fake / Duplicate Item Handed Over',
-      desc: 'Product returned is not the original Meesho catalog brand item.',
+      desc: 'Product returned is not the original MShoppy catalog brand item.',
     },
     damaged_by_customer: {
       title: 'Physical Damage / Tear Caused by Customer',
@@ -859,7 +859,7 @@ export default function DriverReversePickup({ onNavigate, onBack }) {
                 )}
               </h3>
               <p className="text-[11px] text-slate-500">
-                Scan tamper-evident Meesho return polybag before leaving customer doorstep
+                Scan tamper-evident MShoppy return polybag before leaving customer doorstep
               </p>
             </div>
           </div>

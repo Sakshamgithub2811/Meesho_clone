@@ -149,7 +149,7 @@ export default function OrderDetailsDriver({ onNavigate = () => {}, onBack }) {
                     <h4 className="font-extrabold text-base text-[#1c1b1b]">Priya Sharma</h4>
                     <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                       <span className="text-amber-500 font-bold">★ 4.9 Rating</span>
-                      <span>• Verified Meesho Shopper</span>
+                      <span>• Verified MShoppy Shopper</span>
                     </p>
                   </div>
                 </div>

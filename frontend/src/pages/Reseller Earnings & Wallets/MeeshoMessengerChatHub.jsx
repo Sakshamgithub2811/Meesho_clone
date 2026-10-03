@@ -85,9 +85,12 @@ export default function MeeshoMessengerChatHub() {
             >
               <span className="material-symbols-outlined text-2xl">arrow_back</span>
             </button>
-            <h1 className="font-['Plus_Jakarta_Sans'] font-bold tracking-tight text-slate-900 text-lg sm:text-xl">
-              Reseller Messenger
-            </h1>
+            <div className="flex items-center gap-2">
+              <img src="/mshoppy-logo.png" alt="MShoppy" className="w-7 h-7 rounded-lg object-contain shadow-xs" />
+              <h1 className="font-['Plus_Jakarta_Sans'] font-bold tracking-tight text-slate-900 text-lg sm:text-xl">
+                MShoppy Messenger
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <button className="material-symbols-outlined p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-900 cursor-pointer">

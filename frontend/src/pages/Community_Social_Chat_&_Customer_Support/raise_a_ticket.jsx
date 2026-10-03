@@ -494,7 +494,7 @@ export function RaiseATicket({ onNavigate, onBack }) {
               <div className="flex items-center gap-2.5">
                 <span className="material-symbols-outlined">smart_toy</span>
                 <div>
-                  <h3 className="font-bold text-sm leading-none">Meesho AI Helpdesk</h3>
+                  <h3 className="font-bold text-sm leading-none">MShoppy AI Helpdesk</h3>
                   <span className="text-[10px] text-emerald-200">Instant Automated Resolution</span>
                 </div>
               </div>

@@ -80,14 +80,16 @@ export default function NavDrawer({ isOpen, onClose }) {
         {/* Drawer Header */}
         <div className="p-6 bg-gradient-to-br from-[#FF3F6C] to-[#b90041] text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-bold text-lg font-['Plus_Jakarta_Sans'] shadow-inner">
-              M
-            </div>
+            <img 
+              src="/mshoppy-logo.png" 
+              alt="MShoppy" 
+              className="w-10 h-10 rounded-2xl object-cover border border-white/30 shadow-inner bg-white" 
+            />
             <div>
               <h2 className="font-['Plus_Jakarta_Sans'] font-extrabold text-lg leading-tight">
-                Meesho Reseller
+                MShoppy Reseller
               </h2>
-              <p className="text-white/80 text-xs font-medium">Digital Curator Hub</p>
+              <p className="text-white/80 text-xs font-medium">Digital Commerce Hub</p>
             </div>
           </div>
           <button

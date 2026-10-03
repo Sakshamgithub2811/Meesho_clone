@@ -81,7 +81,7 @@ export default function MeeshoVelocity({ onNavigate = () => {}, onBack }) {
             </div>
             <div>
               <h1 className="font-black text-base sm:text-lg text-[#191c1e] tracking-tight leading-none">
-                Meesho Velocity Grid
+                MShoppy Velocity Grid
               </h1>
               <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider mt-0.5">
                 Ultra-Speed Fleet Telemetry

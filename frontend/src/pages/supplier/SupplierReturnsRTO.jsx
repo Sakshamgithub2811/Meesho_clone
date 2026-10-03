@@ -77,7 +77,7 @@ const INITIAL_RETURNS = [
       issueType: 'Wrong / Used Item Returned',
       claimAmount: 899,
       status: 'Under Review',
-      reviewNote: 'Meesho Trust & Safety team inspecting unboxing video proofs.',
+      reviewNote: 'MShoppy Trust & Safety team inspecting unboxing video proofs.',
     },
     trackingSteps: [
       { title: 'Reverse Pickup Completed', time: '20 Oct, 02:00 PM', location: 'Bengaluru Hub', done: true },
@@ -274,7 +274,7 @@ export default function SupplierReturnsRTO({ onNavigate, onBack }) {
               issueType: spfIssueType,
               claimAmount: Number(spfClaimAmount) || it.price,
               status: 'Under Review',
-              reviewNote: `Claim submitted with ${spfFiles.length} photo/video proofs. Meesho inspection in progress (SLA: 48h).`,
+              reviewNote: `Claim submitted with ${spfFiles.length} photo/video proofs. MShoppy inspection in progress (SLA: 48h).`,
             },
           };
         }
@@ -299,7 +299,7 @@ export default function SupplierReturnsRTO({ onNavigate, onBack }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Meesho_Returns_RTO_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `MShoppy_Returns_RTO_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     showToast('Returns & RTO report downloaded successfully!');
   };

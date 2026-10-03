@@ -158,7 +158,7 @@ export function AddNewProductSupplier({ onBack, onSaveDraft, onPublish }) {
     if (onPublish) {
       onPublish(newProduct);
     } else {
-      showToast('🚀 Product successfully published to your Meesho catalog!');
+      showToast('🚀 Product successfully published to your MShoppy catalog!');
     }
   };
 
@@ -618,7 +618,7 @@ export function AddNewProductSupplier({ onBack, onSaveDraft, onPublish }) {
                 </p>
               </div>
 
-              {/* Live Meesho Product Card Preview */}
+              {/* Live MShoppy Product Card Preview */}
               <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -674,7 +674,7 @@ export function AddNewProductSupplier({ onBack, onSaveDraft, onPublish }) {
                   type="submit"
                   className="w-full py-4 bg-gradient-to-r from-[#B90041] to-[#DF2457] hover:from-[#a00037] hover:to-[#c71e4d] text-white font-black text-sm rounded-2xl shadow-xl shadow-pink-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
                 >
-                  <span>Publish to Meesho Catalog</span>
+                  <span>Publish to MShoppy Catalog</span>
                   <span className="material-symbols-outlined text-lg">rocket_launch</span>
                 </button>
                 <button

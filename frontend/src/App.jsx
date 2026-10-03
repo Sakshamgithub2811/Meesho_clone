@@ -158,7 +158,7 @@ const screenCatalog = [
   { path: '/delivery-history', name: 'Delivery History', icon: '📜', group: 'Logistics' },
   { path: '/driver-earnings', name: 'Driver Earnings', icon: '💰', group: 'Logistics' },
   { path: '/rider-express', name: 'Rider Express', icon: '⚡', group: 'Logistics' },
-  { path: '/meesho-velocity', name: 'Meesho Velocity', icon: '🚀', group: 'Logistics' },
+  { path: '/meesho-velocity', name: 'MShoppy Velocity', icon: '🚀', group: 'Logistics' },
   { path: '/swiftroute', name: 'SwiftRoute AI', icon: '🧭', group: 'Logistics' },
   { path: '/driver-reverse-pickup', name: 'Reverse Pickup QC', icon: '🔄', group: 'Logistics' },
 

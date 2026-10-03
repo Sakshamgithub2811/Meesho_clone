@@ -1537,7 +1537,7 @@ export default function DropshipperKYCRegister({ onNavigate = () => {}, onBack }
                 Application Submitted! 🎉
               </h3>
               <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                Your Dropshipper store credentials and KYC document proofs have been securely routed to the <strong>Meesho Merchant Verification Desk</strong>.
+                Your Dropshipper store credentials and KYC document proofs have been securely routed to the <strong>MShoppy Merchant Verification Desk</strong>.
               </p>
             </div>
 
