@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Reseller & Fintech Pages (Shruti Branch)
 import HomeUserReseller from './pages/Reseller Earnings & Wallets/HomeUserReseller';
@@ -838,55 +839,57 @@ function AppRoutes() {
           element={<CustomerOrderSupplierFulfilment onNavigate={handleNav} onBack={handleBack} />}
         />
 
-        {/* Admin Panel & Support Routes */}
-        <Route
-          path="/admin-panel"
-          element={
-            <AdminWebPanel
-              onNavigate={handleNav}
-              onSwitchView={() => handleNav('/seller-dashboard')}
-              onLogout={() => handleNav('/login')}
-            />
-          }
-        />
-        <Route
-          path="/admin-support"
-          element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
-        />
-        <Route
-          path="/support"
-          element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
-        />
-        <Route
-          path="/admin-rot-rules"
-          element={<AdminRotRulesConfigurator onNavigate={handleNav} onBack={handleBack} />}
-        />
-        <Route
-          path="/admin-dropshipper-kyc"
-          element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
-        />
-        <Route
-          path="/admin-kyc"
-          element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
-        />
-        <Route
-          path="/admin-affiliate-kyc"
-          element={<AdminAffiliateKycApproval onNavigate={handleNav} onBack={handleBack} />}
-        />
-        <Route
-          path="/admin-returns"
-          element={<AdminReturnRefundHub onNavigate={handleNav} onBack={handleBack} />}
-        />
-        <Route
-          path="/admin-catalog"
-          element={<AdminProductCatalog onNavigate={handleNav} onAddNewProduct={() => handleNav('/add-product')} />}
-        />
-        <Route
-          path="/campaign-flow"
-          element={<CampaignCreationFlowAdmin onNavigate={handleNav} onCancel={() => handleNav('/admin-panel')} />}
-        />
-        <Route path="/admin-analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
+        {/* Admin Panel Routes (Protected) */}
+        {/* <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}> */}
+          <Route
+            path="/admin-panel"
+            element={
+              <AdminWebPanel
+                onNavigate={handleNav}
+                onSwitchView={() => handleNav('/seller-dashboard')}
+                onLogout={() => handleNav('/login')}
+              />
+            }
+          />
+          <Route
+            path="/admin-support"
+            element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
+          />
+          <Route
+            path="/support"
+            element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
+          />
+          <Route
+            path="/admin-rot-rules"
+            element={<AdminRotRulesConfigurator onNavigate={handleNav} onBack={handleBack} />}
+          />
+          <Route
+            path="/admin-dropshipper-kyc"
+            element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
+          />
+          <Route
+            path="/admin-kyc"
+            element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
+          />
+          <Route
+            path="/admin-affiliate-kyc"
+            element={<AdminAffiliateKycApproval onNavigate={handleNav} onBack={handleBack} />}
+          />
+          <Route
+            path="/admin-returns"
+            element={<AdminReturnRefundHub onNavigate={handleNav} onBack={handleBack} />}
+          />
+          <Route
+            path="/admin-catalog"
+            element={<AdminProductCatalog onNavigate={handleNav} onAddNewProduct={() => handleNav('/add-product')} />}
+          />
+          <Route
+            path="/campaign-flow"
+            element={<CampaignCreationFlowAdmin onNavigate={handleNav} onCancel={() => handleNav('/admin-panel')} />}
+          />
+          <Route path="/admin-analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
+          <Route path="/analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
+        {/* </Route> */}
         <Route
           path="/support-center"
           element={<SupportCenter onNavigate={handleNav} onOpenChat={() => handleNav('/conversation')} />}
