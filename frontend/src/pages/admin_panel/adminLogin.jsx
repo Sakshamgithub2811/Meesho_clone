@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../redux/userSlice';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../utils/firebase'; 
+import { auth } from '../../utils/firebase';
+import axios from 'axios';
+
 
 export default function AdminLogin() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
-  const [fullName, setFullName] = useState(''); 
+
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
@@ -20,11 +22,11 @@ export default function AdminLogin() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    
+
     try {
       let userCredential;
-      
-  
+
+
       if (isRegistering) {
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
       } else {
@@ -32,10 +34,12 @@ export default function AdminLogin() {
       }
 
       const firebaseUser = userCredential.user;
-      
+      // const token = await firebaseUser.getIdToken();
+      // console.log("MERA FIREBASE TOKEN YEH HAI:", token);
+
       // 2. Backend API Call (Ab hum fullName bhi bhej rahe hain)
-      const endpoint = isRegistering 
-        ? 'http://localhost:5000/api/v1/admin-auth/register' 
+      const endpoint = isRegistering
+        ? 'http://localhost:5000/api/v1/admin-auth/register'
         : 'http://localhost:5000/api/v1/admin-auth/login';
 
       const response = await axios.post(endpoint, {
@@ -46,7 +50,7 @@ export default function AdminLogin() {
 
       const data = response.data;
 
-     
+
       // 3. Save to Redux & Redirect
       dispatch(loginSuccess(data.user));
       navigate('/admin-panel');
@@ -83,7 +87,7 @@ export default function AdminLogin() {
 
         <div className="w-full bg-white p-8 rounded-[3rem] shadow-[0_12px_40px_rgba(74,33,53,0.06)] space-y-6">
           <form onSubmit={handleAdminAuth} className="space-y-6">
-            
+
             {/* Naya Full Name Input (Sirf Register mode me dikhega) */}
             {isRegistering && (
               <div className="space-y-2">
@@ -140,11 +144,11 @@ export default function AdminLogin() {
           </form>
 
           <button
-             type="button"
-             onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
-             className="w-full py-2 text-[#b7004d] font-bold text-sm hover:underline transition-all cursor-pointer"
+            type="button"
+            onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
+            className="w-full py-2 text-[#b7004d] font-bold text-sm hover:underline transition-all cursor-pointer"
           >
-             {isRegistering ? 'Already an Admin? Login' : 'Need to register? Sign Up'}
+            {isRegistering ? 'Already an Admin? Login' : 'Need to register? Sign Up'}
           </button>
         </div>
       </main>
