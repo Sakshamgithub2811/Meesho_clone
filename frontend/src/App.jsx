@@ -77,6 +77,7 @@ import SupplierRotLedger from './pages/supplier/SupplierRotLedger';
 import CustomerOrderSupplierFulfilment from './pages/supplier/CustomerOrderSupplierFulfilment';
 
 // Admin Panel Pages
+import AdminLogin from './pages/admin_panel/AdminLogin';
 import AdminWebPanel from './pages/admin_panel/admin_web_panel';
 import AdminProductCatalog from './pages/admin_panel/admin_product_catalog';
 import CampaignCreationFlowAdmin from './pages/admin_panel/campaign_creation_flow_admin';
@@ -257,11 +258,11 @@ function FloatingNavigator() {
   // Total matches across ALL groups when searching
   const totalMatchesAllGroups = q
     ? screenCatalog.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.path.toLowerCase().includes(q) ||
-          s.group.toLowerCase().includes(q)
-      ).length
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.path.toLowerCase().includes(q) ||
+        s.group.toLowerCase().includes(q)
+    ).length
     : screenCatalog.length;
 
   return (
@@ -357,16 +358,16 @@ function FloatingNavigator() {
               {groups.map((group) => {
                 const count = q
                   ? screenCatalog.filter((s) => {
-                      const inGroup = group === 'All' || s.group === group;
-                      const matches =
-                        s.name.toLowerCase().includes(q) ||
-                        s.path.toLowerCase().includes(q) ||
-                        s.group.toLowerCase().includes(q);
-                      return inGroup && matches;
-                    }).length
+                    const inGroup = group === 'All' || s.group === group;
+                    const matches =
+                      s.name.toLowerCase().includes(q) ||
+                      s.path.toLowerCase().includes(q) ||
+                      s.group.toLowerCase().includes(q);
+                    return inGroup && matches;
+                  }).length
                   : group === 'All'
-                  ? screenCatalog.length
-                  : screenCatalog.filter((s) => s.group === group).length;
+                    ? screenCatalog.length
+                    : screenCatalog.filter((s) => s.group === group).length;
 
                 const isSelected = selectedGroup === group;
 
@@ -375,19 +376,17 @@ function FloatingNavigator() {
                     key={group}
                     type="button"
                     onClick={() => setSelectedGroup(group)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                      isSelected
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${isSelected
                         ? 'bg-[#b90041] text-white shadow-md shadow-pink-500/30'
                         : 'bg-gray-900 text-gray-400 hover:text-white hover:bg-gray-850'
-                    }`}
+                      }`}
                   >
                     <span>{group}</span>
                     <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                        isSelected
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${isSelected
                           ? 'bg-white/20 text-white'
                           : 'bg-gray-800 text-gray-400'
-                      }`}
+                        }`}
                     >
                       {count}
                     </span>
@@ -409,11 +408,10 @@ function FloatingNavigator() {
                         navigate(screen.path);
                         setIsOpen(false);
                       }}
-                      className={`flex flex-col gap-0.5 p-2.5 rounded-xl text-left transition-all cursor-pointer border ${
-                        isActive
+                      className={`flex flex-col gap-0.5 p-2.5 rounded-xl text-left transition-all cursor-pointer border ${isActive
                           ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-lg shadow-pink-500/30 border-rose-400 scale-[1.02]'
                           : 'bg-gray-900/90 hover:bg-gray-850 text-gray-300 hover:text-white border-gray-800/80 hover:border-gray-700'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-1.5 w-full">
                         <span className="text-base shrink-0">{screen.icon}</span>
@@ -694,6 +692,7 @@ function AppRoutes() {
         <Route path="/notifications" element={<NotificationCenter />} />
         <Route path="/" element={<LoginSignup />} />
         <Route path="/login" element={<LoginSignup />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
 
 
@@ -840,56 +839,56 @@ function AppRoutes() {
         />
 
         {/* Admin Panel Routes (Protected) */}
-        {/* <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}> */}
-          <Route
-            path="/admin-panel"
-            element={
-              <AdminWebPanel
-                onNavigate={handleNav}
-                onSwitchView={() => handleNav('/seller-dashboard')}
-                onLogout={() => handleNav('/login')}
-              />
-            }
-          />
-          <Route
-            path="/admin-support"
-            element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/support"
-            element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-rot-rules"
-            element={<AdminRotRulesConfigurator onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-dropshipper-kyc"
-            element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-kyc"
-            element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-affiliate-kyc"
-            element={<AdminAffiliateKycApproval onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-returns"
-            element={<AdminReturnRefundHub onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-catalog"
-            element={<AdminProductCatalog onNavigate={handleNav} onAddNewProduct={() => handleNav('/add-product')} />}
-          />
-          <Route
-            path="/campaign-flow"
-            element={<CampaignCreationFlowAdmin onNavigate={handleNav} onCancel={() => handleNav('/admin-panel')} />}
-          />
-          <Route path="/admin-analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
-          <Route path="/analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
-        {/* </Route> */}
+        <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+        <Route
+          path="/admin-panel"
+          element={
+            <AdminWebPanel
+              onNavigate={handleNav}
+              onSwitchView={() => handleNav('/seller-dashboard')}
+              onLogout={() => handleNav('/login')}
+            />
+          }
+        />
+        <Route
+          path="/admin-support"
+          element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/support"
+          element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/admin-rot-rules"
+          element={<AdminRotRulesConfigurator onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/admin-dropshipper-kyc"
+          element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/admin-kyc"
+          element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/admin-affiliate-kyc"
+          element={<AdminAffiliateKycApproval onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/admin-returns"
+          element={<AdminReturnRefundHub onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/admin-catalog"
+          element={<AdminProductCatalog onNavigate={handleNav} onAddNewProduct={() => handleNav('/add-product')} />}
+        />
+        <Route
+          path="/campaign-flow"
+          element={<CampaignCreationFlowAdmin onNavigate={handleNav} onCancel={() => handleNav('/admin-panel')} />}
+        />
+        <Route path="/admin-analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
+        </Route>
         <Route
           path="/support-center"
           element={<SupportCenter onNavigate={handleNav} onOpenChat={() => handleNav('/conversation')} />}
