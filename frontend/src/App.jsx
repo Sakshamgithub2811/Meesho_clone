@@ -78,7 +78,9 @@ import CustomerOrderSupplierFulfilment from './pages/supplier/CustomerOrderSuppl
 
 // Admin Panel Pages
 import AdminLogin from './pages/admin_panel/AdminLogin';
+import AdminLogin1 from './pages/admin_panel/AdminLogin1';
 import AdminWebPanel from './pages/admin_panel/admin_web_panel';
+import AdminWebPanel1 from './pages/admin_panel/admin_web_panel1';
 import AdminProductCatalog from './pages/admin_panel/admin_product_catalog';
 import CampaignCreationFlowAdmin from './pages/admin_panel/campaign_creation_flow_admin';
 import PerformanceAnalyticsDashboardAdmin from './pages/admin_panel/performance_analytics_dashboard_admin';
@@ -693,6 +695,7 @@ function AppRoutes() {
         <Route path="/" element={<LoginSignup />} />
         <Route path="/login" element={<LoginSignup />} />
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/auth" element={<AdminLogin1 />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
 
 
@@ -839,6 +842,8 @@ function AppRoutes() {
         />
 
         {/* Admin Panel Routes (Protected) */}
+        <Route path="/admin-panel1" element={<AdminWebPanel1 />} />
+        
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
         <Route
           path="/admin-panel"

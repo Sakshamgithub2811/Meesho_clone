@@ -1032,3 +1032,5 @@ export function AdminWebPanel({ onNavigate, onSwitchView, onLogout }) {
 }
 
 export default AdminWebPanel;
+
+
