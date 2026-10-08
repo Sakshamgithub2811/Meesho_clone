@@ -1,12 +1,36 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { 
+  loginReseller, 
+  logoutReseller 
+} from '../../services/resellerAuthService';
+import {
+  loginCustomer,
+  logoutCustomer 
+} from '../../services/customerAuthService';
+import {
+  loginAffiliate,
+  logoutAffiliate 
+} from '../../services/affiliateAuthService';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const searchParams = new URLSearchParams(location.search);
+  const redirectParam = searchParams.get('redirect');
+  const roleParam = searchParams.get('role');
+
   const [mobileNumber, setMobileNumber] = useState('');
   const [error, setError] = useState('');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const getTargetRoute = () => {
+    if (redirectParam) return redirectParam;
+    if (roleParam === 'customer' || roleParam === 'user') return '/user-dashboard';
+    if (roleParam === 'affiliate') return '/affiliate-panel';
+    return '/reseller-home';
+  };
 
   // Sirf numbers accept karega aur max 10 digits
   const handleInputChange = (e) => {
@@ -17,75 +41,69 @@ export default function LoginPage() {
     }
   };
 
-  // Submit check (exact 10 digits)
-  const handleMobileLogin = (e) => {
+  // Submit check (exact 10 digits) & Call Backend Auth API -> Direct Navigate
+  const handleMobileLogin = async (e) => {
     e.preventDefault();
     if (mobileNumber.length !== 10) {
-      setError('Invalid');
+      setError('Please enter a valid 10-digit mobile number');
       return;
     }
     setError('');
-    setUser(`+91 ${mobileNumber}`);
-    setIsLoggedIn(true);
+    setIsLoading(true);
+
+    try {
+      const res = await loginReseller({ 
+        phone: mobileNumber, 
+        fullName: `Reseller +91 ${mobileNumber}` 
+      });
+
+      // Synchronize session for customer & affiliate
+      await loginCustomer({
+        phone: mobileNumber,
+        fullName: `User +91 ${mobileNumber}`
+      }).catch(() => {});
+
+      await loginAffiliate({
+        phone: mobileNumber,
+        fullName: `Affiliate +91 ${mobileNumber}`
+      }).catch(() => {});
+
+      if (res && res.success) {
+        navigate(getTargetRoute());
+      } else {
+        setError(res?.message || 'Login failed. Please try again.');
+      }
+    } catch (err) {
+      setError(err.message || 'Server error. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleGoogleLogin = () => {
-    setUser('Google User');
-    setIsLoggedIn(true);
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    try {
+      await loginReseller({ 
+        phone: '9876543210', 
+        fullName: 'Google Reseller User' 
+      });
+
+      await loginCustomer({
+        email: 'google.user@meesho.com',
+        fullName: 'Google User'
+      }).catch(() => {});
+
+      await loginAffiliate({
+        email: 'google.affiliate@meesho.com',
+        fullName: 'Google Affiliate'
+      }).catch(() => {});
+
+      navigate(getTargetRoute());
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setMobileNumber('');
-    setUser('');
-    setError('');
-  };
-
-  // ==========================================
-  // SCREEN 2: SIMPLE WELCOME SCREEN
-  // ==========================================
-  if (isLoggedIn) {
-    return (
-      <div className="bg-[#fff4f6] text-[#4a2135] min-h-screen flex flex-col items-center justify-center px-6 font-sans">
-        <div className="w-full max-w-md bg-white p-8 rounded-[3rem] shadow-[0_12px_40px_rgba(74,33,53,0.06)] text-center space-y-5">
-          <div className="w-16 h-16 bg-[#ffecf1] text-[#b7004d] rounded-full flex items-center justify-center mx-auto">
-            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-
-          <div>
-            <h2 className="text-2xl font-extrabold text-[#4a2135]">
-              Welcome to MShoppy!
-            </h2>
-            <p className="text-sm text-[#7d4d62] mt-2">
-              Logged in as <span className="font-bold text-[#b7004d]">{user}</span>
-            </p>
-          </div>
-
-          <div className="space-y-3 pt-2">
-            <button
-              onClick={() => navigate('/reseller-home')}
-              className="w-full bg-[#b7004d] hover:bg-[#990040] text-white font-extrabold py-3.5 rounded-[2rem] transition-colors cursor-pointer text-sm shadow-lg shadow-[#b7004d]/25 active:scale-95"
-            >
-              Enter MShoppy Reseller Catalog →
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="w-full text-[#7d4d62] hover:text-red-600 font-semibold py-2 transition-colors cursor-pointer text-xs"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // SCREEN 1: ORIGINAL LOGIN FORM
-  // ==========================================
   return (
     <div className="bg-[#fff4f6] text-[#4a2135] min-h-screen flex flex-col items-center overflow-x-hidden font-sans">
       {/* Top Section */}
@@ -177,12 +195,25 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* Primary Action Button (Exact Original py-5 rounded-[2rem]) */}
+            {/* Primary Action Button */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-br from-[#b7004d] to-[#ff7293] text-white font-bold py-5 rounded-[2rem] shadow-[0_12px_40px_rgba(74,33,53,0.06)] active:scale-95 transition-all duration-200 cursor-pointer"
+              disabled={isLoading}
+              className={`w-full bg-gradient-to-br from-[#b7004d] to-[#ff7293] text-white font-bold py-5 rounded-[2rem] shadow-[0_12px_40px_rgba(74,33,53,0.06)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
+                isLoading ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
             >
-              Continue
+              {isLoading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                'Continue'
+              )}
             </button>
           </form>
 
@@ -195,7 +226,7 @@ export default function LoginPage() {
             <div className="h-[1px] flex-grow bg-[#d79db5]" />
           </div>
 
-          {/* Secondary Actions (Exact Original py-4 rounded-[2rem]) */}
+          {/* Secondary Actions */}
           <div className="space-y-3">
             <button
               type="button"
@@ -228,8 +259,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => {
-                setUser('user@theatelier.com');
-                setIsLoggedIn(true);
+                navigate(getTargetRoute());
               }}
               className="w-full py-3 text-[#b7004d] font-bold text-sm hover:underline underline-offset-4 transition-all cursor-pointer"
             >

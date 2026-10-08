@@ -24,6 +24,7 @@ import ResellerReturnsLedger from './pages/Reseller Earnings & Wallets/ResellerR
 import DropshipperKYCRegister from './pages/Reseller Earnings & Wallets/DropshipperKYCRegister';
 import SupplierProductAccess from './pages/Reseller Earnings & Wallets/SupplierProductAccess';
 import DropshipperLogin from './pages/Reseller Earnings & Wallets/DropshipperLogin';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Dropshipper Hub Pages
 import DropshipperSettlementTracking from './pages/dropshipper/DropshipperSettlementTracking';
@@ -672,7 +673,14 @@ function AppRoutes() {
         <Route path="/earnings-dashboard-2" element={<EarningsDashboard2 onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/refer-earn" element={<ReferEarn />} />
         <Route path="/affiliate-program" element={<AffiliateProgram />} />
-        <Route path="/affiliate-panel" element={<AffiliateProgramPanel />} />
+        <Route 
+          path="/affiliate-panel" 
+          element={
+            <ProtectedRoute role="affiliate">
+              <AffiliateProgramPanel />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/affiliate-kyc" element={<AffiliateKYC onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/become-affiliate" element={<AffiliateKYC onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/affiliate-kyc-status" element={<AffiliateKycStatus onNavigate={handleNav} onBack={handleBack} />} />
@@ -712,12 +720,54 @@ function AppRoutes() {
         <Route path="/luxe" element={<HomeScreenFlutterLuxe onNavigate={handleNav} />} />
         <Route path="/reviews" element={<RatingsReviews onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/write-review" element={<WriteAReview onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/user-dashboard" element={<UserWebDashboard onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/user_dashboard" element={<UserWebDashboard onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dashboard" element={<UserWebDashboard onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/users" element={<UserWebDashboard onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/user-profile" element={<UserWebDashboard onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/orders" element={<CustomerOrders onNavigate={handleNav} onBack={handleBack} />} />
+        <Route 
+          path="/user-dashboard" 
+          element={
+            <ProtectedRoute role="customer">
+              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/user_dashboard" 
+          element={
+            <ProtectedRoute role="customer">
+              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute role="customer">
+              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/users" 
+          element={
+            <ProtectedRoute role="customer">
+              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/user-profile" 
+          element={
+            <ProtectedRoute role="customer">
+              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/orders" 
+          element={
+            <ProtectedRoute role="customer">
+              <CustomerOrders onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/return-request" element={<ReturnRequest onNavigate={handleNav} onBack={handleBack} />} />
 
         {/* Logistics & Driver Fleet Routes */}
