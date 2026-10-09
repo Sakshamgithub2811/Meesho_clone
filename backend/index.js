@@ -6,7 +6,8 @@ dotenv.config();
 
 import { Router } from 'express';
 import healthRoutes from './src/routes/health.routes.js';
-import adminAuthRoutes from './src/routes/adminAuth.routes.js';
+import adminAuthRoutes from './src/routes/admin/adminAuth.routes.js';
+import dropshipperRoutes from './src/routes/dropshipper/dropshipper.routes.js';
 
 const apiRouter = Router();
 
@@ -25,6 +26,7 @@ apiRouter.use('/',healthRoutes);
 
 
 apiRouter.use('/admin-auth',adminAuthRoutes);
+apiRouter.use('/dropshipper', dropshipperRoutes);
 
 const app = express();
 const port = process.env.PORT || 5000;

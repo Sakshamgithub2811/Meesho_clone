@@ -22,11 +22,11 @@ import EarningsDashboard2 from './pages/Reseller Earnings & Wallets/EarningsDash
 import ResellerWallet from './pages/Reseller Earnings & Wallets/ResellerWallet';
 import WithdrawEarnings from './pages/Reseller Earnings & Wallets/WithdrawEarnings';
 import ResellerReturnsLedger from './pages/Reseller Earnings & Wallets/ResellerReturnsLedger';
-import DropshipperKYCRegister from './pages/Reseller Earnings & Wallets/DropshipperKYCRegister';
 import SupplierProductAccess from './pages/Reseller Earnings & Wallets/SupplierProductAccess';
-import DropshipperLogin from './pages/Reseller Earnings & Wallets/DropshipperLogin';
 
 // Dropshipper Hub Pages
+import DropshipperLogin from './pages/dropshipper/DropshipperLogin';
+import DropshipperKYCRegister from './pages/dropshipper/DropshipperKYCRegister';
 import DropshipperSettlementTracking from './pages/dropshipper/DropshipperSettlementTracking';
 import DropshipperRotManager from './pages/dropshipper/DropshipperRotManager';
 
