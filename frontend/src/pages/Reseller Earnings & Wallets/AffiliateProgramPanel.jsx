@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
 import { getStoredAffiliate, logoutAffiliate, subscribeAffiliateAuth } from '../../services/affiliateAuthService';
+import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
 
 export default function AffiliateProgramPanel() {
   const navigate = useNavigate();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedBanner, setCopiedBanner] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -38,7 +40,8 @@ export default function AffiliateProgramPanel() {
     setTimeout(() => setCopiedBanner(null), 2000);
   };
 
-  const handleLogout = () => {
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
     logoutAffiliate();
     navigate('/login?role=affiliate');
   };
@@ -78,7 +81,7 @@ export default function AffiliateProgramPanel() {
               notifications
             </button>
             <button
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/20 transition-all cursor-pointer"
               title="Logout Partner Session"
             >
@@ -293,6 +296,16 @@ export default function AffiliateProgramPanel() {
 
       {/* Navigation Drawer */}
       <NavDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
+
+      {/* Shadcn Logout Confirmation Dialog for Affiliate */}
+      <LogoutConfirmDialog
+        isOpen={showLogoutConfirm}
+        setIsOpen={setShowLogoutConfirm}
+        roleLabel="Affiliate Partner"
+        title="Log out of Affiliate Partner Account?"
+        description="Are you sure you want to end your affiliate session? You can sign back in anytime to access your dashboard."
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 }

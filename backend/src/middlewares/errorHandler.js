@@ -1,4 +1,4 @@
-/**
+cd fr/**
  * Centralized Error Handling Middleware
  */
 export const notFoundHandler = (req, res, next) => {
