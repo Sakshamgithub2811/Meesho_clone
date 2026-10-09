@@ -77,8 +77,8 @@ import SupplierRotLedger from './pages/supplier/SupplierRotLedger';
 import CustomerOrderSupplierFulfilment from './pages/supplier/CustomerOrderSupplierFulfilment';
 
 // Admin Panel Pages
+import ForgotPassword from './pages/auth/ForgotPassword';
 import AdminLogin from './pages/admin_panel/AdminLogin';
-import AdminLogin1 from './pages/admin_panel/AdminLogin1';
 import AdminWebPanel from './pages/admin_panel/admin_web_panel';
 import AdminWebPanel1 from './pages/admin_panel/admin_web_panel1';
 import AdminProductCatalog from './pages/admin_panel/admin_product_catalog';
@@ -695,8 +695,8 @@ function AppRoutes() {
         <Route path="/" element={<LoginSignup />} />
         <Route path="/login" element={<LoginSignup />} />
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/auth" element={<AdminLogin1 />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
 
         {/* Customer Shopping Routes */}

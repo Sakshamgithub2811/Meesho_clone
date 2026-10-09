@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLogout } from '../../hooks/useLogout';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { 
   LayoutDashboard, ShieldCheck, Truck, Users, 
@@ -31,15 +31,10 @@ const ADMIN_MENU = [
 
 
 export default function AdminWebPanel() {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
-
-  const handleLogout = () => {
-    // Logout Logic
-    localStorage.clear();
-    sessionStorage.clear();
-    navigate('/admin-login');
-  };
+  
+  // Custom Firebase Logout Hook call
+  const handleLogout = useLogout('/admin/login');
 
   return (
     <DashboardLayout 
