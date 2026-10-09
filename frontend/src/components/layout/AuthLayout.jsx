@@ -41,7 +41,7 @@ export default function AuthLayout({
                 {subtitle}
               </CardDescription>
             )}
-          </CardHeader>
+          </CardHeader> 
           
           <CardContent className="pb-8 px-6 sm:px-8">
             {/* Agar registerContent bheja hai toh Tabs dikhayenge */}

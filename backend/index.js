@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -11,8 +11,6 @@ import dropshipperRoutes from './src/routes/dropshipper/dropshipper.routes.js';
 
 const apiRouter = Router();
 
-
-
 // Initialize services
 import './src/config/firebaseAdmin.js';
 import './src/config/redisClient.js';
@@ -20,12 +18,8 @@ import './src/config/supabaseClient.js';
 import './src/config/emailTransporter.js';
 import prisma from './src/config/prisma.js';
 
-
-
-apiRouter.use('/',healthRoutes);
-
-
-apiRouter.use('/admin-auth',adminAuthRoutes);
+apiRouter.use('/', healthRoutes);
+apiRouter.use('/admin-auth', adminAuthRoutes);
 apiRouter.use('/dropshipper', dropshipperRoutes);
 
 const app = express();
