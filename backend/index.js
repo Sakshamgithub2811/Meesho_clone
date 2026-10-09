@@ -6,7 +6,7 @@ dotenv.config();
 
 import { Router } from 'express';
 import healthRoutes from './src/routes/health.routes.js';
-import adminAuthRoutes from './src/routes/adminAuth.routes.js';
+import adminAuthRoutes from './src/routes/admin/adminAuth.routes.js';
 
 const apiRouter = Router();
 
