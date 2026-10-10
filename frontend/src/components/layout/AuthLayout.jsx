@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -7,8 +7,12 @@ export default function AuthLayout({
   subtitle, 
   roleName = "Portal", 
   loginContent, 
-  registerContent 
+  registerContent,
+  activeTab,
+  onTabChange 
 }) {
+  const tabsProps = activeTab ? { value: activeTab, onValueChange: onTabChange } : { defaultValue: "login" };
+
   return (
     <div className="bg-[#fff4f6] text-[#4a2135] h-screen w-full overflow-hidden relative font-sans">
       {/* 1. Background Graphic & Floating Logo (Fixed) */}
@@ -46,17 +50,17 @@ export default function AuthLayout({
           <CardContent className="pb-8 px-6 sm:px-8">
             {/* Agar registerContent bheja hai toh Tabs dikhayenge */}
             {registerContent ? (
-              <Tabs defaultValue="login" className="w-full">
+              <Tabs {...tabsProps} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6 rounded-full bg-[#ffecf1] p-1.5 min-h-[54px] items-center">
                   <TabsTrigger 
                     value="login" 
-                    className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all"
+                    className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all cursor-pointer"
                   >
                     Login
                   </TabsTrigger>
                   <TabsTrigger 
                     value="register" 
-                    className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all"
+                    className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all cursor-pointer"
                   >
                     Register
                   </TabsTrigger>

@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -7,10 +7,9 @@ dotenv.config();
 import { Router } from 'express';
 import healthRoutes from './src/routes/health.routes.js';
 import adminAuthRoutes from './src/routes/admin/adminAuth.routes.js';
+import dropshipperRoutes from './src/routes/dropshipper/dropshipper.routes.js';
 
 const apiRouter = Router();
-
-
 
 // Initialize services
 import './src/config/firebaseAdmin.js';
@@ -19,12 +18,9 @@ import './src/config/supabaseClient.js';
 import './src/config/emailTransporter.js';
 import prisma from './src/config/prisma.js';
 
-
-
-apiRouter.use('/',healthRoutes);
-
-
-apiRouter.use('/admin-auth',adminAuthRoutes);
+apiRouter.use('/', healthRoutes);
+apiRouter.use('/admin-auth', adminAuthRoutes);
+apiRouter.use('/dropshipper', dropshipperRoutes);
 
 const app = express();
 const port = process.env.PORT || 5000;
