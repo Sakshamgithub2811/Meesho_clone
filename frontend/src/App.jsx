@@ -26,6 +26,7 @@ import SupplierProductAccess from './pages/Reseller Earnings & Wallets/SupplierP
 
 // Dropshipper Hub Pages
 import DropshipperLogin from './pages/dropshipper/DropshipperLogin';
+import DropshipperDashboard from './pages/dropshipper/DropshipperDashboard';
 import DropshipperKYCRegister from './pages/dropshipper/DropshipperKYCRegister';
 import DropshipperSettlementTracking from './pages/dropshipper/DropshipperSettlementTracking';
 import DropshipperRotManager from './pages/dropshipper/DropshipperRotManager';
@@ -105,6 +106,7 @@ import StructureFlow from './pages/Design_Ecosystem_&_Theme_Variations/structure
 // Screen Catalog for Floating Navigator
 const screenCatalog = [
   // 1. Dropshipper Portal Screens
+  { path: '/dropshipper-dashboard', name: 'Dropshipper Dashboard', icon: '📊', group: 'Dropshipper' },
   { path: '/dropshipper-settlements', name: 'Settlement & Tracking', icon: '📊', group: 'Dropshipper' },
   { path: '/dropshipper-rot-manager', name: 'ROT Liability & Policy Manager', icon: '🛡️', group: 'Dropshipper' },
   { path: '/share-earn-config', name: 'Share & Margin Config', icon: '🔗', group: 'Dropshipper' },
@@ -521,6 +523,8 @@ function AppRoutes() {
       products: '/supplier-products',
       '/products': '/supplier-products',
       'dropshipper-login': '/dropshipper-login',
+      'dropshipper-dashboard': '/dropshipper-dashboard',
+      dropshipperDashboard: '/dropshipper-dashboard',
       dropshipperLogin: '/dropshipper-login',
       'supplier-products': '/supplier-products',
       '/supplier-products': '/supplier-products',
@@ -696,6 +700,7 @@ function AppRoutes() {
         <Route path="/login" element={<LoginSignup />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
+        <Route path="/dropshipper-dashboard" element={<DropshipperDashboard />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
 

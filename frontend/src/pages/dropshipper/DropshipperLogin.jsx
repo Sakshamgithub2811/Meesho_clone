@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../redux/userSlice';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  sendPasswordResetEmail 
+  sendPasswordResetEmail,
+  signOut
 } from 'firebase/auth';
 import { auth } from '../../utils/firebase';
 import { loginDropshipperApi, registerDropshipperApi } from '../../services/dropshipperService';
@@ -13,14 +14,14 @@ import AuthLayout from '../../components/layout/AuthLayout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from 'sonner';
 
 export default function DropshipperLogin() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  const [activeTab, setActiveTab] = useState('login');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -36,31 +37,35 @@ export default function DropshipperLogin() {
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotMsg, setForgotMsg] = useState('');
 
   // 1. Handle Login & Registration
   const handleAuth = async (e, isRegistering) => {
     e.preventDefault();
-    setError('');
-    setSuccessMsg('');
     setLoading(true);
 
     try {
-      let userCredential;
       const email = isRegistering ? registerEmail.trim() : loginEmail.trim();
       const password = isRegistering ? registerPassword : loginPassword;
 
       if (!email || !password) {
-        throw new Error('Please fill all required credentials.');
+        toast.error('Please enter all required credentials.');
+        setLoading(false);
+        return;
       }
 
       if (isRegistering) {
+        if (password.length < 6) {
+          toast.error('Password must be at least 6 characters long.');
+          setLoading(false);
+          return;
+        }
+
         // Firebase Client Register
-        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const firebaseUser = userCredential.user;
 
         // Backend Database Sync with DROPSHIPPER role
-        const dbResponse = await registerDropshipperApi({
+        await registerDropshipperApi({
           firebaseUid: firebaseUser.uid,
           email: firebaseUser.email,
           fullName: registerName.trim() || 'Verified Dropshipper',
@@ -68,24 +73,22 @@ export default function DropshipperLogin() {
           businessName: registerName.trim() || 'Direct Store'
         });
 
-        // Save session in Redux & LocalStorage
-        dispatch(loginSuccess(dbResponse.user));
-        localStorage.setItem('meesho_dropshipper_session', JSON.stringify({
-          isLoggedIn: true,
-          dropshipperId: dbResponse.user.id,
-          name: dbResponse.user.fullName,
-          email: dbResponse.user.email,
-          role: dbResponse.user.role
-        }));
+        // Registration complete: User must NOT go to dashboard immediately.
+        // User must receive toast and be switched to Login tab.
+        toast.success('Account created successfully! Please sign in with your credentials.');
 
-        setSuccessMsg('Dropshipper registered successfully! Redirecting...');
-        setTimeout(() => {
-          navigate('/supplier-products');
-        }, 1000);
+        // Prefill email for login and switch tab
+        setLoginEmail(email);
+        setLoginPassword('');
+        setRegisterName('');
+        setRegisterEmail('');
+        setRegisterPhone('');
+        setRegisterPassword('');
+        setActiveTab('login');
 
       } else {
         // Firebase Client Sign In
-        userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const firebaseUser = userCredential.user;
 
         // Backend Database Role Verification
@@ -94,32 +97,43 @@ export default function DropshipperLogin() {
           email: firebaseUser.email
         });
 
+        const userData = dbResponse.user;
+
+        // Strict Role Guard
+        if (userData.role !== 'DROPSHIPPER') {
+          await signOut(auth);
+          toast.error('Access Denied: Only verified dropshippers can access this portal.');
+          setLoading(false);
+          return;
+        }
+
         // Save session in Redux & LocalStorage
-        dispatch(loginSuccess(dbResponse.user));
+        dispatch(loginSuccess(userData));
         localStorage.setItem('meesho_dropshipper_session', JSON.stringify({
           isLoggedIn: true,
-          dropshipperId: dbResponse.user.id,
-          name: dbResponse.user.fullName,
-          email: dbResponse.user.email,
-          role: dbResponse.user.role
+          dropshipperId: userData.id,
+          name: userData.fullName,
+          email: userData.email,
+          role: userData.role
         }));
 
-        setSuccessMsg('Login successful! Redirecting to dashboard...');
-        setTimeout(() => {
-          navigate('/supplier-products');
-        }, 800);
+        toast.success(`Welcome back, ${userData.fullName || 'Dropshipper'}!`);
+        navigate('/dropshipper-dashboard');
       }
 
     } catch (err) {
       console.error('Dropshipper Auth Error:', err);
       if (err.code === 'auth/email-already-in-use') {
-        setError('This email is already registered. Please login.');
+        toast.error('This email is already registered. Please login.');
+        setActiveTab('login');
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('Invalid email or password credentials.');
+        toast.error('Invalid email or password credentials.');
+      } else if (err.code === 'auth/weak-password') {
+        toast.error('Password should be at least 6 characters.');
       } else if (err.response?.data?.error) {
-        setError(err.response.data.error);
+        toast.error(err.response.data.error);
       } else {
-        setError(err.message || 'Authentication failed. Please try again.');
+        toast.error(err.message || 'Authentication failed. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -130,22 +144,22 @@ export default function DropshipperLogin() {
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     if (!forgotEmail.trim()) {
-      setError('Please enter your registered email address.');
+      toast.error('Please enter your registered email address.');
       return;
     }
     setForgotLoading(true);
-    setForgotMsg('');
-    setError('');
 
     try {
       await sendPasswordResetEmail(auth, forgotEmail.trim());
-      setForgotMsg('Password reset link has been sent to your email! Please check your inbox.');
+      toast.success('Password reset link sent to your email! Please check your inbox.');
+      setShowForgotModal(false);
+      setForgotEmail('');
     } catch (err) {
       console.error(err);
       if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email.');
+        toast.error('No account found with this email.');
       } else {
-        setError(err.message || 'Failed to send reset email.');
+        toast.error(err.message || 'Failed to send reset email.');
       }
     } finally {
       setForgotLoading(false);
@@ -176,8 +190,6 @@ export default function DropshipperLogin() {
             onClick={() => {
               setForgotEmail(loginEmail);
               setShowForgotModal(true);
-              setError('');
-              setForgotMsg('');
             }}
             className="text-xs text-[#b7004d] hover:underline font-semibold cursor-pointer"
           >
@@ -194,18 +206,6 @@ export default function DropshipperLogin() {
           className="h-12 px-4 text-base rounded-xl focus-visible:ring-[#b7004d]/30"
         />
       </div>
-
-      {error && !loading && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-semibold text-center">
-          {error}
-        </div>
-      )}
-
-      {successMsg && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 font-semibold text-center">
-          {successMsg}
-        </div>
-      )}
 
       <Button 
         type="submit" 
@@ -269,7 +269,7 @@ export default function DropshipperLogin() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="register-phone">Mobile Number</Label>
+        <Label htmlFor="register-phone">Mobile Number (Optional)</Label>
         <Input 
           id="register-phone" 
           type="tel" 
@@ -289,21 +289,10 @@ export default function DropshipperLogin() {
           value={registerPassword}
           onChange={(e) => setRegisterPassword(e.target.value)}
           required 
+          minLength={6}
           className="h-12 px-4 text-base rounded-xl focus-visible:ring-[#b7004d]/30"
         />
       </div>
-
-      {error && !loading && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-semibold text-center">
-          {error}
-        </div>
-      )}
-
-      {successMsg && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 font-semibold text-center">
-          {successMsg}
-        </div>
-      )}
 
       <Button 
         type="submit" 
@@ -341,10 +330,12 @@ export default function DropshipperLogin() {
     <>
       <AuthLayout
         title="Dropshipper Access"
-        subtitle="Secure B2B portal for verified merchants & dropshippers"
+        subtitle="Secure B2B portal for verified merchants and dropshippers"
         roleName="DROPSHIPPER"
         loginContent={loginForm}
         registerContent={registerForm}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       {/* Forgot Password Modal */}
@@ -375,18 +366,6 @@ export default function DropshipperLogin() {
                   className="h-12 px-4 rounded-xl"
                 />
               </div>
-
-              {forgotMsg && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 font-semibold">
-                  {forgotMsg}
-                </div>
-              )}
-
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-semibold">
-                  {error}
-                </div>
-              )}
 
               <Button
                 type="submit"

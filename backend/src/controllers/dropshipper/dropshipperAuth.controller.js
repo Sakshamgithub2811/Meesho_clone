@@ -19,7 +19,11 @@ export const registerDropshipper = async (req, res) => {
     });
 
     if (existingProfile) {
-      return res.status(400).json({ error: "Dropshipper account already exists with this ID" });
+      return res.status(200).json({ 
+        success: true, 
+        message: "Dropshipper account already exists. Please login.", 
+        user: existingProfile 
+      });
     }
 
     // Check if email or phone is already taken
@@ -81,7 +85,7 @@ export const registerDropshipper = async (req, res) => {
   }
 };
 
-// 2. LOGIN DROPSHIPPER
+// 2. LOGIN DROPSHIPPER (With Self-Healing Auto-Sync)
 export const loginDropshipper = async (req, res) => {
   try {
     const { firebaseUid, email } = req.body;
@@ -90,14 +94,45 @@ export const loginDropshipper = async (req, res) => {
       return res.status(400).json({ error: "Missing Firebase Uid and Email" });
     }
 
-    const profile = await prisma.profile.findUnique({
+    const cleanEmail = email.trim();
+
+    // Step 1: Find by Firebase UID
+    let profile = await prisma.profile.findUnique({
       where: { id: firebaseUid }
     });
 
+    // Step 2: If not found by UID, check by Email (in case UID changed or registered via OAuth/Console)
     if (!profile) {
-      return res.status(404).json({ error: "Dropshipper Profile not found in database. Please register first." });
+      profile = await prisma.profile.findFirst({
+        where: { email: { equals: cleanEmail, mode: 'insensitive' } }
+      });
     }
 
+    // Step 3: Self-Healing: If user passed Firebase Auth but profile is missing in PostgreSQL, auto-create it!
+    if (!profile) {
+      profile = await prisma.profile.create({
+        data: {
+          id: firebaseUid,
+          email: cleanEmail,
+          role: "DROPSHIPPER",
+          fullName: "Verified Dropshipper"
+        }
+      });
+
+      try {
+        await prisma.wallet.create({
+          data: {
+            userId: profile.id,
+            balance: 0,
+            pending: 0
+          }
+        });
+      } catch (wErr) {
+        // Non-blocking wallet creation
+      }
+    }
+
+    // Step 4: Strict Role Guard (Only DROPSHIPPER or RESELLER can login here)
     if (profile.role !== 'DROPSHIPPER' && profile.role !== 'RESELLER') {
       return res.status(403).json({ error: 'Access Denied: Your account role is not registered as a Dropshipper' });
     }
@@ -109,6 +144,7 @@ export const loginDropshipper = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("Dropshipper Login Error:", error);
     return res.status(500).json({ error: error.message });
   }
 };
