@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
+import { getStoredReseller, fetchResellerProfile } from '../../services/resellerAuthService';
 
 export default function ResellerWallet() {
   const navigate = useNavigate();
@@ -13,6 +14,27 @@ export default function ResellerWallet() {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'pending' | 'paid'
   const [activeNav, setActiveNav] = useState('earnings');
   const [toastMessage, setToastMessage] = useState('');
+  const [resellerUser, setResellerUser] = useState(null);
+
+  useEffect(() => {
+    // 1. Load from storage immediately
+    const session = getStoredReseller();
+    if (session) {
+      if (session.user) setResellerUser(session.user);
+      if (session.wallet) {
+        if (typeof session.wallet.balance === 'number') setBalance(session.wallet.balance);
+        if (typeof session.wallet.pendingAmount === 'number') setPendingAmount(session.wallet.pendingAmount);
+      }
+    }
+
+    // 2. Fetch fresh from backend
+    fetchResellerProfile().then(data => {
+      if (data?.wallet) {
+        if (typeof data.wallet.balance === 'number') setBalance(data.wallet.balance);
+        if (typeof data.wallet.pendingAmount === 'number') setPendingAmount(data.wallet.pendingAmount);
+      }
+    });
+  }, []);
 
   // 2. Transactions Data
   const [transactions, setTransactions] = useState([
@@ -130,6 +152,19 @@ export default function ResellerWallet() {
           </div>
 
           <div className="flex items-center gap-3">
+            {resellerUser ? (
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-[#b7004d] rounded-full text-xs font-bold border border-rose-100">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                {resellerUser.fullName || resellerUser.phone}
+              </span>
+            ) : (
+              <button 
+                onClick={() => navigate('/login-signup')}
+                className="text-xs font-bold text-[#b7004d] hover:underline cursor-pointer"
+              >
+                Login
+              </button>
+            )}
             <button
               onClick={() => navigate('/withdraw-earnings')}
               className="flex items-center gap-2 bg-[#FF3F6C] text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#b90041] transition-colors cursor-pointer"

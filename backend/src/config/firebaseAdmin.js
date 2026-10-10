@@ -29,6 +29,11 @@ if (!existsSync(serviceAccountPath)) {
   }
 }
 
-// Export auth helper for verifying tokens in middleware
+// Export auth helper and admin object for verifying tokens in middleware
 export const auth = getApps().length > 0 ? getAuth() : null;
-export default { auth }
+
+const admin = {
+  auth: () => (getApps().length > 0 ? getAuth() : null)
+};
+
+export default admin;

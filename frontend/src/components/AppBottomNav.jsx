@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function AppBottomNav({ activeNav = 'home', onNavigate }) {
+export default function AppBottomNav({ activeNav = 'home', onNavigate, role = 'reseller', homePath }) {
   const navigate = useNavigate();
 
   const handleNavClick = (navId, path) => {
@@ -18,7 +18,17 @@ export default function AppBottomNav({ activeNav = 'home', onNavigate }) {
     }
   };
 
-  const navItems = [
+  const isCustomer = role === 'customer' || homePath === '/user-home';
+  const effectiveHome = homePath || (isCustomer ? '/user-home' : '/reseller-home');
+
+  const navItems = isCustomer ? [
+    { id: 'home', label: 'Home', icon: 'home', path: effectiveHome },
+    { id: 'categories', label: 'Categories', icon: 'grid_view', path: '/explorer' },
+    { id: 'orders', label: 'Orders', icon: 'shopping_bag', path: '/orders' },
+    { id: 'wishlist', label: 'Wishlist', icon: 'favorite', path: '/wishlist' },
+    { id: 'profile', label: 'Profile', icon: 'person', path: '/user-dashboard' },
+    { id: 'screens', label: 'Screens', icon: 'layers', badge: '68' },
+  ] : [
     { id: 'home', label: 'Home', icon: 'home', path: '/reseller-home' },
     { id: 'categories', label: 'Categories', icon: 'grid_view', path: '/explorer' },
     { id: 'orders', label: 'Orders', icon: 'shopping_bag', path: '/orders' },

@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -7,6 +7,9 @@ dotenv.config();
 import { Router } from 'express';
 import healthRoutes from './src/routes/health.routes.js';
 import adminAuthRoutes from './src/routes/admin/adminAuth.routes.js';
+import userAuthRoutes from './src/routes/user/userAuth.routes.js';
+import affiliateAuthRoutes from './src/routes/affiliate/affiliateAuth.routes.js';
+import authRoutes from './src/routes/auth.routes.js';
 import dropshipperRoutes from './src/routes/dropshipper/dropshipper.routes.js';
 
 const apiRouter = Router();
@@ -20,6 +23,9 @@ import prisma from './src/config/prisma.js';
 
 apiRouter.use('/', healthRoutes);
 apiRouter.use('/admin-auth', adminAuthRoutes);
+apiRouter.use('/user-auth', userAuthRoutes);
+apiRouter.use('/affiliate-auth', affiliateAuthRoutes);
+apiRouter.use('/auth', authRoutes);
 apiRouter.use('/dropshipper', dropshipperRoutes);
 
 const app = express();
