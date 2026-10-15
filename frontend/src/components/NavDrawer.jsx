@@ -39,9 +39,50 @@ const navSections = [
   }
 ];
 
-export default function NavDrawer({ isOpen, onClose }) {
+const customerNavSections = [
+  {
+    title: "Shop & Categories",
+    items: [
+      { name: "Home & Deals", path: "/user-home", icon: "home" },
+      { name: "Sarees & Ethnic", path: "/sarees", icon: "checkroom", badge: "Trending" },
+      { name: "Western Wear", path: "/western", icon: "styler" },
+      { name: "Explore All Categories", path: "/explorer", icon: "grid_view" },
+      { name: "Flash Sale Deals", path: "/flash", icon: "bolt", badge: "Hot" },
+      { name: "Curated Spotlight", path: "/spotlight", icon: "auto_awesome" },
+    ]
+  },
+  {
+    title: "My Account & Orders",
+    items: [
+      { name: "My Orders & Tracking", path: "/orders", icon: "local_shipping" },
+      { name: "My Wishlist", path: "/wishlist", icon: "favorite" },
+      { name: "Shopping Bag", path: "/cart", icon: "shopping_bag" },
+      { name: "Account Profile", path: "/user-dashboard", icon: "account_circle" },
+      { name: "Notifications", path: "/notifications", icon: "notifications" },
+    ]
+  },
+  {
+    title: "Customer Support",
+    items: [
+      { name: "Help Center", path: "/support-center", icon: "support_agent" },
+      { name: "Raise a Ticket", path: "/raise-ticket", icon: "confirmation_number" },
+    ]
+  },
+  {
+    title: "Earn with MShoppy",
+    items: [
+      { name: "Become a Reseller", path: "/dropshipper-register", icon: "storefront", badge: "Free" },
+      { name: "Affiliate Program", path: "/affiliate-program", icon: "loyalty" },
+    ]
+  }
+];
+
+export default function NavDrawer({ isOpen, onClose, role = 'reseller', isCustomer }) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const customerMode = isCustomer || role === 'customer' || location.pathname === '/user-home';
+  const sections = customerMode ? customerNavSections : navSections;
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -87,9 +128,11 @@ export default function NavDrawer({ isOpen, onClose }) {
             />
             <div>
               <h2 className="font-['Plus_Jakarta_Sans'] font-extrabold text-lg leading-tight">
-                MShoppy Reseller
+                {customerMode ? 'MShoppy Shopper' : 'MShoppy Reseller'}
               </h2>
-              <p className="text-white/80 text-xs font-medium">Digital Commerce Hub</p>
+              <p className="text-white/80 text-xs font-medium">
+                {customerMode ? 'India’s Favorite Shopping' : 'Digital Commerce Hub'}
+              </p>
             </div>
           </div>
           <button
@@ -105,16 +148,18 @@ export default function NavDrawer({ isOpen, onClose }) {
         <div className="px-6 py-3.5 bg-rose-50/60 border-b border-rose-100/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-xs font-semibold text-gray-700">Reseller Mode Active</span>
+            <span className="text-xs font-semibold text-gray-700">
+              {customerMode ? 'Customer Store Online' : 'Reseller Mode Active'}
+            </span>
           </div>
           <span className="text-[11px] font-bold text-[#FF3F6C] bg-white px-2.5 py-0.5 rounded-full border border-[#FF3F6C]/20 shadow-xs">
-            Gold Tier
+            {customerMode ? 'Free Shipping' : 'Gold Tier'}
           </span>
         </div>
 
         {/* Navigation Items List */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-          {navSections.map((section, idx) => (
+          {sections.map((section, idx) => (
             <div key={idx} className="space-y-1.5">
               <h3 className="px-3 text-[11px] font-bold tracking-wider text-gray-400 uppercase font-['Plus_Jakarta_Sans']">
                 {section.title}
@@ -168,7 +213,7 @@ export default function NavDrawer({ isOpen, onClose }) {
         <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span className="material-symbols-outlined text-base">verified_user</span>
-            <span>100% Safe Reselling</span>
+            <span>{customerMode ? '100% Genuine Shopping' : '100% Safe Reselling'}</span>
           </div>
           <button 
             onClick={() => {

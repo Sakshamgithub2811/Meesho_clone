@@ -13,10 +13,10 @@ datasource db {
 enum UserRole {
   CUSTOMER
   RESELLER
-  DROPSHIPPER
   SUPPLIER
   DRIVER
   ADMIN
+  DROPSHIPPER
 }
 
 enum KYCStatus {
@@ -69,6 +69,18 @@ model Profile {
   fullName  String?  @map("full_name")
   avatarUrl String?  @map("avatar_url")
   role      UserRole @default(CUSTOMER)
+
+  // Supplier & Auth Fields
+  passwordHash    String?  @map("password_hash")
+  storeName       String?  @map("store_name")
+  gstin           String?
+  pan             String?
+  bankDetails     Json?    @map("bank_details")
+  tier            String?  @default("Silver")
+  tierLabel       String?  @default("Silver Supplier") @map("tier_label")
+  rating          Float    @default(5.0)
+  followers       String?  @default("0")
+  experienceYears String?  @default("1+") @map("experience_years")
 
   addresses       Address[]
   orders          Order[]

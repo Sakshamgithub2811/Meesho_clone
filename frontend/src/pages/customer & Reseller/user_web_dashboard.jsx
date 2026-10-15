@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 import { getDropshipperApp, subscribeDropshipperApp } from '../../services/dropshipperSessionStore';
 import { getAffiliateApp, subscribeAffiliateApp } from '../../services/affiliateSessionStore';
+import { getStoredCustomer, logoutCustomer, subscribeCustomerAuth } from '../../services/customerAuthService';
 
 export default function UserWebDashboard({ onNavigate, onBack }) {
   const navigate = useNavigate();
@@ -16,6 +17,16 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
   const [walletBalance, setWalletBalance] = useState(12840);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+
+  // Customer Auth State
+  const [customerUser, setCustomerUser] = useState(() => getStoredCustomer()?.user || null);
+
+  useEffect(() => {
+    const unsubCustomer = subscribeCustomerAuth((session) => {
+      setCustomerUser(session?.user || null);
+    });
+    return unsubCustomer;
+  }, []);
 
   // Dropshipper KYC State (Synced with in-memory store; auto-resets on refresh)
   const [dropshipperApp, setDropshipperApp] = useState(() => getDropshipperApp());
@@ -293,11 +304,15 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
             <span>Back to Shopping</span>
           </button>
           <button
-            onClick={() => triggerToast('Logged out of Curator Hub')}
+            onClick={() => {
+              logoutCustomer();
+              triggerToast('Logged out successfully');
+              navigate('/login?role=customer');
+            }}
             className="w-full text-left rounded-2xl px-4 py-2.5 flex items-center space-x-3 text-red-600 hover:bg-red-50 transition-colors cursor-pointer text-xs font-bold"
           >
             <span className="material-symbols-outlined text-lg">logout</span>
-            <span>Logout</span>
+            <span>Logout Account</span>
           </button>
         </div>
       </aside>
@@ -317,7 +332,7 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
                 <span className="material-symbols-outlined text-2xl">arrow_back</span>
               </button>
               <h1 className="text-base sm:text-2xl md:text-3xl font-black tracking-tight text-[#191c1e] truncate font-['Plus_Jakarta_Sans',sans-serif]">
-                Hello, Sarah James! 👋
+                Hello, {customerUser?.fullName || 'Valued Shopper'}! 👋
               </h1>
             </div>
 
@@ -356,10 +371,10 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-pink-500"></span>
               </button>
               <div
-                onClick={() => triggerToast('Viewing Sarah James Curator Profile')}
-                className="h-8 w-8 sm:h-10 sm:w-10 rounded-2xl bg-[#4d41df] text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-md cursor-pointer hover:opacity-90 shrink-0"
+                onClick={() => triggerToast(`Customer Profile: ${customerUser?.fullName || 'Active User'}`)}
+                className="h-8 w-8 sm:h-10 sm:w-10 rounded-2xl bg-[#b90041] text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-md cursor-pointer hover:opacity-90 shrink-0"
               >
-                SJ
+                {customerUser?.fullName ? customerUser.fullName.charAt(0).toUpperCase() : 'U'}
               </div>
             </div>
           </div>

@@ -11,12 +11,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const serviceAccountPath = path.resolve(__dirname, "serviceAccountKey.json");
+let serviceAccount = null;
 
 if (!existsSync(serviceAccountPath)) {
   console.error(`❌ Service account key not found at: ${serviceAccountPath}`);
 } else {
   try {
-    const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, "utf-8"));
+    serviceAccount = JSON.parse(readFileSync(serviceAccountPath, "utf-8"));
 
     if (getApps().length === 0) {
       initializeApp({
@@ -29,6 +30,15 @@ if (!existsSync(serviceAccountPath)) {
   }
 }
 
-// Export auth helper for verifying tokens in middleware
+// Export auth helper and admin object for verifying tokens in middleware
 export const auth = getApps().length > 0 ? getAuth() : null;
-export default { auth }
+export { serviceAccount };
+
+const admin = {
+  auth: () => auth,
+};
+if (auth) {
+  Object.assign(admin.auth, auth);
+}
+
+export default admin;

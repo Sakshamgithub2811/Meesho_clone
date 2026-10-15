@@ -1,0 +1,11 @@
+{
+  "name": "meesho-superapp-root",
+  "version": "1.0.0",
+  "description": "Meesho Clone SuperApp Monorepo Workspace",
+  "private": true,
+  "scripts": {
+    "start": "start-all.bat",
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm run dev"
+  }
+}

@@ -1,16 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
+import { getStoredAffiliate, logoutAffiliate, subscribeAffiliateAuth } from '../../services/affiliateAuthService';
+import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
 
 export default function AffiliateProgramPanel() {
   const navigate = useNavigate();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedBanner, setCopiedBanner] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
 
-  const referralCode = "MEESHO500";
+  // Affiliate Authentication State
+  const [affiliateSession, setAffiliateSession] = useState(() => getStoredAffiliate());
+
+  useEffect(() => {
+    const unsub = subscribeAffiliateAuth((sess) => {
+      setAffiliateSession(sess);
+    });
+    return unsub;
+  }, []);
+
+  const currentAffiliate = affiliateSession?.user;
+  const affiliateStats = affiliateSession?.stats;
+  const referralCode = currentAffiliate?.referralCode || "MEESHO500";
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(referralCode);
@@ -23,6 +38,12 @@ export default function AffiliateProgramPanel() {
     navigator.clipboard.writeText(link);
     setCopiedBanner(category);
     setTimeout(() => setCopiedBanner(null), 2000);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
+    logoutAffiliate();
+    navigate('/login?role=affiliate');
   };
 
   return (
@@ -39,23 +60,35 @@ export default function AffiliateProgramPanel() {
             >
               <span className="material-symbols-outlined text-2xl">arrow_back</span>
             </button>
-            <div className="w-10 h-10 rounded-full border-2 border-[#f6b630] overflow-hidden">
-              <img
-                alt="User Profile"
-                className="w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAK9YSzbRRSYTaQiWJZ1dm_Ye5gldfqy5u0Z0etgsxeMtwjplczxXy70QTK8Qy52xs8fkz-3AJ3nNh5YFYite-g888hA9W9UZ7oOqgdkOIT_O9V67f27v1P2ybtEwsnIoFwuSs_Pji9FnQXcgoz1yb31vUTkvo5RIxmZPDMkjDgFKkg7X5RCaoUuU9pcwp31zCd_AiMlZrOYi3Wsl5mKnfSZpwskBiNESpFDbYuwlDhOotskYOvmsucDjG1VwNv0qys41yaVo7qaY"
-              />
+            <div className="w-10 h-10 rounded-full border-2 border-[#f6b630] overflow-hidden flex items-center justify-center bg-[#251f33] font-bold text-sm text-[#f6b630]">
+              {currentAffiliate?.fullName ? currentAffiliate.fullName.charAt(0).toUpperCase() : 'A'}
             </div>
-            <span className="text-lg sm:text-xl font-black tracking-[0.05em] uppercase text-[#f6b630] font-['Plus_Jakarta_Sans']">
-              SOVEREIGN
-            </span>
+            <div>
+              <span className="text-base sm:text-lg font-black tracking-[0.05em] uppercase text-[#f6b630] font-['Plus_Jakarta_Sans'] block leading-none">
+                {currentAffiliate?.fullName || 'SOVEREIGN'}
+              </span>
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                {currentAffiliate?.kycStatus ? `KYC: ${currentAffiliate.kycStatus}` : 'Verified Partner'}
+              </span>
+            </div>
           </div>
-          <button 
-            onClick={() => navigate('/notifications')}
-            className="material-symbols-outlined text-[#f6b630] hover:bg-[#282430] transition-colors duration-300 p-2 rounded-full active:scale-95 transition-transform cursor-pointer"
-          >
-            notifications
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => navigate('/notifications')}
+              className="material-symbols-outlined text-[#f6b630] hover:bg-[#282430] transition-colors duration-300 p-2 rounded-full active:scale-95 transition-transform cursor-pointer"
+              title="Notifications"
+            >
+              notifications
+            </button>
+            <button
+              onClick={() => setShowLogoutConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/20 transition-all cursor-pointer"
+              title="Logout Partner Session"
+            >
+              <span className="material-symbols-outlined text-sm">logout</span>
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -263,6 +296,16 @@ export default function AffiliateProgramPanel() {
 
       {/* Navigation Drawer */}
       <NavDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
+
+      {/* Shadcn Logout Confirmation Dialog for Affiliate */}
+      <LogoutConfirmDialog
+        isOpen={showLogoutConfirm}
+        setIsOpen={setShowLogoutConfirm}
+        roleLabel="Affiliate Partner"
+        title="Log out of Affiliate Partner Account?"
+        description="Are you sure you want to end your affiliate session? You can sign back in anytime to access your dashboard."
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 }

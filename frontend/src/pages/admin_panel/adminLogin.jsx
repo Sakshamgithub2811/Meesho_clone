@@ -96,8 +96,8 @@ export default function AdminLogin() {
         <div className="flex justify-end pt-1">
           <button 
             type="button" 
-            onClick={() => navigate('/forgot-password')} 
-            className="text-xs font-bold text-[#b7004d] hover:underline"
+            onClick={() => navigate('/forgot-password?from=/admin-login')} 
+            className="text-xs font-bold text-[#b7004d] hover:underline cursor-pointer"
           >
             Forgot Password?
           </button>

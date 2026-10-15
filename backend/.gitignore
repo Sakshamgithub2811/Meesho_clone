@@ -9,3 +9,5 @@ logs/
 *.log
 *serviceAccount*.json
 serviceAccountKey.json
+uploads/*
+!uploads/.gitkeep

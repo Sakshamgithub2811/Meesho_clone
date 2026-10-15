@@ -453,7 +453,7 @@ export default function HomeUserReseller() {
               onClick={() => navigate('/flash')}
               className="min-w-[85%] md:min-w-[100%] snap-center shrink-0 cursor-pointer"
             >
-              <div className="h-48 md:h-80 rounded-3xl bg-gradient-to-br from-primary to-primary-container relative overflow-hidden flex items-center px-8 text-white">
+              <div className="h-48 md:h-80 rounded-3xl bg-gradient-to-br from-[#b90041] to-[#df2457] relative overflow-hidden flex items-center px-8 text-white shadow-lg shadow-[#b90041]/20">
                 <div className="relative z-10 max-w-xs md:max-w-md">
                   <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-3 inline-block">
                     Flash Sale
@@ -469,7 +469,7 @@ export default function HomeUserReseller() {
                       e.stopPropagation();
                       navigate('/flash');
                     }} 
-                    className="mt-6 bg-white text-primary px-6 py-2 rounded-xl font-bold text-sm shadow-xl active:scale-95 transition-transform hover:bg-opacity-95 cursor-pointer"
+                    className="mt-6 bg-white text-[#b90041] px-6 py-2 rounded-xl font-bold text-sm shadow-xl active:scale-95 transition-transform hover:bg-opacity-95 cursor-pointer"
                   >
                     Shop Now
                   </button>
@@ -492,7 +492,7 @@ export default function HomeUserReseller() {
               onClick={() => navigate('/dropshipper-register')}
               className="min-w-[85%] md:min-w-[100%] snap-center shrink-0 cursor-pointer"
             >
-              <div className="h-48 md:h-80 rounded-3xl bg-gradient-to-br from-secondary to-secondary-container relative overflow-hidden flex items-center px-8 text-white">
+              <div className="h-48 md:h-80 rounded-3xl bg-gradient-to-br from-[#4d41df] to-[#675df9] relative overflow-hidden flex items-center px-8 text-white shadow-lg shadow-[#4d41df]/20">
                 <div className="relative z-10 max-w-xs md:max-w-md">
                   <h2 className="text-3xl md:text-5xl font-black font-headline leading-tight">
                     BECOME A RESELLER
@@ -505,7 +505,7 @@ export default function HomeUserReseller() {
                       e.stopPropagation();
                       navigate('/dropshipper-register');
                     }} 
-                    className="mt-6 bg-white text-secondary px-6 py-2 rounded-xl font-bold text-sm shadow-xl active:scale-95 transition-transform hover:bg-opacity-95 cursor-pointer"
+                    className="mt-6 bg-white text-[#4d41df] px-6 py-2 rounded-xl font-bold text-sm shadow-xl active:scale-95 transition-transform hover:bg-opacity-95 cursor-pointer"
                   >
                     Join Now
                   </button>
@@ -538,12 +538,12 @@ export default function HomeUserReseller() {
           <div className="flex justify-center gap-2 mt-2">
             <button 
               onClick={() => scrollToSlide(0)} 
-              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 0 ? 'w-6 bg-primary' : 'w-2 bg-gray-300'}`} 
+              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 0 ? 'w-6 bg-[#b90041]' : 'w-2 bg-gray-300'}`} 
               aria-label="Slide 1: Flash Sale"
             />
             <button 
               onClick={() => scrollToSlide(1)} 
-              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 1 ? 'w-6 bg-secondary' : 'w-2 bg-gray-300'}`} 
+              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${activeSlide === 1 ? 'w-6 bg-[#4d41df]' : 'w-2 bg-gray-300'}`} 
               aria-label="Slide 2: Become a Reseller"
             />
           </div>
@@ -554,7 +554,7 @@ export default function HomeUserReseller() {
         <section className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-headline font-bold text-lg text-on-surface">Categories</h3>
-            <button onClick={() => navigate('/explorer')} className="text-primary text-xs font-bold font-label uppercase tracking-wider cursor-pointer">See All</button>
+            <button onClick={() => navigate('/explorer')} className="text-[#b90041] text-xs font-bold font-label uppercase tracking-wider cursor-pointer hover:underline">See All</button>
           </div>
           <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
             {categories.map((cat, idx) => (
@@ -566,7 +566,7 @@ export default function HomeUserReseller() {
                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${
                   selectedCategory === cat.name 
                     ? 'bg-[#FF3F6C] text-white shadow-lg shadow-[#FF3F6C]/20 scale-105' 
-                    : 'bg-surface-container-high group-hover:bg-primary-fixed text-on-surface-variant'
+                    : 'bg-surface-container-high group-hover:bg-[#ffd9dc] text-on-surface-variant'
                 }`}>
                   <span className="material-symbols-outlined text-2xl">{cat.icon}</span>
                 </div>
@@ -594,7 +594,7 @@ export default function HomeUserReseller() {
                 <p className="text-xs text-on-surface-variant mt-1">Explore other categories or check back soon for new arrivals.</p>
                 <button 
                   onClick={() => setSelectedCategory("All")} 
-                  className="mt-4 px-4 py-2 text-xs font-bold text-primary bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors cursor-pointer"
+                  className="mt-4 px-4 py-2 text-xs font-bold text-[#b90041] bg-[#b90041]/10 rounded-xl hover:bg-[#b90041]/20 transition-colors cursor-pointer"
                 >
                   View All Products
                 </button>
@@ -624,7 +624,7 @@ export default function HomeUserReseller() {
                           className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center shadow-sm active:scale-90 transition-transform cursor-pointer"
                         >
                           <span 
-                            className={`material-symbols-outlined text-sm ${isFav ? 'text-primary' : 'text-on-surface-variant'}`}
+                            className={`material-symbols-outlined text-sm ${isFav ? 'text-[#b90041]' : 'text-on-surface-variant'}`}
                             style={isFav ? { fontVariationSettings: "'FILL' 1" } : {}}
                           >
                             favorite
@@ -634,7 +634,7 @@ export default function HomeUserReseller() {
 
                       <div className="px-1 min-w-0">
                         {p.brand && (
-                          <span className="text-[10px] font-bold text-primary uppercase tracking-wider block mb-0.5 truncate">
+                          <span className="text-[10px] font-bold text-[#b90041] uppercase tracking-wider block mb-0.5 truncate">
                             {p.brand}
                           </span>
                         )}
