@@ -192,6 +192,21 @@ export async function updateGstDetails(gstData) {
   return data.gstDetails;
 }
 
+// Get Supplier KYC Application & Status
+export async function fetchSupplierKyc() {
+  const data = await request('/supplier/kyc');
+  return data;
+}
+
+// Submit or Re-submit Supplier KYC Application
+export async function submitSupplierKyc(kycPayload) {
+  const data = await request('/supplier/kyc', {
+    method: 'POST',
+    body: JSON.stringify(kycPayload),
+  });
+  return data;
+}
+
 /**
  * ========================================================
  * 3. DASHBOARD, INVENTORY & PRODUCTS
@@ -293,6 +308,8 @@ export default {
   updateSupplierProfile,
   updateBankDetails,
   updateGstDetails,
+  fetchSupplierKyc,
+  submitSupplierKyc,
   fetchDashboardStats,
   fetchSupplierProducts,
   createSupplierProduct,

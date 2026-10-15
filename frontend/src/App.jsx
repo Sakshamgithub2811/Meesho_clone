@@ -81,6 +81,7 @@ import SellerDropship1 from './pages/supplier/SellerDropship1';
 import SellerReturns1 from './pages/supplier/SellerReturns1';
 import SellerAddProduct1 from './pages/supplier/SellerAddProduct1';
 import SellerProfile1 from './pages/supplier/SellerProfile1';
+import SellerKyc1 from './pages/supplier/SellerKyc1';
 import SupplierReturnsRTO from './pages/supplier/SupplierReturnsRTO';
 import SupplierRotLedger from './pages/supplier/SupplierRotLedger';
 import CustomerOrderSupplierFulfilment from './pages/supplier/CustomerOrderSupplierFulfilment';
@@ -198,6 +199,7 @@ const screenCatalog = [
   { path: '/supplier-returns1', name: 'Returns & RTO Hub (Live)', icon: '🔄', group: 'Supplier' },
   { path: '/supplier-add-product1', name: 'Add Product (Live)', icon: '➕', group: 'Supplier' },
   { path: '/supplier-profile1', name: 'Supplier Profile (Live)', icon: '👤', group: 'Supplier' },
+  { path: '/supplier-kyc1', name: 'Supplier KYC Hub (Live)', icon: '🛡️', group: 'Supplier' },
   { path: '/seller-dashboard', name: 'Seller Web Dashboard', icon: '💻', group: 'Supplier' },
   { path: '/supplier-returns', name: 'Returns, RTO & Claims Hub', icon: '🔄', group: 'Supplier' },
   { path: '/supplier-rot-ledger', name: 'Supplier ROT & Freight Ledger', icon: '🧾', group: 'Supplier' },
@@ -637,6 +639,10 @@ function AppRoutes() {
       '/seller-add-product1': '/supplier-add-product1',
       'seller-profile1': '/supplier-profile1',
       '/seller-profile1': '/supplier-profile1',
+      'supplier-kyc1': '/supplier-kyc1',
+      '/supplier-kyc1': '/supplier-kyc1',
+      'seller-kyc1': '/supplier-kyc1',
+      '/seller-kyc1': '/supplier-kyc1',
       sellers: '/seller-dashboard',
       '/sellers': '/seller-dashboard',
       seller: '/seller-dashboard',
@@ -1040,6 +1046,24 @@ function AppRoutes() {
           path="/seller-profile1"
           element={
             <SellerProfile1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/supplier-kyc1"
+          element={
+            <SellerKyc1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/seller-kyc1"
+          element={
+            <SellerKyc1
               onNavigate={handleNav}
               onBack={handleBack}
             />

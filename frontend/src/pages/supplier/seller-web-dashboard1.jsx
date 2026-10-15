@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
-import supplierApiService, { clearAuthSession, getCurrentSupplier } from '../../services/supplierApiService';
+import supplierApiService, { clearAuthSession, getCurrentSupplier, fetchSupplierKyc } from '../../services/supplierApiService';
 import { auth } from '../../utils/firebase';
 import { signOut } from 'firebase/auth';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import {
   Store,
   TrendingUp,
   AlertTriangle,
+  AlertCircle,
   IndianRupee,
   RefreshCw,
   ArrowRight,
@@ -55,6 +56,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [kycData, setKycData] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Fetch real data from backend
@@ -68,12 +70,23 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
       setError(null);
 
       // Fetch all dynamic metrics in parallel
-      const [statsRes, profileRes, productsRes, ordersRes] = await Promise.allSettled([
+      const kycPromise = typeof supplierApiService?.fetchSupplierKyc === 'function'
+        ? supplierApiService.fetchSupplierKyc()
+        : typeof fetchSupplierKyc === 'function'
+        ? fetchSupplierKyc()
+        : Promise.resolve({ success: true, kyc: null });
+
+      const [statsRes, profileRes, productsRes, ordersRes, kycRes] = await Promise.allSettled([
         supplierApiService.fetchDashboardStats(),
         supplierApiService.fetchSupplierProfile(),
         supplierApiService.fetchSupplierProducts({ limit: 6 }),
         supplierApiService.fetchSupplierOrders(),
+        kycPromise,
       ]);
+
+      if (kycRes.status === 'fulfilled' && kycRes.value?.kyc) {
+        setKycData(kycRes.value.kyc);
+      }
 
       // 1. Stats
       if (statsRes.status === 'fulfilled' && statsRes.value) {
@@ -102,7 +115,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
           productsRes.value.data ||
           productsRes.value.products ||
           (Array.isArray(productsRes.value) ? productsRes.value : []);
-        setProducts(prodData);
+        setProducts(Array.isArray(prodData) ? prodData : []);
       } else {
         setProducts([]);
       }
@@ -113,7 +126,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
           ordersRes.value.data ||
           ordersRes.value.orders ||
           (Array.isArray(ordersRes.value) ? ordersRes.value : []);
-        setOrders(ordData);
+        setOrders(Array.isArray(ordData) ? ordData : []);
       } else {
         setOrders([]);
       }
@@ -166,27 +179,35 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
     }
   };
 
+  const safeProducts = Array.isArray(products) ? products : [];
+  const safeOrders = Array.isArray(orders) ? orders : [];
+
   const supplierDisplayName =
-    profile?.storeName || profile?.fullName || profile?.name || 'Verified Supplier';
-  const supplierRoleTitle = profile?.tierLabel || 'MShoppy Supplier';
+    (typeof profile?.storeName === 'string' && profile.storeName.trim()) ||
+    (typeof profile?.fullName === 'string' && profile.fullName.trim()) ||
+    (typeof profile?.name === 'string' && profile.name.trim()) ||
+    'Verified Supplier';
+  const supplierRoleTitle =
+    (typeof profile?.tierLabel === 'string' && profile.tierLabel) || 'MShoppy Supplier';
 
   // Compute combined recent orders from stats or orders list
   const recentOrdersList =
-    stats?.recentOrders && stats.recentOrders.length > 0
+    Array.isArray(stats?.recentOrders) && stats.recentOrders.length > 0
       ? stats.recentOrders
-      : orders.slice(0, 5).map((o) => ({
-          orderId: o.id || o.orderId || '#ORD-LIVE',
-          productTitle: o.productTitle || o.title || o.product?.title || 'Catalog Item',
-          quantity: o.quantity || 1,
-          price: o.price || o.totalAmount || 0,
-          status: o.orderStatus || o.status || 'Pending',
-          createdAt: o.createdAt || new Date().toISOString(),
+      : safeOrders.slice(0, 5).map((o, idx) => ({
+          orderId: o?.id || o?.orderId || `#ORD-${1000 + idx}`,
+          productTitle: o?.productTitle || o?.title || o?.product?.title || 'Catalog Item',
+          quantity: o?.quantity || 1,
+          price: o?.price || o?.totalAmount || 0,
+          status: o?.orderStatus || o?.status || 'Pending',
+          createdAt: o?.createdAt || new Date().toISOString(),
         }));
 
   const activeProductsCount =
-    stats?.totalProducts !== undefined ? stats.totalProducts : products.length;
+    typeof stats?.totalProducts === 'number' ? stats.totalProducts : safeProducts.length;
   const totalRevenueAmount = stats?.totalRevenue || 0;
-  const totalOrdersCount = stats?.totalOrders || orders.length;
+  const totalOrdersCount =
+    typeof stats?.totalOrders === 'number' ? stats.totalOrders : safeOrders.length;
   const lowStockItemsCount = stats?.lowStockCount || 0;
 
   return (
@@ -291,6 +312,57 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
               className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shrink-0 transition"
             >
               Retry Sync
+            </button>
+          </div>
+        )}
+
+        {/* Dynamic KYC Compliance Alert */}
+        {kycData?.status === 'APPROVED' ? (
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-emerald-900">Verified Merchant Account</span>
+                <p className="text-[11px] text-emerald-700">Your business KYC is fully verified. Automated daily settlements are active.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleNav('/supplier-kyc1')}
+              className="text-xs font-bold text-emerald-800 hover:underline shrink-0 cursor-pointer"
+            >
+              View Verification ➔
+            </button>
+          </div>
+        ) : (
+          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 border border-pink-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#d82a62] text-white flex items-center justify-center shrink-0 shadow-sm shadow-pink-500/20">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                    {kycData ? `KYC Status: ${kycData.status}` : 'Action Required: Supplier KYC Verification'}
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full bg-pink-100 text-[#b7004d] text-[10px] font-bold">
+                    {kycData?.status || 'Pending'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Complete GSTIN, PAN, and Bank verification to activate wholesale catalog distribution and daily bank payouts.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleNav('/supplier-kyc1')}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#d82a62] hover:bg-[#b7004d] text-white text-xs font-bold transition shadow-sm shrink-0 cursor-pointer"
+            >
+              <span>{kycData ? 'Check KYC Status' : 'Complete KYC Verification'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -607,7 +679,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
                 <p className="text-xs text-slate-500">Real items currently in wholesale inventory</p>
               </div>
 
-              {products.length > 0 && (
+              {safeProducts.length > 0 && (
                 <button
                   type="button"
                   onClick={() => handleNav('/supplier-inventory1')}
@@ -625,7 +697,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
                     <div key={i} className="h-16 bg-slate-50 rounded-2xl animate-pulse" />
                   ))}
                 </div>
-              ) : products.length === 0 ? (
+              ) : safeProducts.length === 0 ? (
                 /* REAL EMPTY STATE: No dummy data */
                 <div className="py-12 px-4 text-center flex flex-col items-center justify-center space-y-3">
                   <div className="w-16 h-16 rounded-3xl bg-pink-50 text-[#b7004d] flex items-center justify-center shadow-inner">
@@ -649,9 +721,9 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
               ) : (
                 /* REAL PRODUCT LIST */
                 <div className="space-y-3">
-                  {products.slice(0, 5).map((prod) => (
+                  {safeProducts.slice(0, 5).map((prod, idx) => (
                     <div
-                      key={prod.id}
+                      key={prod?.id || idx}
                       className="p-3 rounded-2xl border border-slate-100 hover:border-pink-200 bg-slate-50/40 hover:bg-white transition-all flex items-center justify-between gap-3"
                     >
                       <div className="flex items-center gap-3 min-w-0">

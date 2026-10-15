@@ -127,7 +127,16 @@ export const updateKycStatus = async (req, res) => {
         await prisma.profile.update({
           where: { id: existing.userId },
           data: { role: 'DROPSHIPPER' }
-        });
+        }).catch(() => {});
+      } else if (existing.type?.toLowerCase() === 'supplier') {
+        await prisma.profile.update({
+          where: { id: existing.userId },
+          data: { 
+            role: 'SUPPLIER',
+            tier: 'Silver',
+            tierLabel: 'Verified Supplier'
+          }
+        }).catch(() => {});
       }
     }
 
