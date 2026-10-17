@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
+import supplierApiService from '../../services/supplierApiService';
 
 // Default mock supplier data matching design specifications
 const DEFAULT_SUPPLIER = {
@@ -32,9 +33,34 @@ const BOTTOM_NAV_ITEMS = [
   { id: 'profile', label: 'Profile', icon: 'person', active: true },
 ];
 
-export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAULT_SUPPLIER }) {
+export function SupplierProfile({ onBack, onNavigate, onLogout, supplier: propSupplier }) {
+  const [supplier, setSupplier] = useState(propSupplier || DEFAULT_SUPPLIER);
   const [activeModal, setActiveModal] = useState(null); // 'bank' | 'gst' | 'business' | 'support' | 'settings' | 'logout' | null
   const [toastMessage, setToastMessage] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Bank Form State
+  const [bankForm, setBankForm] = useState(supplier.bankDetails || DEFAULT_SUPPLIER.bankDetails);
+  // GST Form State
+  const [gstForm, setGstForm] = useState(supplier.gstDetails || DEFAULT_SUPPLIER.gstDetails);
+  // Store Form State
+  const [storeName, setStoreName] = useState(supplier.storeName || supplier.name || '');
+
+  // Load verified live profile from backend on mount
+  useEffect(() => {
+    supplierApiService.fetchSupplierProfile()
+      .then((data) => {
+        if (data) {
+          setSupplier((prev) => ({ ...prev, ...data }));
+          if (data.bankDetails) setBankForm(data.bankDetails);
+          if (data.gstDetails) setGstForm(data.gstDetails);
+          if (data.storeName || data.name) setStoreName(data.storeName || data.name);
+        }
+      })
+      .catch(() => {
+        // Fallback to default
+      });
+  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -305,34 +331,93 @@ export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAU
             <h3 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-lg text-[#191C1E] mb-1">
               Bank &amp; UPI Details
             </h3>
-            <p className="text-xs text-slate-500 mb-4">Your verified payment accounts</p>
+            <p className="text-xs text-slate-500 mb-4">Edit verified payout accounts</p>
 
-            <div className="space-y-3 text-sm bg-slate-50 p-4 rounded-xl border border-slate-200/60 mb-5">
-              <div>
-                <span className="text-[11px] text-slate-400 font-semibold uppercase">Account Holder</span>
-                <p className="font-bold text-slate-800">{supplier.bankDetails.accountHolder}</p>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-semibold uppercase">Bank Name</span>
-                <p className="font-bold text-slate-800">{supplier.bankDetails.bankName}</p>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-semibold uppercase">Account Number</span>
-                <p className="font-mono font-bold text-slate-800">{supplier.bankDetails.accountNumber}</p>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-semibold uppercase">UPI ID</span>
-                <p className="font-mono font-bold text-[#4d41df]">{supplier.bankDetails.upiId}</p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setActiveModal(null)}
-              className="w-full py-2.5 bg-[#FF3F6C] text-white text-xs font-bold rounded-xl hover:bg-[#e0305a]"
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setIsSaving(true);
+                try {
+                  const updated = await supplierApiService.updateBankDetails(bankForm);
+                  setSupplier((prev) => ({ ...prev, bankDetails: updated || bankForm }));
+                  showToast('Bank details saved to backend! 💳');
+                  setActiveModal(null);
+                } catch (err) {
+                  showToast('Failed to save bank details: ' + err.message);
+                } finally {
+                  setIsSaving(false);
+                }
+              }}
+              className="space-y-3 mb-5"
             >
-              Close
-            </button>
+              <div>
+                <label className="text-[11px] text-slate-500 font-bold uppercase block mb-1">Account Holder</label>
+                <input
+                  type="text"
+                  value={bankForm.accountHolder || ''}
+                  onChange={(e) => setBankForm({ ...bankForm, accountHolder: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-500 font-bold uppercase block mb-1">Bank Name</label>
+                <input
+                  type="text"
+                  value={bankForm.bankName || ''}
+                  onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-500 font-bold uppercase block mb-1">Account Number</label>
+                <input
+                  type="text"
+                  value={bankForm.accountNumber || ''}
+                  onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-500 font-bold uppercase block mb-1">IFSC Code</label>
+                <input
+                  type="text"
+                  value={bankForm.ifsc || ''}
+                  onChange={(e) => setBankForm({ ...bankForm, ifsc: e.target.value.toUpperCase() })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 uppercase outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-500 font-bold uppercase block mb-1">UPI ID</label>
+                <input
+                  type="text"
+                  value={bankForm.upiId || ''}
+                  onChange={(e) => setBankForm({ ...bankForm, upiId: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono font-bold text-[#4d41df] outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-1 py-2.5 bg-[#FF3F6C] text-white text-xs font-bold rounded-xl hover:bg-[#e0305a] disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save Bank Details'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -344,30 +429,73 @@ export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAU
             <h3 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-lg text-[#191C1E] mb-1">
               GST &amp; Tax Documents
             </h3>
-            <p className="text-xs text-slate-500 mb-4">Registered Business Credentials</p>
+            <p className="text-xs text-slate-500 mb-4">Edit registered credentials</p>
 
-            <div className="space-y-3 text-sm bg-slate-50 p-4 rounded-xl border border-slate-200/60 mb-5">
-              <div>
-                <span className="text-[11px] text-slate-400 font-semibold uppercase">GSTIN Number</span>
-                <p className="font-mono font-bold text-slate-800">{supplier.gstDetails.gstin}</p>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-semibold uppercase">PAN Number</span>
-                <p className="font-mono font-bold text-slate-800">{supplier.gstDetails.pan}</p>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-semibold uppercase">State</span>
-                <p className="font-bold text-slate-800">{supplier.gstDetails.registeredState}</p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setActiveModal(null)}
-              className="w-full py-2.5 bg-[#FF3F6C] text-white text-xs font-bold rounded-xl hover:bg-[#e0305a]"
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setIsSaving(true);
+                try {
+                  const updated = await supplierApiService.updateGstDetails(gstForm);
+                  setSupplier((prev) => ({ ...prev, gstDetails: updated || gstForm }));
+                  showToast('GST details saved to backend! 📄');
+                  setActiveModal(null);
+                } catch (err) {
+                  showToast('Failed to save GST: ' + err.message);
+                } finally {
+                  setIsSaving(false);
+                }
+              }}
+              className="space-y-3 mb-5"
             >
-              Close
-            </button>
+              <div>
+                <label className="text-[11px] text-slate-500 font-bold uppercase block mb-1">GSTIN Number</label>
+                <input
+                  type="text"
+                  value={gstForm.gstin || ''}
+                  onChange={(e) => setGstForm({ ...gstForm, gstin: e.target.value.toUpperCase() })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 uppercase outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-500 font-bold uppercase block mb-1">PAN Number</label>
+                <input
+                  type="text"
+                  value={gstForm.pan || ''}
+                  onChange={(e) => setGstForm({ ...gstForm, pan: e.target.value.toUpperCase() })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 uppercase outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-500 font-bold uppercase block mb-1">Registered State</label>
+                <input
+                  type="text"
+                  value={gstForm.registeredState || ''}
+                  onChange={(e) => setGstForm({ ...gstForm, registeredState: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-1 py-2.5 bg-[#FF3F6C] text-white text-xs font-bold rounded-xl hover:bg-[#e0305a] disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save GST Details'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -386,7 +514,8 @@ export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAU
                 Store Name
                 <input
                   type="text"
-                  defaultValue={supplier.name}
+                  value={storeName}
+                  onChange={(e) => setStoreName(e.target.value)}
                   className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-[#FF3F6C]"
                 />
               </label>
@@ -394,8 +523,9 @@ export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAU
                 Contact Email
                 <input
                   type="email"
-                  defaultValue="contact@globalexports.com"
-                  className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                  defaultValue={supplier.email || 'contact@globalexports.com'}
+                  disabled
+                  className="mt-1 w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-500 font-semibold"
                 />
               </label>
             </div>
@@ -410,13 +540,23 @@ export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAU
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  showToast('Store settings updated successfully!');
-                  setActiveModal(null);
+                onClick={async () => {
+                  setIsSaving(true);
+                  try {
+                    await supplierApiService.updateSupplierProfile({ name: storeName, storeName });
+                    setSupplier((prev) => ({ ...prev, name: storeName, storeName }));
+                    showToast('Store settings updated in backend! 🎉');
+                    setActiveModal(null);
+                  } catch (err) {
+                    showToast('Failed to update store: ' + err.message);
+                  } finally {
+                    setIsSaving(false);
+                  }
                 }}
+                disabled={isSaving}
                 className="flex-1 py-2.5 bg-[#FF3F6C] text-white text-xs font-bold rounded-xl"
               >
-                Save
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
@@ -452,7 +592,7 @@ export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAU
             <button
               type="button"
               onClick={() => setActiveModal(null)}
-              className="w-full py-2.5 bg-[#4d41df] text-white text-xs font-bold rounded-xl"
+              className="w-full py-2.5 bg-[#4d41df] text-white text-xs font-bold rounded-xl cursor-pointer"
             >
               Close
             </button>
@@ -486,7 +626,7 @@ export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAU
                 showToast('Settings saved.');
                 setActiveModal(null);
               }}
-              className="w-full py-2.5 bg-[#FF3F6C] text-white text-xs font-bold rounded-xl"
+              className="w-full py-2.5 bg-[#FF3F6C] text-white text-xs font-bold rounded-xl cursor-pointer"
             >
               Save
             </button>
@@ -505,7 +645,7 @@ export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAU
               Logout Account?
             </h3>
             <p className="text-xs text-slate-500 mb-5">
-              Are you sure you want to sign out of Global Exports Ltd.?
+              Are you sure you want to sign out of {supplier.name}?
             </p>
 
             <div className="flex gap-2">
@@ -518,12 +658,14 @@ export function SupplierProfile({ onBack, onNavigate, onLogout, supplier = DEFAU
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setActiveModal(null);
+                  await supplierApiService.logoutSupplier();
                   if (onLogout) onLogout();
-                  else showToast('Logged out successfully.');
+                  else if (onNavigate) onNavigate('/supplier-login');
+                  else window.location.href = '/supplier-login';
                 }}
-                className="flex-1 py-2.5 bg-[#ba1a1a] text-white text-xs font-bold rounded-xl cursor-pointer"
+                className="flex-1 py-2.5 bg-[#ba1a1a] text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-red-700"
               >
                 Yes, Logout
               </button>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import supplierApiService from '../../services/supplierApiService';
 
 const INITIAL_COLORS = ['Red', 'Navy Blue', 'Emerald Green', 'Black', 'Wine', 'Mustard Yellow'];
 const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
@@ -134,11 +135,30 @@ export function AddNewProductSupplier({ onBack, onSaveDraft, onPublish }) {
   const qualityScore = calculateQualityScore();
 
   // Form Submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!productName.trim()) {
       showToast('Please enter a Product Name.');
       return;
+    }
+
+    try {
+      const payload = {
+        title: productName,
+        categoryName: category,
+        description,
+        price: parseFloat(supplierPrice) || 0,
+        originalPrice: mrp ? parseFloat(mrp) : null,
+        discountPercentage: discount ? parseInt(discount, 10) : 0,
+        stock: parseInt(stockQuantity, 10) || 50,
+        sizes: selectedSizes,
+        primaryImage,
+        images: [primaryImage, ...secondaryImages.filter(Boolean)],
+      };
+      await supplierApiService.createSupplierProduct(payload);
+      showToast('🚀 Product successfully published to backend catalog!');
+    } catch (err) {
+      showToast('Product published locally: ' + err.message);
     }
 
     const newProduct = {
@@ -157,8 +177,6 @@ export function AddNewProductSupplier({ onBack, onSaveDraft, onPublish }) {
 
     if (onPublish) {
       onPublish(newProduct);
-    } else {
-      showToast('🚀 Product successfully published to your MShoppy catalog!');
     }
   };
 

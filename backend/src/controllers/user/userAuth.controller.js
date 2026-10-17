@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import prisma from '../../config/prisma.js';
 
 // In-memory fallback in case Prisma / database connection is unavailable
 const fallbackUserStore = new Map();

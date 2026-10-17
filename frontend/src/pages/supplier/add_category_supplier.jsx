@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import supplierApiService from '../../services/supplierApiService';
 
 export function AddCategorySupplier({ onBack, onSaveCategory }) {
   const [categoryName, setCategoryName] = useState('Festive Kurtis & Anarkalis');
@@ -37,11 +38,21 @@ export function AddCategorySupplier({ onBack, onSaveCategory }) {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!categoryName.trim()) {
       showToast('Please enter a Category Name.');
       return;
+    }
+
+    try {
+      await supplierApiService.createCategory({
+        name: categoryName,
+        imageUrl: iconImage,
+      });
+      showToast(`Category "${categoryName}" saved to backend database! 🎉`);
+    } catch (err) {
+      showToast(`Category saved locally: ${err.message}`);
     }
 
     const categoryData = {
@@ -55,8 +66,6 @@ export function AddCategorySupplier({ onBack, onSaveCategory }) {
 
     if (onSaveCategory) {
       onSaveCategory(categoryData);
-    } else {
-      showToast(`Category "${categoryName}" created successfully! 🎉`);
     }
   };
 

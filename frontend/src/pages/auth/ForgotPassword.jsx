@@ -18,11 +18,16 @@ export default function ForgotPassword() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const handleBack = () => {
+  const handleBack = (e) => {
+    e?.preventDefault();
     if (fromParam) {
       navigate(fromParam);
-    } else {
+    } else if (location.state?.from) {
+      navigate(location.state.from);
+    } else if (window.history.length > 2 && window.history.state && window.history.state.idx > 0) {
       navigate(-1);
+    } else {
+      navigate('/supplier-login');
     }
   };
 
@@ -33,9 +38,9 @@ export default function ForgotPassword() {
     setMessage('');
 
     try {
-      await sendPasswordResetEmail(auth, email);
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
       
-      setMessage("Password reset link has been sent to your email!");
+      setMessage("✅ Password reset link has been sent to your email! Please check your Inbox and Spam folder.");
       setLoading(false);
       
       // Go back to login automatically after 3 seconds
@@ -45,7 +50,15 @@ export default function ForgotPassword() {
 
     } catch (err) {
       console.error(err);
-      setError("Failed to send reset email. Please try again.");
+      if (err.code === 'auth/user-not-found') {
+        setError("No account found with this email address. Please check and try again.");
+      } else if (err.code === 'auth/invalid-email') {
+        setError("Please enter a valid email address.");
+      } else if (err.code === 'auth/too-many-requests') {
+        setError("Too many requests sent. Please wait a few minutes before trying again.");
+      } else {
+        setError(err.message || "Failed to send reset email. Please try again.");
+      }
       setLoading(false);
     }
   };
@@ -83,7 +96,7 @@ export default function ForgotPassword() {
         <button 
           type="button" 
           onClick={handleBack} 
-          className="text-sm text-[#b7004d] hover:underline font-bold cursor-pointer"
+          className="text-sm text-[#b7004d] hover:text-[#8a0039] hover:underline font-bold cursor-pointer transition py-1 px-3"
         >
           ← Back to Login
         </button>

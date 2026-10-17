@@ -1,26 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
-
-import { Router } from 'express';
-import healthRoutes from './src/routes/health.routes.js';
-import adminAuthRoutes from './src/routes/admin/adminAuth.routes.js';
-import userAuthRoutes from './src/routes/user/userAuth.routes.js';
-import affiliateAuthRoutes from './src/routes/affiliate/affiliateAuth.routes.js';
-import authRoutes from './src/routes/auth.routes.js';
-import dropshipperRoutes from './src/routes/dropshipper/dropshipper.routes.js';
-import productRoutes from './src/routes/product.routes.js';
-import categoryRoutes from './src/routes/category.routes.js';
-import cartRoutes from './src/routes/cart.routes.js';
-import orderRoutes from './src/routes/order.routes.js';
-import wishlistRoutes from './src/routes/wishlist.routes.js';
-import addressRoutes from './src/routes/address.routes.js';
-import reviewRoutes from './src/routes/review.routes.js';
-import couponRoutes from './src/routes/coupon.routes.js';
-
-const apiRouter = Router();
 
 // Initialize services
 import './src/config/firebaseAdmin.js';
@@ -29,50 +13,56 @@ import './src/config/supabaseClient.js';
 import './src/config/emailTransporter.js';
 import prisma from './src/config/prisma.js';
 
-apiRouter.use('/', healthRoutes);
-apiRouter.use('/admin-auth', adminAuthRoutes);
-apiRouter.use('/user-auth', userAuthRoutes);
-apiRouter.use('/affiliate-auth', affiliateAuthRoutes);
-apiRouter.use('/auth', authRoutes);
-apiRouter.use('/dropshipper', dropshipperRoutes);
+// Import Routes and Middlewares
+import apiRouter from './src/routes/index.js';
+import { notFoundHandler, errorHandler } from './src/middlewares/errorHandler.js';
 
-// Real Ecommerce Core Routes
-apiRouter.use('/products', productRoutes);
-apiRouter.use('/categories', categoryRoutes);
-apiRouter.use('/cart', cartRoutes);
-apiRouter.use('/orders', orderRoutes);
-apiRouter.use('/wishlist', wishlistRoutes);
-apiRouter.use('/addresses', addressRoutes);
-apiRouter.use('/reviews', reviewRoutes);
-apiRouter.use('/coupons', couponRoutes);
-
-
-import { errorHandler } from './src/middlewares/errorHandler.js';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  credentials: true,
 }));
 app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Routes
+// Static uploads directory for product images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Root documentation route
 app.get('/api', (req, res) => {
-  res.json({ message: 'Welcome to the Meesho API!' });
+  res.json({
+    message: 'Welcome to the Meesho SuperApp API!',
+    status: 'online',
+    version: '1.0.0',
+    documentation: {
+      adminAuth: '/api/v1/admin-auth',
+      adminProfile: '/api/v1/admin-profile',
+      supplierAuth: '/api/supplier/auth',
+      supplier: '/api/supplier',
+      health: '/api/health',
+    },
+  });
 });
 
+// Mount Main API Router (Supports both /api and /api/v1 prefix)
+app.use('/api', apiRouter);
 app.use('/api/v1', apiRouter);
 
-// Centralized Error Handler (guarantees JSON responses, avoids HTML error pages)
+// Error Handling
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start the server
 app.listen(port, () => {
   console.log(`🚀 Backend server is running on http://localhost:${port}`);
+  console.log(`🛡️ Admin auth endpoints available at http://localhost:${port}/api/v1/admin-auth`);
+  console.log(`👤 Admin profile endpoints available at http://localhost:${port}/api/v1/admin-profile`);
 });
 
-export default apiRouter;
+export default app;

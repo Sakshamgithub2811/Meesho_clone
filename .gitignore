@@ -42,3 +42,7 @@ pdf_navigation_flows/
 
 # Duplicate directory ignore
 frontend/frontend/
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep

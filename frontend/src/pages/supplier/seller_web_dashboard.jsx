@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
+import supplierApiService from '../../services/supplierApiService';
+import SupplierLogout from '../../components/supplier/SupplierLogout';
 
 const INITIAL_ORDERS = [
   {
@@ -102,6 +104,23 @@ export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders, o
   const [toastMessage, setToastMessage] = useState(null);
   const [selectedOrderMenu, setSelectedOrderMenu] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [stats, setStats] = useState({
+    totalRevenue: 482900,
+    totalOrders: 1284,
+    totalProducts: 124,
+    lowStockCount: 3,
+  });
+
+  // Fetch live stats from backend
+  useEffect(() => {
+    supplierApiService.fetchDashboardStats()
+      .then((data) => {
+        if (data && (data.totalOrders > 0 || data.totalRevenue > 0)) {
+          setStats((prev) => ({ ...prev, ...data }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -338,14 +357,12 @@ export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders, o
               <span className="material-symbols-outlined mr-2.5 text-base">help</span>
               Support
             </button>
-            <button
-              type="button"
-              onClick={() => showToast('Logging out...')}
-              className="w-full flex items-center px-3 py-2 text-red-500 hover:text-red-700 cursor-pointer text-xs font-semibold transition-colors rounded-lg"
-            >
-              <span className="material-symbols-outlined mr-2.5 text-base">logout</span>
-              Logout
-            </button>
+            <div className="pt-1">
+              <SupplierLogout 
+                onNavigate={onNavigate} 
+                className="w-full justify-start !px-3 !py-2 !rounded-lg text-red-500 bg-transparent hover:bg-red-50 border-transparent hover:border-red-100" 
+              />
+            </div>
           </div>
         </aside>
 
@@ -418,6 +435,7 @@ export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders, o
                     account_circle
                   </span>
                 </button>
+                <SupplierLogout onNavigate={onNavigate} />
               </div>
             </div>
           </header>
@@ -461,7 +479,7 @@ export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders, o
                     Total Sales
                   </p>
                   <h2 className="text-2xl font-black text-[#4d41df] mt-1 font-['Plus_Jakarta_Sans',sans-serif]">
-                    ₹4,82,900
+                    ₹{Number(stats.totalRevenue).toLocaleString('en-IN')}
                   </h2>
                 </div>
               </div>
@@ -481,7 +499,7 @@ export function SellerWebDashboard({ onNavigate, onViewProducts, onViewOrders, o
                     Orders
                   </p>
                   <h2 className="text-2xl font-black text-[#4d41df] mt-1 font-['Plus_Jakarta_Sans',sans-serif]">
-                    1,284
+                    {Number(stats.totalOrders).toLocaleString('en-IN')}
                   </h2>
                 </div>
               </div>

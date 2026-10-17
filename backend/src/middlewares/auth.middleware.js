@@ -46,6 +46,14 @@ export const verifyAuth = async (req, res, next) => {
       if (prisma?.profile?.findUnique) {
         profile = await prisma.profile.findUnique({
           where: { id: uid },
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            phone: true,
+            avatarUrl: true,
+            role: true,
+          }
         });
       }
     } catch (dbErr) {

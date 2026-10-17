@@ -3,6 +3,7 @@ import useLogout from '../../hooks/useLogout';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
 
 export { useLogout };
+export { default as SupplierLogout } from '../../components/supplier/SupplierLogout';
 
 /**
  * Ready-to-use Logout Button Component for User Panel
@@ -52,6 +53,31 @@ export function LogoutPage() {
       </div>
       <h2 className="text-lg font-bold text-slate-800">Signing you out...</h2>
       <p className="text-xs text-slate-500 mt-1">Clearing your session securely.</p>
+    </div>
+  );
+}
+
+/**
+ * Route Page for /supplier/logout (Auto-executes supplier logout and redirects to /supplier-login)
+ */
+export function SupplierLogoutPage() {
+  const handleSupplierLogout = useLogout('/supplier-login');
+
+  React.useEffect(() => {
+    localStorage.removeItem('meesho_supplier_token');
+    localStorage.removeItem('meesho_supplier_user');
+    localStorage.removeItem('supplierToken');
+    localStorage.removeItem('supplier');
+    handleSupplierLogout();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-[#f8f9fb] flex flex-col items-center justify-center p-4 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 animate-bounce">
+        <span className="material-symbols-outlined text-3xl">logout</span>
+      </div>
+      <h2 className="text-lg font-bold text-slate-800">Signing out Supplier...</h2>
+      <p className="text-xs text-slate-500 mt-1">Clearing your supplier session securely.</p>
     </div>
   );
 }

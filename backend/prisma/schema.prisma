@@ -70,6 +70,18 @@ model Profile {
   avatarUrl String?  @map("avatar_url")
   role      UserRole @default(CUSTOMER)
 
+  // Supplier & Auth Fields
+  passwordHash    String?  @map("password_hash")
+  storeName       String?  @map("store_name")
+  gstin           String?
+  pan             String?
+  bankDetails     Json?    @map("bank_details")
+  tier            String?  @default("Silver")
+  tierLabel       String?  @default("Silver Supplier") @map("tier_label")
+  rating          Float    @default(5.0)
+  followers       String?  @default("0")
+  experienceYears String?  @default("1+") @map("experience_years")
+
   addresses       Address[]
   orders          Order[]
   cart            CartItem[]
