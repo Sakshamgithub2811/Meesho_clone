@@ -44,8 +44,6 @@ const customerNavSections = [
     title: "Shop & Categories",
     items: [
       { name: "Home & Deals", path: "/user-home", icon: "home" },
-      { name: "Sarees & Ethnic", path: "/sarees", icon: "checkroom", badge: "Trending" },
-      { name: "Western Wear", path: "/western", icon: "styler" },
       { name: "Explore All Categories", path: "/explorer", icon: "grid_view" },
       { name: "Flash Sale Deals", path: "/flash", icon: "bolt", badge: "Hot" },
       { name: "Curated Spotlight", path: "/spotlight", icon: "auto_awesome" },
@@ -67,15 +65,9 @@ const customerNavSections = [
       { name: "Help Center", path: "/support-center", icon: "support_agent" },
       { name: "Raise a Ticket", path: "/raise-ticket", icon: "confirmation_number" },
     ]
-  },
-  {
-    title: "Earn with MShoppy",
-    items: [
-      { name: "Become a Reseller", path: "/dropshipper-register", icon: "storefront", badge: "Free" },
-      { name: "Affiliate Program", path: "/affiliate-program", icon: "loyalty" },
-    ]
   }
 ];
+
 
 export default function NavDrawer({ isOpen, onClose, role = 'reseller', isCustomer }) {
   const navigate = useNavigate();

@@ -4,6 +4,7 @@ import AppBottomNav from '../../components/AppBottomNav';
 import { getDropshipperApp, subscribeDropshipperApp } from '../../services/dropshipperSessionStore';
 import { getAffiliateApp, subscribeAffiliateApp } from '../../services/affiliateSessionStore';
 import { getStoredCustomer, logoutCustomer, subscribeCustomerAuth } from '../../services/customerAuthService';
+import { getOrders, getWishlist } from '../../services/ecommerceService';
 
 export default function UserWebDashboard({ onNavigate, onBack }) {
   const navigate = useNavigate();
@@ -20,6 +21,24 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
 
   // Customer Auth State
   const [customerUser, setCustomerUser] = useState(() => getStoredCustomer()?.user || null);
+  const [realOrders, setRealOrders] = useState([]);
+  const [wishlistCount, setWishlistCount] = useState(0);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const [ordersData, wishData] = await Promise.all([
+          getOrders(),
+          getWishlist()
+        ]);
+        if (ordersData) setRealOrders(ordersData);
+        if (wishData) setWishlistCount(wishData.length);
+      } catch (e) {
+        console.error('Failed to load dashboard stats:', e);
+      }
+    }
+    loadStats();
+  }, []);
 
   useEffect(() => {
     const unsubCustomer = subscribeCustomerAuth((session) => {
@@ -698,7 +717,7 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
             </div>
             <div>
               <p className="text-[11px] sm:text-xs font-bold text-slate-400">Total Customer Orders</p>
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-black mt-1 text-[#191c1e]">142</h3>
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-black mt-1 text-[#191c1e]">{realOrders.length}</h3>
             </div>
           </div>
 
@@ -710,11 +729,11 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
               <span className="p-2 sm:p-2.5 bg-indigo-50 rounded-2xl text-[#4d41df] group-hover:scale-110 transition-transform">
                 <span className="material-symbols-outlined text-lg sm:text-xl">local_shipping</span>
               </span>
-              <span className="text-[9px] sm:text-[10px] font-bold text-slate-500">4 arriving today</span>
+              <span className="text-[9px] sm:text-[10px] font-bold text-slate-500">Live Tracking</span>
             </div>
             <div>
-              <p className="text-[11px] sm:text-xs font-bold text-slate-400">Pending Deliveries</p>
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-black mt-1 text-[#191c1e]">8</h3>
+              <p className="text-[11px] sm:text-xs font-bold text-slate-400">Track Orders</p>
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-black mt-1 text-[#191c1e]">{realOrders.length}</h3>
             </div>
           </div>
 
@@ -732,7 +751,7 @@ export default function UserWebDashboard({ onNavigate, onBack }) {
             </div>
             <div>
               <p className="text-[11px] sm:text-xs font-bold text-slate-400">Saved Wishlist Items</p>
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-black mt-1 text-[#191c1e]">24</h3>
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-black mt-1 text-[#191c1e]">{wishlistCount}</h3>
             </div>
           </div>
 

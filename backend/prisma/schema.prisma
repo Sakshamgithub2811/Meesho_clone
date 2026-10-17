@@ -136,9 +136,11 @@ model Product {
   category           Category @relation(fields: [categorySlug], references: [slug])
   images             String[]
   sizes              String[] @default(["S", "M", "L", "XL", "Free Size"])
+  colors             String[] @default([])
   stock              Int      @default(50)
   isFreeDelivery     Boolean  @default(true) @map("is_free_delivery")
   supplierName       String   @default("Verified Supplier") @map("supplier_name")
+
   supplierId         String?  @map("supplier_id")
 
   cartItems     CartItem[]
@@ -159,7 +161,7 @@ model CartItem {
   userId    String  @map("user_id")
   user      Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
   productId String  @map("product_id")
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   quantity  Int     @default(1)
   size      String?
 
@@ -176,7 +178,7 @@ model WishlistItem {
   userId    String  @map("user_id")
   user      Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
   productId String  @map("product_id")
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -227,7 +229,7 @@ model Review {
   userId    String  @map("user_id")
   user      Profile @relation(fields: [userId], references: [id])
   productId String  @map("product_id")
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   rating    Int
   title     String?
   comment   String?

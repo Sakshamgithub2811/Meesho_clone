@@ -716,15 +716,7 @@ function AppRoutes() {
         <Route path="/login" element={<LoginSignup />} />
         <Route path="/logout" element={<LogoutPage />} />
         <Route path="/user/login" element={<UserLogin />} />
-        <Route path="/user/auth" element={<UserLogin />} />
-        <Route path="/user-login" element={<UserLogin />} />
         <Route path="/affiliate/login" element={<AffiliateLogin />} />
-        <Route path="/affiliate/auth" element={<AffiliateLogin />} />
-        <Route path="/affiliate-login" element={<AffiliateLogin />} />
-        <Route path="/affilate/login" element={<AffiliateLogin />} />
-        <Route path="/affilate/auth" element={<AffiliateLogin />} />
-        <Route path="/affilate-login" element={<AffiliateLogin />} />
-        <Route path="/affilate" element={<AffiliateLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
         <Route path="/dropshipper-dashboard" element={<DropshipperDashboard />} />
@@ -733,7 +725,6 @@ function AppRoutes() {
 
         {/* Customer Shopping Routes */}
         <Route path="/user-home" element={<HomeUserCustomer />} />
-        <Route path="/home" element={<HomeUserCustomer />} />
         <Route path="/product" element={<ProductDetail onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/cart" element={<ShoppingCart onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/address" element={<CheckoutAddressSelection onNavigate={handleNav} onBack={handleBack} />} />
@@ -751,22 +742,6 @@ function AppRoutes() {
         <Route path="/write-review" element={<WriteAReview onNavigate={handleNav} onBack={handleBack} />} />
         <Route 
           path="/user-dashboard" 
-          element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/user_dashboard" 
-          element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/dashboard" 
           element={
             <ProtectedRoute role="customer">
               <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
