@@ -352,11 +352,12 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
-    // Safely delete associated cart items, wishlist items, and reviews first
+    // Safely delete associated cart items, wishlist items, reviews, and order items first
     await prisma.$transaction([
       prisma.cartItem.deleteMany({ where: { productId: id } }),
       prisma.wishlistItem.deleteMany({ where: { productId: id } }),
       prisma.review.deleteMany({ where: { productId: id } }),
+      prisma.orderItem.deleteMany({ where: { productId: id } }),
       prisma.product.delete({ where: { id } })
     ]);
 
