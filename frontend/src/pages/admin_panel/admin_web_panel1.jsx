@@ -25,16 +25,17 @@ const ADMIN_MENU = [
     label: 'KYC Verifications',
     icon: ShieldCheck,
     children: [
-      { id: 'dropshipper-kyc', label: 'Dropshipper KYC 📦', icon: Truck, path: '/admin-dropshipper-kyc' },
-      { id: 'affiliate-kyc', label: 'Affiliate KYC 🤝', icon: Users, path: '/admin-affiliate-kyc' },
+      { id: 'supplier-kyc', label: 'Supplier KYC ', icon: Store },
+      { id: 'dropshipper-kyc', label: 'Dropshipper KYC ', icon: Truck, path: '/admin-dropshipper-kyc' },
+      { id: 'affiliate-kyc', label: 'Affiliate KYC ', icon: Users, path: '/admin-affiliate-kyc' },
     ],
   },
-  { id: 'products', label: 'Products 📦', icon: Package },
+  { id: 'products', label: 'Products ', icon: Package },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
-  { id: 'returns', label: 'Returns & Refunds 🔄', icon: RotateCcw },
-  { id: 'sellers', label: 'Sellers 🏬', icon: Store },
-  { id: 'finance', label: 'Finance & Payouts 💳', icon: Banknote },
-  { id: 'analytics', label: 'Analytics 📊', icon: LineChart },
+  { id: 'returns', label: 'Returns & Refunds ', icon: RotateCcw },
+  { id: 'sellers', label: 'Sellers ', icon: Store },
+  { id: 'finance', label: 'Finance & Payouts ', icon: Banknote },
+  { id: 'analytics', label: 'Analytics ', icon: LineChart },
   { id: 'users', label: 'Users', icon: Users, path: '/user-dashboard' },
 ];
 
@@ -57,6 +58,7 @@ export default function AdminWebPanel() {
       case 'dashboard':
         return { title: "Dashboard Overview", subtitle: "" };
       case 'kyc':
+      case 'supplier-kyc':   
       case 'dropshipper-kyc':
       case 'affiliate-kyc':
         return { title: "KYC Verifications", subtitle: "" };
@@ -111,10 +113,11 @@ export default function AdminWebPanel() {
         <AdminDashboardOverview onNavigateTab={(tab) => setActiveTab(tab)} />
       )}
 
-      {(activeTab === 'kyc' || activeTab === 'dropshipper-kyc' || activeTab === 'affiliate-kyc') && (
+      {(activeTab === 'kyc' || activeTab === 'supplier-kyc' || activeTab === 'dropshipper-kyc' || activeTab === 'affiliate-kyc') && (
         <AdminKycManagement
           key={activeTab}
-          initialType={activeTab === 'dropshipper-kyc' ? 'dropshipper' : activeTab === 'affiliate-kyc' ? 'affiliate' : 'all'}
+          initialType={activeTab === 'supplier-kyc'
+            ? 'supplier' : activeTab === 'dropshipper-kyc' ? 'dropshipper': activeTab === 'affiliate-kyc'? 'affiliate': 'all'}
         />
       )}
 

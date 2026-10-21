@@ -95,6 +95,30 @@ export default function KycReviewModal({
                       <span className="font-semibold text-gray-800">{reviewApp.documents.businessName}</span>
                     </div>
                   )}
+                                    {/* GSTIN Number agar available ho */}
+                  {reviewApp.documents.gstin && (
+                    <div>
+                      <span className="text-gray-400 block">GSTIN Number</span>
+                      <span className="font-mono font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">
+                        {reviewApp.documents.gstin}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* GST Certificate Photo / Link agar uploaded ho */}
+                  {reviewApp.documents.gstCertificate && (
+                    <div>
+                      <span className="text-gray-400 block">GST Certificate</span>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImage(reviewApp.documents.gstCertificate)}
+                        className="text-[11px] text-[#b7004d] hover:underline flex items-center gap-1 font-semibold pt-0.5 cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> View Certificate
+                      </button>
+                    </div>
+                  )}
+
                   {reviewApp.documents.storeType && (
                     <div>
                       <span className="text-gray-400 block">Store Type</span>

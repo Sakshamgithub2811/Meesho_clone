@@ -129,14 +129,19 @@ export const updateKycStatus = async (req, res) => {
           data: { role: 'DROPSHIPPER' }
         }).catch(() => {});
       } else if (existing.type?.toLowerCase() === 'supplier') {
+        const docs = existing.documents || {};
         await prisma.profile.update({
           where: { id: existing.userId },
           data: { 
             role: 'SUPPLIER',
+            storeName: docs.businessName || docs.tradeName || undefined,
+            gstin: docs.gstin || undefined,
+            pan: docs.pan?.number || undefined,
+            bankDetails: docs.bank || undefined,
             tier: 'Silver',
             tierLabel: 'Verified Supplier'
           }
-        }).catch(() => {});
+        }).catch((err) => console.warn('Supplier profile auto-update warning:', err.message));
       }
     }
 
