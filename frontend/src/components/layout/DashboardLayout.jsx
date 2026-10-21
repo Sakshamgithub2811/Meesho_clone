@@ -88,6 +88,11 @@ export default function DashboardLayout({
                     >
                       {item.icon && <item.icon className="h-5 w-5" />}
                       <span className="font-medium text-[15px]">{item.label}</span>
+                      {item.badge && (
+                        <span className={`ml-auto text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${item.badgeClass || 'bg-[#b7004d] text-white'}`}>
+                          {item.badge}
+                        </span>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );

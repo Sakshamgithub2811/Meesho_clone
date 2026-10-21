@@ -55,7 +55,7 @@ const customerNavSections = [
       { name: "My Orders & Tracking", path: "/orders", icon: "local_shipping" },
       { name: "My Wishlist", path: "/wishlist", icon: "favorite" },
       { name: "Shopping Bag", path: "/cart", icon: "shopping_bag" },
-      { name: "Account Profile", path: "/user-dashboard", icon: "account_circle" },
+      { name: "Account Profile", path: "/user-dashboard1?tab=profile", icon: "account_circle" },
       { name: "Notifications", path: "/notifications", icon: "notifications" },
     ]
   },

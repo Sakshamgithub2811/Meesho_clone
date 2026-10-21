@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Reseller & Fintech Pages (Shruti Branch)
@@ -48,6 +48,7 @@ import ShoppingCart from './pages/customer & Reseller/shopping_cart';
 import CheckoutAddressSelection from './pages/customer & Reseller/checkout_address_selection';
 import CheckoutPayment from './pages/customer & Reseller/checkout_payment';
 import UserWebDashboard from './pages/customer & Reseller/user_web_dashboard';
+import UserWebDashboard1 from './pages/customer & Reseller/user_web_dashboard1';
 import CustomerOrders from './pages/customer & Reseller/CustomerOrders';
 import ReturnRequest from './pages/customer & Reseller/ReturnRequest';
 import AffiliateKYC from './pages/customer & Reseller/AffiliateKYC';
@@ -167,7 +168,8 @@ const screenCatalog = [
   { path: '/luxe', name: 'Flutter Luxe Theme', icon: '✨', group: 'Shopping' },
   { path: '/reviews', name: 'Ratings & Reviews', icon: '⭐', group: 'Shopping' },
   { path: '/write-review', name: 'Write a Review', icon: '✍️', group: 'Shopping' },
-  { path: '/user-dashboard', name: 'Curator Web Dashboard', icon: '📊', group: 'Shopping' },
+  { path: '/user-dashboard1', name: 'User Dashboard (Live Theme)', icon: '🛍️', group: 'Shopping' },
+  { path: '/user-dashboard1?tab=profile', name: 'Account Profile & Settings', icon: '👤', group: 'Shopping' },
   { path: '/orders', name: 'Customer My Orders', icon: '📦', group: 'Shopping' },
   { path: '/return-request', name: 'Return / Exchange Flow', icon: '🔄', group: 'Shopping' },
 
@@ -530,18 +532,28 @@ function AppRoutes() {
       spotlight: '/spotlight',
       flash: '/flash',
       luxe: '/luxe',
-      user_dashboard: '/user-dashboard',
-      'user-dashboard': '/user-dashboard',
-      '/user-dashboard': '/user-dashboard',
-      dashboard: '/user-dashboard',
-      'user-web-dashboard': '/user-dashboard',
-      userWebDashboard: '/user-dashboard',
-      users: '/user-dashboard',
-      '/users': '/user-dashboard',
-      'user-profile': '/user-dashboard',
-      '/user-profile': '/user-dashboard',
-      userProfile: '/user-dashboard',
-      user_profile: '/user-dashboard',
+      user_dashboard: '/user-dashboard1',
+      'user-dashboard': '/user-dashboard1',
+      '/user-dashboard': '/user-dashboard1',
+      dashboard: '/user-dashboard1',
+      'user-web-dashboard': '/user-dashboard1',
+      userWebDashboard: '/user-dashboard1',
+      'user-dashboard1': '/user-dashboard1',
+      '/user-dashboard1': '/user-dashboard1',
+      'user_dashboard1': '/user-dashboard1',
+      userWebDashboard1: '/user-dashboard1',
+      'user-web-dashboard1': '/user-dashboard1',
+      '/user-web-dashboard1': '/user-dashboard1',
+      users: '/user-dashboard1',
+      '/users': '/user-dashboard1',
+      'user-profile': '/user-dashboard1?tab=profile',
+      '/user-profile': '/user-dashboard1?tab=profile',
+      userProfile: '/user-dashboard1?tab=profile',
+      user_profile: '/user-dashboard1?tab=profile',
+      profile: '/user-dashboard1?tab=profile',
+      '/profile': '/user-dashboard1?tab=profile',
+      'account-profile': '/user-dashboard1?tab=profile',
+      '/account-profile': '/user-dashboard1?tab=profile',
       orders: '/orders',
       'my-orders': '/orders',
       return_request: '/return-request',
@@ -798,28 +810,37 @@ function AppRoutes() {
         <Route path="/luxe" element={<HomeScreenFlutterLuxe onNavigate={handleNav} />} />
         <Route path="/reviews" element={<RatingsReviews onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/write-review" element={<WriteAReview onNavigate={handleNav} onBack={handleBack} />} />
+        {/* Customer Dashboard - redirected to new /user-dashboard1 */}
         <Route 
           path="/user-dashboard" 
-          element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
-          } 
+          element={<Navigate to="/user-dashboard1" replace />} 
         />
         <Route 
           path="/users" 
-          element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
-          } 
+          element={<Navigate to="/user-dashboard1" replace />} 
         />
         <Route 
           path="/user-profile" 
+          element={<Navigate to="/user-dashboard1?tab=profile" replace />} 
+        />
+        <Route 
+          path="/profile" 
+          element={<Navigate to="/user-dashboard1?tab=profile" replace />} 
+        />
+        <Route 
+          path="/account-profile" 
+          element={<Navigate to="/user-dashboard1?tab=profile" replace />} 
+        />
+        <Route 
+          path="/user-dashboard1" 
           element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
+            <UserWebDashboard1 onNavigate={handleNav} onBack={handleBack} />
+          } 
+        />
+        <Route 
+          path="/user-web-dashboard1" 
+          element={
+            <UserWebDashboard1 onNavigate={handleNav} onBack={handleBack} />
           } 
         />
         <Route 
