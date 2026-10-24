@@ -1,9 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { toast } from 'sonner';
+import { auth } from '../../utils/firebase';
 import AppBottomNav from '../../components/AppBottomNav';
 import BankAutocompleteSelect from '../../components/BankAutocompleteSelect';
 import { getDropshipperApp, saveDropshipperApp, subscribeDropshipperApp } from '../../services/dropshipperSessionStore';
+import { submitDropshipperKycApi, getDropshipperKycStatusApi } from '../../services/dropshipperService';
 
 export default function DropshipperKYCRegister({ onNavigate = () => {}, onBack }) {
+  const currentUser = useSelector((state) => state.user?.currentUser);
   const [currentStep, setCurrentStep] = useState(1);
   const [toastMessage, setToastMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -97,15 +102,98 @@ export default function DropshipperKYCRegister({ onNavigate = () => {}, onBack }
   };
 
   useEffect(() => {
+    // 1. Prefill basic fields if user is logged in
+    if (currentUser) {
+      setFormData((prev) => ({
+        ...prev,
+        proprietorName: currentUser.fullName || prev.proprietorName,
+        email: currentUser.email || prev.email,
+        phone: currentUser.phone || prev.phone,
+        brandName: currentUser.storeName || prev.brandName,
+        accountHolder: currentUser.fullName || prev.accountHolder,
+      }));
+    }
+
+    // 2. Fetch live status from backend if uid available
+    const uid = currentUser?.id || auth.currentUser?.uid || (() => {
+      try {
+        const s = JSON.parse(localStorage.getItem('meesho_dropshipper_session') || '{}');
+        return s.dropshipperId;
+      } catch (e) {
+        return null;
+      }
+    })();
+
+    if (uid) {
+      getDropshipperKycStatusApi(uid)
+        .then((res) => {
+          if (res?.success && res.hasSubmitted && res.application) {
+            const app = res.application;
+            const docs = app.documents || {};
+            const normalizedApp = {
+              id: app.id ? `#${app.id.slice(0, 8).toUpperCase()}` : 'DSP-KYC-PENDING',
+              brandName: docs.brandName || docs.businessName || 'My Dropship Store',
+              proprietorName: docs.proprietorName || 'Applicant',
+              phone: docs.phone || '',
+              email: docs.email || '',
+              storeUrl: docs.storeUrl || '',
+              platform: docs.platform || '',
+              panNumber: docs.pan?.number || docs.panNumber || '',
+              aadhaarNumber: docs.aadhaar?.number || docs.aadhaarNumber || '',
+              businessType: docs.storeType || 'Individual Dropshipper',
+              businessRegType: docs.tax?.businessRegType || 'gstin',
+              gstin: docs.tax?.gstin || '',
+              msmeNumber: docs.tax?.msmeNumber || '',
+              bankName: docs.bank?.bankName || '',
+              accountNumber: docs.bank?.accountNumber || '',
+              ifscCode: docs.bank?.ifsc || '',
+              upiId: docs.bank?.upiId || '',
+              submittedAt: new Date(app.createdAt).toLocaleDateString(),
+              status: app.status === 'APPROVED' ? 'Approved' : (app.status === 'REJECTED' ? 'Rejected' : 'Under Review'),
+            };
+            setExistingApp(normalizedApp);
+            saveDropshipperApp(normalizedApp);
+          }
+        })
+        .catch((e) => console.warn('Could not fetch remote KYC status:', e.message));
+    }
+
     const app = getDropshipperApp();
     if (app) setExistingApp(app);
     const unsubscribe = subscribeDropshipperApp((updatedApp) => {
       if (updatedApp) setExistingApp(updatedApp);
     });
     return unsubscribe;
-  }, []);
+  }, [currentUser]);
 
   const refreshApplicationStatus = () => {
+    const uid = currentUser?.id || auth.currentUser?.uid || (() => {
+      try {
+        const s = JSON.parse(localStorage.getItem('meesho_dropshipper_session') || '{}');
+        return s.dropshipperId;
+      } catch (e) {
+        return null;
+      }
+    })();
+
+    if (uid) {
+      getDropshipperKycStatusApi(uid).then((res) => {
+        if (res?.success && res.hasSubmitted && res.application) {
+          const app = res.application;
+          const docs = app.documents || {};
+          const normalizedApp = {
+            id: app.id ? `#${app.id.slice(0, 8).toUpperCase()}` : 'DSP-KYC-PENDING',
+            brandName: docs.brandName || docs.businessName || 'My Dropship Store',
+            proprietorName: docs.proprietorName || 'Applicant',
+            status: app.status === 'APPROVED' ? 'Approved' : (app.status === 'REJECTED' ? 'Rejected' : 'Under Review'),
+          };
+          setExistingApp(normalizedApp);
+          saveDropshipperApp(normalizedApp);
+          showToast(`Live status synced from Admin desk: ${app.status}`);
+          return;
+        }
+      }).catch(() => {});
+    }
     const app = getDropshipperApp();
     if (app) setExistingApp(app);
     showToast('Live KYC status updated from desk!');
@@ -242,21 +330,66 @@ export default function DropshipperKYCRegister({ onNavigate = () => {}, onBack }
     }
   };
 
-  const handleSubmitApplication = () => {
+  const handleSubmitApplication = async () => {
     if (!formData.agreedTerms || !formData.agreedRotPolicy) {
       showToast('Please agree to the Dropshipper Terms & ROT Policy');
       return;
     }
 
+    const firebaseUid = currentUser?.id || auth.currentUser?.uid || (() => {
+      try {
+        const s = JSON.parse(localStorage.getItem('meesho_dropshipper_session') || '{}');
+        return s.dropshipperId;
+      } catch (e) {
+        return null;
+      }
+    })();
+
+    if (!firebaseUid) {
+      showToast('Please login as a dropshipper first to submit KYC verification.');
+      return;
+    }
+
     setIsSubmitting(true);
-    setTimeout(() => {
-      const generatedId = `DSP-KYC-${Math.floor(1000 + Math.random() * 9000)}`;
-      setApplicationId(generatedId);
-      setIsSubmitting(false);
+    try {
+      const payload = {
+        firebaseUid,
+        brandName: formData.brandName,
+        storeName: formData.brandName,
+        proprietorName: formData.proprietorName,
+        phone: formData.phone,
+        email: formData.email,
+        storeUrl: formData.storeUrl,
+        platform: formData.platform,
+        expectedOrders: formData.expectedOrders,
+        niche: formData.niche,
+        businessType: formData.businessType,
+        panNumber: formData.panNumber,
+        aadhaarNumber: formData.aadhaarNumber,
+        businessRegType: formData.businessRegType,
+        gstin: formData.businessRegType === 'gstin' ? formData.gstin : '',
+        msmeNumber: formData.businessRegType === 'msme' ? formData.msmeNumber : '',
+        accountHolder: formData.accountHolder,
+        bankName: formData.bankName,
+        accountNumber: formData.accountNumber,
+        ifscCode: formData.ifscCode,
+        upiId: formData.upiId,
+        documents: {
+          panFile: panFile?.name || null,
+          aadhaarFile: aadhaarFile?.name || null,
+          businessRegFile: businessRegFile?.name || null,
+        }
+      };
+
+      const res = await submitDropshipperKycApi(payload);
+      const returnedApp = res.application;
+      const genId = returnedApp?.id ? `#${returnedApp.id.slice(0, 8).toUpperCase()}` : `DSP-KYC-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      setApplicationId(genId);
       setIsSubmitted(true);
 
       const newApp = {
-        id: generatedId,
+        id: genId,
         brandName: formData.brandName,
         proprietorName: formData.proprietorName,
         phone: formData.phone,
@@ -276,12 +409,22 @@ export default function DropshipperKYCRegister({ onNavigate = () => {}, onBack }
         panFile,
         aadhaarFile,
         businessRegFile,
-        submittedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: 'Under Review',
+        submittedAt: 'Just Now',
+        status: returnedApp?.status === 'APPROVED' ? 'Approved' : 'Under Review',
       };
       setExistingApp(newApp);
       saveDropshipperApp(newApp);
-    }, 1200);
+
+      toast.success('KYC Application Submitted!', {
+        description: 'Your 4-step application has reached the Admin verification desk.'
+      });
+
+    } catch (err) {
+      console.error('Submit KYC Error:', err);
+      showToast(err.response?.data?.error || err.message || 'Failed to submit KYC application. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const steps = [

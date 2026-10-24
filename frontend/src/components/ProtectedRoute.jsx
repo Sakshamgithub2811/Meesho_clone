@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { isCustomerAuthenticated } from '../services/customerAuthService';
 import { isAffiliateAuthenticated } from '../services/affiliateAuthService';
 import { isResellerAuthenticated } from '../services/resellerAuthService';
+import { isDropshipperAuthenticated } from '../services/dropshipperService';
 
 const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
   const location = useLocation();
@@ -20,12 +21,14 @@ const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
       isAuth = isAffiliateAuthenticated();
     } else if (role === 'reseller') {
       isAuth = isResellerAuthenticated();
+    } else if (role === 'dropshipper') {
+      isAuth = isDropshipperAuthenticated();
     } else if (role === 'any') {
-      isAuth = isCustomerAuthenticated() || isAffiliateAuthenticated() || isResellerAuthenticated();
+      isAuth = isCustomerAuthenticated() || isAffiliateAuthenticated() || isResellerAuthenticated() || isDropshipperAuthenticated();
     }
   }
 
-  // Check allowedRoles if provided (e.g. ['ADMIN', 'SUPER_ADMIN'])
+  // Check allowedRoles if provided (e.g. ['ADMIN', 'SUPER_ADMIN', 'DROPSHIPPER'])
   if (allowedRoles && currentUser) {
     if (!allowedRoles.includes(currentUser.role)) {
       return <Navigate to="/" replace />;
@@ -33,6 +36,9 @@ const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
   }
 
   if (!isAuth) {
+    if (role === 'dropshipper') {
+      return <Navigate to={`/dropshipper-login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
+    }
     const targetRole = role === 'any' ? 'customer' : role;
     return <Navigate to={`/login?role=${targetRole}&redirect=${encodeURIComponent(location.pathname)}`} replace />;
   }

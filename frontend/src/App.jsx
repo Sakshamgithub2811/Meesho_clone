@@ -751,10 +751,38 @@ function AppRoutes() {
         <Route path="/my-wallet" element={<MyWalletFintechStyle />} />
         <Route path="/reseller-wallet" element={<ResellerWallet />} />
         <Route path="/reseller-returns" element={<ResellerReturnsLedger onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-settlements" element={<DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-tracking" element={<DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-rot-manager" element={<DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-register" element={<DropshipperKYCRegister onNavigate={handleNav} onBack={handleBack} />} />
+        <Route 
+          path="/dropshipper-settlements" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-tracking" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-rot-manager" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-register" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperKYCRegister onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/withdraw-earnings" element={<WithdrawEarnings />} />
         <Route path="/payout-settings" element={<PayoutSettings />} />
         <Route path="/payout-confirmation" element={<PayoutConfirmation />} />
@@ -779,7 +807,14 @@ function AppRoutes() {
         <Route path="/affilate" element={<AffiliateLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
-        <Route path="/dropshipper-dashboard" element={<DropshipperDashboard />} />
+        <Route 
+          path="/dropshipper-dashboard" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperDashboard />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
 

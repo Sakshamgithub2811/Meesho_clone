@@ -1,6 +1,8 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { registerDropshipper, loginDropshipper } from '../../controllers/dropshipper/dropshipperAuth.controller.js';
-import { getDropshipperProfile, updateDropshipperProfile } from '../../controllers/dropshipper/dropshipperProfile.controller.js';
+import { getDropshipperProfile, updateDropshipperProfile, uploadDropshipperAvatar } from '../../controllers/dropshipper/dropshipperProfile.controller.js';
+import { submitDropshipperKyc, getDropshipperKycStatus } from '../../controllers/dropshipper/dropshipperKyc.controller.js';
+import { uploadAvatar } from '../../middlewares/upload.middleware.js';
 
 const router = Router();
 
@@ -11,5 +13,10 @@ router.post('/auth/login', loginDropshipper);
 // 2. Profile Management Endpoints
 router.get('/profile/:firebaseUid', getDropshipperProfile);
 router.put('/profile', updateDropshipperProfile);
+router.post('/profile/avatar', uploadAvatar.single('avatar'), uploadDropshipperAvatar);
+
+// 3. 4-Step KYC Onboarding & Status Endpoints
+router.post('/kyc', submitDropshipperKyc);
+router.get('/kyc/:firebaseUid', getDropshipperKycStatus);
 
 export default router;

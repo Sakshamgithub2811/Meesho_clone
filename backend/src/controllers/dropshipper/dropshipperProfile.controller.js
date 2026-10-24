@@ -1,4 +1,4 @@
-﻿import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 /**
@@ -53,7 +53,7 @@ export const getDropshipperProfile = async (req, res) => {
  */
 export const updateDropshipperProfile = async (req, res) => {
   try {
-    const { firebaseUid, fullName, phone, avatarUrl } = req.body;
+    const { firebaseUid, fullName, phone, avatarUrl, storeName, bankDetails } = req.body;
 
     if (!firebaseUid) {
       return res.status(400).json({ error: "Missing Firebase UID in request body" });
@@ -102,13 +102,23 @@ export const updateDropshipperProfile = async (req, res) => {
     }
 
     // Update profile in PostgreSQL
+    const updateData = {
+      fullName: cleanName,
+      phone: cleanPhone !== null ? cleanPhone : existingProfile.phone,
+      avatarUrl: cleanAvatar
+    };
+
+    if (typeof storeName === 'string') {
+      updateData.storeName = storeName.trim();
+    }
+
+    if (bankDetails && typeof bankDetails === 'object') {
+      updateData.bankDetails = bankDetails;
+    }
+
     const updatedProfile = await prisma.profile.update({
       where: { id: firebaseUid },
-      data: {
-        fullName: cleanName,
-        phone: cleanPhone !== null ? cleanPhone : existingProfile.phone,
-        avatarUrl: cleanAvatar
-      },
+      data: updateData,
       include: {
         wallet: {
           select: {
@@ -119,6 +129,50 @@ export const updateDropshipperProfile = async (req, res) => {
         }
       }
     });
+
+    // Also sync updated storeName and bankDetails with the user's KYCApplication documents in DB
+    try {
+      const existingKyc = await prisma.kYCApplication.findFirst({
+        where: { userId: firebaseUid, type: 'dropshipper' },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (existingKyc) {
+        const docs = typeof existingKyc.documents === 'object' && existingKyc.documents !== null 
+          ? { ...existingKyc.documents } 
+          : {};
+
+        if (typeof storeName === 'string' && storeName.trim()) {
+          docs.brandName = storeName.trim();
+          docs.businessName = storeName.trim();
+        }
+        if (cleanName) {
+          docs.proprietorName = cleanName;
+        }
+        if (cleanPhone) {
+          docs.phone = cleanPhone;
+        }
+        if (bankDetails && typeof bankDetails === 'object') {
+          docs.bank = {
+            ...(docs.bank || {}),
+            bankName: bankDetails.bankName || docs.bank?.bankName || '',
+            accountNumber: bankDetails.accountNumber || docs.bank?.accountNumber || '',
+            ifsc: (bankDetails.ifscCode || bankDetails.ifsc || docs.bank?.ifsc || '').toUpperCase(),
+            upiId: bankDetails.upiId || docs.bank?.upiId || '',
+            holderName: bankDetails.accountHolder || docs.bank?.holderName || cleanName
+          };
+          if (bankDetails.storeUrl) docs.storeUrl = bankDetails.storeUrl;
+          if (bankDetails.platform) docs.platform = bankDetails.platform;
+        }
+
+        await prisma.kYCApplication.update({
+          where: { id: existingKyc.id },
+          data: { documents: docs }
+        });
+      }
+    } catch (kycSyncErr) {
+      console.warn("KYC documents sync warning:", kycSyncErr.message);
+    }
 
     return res.status(200).json({
       success: true,
@@ -136,3 +190,61 @@ export const updateDropshipperProfile = async (req, res) => {
     return res.status(500).json({ error: error.message || "Failed to update profile" });
   }
 };
+
+/**
+ * 3. UPLOAD DROPSHIPPER AVATAR
+ * Route: POST /api/v1/dropshipper/profile/avatar
+ * Multipart Form Data: { firebaseUid, avatar (file) }
+ */
+export const uploadDropshipperAvatar = async (req, res) => {
+  try {
+    const { firebaseUid } = req.body;
+
+    if (!firebaseUid) {
+      return res.status(400).json({ error: "Missing Firebase UID in request body" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file provided for avatar upload" });
+    }
+
+    const profile = await prisma.profile.findUnique({
+      where: { id: firebaseUid }
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: "Dropshipper profile not found in database" });
+    }
+
+    // Public URL path relative to static server
+    const avatarPath = `/uploads/avatars/${req.file.filename}`;
+
+    const updatedProfile = await prisma.profile.update({
+      where: { id: firebaseUid },
+      data: {
+        avatarUrl: avatarPath
+      },
+      include: {
+        wallet: {
+          select: {
+            id: true,
+            balance: true,
+            pending: true
+          }
+        }
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile avatar uploaded successfully",
+      avatarUrl: avatarPath,
+      profile: updatedProfile
+    });
+
+  } catch (error) {
+    console.error("Upload Avatar Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to upload avatar" });
+  }
+};
+
