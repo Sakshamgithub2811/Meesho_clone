@@ -30,6 +30,8 @@ import DropshipperDashboard from './pages/dropshipper/DropshipperDashboard';
 import DropshipperKYCRegister from './pages/dropshipper/DropshipperKYCRegister';
 import DropshipperSettlementTracking from './pages/dropshipper/DropshipperSettlementTracking';
 import DropshipperRotManager from './pages/dropshipper/DropshipperRotManager';
+import DropshipperMarginConfig from './pages/dropshipper/DropshipperMarginConfig';
+import DropshipperSupportDesk from './pages/dropshipper/DropshipperSupportDesk';
 
 // Customer & Reseller Shopping Pages
 import HomeUserCustomer from './pages/customer & Reseller/HomeUserCustomer';
@@ -120,15 +122,15 @@ import StructureFlow from './pages/Design_Ecosystem_&_Theme_Variations/structure
 const screenCatalog = [
   // 1. Dropshipper Portal Screens
   { path: '/dropshipper-dashboard', name: 'Dropshipper Dashboard', icon: '📊', group: 'Dropshipper' },
-  { path: '/dropshipper-settlements', name: 'Settlement & Tracking', icon: '📊', group: 'Dropshipper' },
+  { path: '/dropshipper-margin-config', name: 'Margin & Price Rules', icon: '🏷️', group: 'Dropshipper' },
+  { path: '/dropshipper-support', name: 'Disputes & Support Desk', icon: '🎧', group: 'Dropshipper' },
+  { path: '/dropshipper-settlements', name: 'Settlement & Tracking', icon: '📈', group: 'Dropshipper' },
   { path: '/dropshipper-rot-manager', name: 'ROT Liability & Policy Manager', icon: '🛡️', group: 'Dropshipper' },
-  { path: '/share-earn-config', name: 'Share & Margin Config', icon: '🔗', group: 'Dropshipper' },
   { path: '/reseller-returns', name: 'Returns & Margin Ledger', icon: '🔄', group: 'Dropshipper' },
   { path: '/my-wallet', name: 'Fintech Wallet & Passbook', icon: '👛', group: 'Dropshipper' },
-  { path: '/reseller-wallet', name: 'Reseller Earnings Wallet', icon: '💳', group: 'Dropshipper' },
   { path: '/withdraw-earnings', name: 'Withdraw Margin to Bank', icon: '🏦', group: 'Dropshipper' },
   { path: '/payout-settings', name: 'Bank & UPI Settings', icon: '⚙️', group: 'Dropshipper' },
-  { path: '/admin-dropshipper-kyc', name: 'Dropshipper KYC Audit', icon: '📦', group: 'Dropshipper' },
+  { path: '/dropshipper-register', name: '4-Step KYC Verification', icon: '🚀', group: 'Dropshipper' },
 
   // 2. Reseller & Fintech 
   { path: '/reseller-home', name: 'Reseller Home', icon: '🛍️', group: 'Reseller & Shop' },
@@ -812,6 +814,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute role="dropshipper">
               <DropshipperDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-margin-config" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperMarginConfig />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-support" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperSupportDesk />
             </ProtectedRoute>
           } 
         />

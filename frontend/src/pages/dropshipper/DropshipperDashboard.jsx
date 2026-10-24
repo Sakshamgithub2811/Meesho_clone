@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout, updateProfileSuccess } from '../../redux/userSlice';
 import { signOut, sendPasswordResetEmail } from 'firebase/auth';
@@ -66,40 +66,28 @@ const getAvatarSrc = (url) => {
   return `${backendBase}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
-// Dropshipper Master Sidebar Menu
-const DROPSHIPPER_MENU = [
-  { id: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
-  { id: 'profile', label: 'Store & Profile Settings', icon: UserCircle },
-  { id: 'products', label: 'Wholesale Catalog', icon: Package, path: '/supplier-products' },
-  {
-    id: 'settlements-group',
-    label: 'Orders & Settlements',
-    icon: ShoppingCart,
-    children: [
-      { id: 'settlements', label: 'Settlement Tracking', icon: TrendingUp, path: '/dropshipper-settlements' },
-      { id: 'rot-manager', label: 'ROT Liability & Return', icon: RotateCcw, path: '/dropshipper-rot-manager' },
-      { id: 'returns-ledger', label: 'Margin Returns Ledger', icon: Percent, path: '/reseller-returns' },
-    ]
-  },
-  {
-    id: 'wallet-group',
-    label: 'Earnings & Payouts',
-    icon: Wallet,
-    children: [
-      { id: 'wallet-passbook', label: 'Fintech Wallet', icon: Wallet, path: '/my-wallet' },
-      { id: 'withdraw-funds', label: 'Withdraw Margin', icon: Banknote, path: '/withdraw-earnings' },
-      { id: 'payout-settings', label: 'Bank & UPI Settings', icon: CheckCircle2, path: '/payout-settings' },
-    ]
-  },
-  { id: 'kyc', label: '4-Step KYC Verification', icon: ShieldCheck, path: '/dropshipper-register' },
-];
+// Import Centralized Master Dropshipper Menu
+import { DROPSHIPPER_MENU } from './dropshipperMenu';
 
 export default function DropshipperDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const { currentUser } = useSelector((state) => state.user);
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // Sync activeTab with URL query (?tab=profile or default 'dashboard')
+  const searchParams = new URLSearchParams(location.search);
+  const initialTab = searchParams.get('tab') || 'dashboard';
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // If query changes externally, sync state
+  useEffect(() => {
+    const qTab = new URLSearchParams(location.search).get('tab');
+    if (qTab && (qTab === 'profile' || qTab === 'dashboard')) {
+      setActiveTab(qTab);
+    }
+  }, [location.search]);
+
   const avatarInputRef = useRef(null);
 
   // Profile Form States
@@ -523,6 +511,17 @@ export default function DropshipperDashboard() {
 
   // Handle Tab / Menu navigation
   const handleTabChange = (tabId) => {
+    if (tabId === 'dashboard') {
+      setActiveTab('dashboard');
+      navigate('/dropshipper-dashboard');
+      return;
+    }
+    if (tabId === 'profile') {
+      setActiveTab('profile');
+      navigate('/dropshipper-dashboard?tab=profile');
+      return;
+    }
+
     setActiveTab(tabId);
 
     const findPath = (items) => {
