@@ -212,14 +212,25 @@ export default function SellerProfile1({ onNavigate }) {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => loadProfile(true)}
-            className="p-2.5 rounded-2xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-            title="Refresh Profile"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleNav('/supplier-kyc1')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-pink-50 hover:bg-pink-100 text-[#b7004d] text-xs font-bold border border-pink-200 transition cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>KYC Hub ➔</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => loadProfile(true)}
+              className="p-2.5 rounded-2xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              title="Refresh Profile"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Pills */}

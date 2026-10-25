@@ -21,14 +21,14 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
     if (e && e.preventDefault) e.preventDefault();
     if (onNavigate) {
       try {
-        onNavigate('/user-dashboard');
+        onNavigate('/user-dashboard1');
       } catch (err) {
         console.error('onNavigate error', err);
       }
     }
-    navigate('/user-dashboard');
-    if (window.location.pathname !== '/user-dashboard') {
-      window.location.href = '/user-dashboard';
+    navigate('/user-dashboard1');
+    if (window.location.pathname !== '/user-dashboard1') {
+      window.location.href = '/user-dashboard1';
     }
   };
 

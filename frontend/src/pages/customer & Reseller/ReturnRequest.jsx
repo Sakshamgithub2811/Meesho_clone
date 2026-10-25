@@ -33,28 +33,17 @@ const RETURN_REASONS = [
   },
 ];
 
-const INITIAL_PROOFS = [
-  {
-    id: 'p1',
-    name: 'product_full_view.jpg',
-    url: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=500&auto=format&fit=crop&q=80',
-    type: 'Product Overview',
-  },
-  {
-    id: 'p2',
-    name: 'brand_tag_intact.jpg',
-    url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop&q=80',
-    type: 'Price Tag Photo',
-  },
-];
-
 export default function ReturnRequest({ onNavigate, onBack }) {
   const location = useLocation();
 
   // Parse query params if any
   const searchParams = new URLSearchParams(location.search);
-  const orderIdParam = searchParams.get('orderId') || 'ORD-998241';
-  const itemParam = searchParams.get('item') || 'Kanjivaram Soft Silk Woven Saree with Blouse Piece';
+  const orderIdParam = searchParams.get('orderId') || '';
+  const itemParam = searchParams.get('item') || 'Delivered Product';
+  const priceParam = searchParams.get('price') || '799';
+  const imageParam = searchParams.get('image') || '';
+  const sizeParam = searchParams.get('size') || 'Free Size';
+  const deliveredDateParam = searchParams.get('deliveredDate') || 'Recently Delivered';
 
   // Step state (1: Mode & Reason, 2: Proof & Photos, 3: Refund/Exchange, 4: Pickup Slot, 5: Success)
   const [currentStep, setCurrentStep] = useState(1);
@@ -62,37 +51,34 @@ export default function ReturnRequest({ onNavigate, onBack }) {
 
   // Reason state
   const [selectedReasonId, setSelectedReasonId] = useState('size_fit');
-  const [selectedSubReason, setSelectedSubReason] = useState('Too loose / baggy');
+  const [selectedSubReason, setSelectedSubReason] = useState('Too small / tight overall');
   const [comments, setComments] = useState('');
 
   // Exchange options
-  const [selectedExchangeSize, setSelectedExchangeSize] = useState('S');
+  const [selectedExchangeSize, setSelectedExchangeSize] = useState('M');
 
-  // Photo proof state (initialized with 2 demo proofs for seamless testing, users can also upload their own)
-  const [proofs, setProofs] = useState(INITIAL_PROOFS);
+  // Photo proof state - starts completely empty, no dummy photos!
+  const [proofs, setProofs] = useState([]);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const [showMobileSourceModal, setShowMobileSourceModal] = useState(false);
   const [isChecklistAgreed, setIsChecklistAgreed] = useState(true);
 
-  const handleLoadSampleProofs = () => {
-    setProofs(INITIAL_PROOFS);
-    showToast('Loaded 2 sample verification photos 📸');
-  };
-
-  // Refund state
+  // Refund state - starts clean
   const [refundMethod, setRefundMethod] = useState('upi'); // 'upi' | 'bank' | 'wallet'
-  const [upiId, setUpiId] = useState('priyasharma@okaxis');
-  const [isUpiVerified, setIsUpiVerified] = useState(true);
+  const [upiId, setUpiId] = useState('');
+  const [isUpiVerified, setIsUpiVerified] = useState(false);
   const [bankDetails, setBankDetails] = useState({
-    accountNumber: '918273645019',
-    reAccountNumber: '918273645019',
-    ifsc: 'HDFC0001234',
-    holderName: 'Priya Sharma',
+    accountNumber: '',
+    reAccountNumber: '',
+    ifsc: '',
+    holderName: '',
   });
 
   // Pickup slot state
   const [pickupSlot, setPickupSlot] = useState('slot_tomorrow_morning');
   const [pickupAddress, setPickupAddress] = useState(
-    'Priya Sharma, Flat 402, Royal Palms, MG Road, Bengaluru - 560001 (Phone: +91 98765 43210)'
+    searchParams.get('address') || 'Your Delivery Address'
   );
 
   // UI Toast
@@ -103,10 +89,14 @@ export default function ReturnRequest({ onNavigate, onBack }) {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Trigger device native gallery/file picker
+  // Trigger device native gallery/file picker (mobile opens source sheet, desktop opens file picker)
   const handleOpenFileDialog = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
+    if (window.innerWidth <= 768) {
+      setShowMobileSourceModal(true);
+    } else {
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
     }
   };
 
@@ -280,18 +270,22 @@ export default function ReturnRequest({ onNavigate, onBack }) {
         {currentStep < 5 && (
           <section className="bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 flex items-center gap-3 sm:gap-4">
             <img
-              src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&auto=format&fit=crop&q=80"
-              alt="Item preview"
+              src={imageParam || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&auto=format&fit=crop&q=80'}
+              alt={itemParam}
               className="w-14 h-18 sm:w-20 sm:h-24 object-cover rounded-xl sm:rounded-2xl border border-slate-200 shrink-0"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400';
+              }}
             />
             <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
               <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full inline-block">
-                Delivered on 17 Sep 2026
+                Delivered on {deliveredDateParam}
               </span>
               <h2 className="font-extrabold text-xs sm:text-sm text-slate-900 truncate">{itemParam}</h2>
               <p className="text-[11px] sm:text-xs text-slate-500 leading-tight">
-                Size: <strong className="text-slate-800">Free Size</strong> • Qty: <strong>1</strong> • Refund:{' '}
-                <strong className="text-[#9f0038] font-black">₹849</strong>
+                Size: <strong className="text-slate-800">{sizeParam}</strong> • Qty: <strong>1</strong> • Refund:{' '}
+                <strong className="text-[#9f0038] font-black">₹{priceParam}</strong>
               </p>
             </div>
           </section>
@@ -323,7 +317,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                   <div className="min-w-0">
                     <h4 className="font-black text-xs sm:text-sm text-slate-900">Return &amp; Get 100% Refund</h4>
                     <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                      Rider will pick up item from your doorstep &amp; ₹849 will be credited to UPI/Bank.
+                      Rider will pick up item from your doorstep &amp; ₹{priceParam} will be credited to UPI/Bank.
                     </p>
                   </div>
                 </button>
@@ -491,12 +485,20 @@ export default function ReturnRequest({ onNavigate, onBack }) {
         {currentStep === 2 && (
           <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
             <section className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 space-y-3 sm:space-y-4">
-              {/* Hidden Native File Input */}
+              {/* Hidden Native File & Camera Inputs */}
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 multiple
+                onChange={handleRealFileUpload}
+                className="hidden"
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
                 onChange={handleRealFileUpload}
                 className="hidden"
               />
@@ -514,17 +516,6 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {proofs.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={handleLoadSampleProofs}
-                      className="text-xs font-bold text-[#9f0038] bg-rose-50 hover:bg-rose-100 active:scale-95 px-3 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1 border border-pink-200"
-                      title="Load demo photos"
-                    >
-                      <span>⚡</span>
-                      <span>Demo Photos</span>
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={handleOpenFileDialog}
@@ -559,13 +550,6 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                     >
                       <span>Choose from Device</span>
                       <span>➔</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleLoadSampleProofs}
-                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-pink-200 text-[#9f0038] text-xs font-bold hover:bg-rose-50 active:scale-95 cursor-pointer"
-                    >
-                      <span>⚡ Use Sample Photos</span>
                     </button>
                   </div>
                 </div>
@@ -681,7 +665,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
             {actionType === 'return' ? (
               <section className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 space-y-3 sm:space-y-4">
                 <div>
-                  <h3 className="font-black text-xs sm:text-sm text-slate-900">Where should we send your ₹849 refund?</h3>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900">Where should we send your ₹{priceParam} refund?</h3>
                   <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
                     Refund is initiated automatically the moment delivery rider picks up the product.
                   </p>
@@ -817,7 +801,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                            Instant ₹849 + ₹50 shopping bonus = ₹899 credit for next orders
+                            Instant ₹{priceParam} + ₹50 shopping bonus = ₹{Number(priceParam) + 50} credit for next orders
                           </p>
                         </div>
                       </div>
@@ -839,11 +823,11 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                 <div className="bg-slate-50 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Current Item:</span>
-                    <strong className="text-slate-800">Free Size (₹849)</strong>
+                    <strong className="text-slate-800">{sizeParam} (₹{priceParam})</strong>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Requested Replacement:</span>
-                    <strong className="text-emerald-700">Size: {selectedExchangeSize} (₹849)</strong>
+                    <strong className="text-emerald-700">Size: {selectedExchangeSize} (₹{priceParam})</strong>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-slate-200 text-xs sm:text-sm">
                     <span className="font-bold text-slate-700">Total Price Difference:</span>
@@ -968,7 +952,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
               {actionType === 'return' ? (
                 <div className="flex justify-between items-center text-xs sm:text-sm font-black pt-2.5 border-t border-rose-200/90 text-slate-900">
                   <span>Net Refund to be Credited:</span>
-                  <span className="text-[#9f0038] text-base sm:text-lg font-black">₹849.00</span>
+                  <span className="text-[#9f0038] text-base sm:text-lg font-black">₹{priceParam}.00</span>
                 </div>
               ) : (
                 <div className="flex justify-between items-center text-xs sm:text-sm font-black pt-2.5 border-t border-rose-200/90 text-slate-900">
@@ -1016,7 +1000,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
                 {actionType === 'return'
-                  ? 'Our courier partner will visit your address to pick up the item. Your refund of ₹849 will be credited immediately upon pickup.'
+                  ? `Our courier partner will visit your address to pick up the item. Your refund of ₹${priceParam} will be credited immediately upon pickup.`
                   : `Your size ${selectedExchangeSize} replacement has been booked and will be dispatched once rider picks up the current item.`}
               </p>
             </div>
@@ -1031,13 +1015,13 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                 {[
                   {
                     title: 'Return Request Registered',
-                    desc: 'Today, 18 Sep • Verified by Meesho Guarantee',
+                    desc: 'Today • Verified by Meesho Guarantee',
                     done: true,
                     current: false,
                   },
                   {
                     title: 'Courier Rider Assigned (Shadowfax)',
-                    desc: 'Rider Sunil Kumar (+91 98765 01928) will arrive tomorrow morning',
+                    desc: 'Rider Sunil Kumar will arrive to collect return parcel',
                     done: false,
                     current: true,
                   },
@@ -1050,11 +1034,11 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                   {
                     title:
                       actionType === 'return'
-                        ? '₹849 Refund Credited to UPI/Bank'
+                        ? `₹${priceParam} Refund Credited to UPI/Bank`
                         : 'New Replacement Size Dispatched',
                     desc:
                       actionType === 'return'
-                        ? `Funds sent to ${refundMethod === 'upi' ? upiId : 'your bank account'}`
+                        ? `Funds sent to ${refundMethod === 'upi' ? (upiId || 'your UPI ID') : 'your bank account'}`
                         : 'Tracking number will be sent via SMS',
                     done: false,
                     current: false,
@@ -1108,6 +1092,54 @@ export default function ReturnRequest({ onNavigate, onBack }) {
           </section>
         )}
       </main>
+
+      {/* Mobile Responsive Camera vs Gallery Bottom Sheet Modal */}
+      {showMobileSourceModal && (
+        <div
+          onClick={() => setShowMobileSourceModal(false)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-5 space-y-3 animate-in slide-in-from-bottom-5"
+          >
+            <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-1 sm:hidden" />
+            <h4 className="font-black text-sm text-slate-900 text-center">Add Product Photo</h4>
+            <p className="text-[11px] text-slate-500 text-center">Select photo source from your phone</p>
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileSourceModal(false);
+                  if (cameraInputRef.current) cameraInputRef.current.click();
+                }}
+                className="w-full py-3.5 px-4 rounded-2xl bg-pink-50 hover:bg-pink-100 text-[#9f0038] font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">photo_camera</span>
+                <span>Take Photo with Camera</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileSourceModal(false);
+                  if (fileInputRef.current) fileInputRef.current.click();
+                }}
+                className="w-full py-3.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">photo_library</span>
+                <span>Choose from Gallery / Files</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMobileSourceModal(false)}
+                className="w-full py-2.5 px-4 rounded-2xl text-slate-500 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Nav */}
       <AppBottomNav activeNav="orders" onNavigate={onNavigate} />

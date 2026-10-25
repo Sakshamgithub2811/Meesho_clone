@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Reseller & Fintech Pages (Shruti Branch)
@@ -50,6 +50,7 @@ import ShoppingCart from './pages/customer & Reseller/shopping_cart';
 import CheckoutAddressSelection from './pages/customer & Reseller/checkout_address_selection';
 import CheckoutPayment from './pages/customer & Reseller/checkout_payment';
 import UserWebDashboard from './pages/customer & Reseller/user_web_dashboard';
+import UserWebDashboard1 from './pages/customer & Reseller/user_web_dashboard1';
 import CustomerOrders from './pages/customer & Reseller/CustomerOrders';
 import ReturnRequest from './pages/customer & Reseller/ReturnRequest';
 import AffiliateKYC from './pages/customer & Reseller/AffiliateKYC';
@@ -83,6 +84,7 @@ import SellerDropship1 from './pages/supplier/SellerDropship1';
 import SellerReturns1 from './pages/supplier/SellerReturns1';
 import SellerAddProduct1 from './pages/supplier/SellerAddProduct1';
 import SellerProfile1 from './pages/supplier/SellerProfile1';
+import SellerKyc1 from './pages/supplier/SellerKyc1';
 import SupplierReturnsRTO from './pages/supplier/SupplierReturnsRTO';
 import SupplierRotLedger from './pages/supplier/SupplierRotLedger';
 import CustomerOrderSupplierFulfilment from './pages/supplier/CustomerOrderSupplierFulfilment';
@@ -168,7 +170,8 @@ const screenCatalog = [
   { path: '/luxe', name: 'Flutter Luxe Theme', icon: '✨', group: 'Shopping' },
   { path: '/reviews', name: 'Ratings & Reviews', icon: '⭐', group: 'Shopping' },
   { path: '/write-review', name: 'Write a Review', icon: '✍️', group: 'Shopping' },
-  { path: '/user-dashboard', name: 'Curator Web Dashboard', icon: '📊', group: 'Shopping' },
+  { path: '/user-dashboard1', name: 'User Dashboard (Live Theme)', icon: '🛍️', group: 'Shopping' },
+  { path: '/user-dashboard1?tab=profile', name: 'Account Profile & Settings', icon: '👤', group: 'Shopping' },
   { path: '/orders', name: 'Customer My Orders', icon: '📦', group: 'Shopping' },
   { path: '/return-request', name: 'Return / Exchange Flow', icon: '🔄', group: 'Shopping' },
 
@@ -200,6 +203,7 @@ const screenCatalog = [
   { path: '/supplier-returns1', name: 'Returns & RTO Hub (Live)', icon: '🔄', group: 'Supplier' },
   { path: '/supplier-add-product1', name: 'Add Product (Live)', icon: '➕', group: 'Supplier' },
   { path: '/supplier-profile1', name: 'Supplier Profile (Live)', icon: '👤', group: 'Supplier' },
+  { path: '/supplier-kyc1', name: 'Supplier KYC Hub (Live)', icon: '🛡️', group: 'Supplier' },
   { path: '/seller-dashboard', name: 'Seller Web Dashboard', icon: '💻', group: 'Supplier' },
   { path: '/supplier-returns', name: 'Returns, RTO & Claims Hub', icon: '🔄', group: 'Supplier' },
   { path: '/supplier-rot-ledger', name: 'Supplier ROT & Freight Ledger', icon: '🧾', group: 'Supplier' },
@@ -530,18 +534,28 @@ function AppRoutes() {
       spotlight: '/spotlight',
       flash: '/flash',
       luxe: '/luxe',
-      user_dashboard: '/user-dashboard',
-      'user-dashboard': '/user-dashboard',
-      '/user-dashboard': '/user-dashboard',
-      dashboard: '/user-dashboard',
-      'user-web-dashboard': '/user-dashboard',
-      userWebDashboard: '/user-dashboard',
-      users: '/user-dashboard',
-      '/users': '/user-dashboard',
-      'user-profile': '/user-dashboard',
-      '/user-profile': '/user-dashboard',
-      userProfile: '/user-dashboard',
-      user_profile: '/user-dashboard',
+      user_dashboard: '/user-dashboard1',
+      'user-dashboard': '/user-dashboard1',
+      '/user-dashboard': '/user-dashboard1',
+      dashboard: '/user-dashboard1',
+      'user-web-dashboard': '/user-dashboard1',
+      userWebDashboard: '/user-dashboard1',
+      'user-dashboard1': '/user-dashboard1',
+      '/user-dashboard1': '/user-dashboard1',
+      'user_dashboard1': '/user-dashboard1',
+      userWebDashboard1: '/user-dashboard1',
+      'user-web-dashboard1': '/user-dashboard1',
+      '/user-web-dashboard1': '/user-dashboard1',
+      users: '/user-dashboard1',
+      '/users': '/user-dashboard1',
+      'user-profile': '/user-dashboard1?tab=profile',
+      '/user-profile': '/user-dashboard1?tab=profile',
+      userProfile: '/user-dashboard1?tab=profile',
+      user_profile: '/user-dashboard1?tab=profile',
+      profile: '/user-dashboard1?tab=profile',
+      '/profile': '/user-dashboard1?tab=profile',
+      'account-profile': '/user-dashboard1?tab=profile',
+      '/account-profile': '/user-dashboard1?tab=profile',
       orders: '/orders',
       'my-orders': '/orders',
       return_request: '/return-request',
@@ -639,6 +653,10 @@ function AppRoutes() {
       '/seller-add-product1': '/supplier-add-product1',
       'seller-profile1': '/supplier-profile1',
       '/seller-profile1': '/supplier-profile1',
+      'supplier-kyc1': '/supplier-kyc1',
+      '/supplier-kyc1': '/supplier-kyc1',
+      'seller-kyc1': '/supplier-kyc1',
+      '/seller-kyc1': '/supplier-kyc1',
       sellers: '/seller-dashboard',
       '/sellers': '/seller-dashboard',
       seller: '/seller-dashboard',
@@ -798,15 +816,7 @@ function AppRoutes() {
         <Route path="/supplier/logout" element={<SupplierLogoutPage />} />
         <Route path="/supplier-logout" element={<SupplierLogoutPage />} />
         <Route path="/user/login" element={<UserLogin />} />
-        <Route path="/user/auth" element={<UserLogin />} />
-        <Route path="/user-login" element={<UserLogin />} />
         <Route path="/affiliate/login" element={<AffiliateLogin />} />
-        <Route path="/affiliate/auth" element={<AffiliateLogin />} />
-        <Route path="/affiliate-login" element={<AffiliateLogin />} />
-        <Route path="/affilate/login" element={<AffiliateLogin />} />
-        <Route path="/affilate/auth" element={<AffiliateLogin />} />
-        <Route path="/affilate-login" element={<AffiliateLogin />} />
-        <Route path="/affilate" element={<AffiliateLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
         <Route 
@@ -838,7 +848,6 @@ function AppRoutes() {
 
         {/* Customer Shopping Routes */}
         <Route path="/user-home" element={<HomeUserCustomer />} />
-        <Route path="/home" element={<HomeUserCustomer />} />
         <Route path="/product" element={<ProductDetail onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/cart" element={<ShoppingCart onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/address" element={<CheckoutAddressSelection onNavigate={handleNav} onBack={handleBack} />} />
@@ -854,44 +863,37 @@ function AppRoutes() {
         <Route path="/luxe" element={<HomeScreenFlutterLuxe onNavigate={handleNav} />} />
         <Route path="/reviews" element={<RatingsReviews onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/write-review" element={<WriteAReview onNavigate={handleNav} onBack={handleBack} />} />
+        {/* Customer Dashboard - redirected to new /user-dashboard1 */}
         <Route 
           path="/user-dashboard" 
-          element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/user_dashboard" 
-          element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
-          } 
+          element={<Navigate to="/user-dashboard1" replace />} 
         />
         <Route 
           path="/users" 
-          element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
-          } 
+          element={<Navigate to="/user-dashboard1" replace />} 
         />
         <Route 
           path="/user-profile" 
+          element={<Navigate to="/user-dashboard1?tab=profile" replace />} 
+        />
+        <Route 
+          path="/profile" 
+          element={<Navigate to="/user-dashboard1?tab=profile" replace />} 
+        />
+        <Route 
+          path="/account-profile" 
+          element={<Navigate to="/user-dashboard1?tab=profile" replace />} 
+        />
+        <Route 
+          path="/user-dashboard1" 
           element={
-            <ProtectedRoute role="customer">
-              <UserWebDashboard onNavigate={handleNav} onBack={handleBack} />
-            </ProtectedRoute>
+            <UserWebDashboard1 onNavigate={handleNav} onBack={handleBack} />
+          } 
+        />
+        <Route 
+          path="/user-web-dashboard1" 
+          element={
+            <UserWebDashboard1 onNavigate={handleNav} onBack={handleBack} />
           } 
         />
         <Route 
@@ -1093,6 +1095,24 @@ function AppRoutes() {
           path="/seller-profile1"
           element={
             <SellerProfile1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/supplier-kyc1"
+          element={
+            <SellerKyc1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/seller-kyc1"
+          element={
+            <SellerKyc1
               onNavigate={handleNav}
               onBack={handleBack}
             />

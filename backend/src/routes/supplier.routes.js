@@ -16,6 +16,10 @@ import {
   updateBankDetails,
   updateGstDetails,
 } from '../controllers/supplier/supplierAuth.controller.js';
+import {
+  getSupplierKyc,
+  submitSupplierKyc,
+} from '../controllers/supplier/supplierKyc.controller.js';
 import { uploadProductMedia } from '../middlewares/upload.middleware.js';
 import { verifySupplier } from '../middlewares/supplierAuth.middleware.js';
 
@@ -24,11 +28,15 @@ const router = Router();
 // Apply supplier authentication middleware to all supplier routes
 router.use(verifySupplier);
 
-// Profile Management
+// Profile & KYC Management
 router.get('/profile', getSupplierProfile);
 router.put('/profile', updateSupplierProfile);
 router.put('/profile/bank', updateBankDetails);
 router.put('/profile/gst', updateGstDetails);
+
+// Supplier KYC Application
+router.get('/kyc', getSupplierKyc);
+router.post('/kyc', submitSupplierKyc);
 
 // Dashboard & Analytics
 router.get('/dashboard-stats', getDashboardStats);

@@ -144,7 +144,21 @@ export const updateKycStatus = async (req, res) => {
               accountHolder: bank.holderName || docs.accountHolder || ''
             }
           }
-        });
+        }).catch((err) => console.warn('Dropshipper profile auto-update warning:', err.message));
+      } else if (existing.type?.toLowerCase() === 'supplier') {
+        const docs = existing.documents || {};
+        await prisma.profile.update({
+          where: { id: existing.userId },
+          data: { 
+            role: 'SUPPLIER',
+            storeName: docs.businessName || docs.tradeName || undefined,
+            gstin: docs.gstin || undefined,
+            pan: docs.pan?.number || undefined,
+            bankDetails: docs.bank || undefined,
+            tier: 'Silver',
+            tierLabel: 'Verified Supplier'
+          }
+        }).catch((err) => console.warn('Supplier profile auto-update warning:', err.message));
       }
     }
 

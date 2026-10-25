@@ -1542,7 +1542,7 @@ export default function AdminDropshipperKyc({ onNavigate, onBack, onSwitchView }
                         Identifier Number
                       </span>
                       <span className="font-mono font-bold text-slate-800">
-                        {activeModalRequest.documents[activeDocTab].number || 'Verified from Database'}
+                        {activeModalRequest.documents[activeDocTab].number || 'Verified Record'}
                       </span>
                     </div>
                     {activeModalRequest.documents[activeDocTab].legalName && (

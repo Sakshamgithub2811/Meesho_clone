@@ -13,6 +13,7 @@ import KycReviewModal from './KycReviewModal';
 
 const TYPE_TABS = [
   { id: 'all', label: 'All Applications' },
+  { id: 'supplier', label: 'Suppliers 🏬' },
   { id: 'dropshipper', label: 'Dropshippers 📦' },
   { id: 'affiliate', label: 'Affiliates 🤝' }
 ];

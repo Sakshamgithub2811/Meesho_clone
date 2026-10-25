@@ -120,7 +120,7 @@ export function RaiseATicket({ onNavigate, onBack }) {
     setAiChatInput('');
 
     setTimeout(() => {
-      let botResponse = 'I have matched your query with our resolution database. For orders in transit, tracking coordinates refresh every 6 hours.';
+      let botResponse = 'I have checked your query with our support center. For orders in transit, tracking coordinates refresh every 6 hours.';
       if (query.includes('refund') || query.includes('margin') || query.includes('payment')) {
         botResponse = 'Reseller payouts are processed via NEFT/UPI within 48 hours of return window expiration.';
       } else if (query.includes('return') || query.includes('damage')) {

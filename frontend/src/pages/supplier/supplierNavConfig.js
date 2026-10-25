@@ -6,6 +6,7 @@ import {
   RotateCcw,
   PlusCircle,
   Store,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const SUPPLIER_MENU = [
@@ -15,5 +16,6 @@ export const SUPPLIER_MENU = [
   { id: 'dropship', label: 'Dropship Fulfilment', icon: Truck, path: '/supplier-dropship1' },
   { id: 'returns', label: 'Returns & RTO Hub', icon: RotateCcw, path: '/supplier-returns1' },
   { id: 'add-product', label: 'Add New Product', icon: PlusCircle, path: '/supplier-add-product1' },
+  { id: 'kyc', label: 'Supplier KYC Hub', icon: ShieldCheck, path: '/supplier-kyc1' },
   { id: 'profile', label: 'Store Profile & KYC', icon: Store, path: '/supplier-profile1' },
 ];

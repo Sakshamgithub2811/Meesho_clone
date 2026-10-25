@@ -25,13 +25,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBac
   };
 
   const handleSubcategoryClick = (subName) => {
-    if (subName.toLowerCase().includes('saree') || activeCategory === 'ethnic') {
-      onNavigate('sarees');
-    } else if (activeCategory === 'western') {
-      onNavigate('western');
-    } else {
-      onNavigate('search');
-    }
+    navigate(`/search?q=${encodeURIComponent(subName)}`);
   };
 
   const categories = [
