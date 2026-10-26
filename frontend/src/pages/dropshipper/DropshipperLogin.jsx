@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../redux/userSlice';
@@ -9,7 +9,11 @@ import {
   signOut
 } from 'firebase/auth';
 import { auth } from '../../utils/firebase';
-import { loginDropshipperApi, registerDropshipperApi } from '../../services/dropshipperService';
+import { 
+  loginDropshipperApi, 
+  registerDropshipperApi,
+  setDropshipperSession
+} from '../../services/dropshipperService';
 import AuthLayout from '../../components/layout/AuthLayout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,15 +111,9 @@ export default function DropshipperLogin() {
           return;
         }
 
-        // Save session in Redux & LocalStorage
+        // Save session in Redux & LocalStorage (with 24-hour auto-expiry)
         dispatch(loginSuccess(userData));
-        localStorage.setItem('meesho_dropshipper_session', JSON.stringify({
-          isLoggedIn: true,
-          dropshipperId: userData.id,
-          name: userData.fullName,
-          email: userData.email,
-          role: userData.role
-        }));
+        setDropshipperSession(userData);
 
         toast.success(`Welcome back, ${userData.fullName || 'Dropshipper'}!`);
         navigate('/dropshipper-dashboard');

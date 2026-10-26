@@ -7,6 +7,10 @@ import { logout } from '../../redux/userSlice';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { DROPSHIPPER_MENU } from './dropshipperMenu';
 import { 
+  createDropshipperTicketApi, 
+  getDropshipperTicketsApi 
+} from '../../services/dropshipperService';
+import { 
   LifeBuoy, 
   MessageSquareText, 
   AlertCircle, 
@@ -121,6 +125,27 @@ export default function DropshipperSupportDesk() {
     } catch (e) {}
   }, [tickets]);
 
+  // Fetch tickets from database on mount
+  useEffect(() => {
+    const fetchDbTickets = async () => {
+      const uid = currentUser?.uid || currentUser?.id;
+      if (!uid) return;
+      try {
+        const res = await getDropshipperTicketsApi(uid);
+        if (res?.success && res.tickets?.length > 0) {
+          setTickets(prev => {
+            const dbIds = new Set(res.tickets.map(t => t.id));
+            const uniqueLocal = prev.filter(t => !dbIds.has(t.id));
+            return [...res.tickets, ...uniqueLocal];
+          });
+        }
+      } catch (err) {
+        console.log("DB Tickets fetch fallback:", err.message);
+      }
+    };
+    fetchDbTickets();
+  }, [currentUser?.uid, currentUser?.id]);
+
   // Handle Tab Change in Sidebar
   const handleTabChange = (tabId) => {
     const findPath = (items) => {
@@ -170,7 +195,7 @@ export default function DropshipperSupportDesk() {
   const resolvedCount = tickets.filter(t => t.status === 'RESOLVED').length;
 
   // Handle Create New Ticket
-  const handleCreateTicket = (e) => {
+  const handleCreateTicket = async (e) => {
     e.preventDefault();
     if (!newSubject.trim() || !newDescription.trim()) {
       toast.error("Please provide both a Subject and detailed Description.");
@@ -185,38 +210,66 @@ export default function DropshipperSupportDesk() {
       'RTO_PENALTY': 'Unfair RTO Freight Charge'
     };
 
-    const newTicket = {
-      id: `TCK-DS-${Math.floor(1000 + Math.random() * 9000)}`,
-      orderId: newOrderId.trim() || 'ORD-GENERAL',
-      awb: newAwb.trim() || 'N/A',
-      courier: 'Express Logistics Desk',
-      category: newCategory,
-      categoryLabel: categoryMap[newCategory] || 'Operational Claim',
-      priority: newPriority,
-      status: 'OPEN',
-      subject: newSubject.trim(),
-      createdAt: 'Just now',
-      lastUpdate: 'Just now',
-      messages: [
-        {
-          sender: 'dropshipper',
-          name: currentUser?.fullName || 'Dropshipper Partner',
-          time: 'Just now',
-          text: newDescription.trim()
-        }
-      ]
-    };
+    const uid = currentUser?.uid || currentUser?.id || 'gv6BEVSvd7O6kXlVdU22FbRiHfz1';
 
-    setTickets([newTicket, ...tickets]);
+    try {
+      const res = await createDropshipperTicketApi({
+        firebaseUid: uid,
+        subject: newSubject.trim(),
+        description: newDescription.trim(),
+        category: categoryMap[newCategory] || 'Operational Claim',
+        priority: newPriority,
+        orderId: newOrderId.trim() || undefined
+      });
+
+      if (res?.success && res.ticket) {
+        const fullTicket = {
+          ...res.ticket,
+          orderId: newOrderId.trim() || 'ORD-GENERAL',
+          awb: newAwb.trim() || 'N/A',
+          courier: 'Express Logistics Desk',
+          categoryLabel: categoryMap[newCategory] || 'Operational Claim',
+          lastUpdate: 'Just now'
+        };
+        setTickets([fullTicket, ...tickets]);
+        toast.success(`Support Ticket #${fullTicket.id} saved in Database & Dispatched!`, {
+          description: "Our dedicated Dropshipper Dispute Desk will review within 2 hours."
+        });
+      }
+    } catch (apiErr) {
+      const newTicket = {
+        id: `TCK-DS-${Math.floor(1000 + Math.random() * 9000)}`,
+        orderId: newOrderId.trim() || 'ORD-GENERAL',
+        awb: newAwb.trim() || 'N/A',
+        courier: 'Express Logistics Desk',
+        category: newCategory,
+        categoryLabel: categoryMap[newCategory] || 'Operational Claim',
+        priority: newPriority,
+        status: 'OPEN',
+        subject: newSubject.trim(),
+        createdAt: 'Just now',
+        lastUpdate: 'Just now',
+        messages: [
+          {
+            sender: 'dropshipper',
+            name: currentUser?.fullName || 'Dropshipper Partner',
+            time: 'Just now',
+            text: newDescription.trim()
+          }
+        ]
+      };
+      setTickets([newTicket, ...tickets]);
+      toast.success(`Support Ticket #${newTicket.id} raised successfully!`, {
+        description: "Our dedicated Dropshipper Dispute Desk will review within 2 hours."
+      });
+    }
+
     setIsNewTicketOpen(false);
     // Reset Form
     setNewSubject('');
     setNewDescription('');
     setNewOrderId('');
     setNewAwb('');
-    toast.success(`Support Ticket #${newTicket.id} raised successfully!`, {
-      description: "Our dedicated Dropshipper Dispute Desk will review within 2 hours."
-    });
   };
 
   // Handle Post Reply

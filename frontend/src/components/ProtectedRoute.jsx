@@ -10,7 +10,19 @@ const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
   const location = useLocation();
   const { currentUser, isAuthenticated: isReduxAuth } = useSelector((state) => state.user || {});
 
-  // Check if authenticated via Redux (Firebase login)
+  // 1. STRICT DROPSHIPPER GUARD (Prevents normal customers or expired sessions from entering)
+  if (role === 'dropshipper') {
+    const isLocalAuth = isDropshipperAuthenticated();
+    const isReduxDropship = isReduxAuth && currentUser && (currentUser.role?.toUpperCase() === 'DROPSHIPPER');
+    const isAuthorizedDropshipper = isLocalAuth || isReduxDropship;
+
+    if (!isAuthorizedDropshipper) {
+      return <Navigate to={`/dropshipper-login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
+    }
+    return children ? children : <Outlet />;
+  }
+
+  // 2. OTHER ROLES (Customer, Affiliate, Reseller)
   let isAuth = isReduxAuth && !!currentUser;
 
   // If not authenticated via Redux, fallback to role-based local storage check
@@ -21,14 +33,12 @@ const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
       isAuth = isAffiliateAuthenticated();
     } else if (role === 'reseller') {
       isAuth = isResellerAuthenticated();
-    } else if (role === 'dropshipper') {
-      isAuth = isDropshipperAuthenticated();
     } else if (role === 'any') {
       isAuth = isCustomerAuthenticated() || isAffiliateAuthenticated() || isResellerAuthenticated() || isDropshipperAuthenticated();
     }
   }
 
-  // Check allowedRoles if provided (e.g. ['ADMIN', 'SUPER_ADMIN', 'DROPSHIPPER'])
+  // Check allowedRoles if provided (e.g. ['ADMIN', 'SUPER_ADMIN'])
   if (allowedRoles && currentUser) {
     if (!allowedRoles.includes(currentUser.role)) {
       return <Navigate to="/" replace />;
@@ -36,9 +46,6 @@ const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
   }
 
   if (!isAuth) {
-    if (role === 'dropshipper') {
-      return <Navigate to={`/dropshipper-login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
-    }
     const targetRole = role === 'any' ? 'customer' : role;
     return <Navigate to={`/login?role=${targetRole}&redirect=${encodeURIComponent(location.pathname)}`} replace />;
   }

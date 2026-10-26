@@ -32,6 +32,8 @@ import DropshipperSettlementTracking from './pages/dropshipper/DropshipperSettle
 import DropshipperRotManager from './pages/dropshipper/DropshipperRotManager';
 import DropshipperMarginConfig from './pages/dropshipper/DropshipperMarginConfig';
 import DropshipperSupportDesk from './pages/dropshipper/DropshipperSupportDesk';
+import DropshipperOrdersPush from './pages/dropshipper/DropshipperOrdersPush';
+import DropshipperIntegrations from './pages/dropshipper/DropshipperIntegrations';
 
 // Customer & Reseller Shopping Pages
 import HomeUserCustomer from './pages/customer & Reseller/HomeUserCustomer';
@@ -840,6 +842,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute role="dropshipper">
               <DropshipperSupportDesk />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-orders-push" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperOrdersPush />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-integrations" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperIntegrations />
             </ProtectedRoute>
           } 
         />

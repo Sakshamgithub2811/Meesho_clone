@@ -13,7 +13,9 @@ import {
   LifeBuoy, 
   MessageSquareText, 
   SlidersHorizontal,
-  AlertCircle
+  AlertCircle,
+  Send,
+  Cable
 } from 'lucide-react';
 
 /**
@@ -58,6 +60,12 @@ export const DROPSHIPPER_MENU = [
     icon: ShoppingCart,
     children: [
       { 
+        id: 'orders-push', 
+        label: 'Push Customer Orders', 
+        icon: Send, 
+        path: '/dropshipper-orders-push' 
+      },
+      { 
         id: 'settlements', 
         label: 'Settlement Tracking', 
         icon: TrendingUp, 
@@ -74,6 +82,19 @@ export const DROPSHIPPER_MENU = [
         label: 'Margin Returns Ledger', 
         icon: Percent, 
         path: '/reseller-returns' 
+      },
+    ]
+  },
+  {
+    id: 'channels-group',
+    label: 'Store Channels & API',
+    icon: Cable,
+    children: [
+      { 
+        id: 'integrations', 
+        label: 'Store Integrations & Webhooks', 
+        icon: Cable, 
+        path: '/dropshipper-integrations' 
       },
     ]
   },

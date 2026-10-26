@@ -9,7 +9,8 @@ import {
   getDropshipperProfileApi, 
   updateDropshipperProfileApi, 
   uploadDropshipperAvatarApi,
-  getDropshipperKycStatusApi 
+  getDropshipperKycStatusApi,
+  isDropshipperAuthenticated
 } from '../../services/dropshipperService';
 import { 
   getDropshipperApp, 
@@ -126,21 +127,13 @@ export default function DropshipperDashboard() {
   const [kycStatus, setKycStatus] = useState('NOT_SUBMITTED'); // 'NOT_SUBMITTED' | 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'
   const [kycRemoteApp, setKycRemoteApp] = useState(null);
 
-  // 1. Strict Auth Guard: If not logged in as dropshipper, redirect to /dropshipper-login
+  // 1. Strict Auth Guard: If not logged in as dropshipper or session expired (>24h), redirect to /dropshipper-login
   useEffect(() => {
-    const sessionStr = localStorage.getItem('meesho_dropshipper_session');
-    let hasValidSession = false;
-    if (sessionStr) {
-      try {
-        const s = JSON.parse(sessionStr);
-        if (s?.isLoggedIn) hasValidSession = true;
-      } catch (e) {}
-    }
-    if (!currentUser && !hasValidSession) {
+    if (!isDropshipperAuthenticated()) {
       toast.error('Authentication Required', { description: 'Please login as a dropshipper to access your dashboard.' });
       navigate('/dropshipper-login', { replace: true });
     }
-  }, [currentUser, navigate]);
+  }, [navigate]);
 
   // 2. Fetch live KYC status from PostgreSQL database
   const fetchKycStatus = async (uid) => {
