@@ -12,11 +12,12 @@ import AdminSellersManagement from '../../components/admin/sellers/AdminSellersM
 import AdminFinanceManagement from '../../components/admin/finance/AdminFinanceManagement';
 import AdminAnalyticsManagement from '../../components/admin/analytics/AdminAnalyticsManagement';
 import AdminSupportManagement from '../../components/admin/support/AdminSupportManagement';
+import AdminCategoriesManagement from '../../components/admin/categories/AdminCategoriesManagement';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
   Package, ShoppingCart, RotateCcw, LineChart,
-  Wallet, Banknote, Store, Headphones
+  Wallet, Banknote, Store, Headphones, Layers
 } from 'lucide-react';
 // Yeh raha aapka MASTER MENU (with Sub-menus)
 const ADMIN_MENU = [
@@ -32,12 +33,13 @@ const ADMIN_MENU = [
     ],
   },
   { id: 'products', label: 'Products ', icon: Package },
+  { id: 'categories', label: 'Categories ', icon: Layers },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
   { id: 'returns', label: 'Returns & Refunds ', icon: RotateCcw },
   { id: 'sellers', label: 'Sellers ', icon: Store },
   { id: 'finance', label: 'Finance & Payouts ', icon: Banknote },
   { id: 'analytics', label: 'Analytics ', icon: LineChart },
-  { id: 'support', label: 'Support Desk 🎧', icon: Headphones },
+  { id: 'support', label: 'Support Desk ', icon: Headphones },
   { id: 'users', label: 'Users', icon: Users, path: '/user-dashboard' },
 ];
 
@@ -68,6 +70,8 @@ export default function AdminWebPanel() {
         return { title: "Manage Users", subtitle: "" };
       case 'products':
         return { title: "Product Catalog & Moderation", subtitle: "Inspect supplier listings, manage inventory, and monitor stock levels" };
+      case 'categories':
+        return { title: "Category Master & Taxonomies", subtitle: "Organize catalog hierarchies, manage category slugs, and link products" };
       case 'orders':
         return { title: "Manage Orders", subtitle: "Track, fulfill, and monitor customer orders" };
       case 'returns':
@@ -131,6 +135,10 @@ export default function AdminWebPanel() {
 
       {activeTab === 'products' && (
         <AdminProductsManagement />
+      )}
+
+      {activeTab === 'categories' && (
+        <AdminCategoriesManagement />
       )}
 
       {activeTab === 'orders' && (

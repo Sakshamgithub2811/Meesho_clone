@@ -72,8 +72,6 @@ app.use(errorHandler);
 // Start the server
 app.listen(port, () => {
   console.log(`🚀 Backend server is running on http://localhost:${port}`);
-  console.log(`🛡️ Admin auth endpoints available at http://localhost:${port}/api/v1/admin-auth`);
-  console.log(`👤 Admin profile endpoints available at http://localhost:${port}/api/v1/admin-profile`);
 });
 
 export default app;
