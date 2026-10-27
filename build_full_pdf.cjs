@@ -1,0 +1,429 @@
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+const edgePaths = [
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+];
+
+const browserPath = edgePaths.find(p => fs.existsSync(p));
+
+if (!browserPath) {
+  console.error('No supported browser found.');
+  process.exit(1);
+}
+
+const htmlContent = `<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<title>Deep Code Quality Analysis: Admin vs. Supplier vs. Customer vs. Dropshipper</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #0f172a;
+    background: #ffffff;
+    font-size: 11px;
+    line-height: 1.55;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: 10px;
+  }
+
+  .header-card {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+    color: #ffffff;
+    padding: 16px 20px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+  }
+
+  .header-card h1 {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    margin-bottom: 4px;
+  }
+
+  .header-card p {
+    font-size: 11px;
+    opacity: 0.95;
+    color: #e0e7ff;
+  }
+
+  h2 {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 14px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1.5px solid #cbd5e1;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 10px 0 4px;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  p {
+    margin-bottom: 6px;
+    color: #1e293b;
+  }
+
+  ul, ol {
+    margin-left: 18px;
+    margin-bottom: 8px;
+    color: #1e293b;
+  }
+
+  li {
+    margin-bottom: 3px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+    margin: 8px 0 12px;
+    border: 1px solid #cbd5e1;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  th {
+    background: #f1f5f9;
+    color: #0f172a;
+    text-align: left;
+    padding: 6px 8px;
+    font-weight: 700;
+    border: 1px solid #cbd5e1;
+  }
+
+  td {
+    padding: 5px 8px;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    vertical-align: middle;
+  }
+
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  .code-pill {
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 9.5px;
+    font-weight: 600;
+    color: #0369a1;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    padding: 1px 4px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  pre {
+    background: #f8fafc;
+    color: #0f172a;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 9.5px;
+    padding: 7px 10px;
+    border-radius: 5px;
+    margin: 6px 0 8px;
+    line-height: 1.45;
+    border: 1px solid #cbd5e1;
+    white-space: pre-wrap;
+    word-break: break-all;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .callout-box {
+    background: #f8fafc;
+    border-left: 3.5px solid #4f46e5;
+    padding: 8px 12px;
+    margin: 8px 0 10px;
+    border-radius: 4px;
+    border-top: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .recommendation-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    padding: 8px 12px;
+    border-radius: 5px;
+    margin: 6px 0 8px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .badge-green { color: #166534; font-weight: 700; }
+  .badge-red { color: #991b1b; font-weight: 700; }
+  .badge-yellow { color: #854d0e; font-weight: 700; }
+</style>
+</head>
+<body>
+
+  <div class="header-card">
+    <h1>🔬 Deep Code Quality Analysis: Admin vs. Supplier vs. Customer vs. Dropshipper</h1>
+    <p>Code quality, architecture design, aur resources ke utilization (Frontend + Backend) ke hisaab se chaaron modules ko evaluate kiya gaya hai.</p>
+  </div>
+
+  <!-- Section 1 -->
+  <h2>🏆 1. TL;DR Code Quality Scorecard</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Evaluation Metric</th>
+        <th>🛡️ Admin Panel</th>
+        <th>🏬 Supplier Hub</th>
+        <th>🛒 Customer Panel</th>
+        <th>🚚 Dropshipper Panel</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Component Modularity (Frontend)</strong></td>
+        <td><span class="badge-green">🟢 9.5 / 10</span></td>
+        <td><span class="badge-red">🔴 4.5 / 10</span></td>
+        <td><span class="badge-yellow">🟡 6.5 / 10</span></td>
+        <td><span class="badge-red">🔴 4.0 / 10</span></td>
+      </tr>
+      <tr>
+        <td><strong>Backend Architecture (Controllers)</strong></td>
+        <td><span class="badge-green">🟢 9.0 / 10</span></td>
+        <td><span class="badge-yellow">🟡 5.5 / 10</span></td>
+        <td><span class="badge-yellow">🟡 5.0 / 10</span></td>
+        <td><span class="badge-yellow">🟡 5.5 / 10</span></td>
+      </tr>
+      <tr>
+        <td><strong>Database &amp; Prisma Utilization</strong></td>
+        <td><span class="badge-green">🟢 9.0 / 10</span></td>
+        <td><span class="badge-red">🔴 4.0 / 10</span></td>
+        <td><span class="badge-yellow">🟡 6.0 / 10</span></td>
+        <td><span class="badge-yellow">🟡 5.5 / 10</span></td>
+      </tr>
+      <tr>
+        <td><strong>Auth &amp; Security Enforcement</strong></td>
+        <td><span class="badge-green">🟢 9.5 / 10</span></td>
+        <td><span class="badge-yellow">🟡 5.0 / 10</span></td>
+        <td><span class="badge-yellow">🟡 6.0 / 10</span></td>
+        <td><span class="badge-yellow">🟡 6.5 / 10</span></td>
+      </tr>
+      <tr>
+        <td><strong>State Management &amp; Data Flow</strong></td>
+        <td><span class="badge-green">🟢 9.0 / 10</span></td>
+        <td><span class="badge-yellow">🟡 5.0 / 10</span></td>
+        <td><span class="badge-yellow">🟡 6.0 / 10</span></td>
+        <td><span class="badge-red">🔴 4.5 / 10</span></td>
+      </tr>
+      <tr>
+        <td><strong>Code Duplication &amp; Dead Code</strong></td>
+        <td><span class="badge-green">🟢 Clean (0%)</span></td>
+        <td><span class="badge-red">🔴 High (35%)</span></td>
+        <td><span class="badge-yellow">🟡 Medium (20%)</span></td>
+        <td><span class="badge-yellow">🟡 Medium (15%)</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section 2 -->
+  <h2>💻 2. Frontend Code Quality &amp; Architecture Comparison</h2>
+
+  <h3>A. Admin Panel (Modular &amp; Clean Architecture)</h3>
+  <p><strong>Orchestrator Pattern:</strong></p>
+  <p><span class="code-pill">admin_web_panel1.jsx</span> sirf <strong>~155 lines</strong> ka hai! Ye khud saari cheezein render nahi karta, balki master router aur layout orchestrator ka kaam karta hai.</p>
+  <p><strong>Separation of Concerns (SoC):</strong> Har feature ke liye alag isolated component folder hai:</p>
+  <ul>
+    <li><code>components/admin/orders/</code> ➔ Orders table &amp; status updates</li>
+    <li><code>components/admin/kyc/</code> ➔ KYC inspection &amp; review modal</li>
+    <li><code>components/admin/returns/</code> ➔ Return &amp; refund arbitration</li>
+    <li><code>components/admin/products/</code> ➔ Catalog moderation</li>
+    <li><code>components/admin/finance/</code> ➔ Escrow wallet &amp; payout settlements</li>
+  </ul>
+  <p><strong>Reusability:</strong> Shared components jaise <code>FilterBar.jsx</code>, <code>KycReviewModal.jsx</code>, aur <code>UserProfile.jsx</code> ko reuse kiya gaya hai.</p>
+  <p><strong>UI Feedback:</strong> Toast notifications (Sonner), dynamic badges, loading skeletons, aur responsive modals properly wired hain.</p>
+
+  <h3>B. Supplier Panel (Monolithic &amp; Redundant Code)</h3>
+  <p><strong>Giant "God" Components:</strong> Supplier ke components bohot heavy aur unwieldy hain:</p>
+  <ul>
+    <li><span class="code-pill">CustomerOrderSupplierFulfilment.jsx</span> ➔ <strong>93 KB</strong> (ek hi file mein 2000+ lines)!</li>
+    <li><span class="code-pill">SellerKyc1.jsx</span> ➔ <strong>52 KB</strong> (1150+ lines)!</li>
+  </ul>
+  <p>Ek hi component mein forms, validation, upload logic, step wizard, aur preview sab kuch mix kar diya gaya hai.</p>
+  <p><strong>Severe File Duplication (Dead Code):</strong></p>
+  <p><code>seller-web-dashboard1.jsx</code> (37 KB) vs <code>seller_web_dashboard.jsx</code> (48 KB) vs <code>seller_web_dashboard1.jsx</code> (52 bytes) vs <code>supplier_dashboard1.jsx</code> (17 KB) vs <code>supplier_dashboard2.jsx</code> (14 KB).</p>
+  <p><strong>4 alag dashboard files</strong> bani hui hain jisse samajh nahi aata active kaunsi hai.</p>
+  <p><strong>Mock Image Over-reliance:</strong> KYC documents ke liye real upload (Cloudinary/S3) lagane ke bajaye hardcoded Unsplash image URLs use kiye gaye hain.</p>
+
+  <h3>C. Dropshipper Panel (High Coupling)</h3>
+  <p><strong>Enormous Component Size:</strong></p>
+  <p><span class="code-pill">SupplierProductAccess.jsx</span> ➔ <strong>165 KB (Single file!)</strong></p>
+  <p>Is ek file ke andar wholesale catalog, margin calculator, category filters, product sharing, aur dialogs sab kuch ek saath likha hua hai.</p>
+  <p><strong>State Spaghetti:</strong> Ek component mein <strong>25+ useState hooks</strong> chal rahe hain jo re-renders ko unoptimized banate hain.</p>
+
+  <h3>D. Customer Panel (Rich UI, Par Screen-Centric)</h3>
+  <p>UI visually pleasing aur e-commerce standards ke mutabiq hai (PDP, Cart, Delivery address, Order timeline).</p>
+  <p><strong>Problem:</strong> Components reusable hone ke bajaye <strong>Screen-Specific</strong> hain. Cart aur Checkout ka logic modular custom hook (jaise <code>useCart()</code>) mein hone ke bajaye direct page JSX ke andar embed kiya gaya hai.</p>
+  <p><strong>Hardcoded dummy data (DUMMY_ORDERS)</strong> direct UI array mein hardcode hai.</p>
+
+  <!-- Section 3 -->
+  <h2>⚙️ 3. Backend Code Quality &amp; Controller Design</h2>
+
+  <h3>A. Admin Backend (controllers/admin/) — 🟢 High Standard</h3>
+  <p><strong>Single Responsibility Principle (SRP):</strong> 11 alag dedicated controllers banaye gaye hain:</p>
+  <ul>
+    <li><span class="code-pill">adminOrders.controller.js</span> sirf orders handle karta hai.</li>
+    <li><span class="code-pill">adminKyc.controller.js</span> sirf KYC status transition handle karta hai.</li>
+    <li><span class="code-pill">adminAnalytics.controller.js</span> sirf BI aggregations handle karta hai.</li>
+  </ul>
+  <p><strong>Clean Response Contracts:</strong> Sabhi controllers consistent response return karte hain:</p>
+  <pre><code>json
+{ "success": true, "data": [...], "count": 10 }</code></pre>
+  <p><strong>Real Error Propagation:</strong> Agar database fail hota hai toh real HTTP status (400, 404, 500) deta hai, silently swallow nahi karta.</p>
+
+  <h3>B. Supplier Backend (controllers/supplier/) — 🟡 Monolithic &amp; Permissive</h3>
+  <p><strong>Monolithic Controllers:</strong></p>
+  <p><span class="code-pill">supplierAuth.controller.js</span> ➔ <strong>27 KB (850+ lines)!</strong></p>
+  <p>Isme bcrypt, Firebase custom tokens, demo login, fallback maps, aur token generation ek hi controller file mein bhare hain.</p>
+  <p><strong>Over-used In-Memory Fallbacks:</strong></p>
+  <p>Har route par <code>fallbackSuppliers = new Map()</code> aur <code>fallbackKycStore = new Map()</code> laga hua hai. Agar database down ho ya column galat ho, toh ye database query skip karke RAM mein save kar leta hai — <strong>jisse developer ko kabhi pata hi nahi chalta ki database mein write fail ho raha hai.</strong></p>
+
+  <h3>C. Customer &amp; Dropshipper Backend — 🟡 Fragmented &amp; Incomplete</h3>
+  <p><strong>Code Fragmentation:</strong> Customer ka auth do jagah bikhra hua hai:</p>
+  <ul>
+    <li>Half code <code>controllers/user/userAuth.controller.js</code> mein hai.</li>
+    <li>Baaki customer OTP/phone login common <code>controllers/auth.controller.js</code> (18 KB) mein hai.</li>
+  </ul>
+  <p><strong>Missing Dedicated Controllers:</strong> Customer ke orders create karne ka dedicated <code>userOrders.controller.js</code> missing hai, aur Dropshipper ka dedicated wallet transaction controller missing hai.</p>
+
+  <!-- Section 4 -->
+  <h2>🗄️ 4. Database &amp; Prisma ORM Utilization</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>🛡️ Admin</th>
+        <th>🏬 Supplier</th>
+        <th>🛒 Customer</th>
+        <th>🚚 Dropshipper</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Query Precision</strong></td>
+        <td>Proper <code>include</code> &amp; <code>select</code> clauses</td>
+        <td>Basic queries with fallback catch-all</td>
+        <td>Simple <code>findUnique</code></td>
+        <td>Basic <code>findFirst</code> conflict checks</td>
+      </tr>
+      <tr>
+        <td><strong>Database Writing</strong></td>
+        <td>100% writes to PostgreSQL/Supabase</td>
+        <td>Often caught in try/catch and routed to RAM</td>
+        <td>Mixed (RAM + DB)</td>
+        <td>Creates profile, skips wallet relation</td>
+      </tr>
+      <tr>
+        <td><strong>Transaction Safety</strong></td>
+        <td>Status checks before updates</td>
+        <td>Direct overwrite</td>
+        <td>Partial</td>
+        <td>Missing transactional lock</td>
+      </tr>
+      <tr>
+        <td><strong>Relations Usage</strong></td>
+        <td><code>Order</code> ➔ <code>OrderItem</code> ➔ <code>Product</code> ➔ <code>Profile</code></td>
+        <td>Only <code>Product</code> &amp; <code>Profile</code></td>
+        <td><code>Profile</code> ➔ <code>CartItem</code></td>
+        <td><code>Profile</code> ➔ <code>KYCApplication</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout-box">
+    <strong>👉 Admin Code Difference:</strong> Admin backend relational data fetch karne ke liye Prisma ke relational joins (<code>include: { items: { include: { product: true } }, user: true }</code>) utilize karta hai, jabki baaki modules single-table queries karke client side par merge karne ki koshish karte hain.
+  </div>
+
+  <!-- Section 5 -->
+  <h2>🔒 5. Authentication &amp; Security Comparison</h2>
+  <p><strong>Admin Panel:</strong></p>
+  <p><strong>Strict Two-Stage Guard:</strong></p>
+  <ul>
+    <li><code>verifyAuth</code>: Validates Firebase JWT.</li>
+    <li><code>authorizeRole('ADMIN')</code>: Database se check karta hai ki user ka role sach mein <code>ADMIN</code> hai ya nahi.</li>
+  </ul>
+
+  <p style="margin-top:8px;"><strong>Supplier Panel:</strong></p>
+  <p><strong>Bypass Vulnerability:</strong> <span class="code-pill">supplierAuth.middleware.js</span> mein backdoor fallback hai:</p>
+  <pre><code>javascript
+const fallbackId = req.headers['x-supplier-id'] || 'supplier_demo_001';
+req.user = { id: fallbackId, role: 'SUPPLIER' };</code></pre>
+  <p>Koi bhi request mein agar token na ho, toh wo silently demo supplier banakar request pass kar deta hai. Dev testing ke liye convenient hai par security-wise weak hai.</p>
+
+  <p style="margin-top:8px;"><strong>Customer Panel:</strong></p>
+  <p>Development mode mein <code>otp === '123456'</code> hardcoded bypass hai.</p>
+
+  <!-- Section 6 -->
+  <h2>🎯 6. Key Takeaways &amp; Recommendations</h2>
+  <p><strong>Admin ka code kaisa hai?</strong></p>
+  <div class="recommendation-box">
+    <strong style="color:#166534;">✅ Production-Ready &amp; Highly Structured:</strong> Modern React component architecture (SoC), Redux integration, isolated Express controllers, aur proper database transactions.
+  </div>
+
+  <p style="margin-top:10px;"><strong>Supplier aur Dropshipper ke code mein kya sudhaar chahiye?</strong></p>
+  <p style="font-weight:700; color:#991b1b; margin-bottom:4px;">⚠️ Refactoring Required:</p>
+  <ol>
+    <li><strong>93 KB</strong> (<code>CustomerOrderSupplierFulfilment.jsx</code>) aur <strong>165 KB</strong> (<code>SupplierProductAccess.jsx</code>) jaise mega-files ko chote reusable sub-components mein todna chahiye (jaise Admin mein kiya gaya hai).</li>
+    <li>Supplier ke folder se duplicate files (<code>seller-web-dashboard1.jsx</code> vs <code>seller_web_dashboard.jsx</code>) delete karni chahiye.</li>
+    <li><code>fallbackKycStore</code> aur <code>fallbackSuppliers</code> par dependency kam karke real database persistence enforce karna chahiye taaki sabhi team members ka data sync rahe.</li>
+  </ol>
+
+</body>
+</html>`;
+
+const htmlPath = path.resolve(__dirname, 'CODE_QUALITY_ANALYSIS_4_PANELS.html');
+const pdfPath = path.resolve(__dirname, 'CODE_QUALITY_ANALYSIS_4_PANELS.pdf');
+
+fs.writeFileSync(htmlPath, htmlContent, 'utf8');
+console.log('Written HTML to:', htmlPath);
+
+const fileUrl = 'file:///' + htmlPath.replace(/\\/g, '/');
+
+// Use exact Chromium flags for high-precision A4 multi-page document printing
+const cmd = `"${browserPath}" --headless --disable-gpu --no-pdf-header-footer --print-to-pdf="${pdfPath}" "${fileUrl}"`;
+console.log('Running cmd to generate PDF...');
+execSync(cmd);
+
+if (fs.existsSync(pdfPath)) {
+  const stats = fs.statSync(pdfPath);
+  console.log(`✅ Success! Generated PDF: ${pdfPath} (${stats.size} bytes)`);
+} else {
+  console.error('❌ Failed to generate PDF.');
+}

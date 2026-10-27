@@ -11,11 +11,12 @@ import AdminProductsManagement from '../../components/admin/products/AdminProduc
 import AdminSellersManagement from '../../components/admin/sellers/AdminSellersManagement';
 import AdminFinanceManagement from '../../components/admin/finance/AdminFinanceManagement';
 import AdminAnalyticsManagement from '../../components/admin/analytics/AdminAnalyticsManagement';
+import AdminSupportManagement from '../../components/admin/support/AdminSupportManagement';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
   Package, ShoppingCart, RotateCcw, LineChart,
-  Wallet, Banknote, Store
+  Wallet, Banknote, Store, Headphones
 } from 'lucide-react';
 // Yeh raha aapka MASTER MENU (with Sub-menus)
 const ADMIN_MENU = [
@@ -36,6 +37,7 @@ const ADMIN_MENU = [
   { id: 'sellers', label: 'Sellers ', icon: Store },
   { id: 'finance', label: 'Finance & Payouts ', icon: Banknote },
   { id: 'analytics', label: 'Analytics ', icon: LineChart },
+  { id: 'support', label: 'Support Desk 🎧', icon: Headphones },
   { id: 'users', label: 'Users', icon: Users, path: '/user-dashboard' },
 ];
 
@@ -58,7 +60,7 @@ export default function AdminWebPanel() {
       case 'dashboard':
         return { title: "Dashboard Overview", subtitle: "" };
       case 'kyc':
-      case 'supplier-kyc':   
+      case 'supplier-kyc':
       case 'dropshipper-kyc':
       case 'affiliate-kyc':
         return { title: "KYC Verifications", subtitle: "" };
@@ -77,6 +79,8 @@ export default function AdminWebPanel() {
         return { title: "Finance, Escrow & Settlements", subtitle: "Manage partner escrow wallets, process withdrawal payouts, and monitor transaction ledger" };
       case 'analytics':
         return { title: "Business Intelligence & Analytics", subtitle: "Analyze sales trends, order progression, catalog distribution, and top suppliers" };
+      case 'support':
+        return { title: "Customer & Partner Support Desk", subtitle: "Arbitrate disputes, manage support tickets, and resolve buyer or seller inquiries" };
       default:
         // Fallback: Menu se title nikal lo
         const item = ADMIN_MENU.find(m => m.id === activeTab) || ADMIN_MENU.flatMap(m => m.children || []).find(c => c.id === activeTab);
@@ -117,7 +121,7 @@ export default function AdminWebPanel() {
         <AdminKycManagement
           key={activeTab}
           initialType={activeTab === 'supplier-kyc'
-            ? 'supplier' : activeTab === 'dropshipper-kyc' ? 'dropshipper': activeTab === 'affiliate-kyc'? 'affiliate': 'all'}
+            ? 'supplier' : activeTab === 'dropshipper-kyc' ? 'dropshipper' : activeTab === 'affiliate-kyc' ? 'affiliate' : 'all'}
         />
       )}
 
@@ -147,6 +151,10 @@ export default function AdminWebPanel() {
 
       {activeTab === 'analytics' && (
         <AdminAnalyticsManagement />
+      )}
+
+      {activeTab === 'support' && (
+        <AdminSupportManagement />
       )}
 
     </DashboardLayout>
