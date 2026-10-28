@@ -13,11 +13,12 @@ import AdminFinanceManagement from '../../components/admin/finance/AdminFinanceM
 import AdminAnalyticsManagement from '../../components/admin/analytics/AdminAnalyticsManagement';
 import AdminSupportManagement from '../../components/admin/support/AdminSupportManagement';
 import AdminCategoriesManagement from '../../components/admin/categories/AdminCategoriesManagement';
+import AdminCouponsManagement from '../../components/admin/coupons/AdminCouponsManagement';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
   Package, ShoppingCart, RotateCcw, LineChart,
-  Wallet, Banknote, Store, Headphones, Layers
+  Wallet, Banknote, Store, Headphones, Layers, Ticket
 } from 'lucide-react';
 // Yeh raha aapka MASTER MENU (with Sub-menus)
 const ADMIN_MENU = [
@@ -34,6 +35,7 @@ const ADMIN_MENU = [
   },
   { id: 'products', label: 'Products ', icon: Package },
   { id: 'categories', label: 'Categories ', icon: Layers },
+  { id: 'coupons', label: 'Coupons 🎟️', icon: Ticket },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
   { id: 'returns', label: 'Returns & Refunds ', icon: RotateCcw },
   { id: 'sellers', label: 'Sellers ', icon: Store },
@@ -72,6 +74,8 @@ export default function AdminWebPanel() {
         return { title: "Product Catalog & Moderation", subtitle: "Inspect supplier listings, manage inventory, and monitor stock levels" };
       case 'categories':
         return { title: "Category Master & Taxonomies", subtitle: "Organize catalog hierarchies, manage category slugs, and link products" };
+      case 'coupons':
+        return { title: "Coupons & Promotional Codes", subtitle: "Configure promotional discounts, validate campaigns, and track customer redemptions" };
       case 'orders':
         return { title: "Manage Orders", subtitle: "Track, fulfill, and monitor customer orders" };
       case 'returns':
@@ -139,6 +143,10 @@ export default function AdminWebPanel() {
 
       {activeTab === 'categories' && (
         <AdminCategoriesManagement />
+      )}
+
+      {activeTab === 'coupons' && (
+        <AdminCouponsManagement />
       )}
 
       {activeTab === 'orders' && (

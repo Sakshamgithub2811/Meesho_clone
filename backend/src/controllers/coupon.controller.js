@@ -1,7 +1,7 @@
 // backend/src/controllers/coupon.controller.js
 
 // Preloaded genuine active coupons
-const activeCoupons = [
+export let activeCoupons = [
   {
     id: 'coup_1',
     code: 'SAVE50',
@@ -14,7 +14,8 @@ const activeCoupons = [
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     isGenerated: false,
     usageLimit: 1000,
-    usedCount: 142
+    usedCount: 142,
+    isActive: true
   },
   {
     id: 'coup_2',
@@ -28,7 +29,8 @@ const activeCoupons = [
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     isGenerated: false,
     usageLimit: 500,
-    usedCount: 89
+    usedCount: 89,
+    isActive: true
   },
   {
     id: 'coup_3',
@@ -42,7 +44,8 @@ const activeCoupons = [
     expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
     isGenerated: false,
     usageLimit: 800,
-    usedCount: 213
+    usedCount: 213,
+    isActive: true
   },
   {
     id: 'coup_4',
@@ -56,7 +59,8 @@ const activeCoupons = [
     expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
     isGenerated: false,
     usageLimit: 2000,
-    usedCount: 410
+    usedCount: 410,
+    isActive: true
   },
   {
     id: 'coup_5',
@@ -70,7 +74,8 @@ const activeCoupons = [
     expiresAt: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
     isGenerated: false,
     usageLimit: 300,
-    usedCount: 65
+    usedCount: 65,
+    isActive: true
   }
 ];
 
@@ -80,7 +85,9 @@ const activeCoupons = [
 export const getActiveCoupons = async (req, res) => {
   try {
     const now = new Date();
-    const validCoupons = activeCoupons.filter(c => new Date(c.expiresAt) > now);
+    const validCoupons = activeCoupons.filter(
+      c => c.isActive !== false && new Date(c.expiresAt) > now
+    );
 
     return res.status(200).json({
       success: true,
@@ -123,6 +130,15 @@ export const validateCoupon = async (req, res) => {
         success: false,
         valid: false,
         message: `Coupon code "${cleanCode}" is invalid or does not exist.`
+      });
+    }
+
+    // Check if disabled by admin
+    if (coupon.isActive === false) {
+      return res.status(400).json({
+        success: false,
+        valid: false,
+        message: `Coupon code "${cleanCode}" has been disabled or deactivated.`
       });
     }
 
