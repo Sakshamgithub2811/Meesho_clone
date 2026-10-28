@@ -14,11 +14,12 @@ import AdminAnalyticsManagement from '../../components/admin/analytics/AdminAnal
 import AdminSupportManagement from '../../components/admin/support/AdminSupportManagement';
 import AdminCategoriesManagement from '../../components/admin/categories/AdminCategoriesManagement';
 import AdminCouponsManagement from '../../components/admin/coupons/AdminCouponsManagement';
+import AdminBannersManagement from '../../components/admin/banners/AdminBannersManagement';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
   Package, ShoppingCart, RotateCcw, LineChart,
-  Wallet, Banknote, Store, Headphones, Layers, Ticket
+  Wallet, Banknote, Store, Headphones, Layers, Ticket, Image
 } from 'lucide-react';
 // Yeh raha aapka MASTER MENU (with Sub-menus)
 const ADMIN_MENU = [
@@ -36,6 +37,7 @@ const ADMIN_MENU = [
   { id: 'products', label: 'Products ', icon: Package },
   { id: 'categories', label: 'Categories ', icon: Layers },
   { id: 'coupons', label: 'Coupons 🎟️', icon: Ticket },
+  { id: 'banners', label: 'Banners 🎨', icon: Image },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
   { id: 'returns', label: 'Returns & Refunds ', icon: RotateCcw },
   { id: 'sellers', label: 'Sellers ', icon: Store },
@@ -76,6 +78,8 @@ export default function AdminWebPanel() {
         return { title: "Category Master & Taxonomies", subtitle: "Organize catalog hierarchies, manage category slugs, and link products" };
       case 'coupons':
         return { title: "Coupons & Promotional Codes", subtitle: "Configure promotional discounts, validate campaigns, and track customer redemptions" };
+      case 'banners':
+        return { title: "Homepage Banners & Carousels", subtitle: "Curate interactive hero sliders, seasonal promotional banners, and campaign redirects" };
       case 'orders':
         return { title: "Manage Orders", subtitle: "Track, fulfill, and monitor customer orders" };
       case 'returns':
@@ -147,6 +151,10 @@ export default function AdminWebPanel() {
 
       {activeTab === 'coupons' && (
         <AdminCouponsManagement />
+      )}
+
+      {activeTab === 'banners' && (
+        <AdminBannersManagement />
       )}
 
       {activeTab === 'orders' && (

@@ -387,3 +387,20 @@ model Referral {
 
   @@map("referrals")
 }
+
+
+model Banner {
+  id           String   @id @default(uuid())
+  title        String
+  subtitle     String?
+  imageUrl     String   @map("image_url")
+  targetUrl    String   @default("/") @map("target_url")
+  badgeText    String?  @default("MEGA SALE") @map("badge_text")
+  badgeColor   String?  @default("bg-purple-600 text-white") @map("badge_color")
+  displayOrder Int      @default(1) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  clicksCount  Int      @default(0) @map("clicks_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  @@map("banners")
+}
