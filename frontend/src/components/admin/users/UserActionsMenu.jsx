@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator 
 } from '../../ui/dropdown-menu';
 import { Button } from '../../ui/button';
-import { MoreVertical, Trash2 } from 'lucide-react';
+import { MoreVertical, Trash2, Edit } from 'lucide-react';
 
 const ROLES = ['CUSTOMER', 'SUPPLIER', 'RESELLER', 'DROPSHIPPER', 'DRIVER', 'ADMIN'];
 
@@ -17,7 +17,8 @@ export default function UserActionsMenu({
   currentAdminId,
   actionLoadingId,
   onRoleChange,
-  onDeleteUser
+  onDeleteUser,
+  onEditUser,
 }) {
   const isCurrentAdmin = user.id === currentAdminId;
   const isLoading = actionLoadingId === user.id;
@@ -34,9 +35,19 @@ export default function UserActionsMenu({
           <MoreVertical className="h-4 w-4 text-gray-500" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem
+          onClick={() => onEditUser && onEditUser(user)}
+          className="text-xs font-semibold text-gray-800 hover:text-[#b7004d] hover:bg-pink-50 cursor-pointer flex items-center gap-2"
+        >
+          <Edit className="h-3.5 w-3.5 text-[#b7004d]" />
+          Edit User Profile & Pass
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
         <DropdownMenuLabel className="text-xs text-gray-500 font-normal">
-          Manage User Role
+          Quick Change Role
         </DropdownMenuLabel>
         
         {ROLES.filter((r) => r !== user.role).map((r) => (
@@ -65,3 +76,4 @@ export default function UserActionsMenu({
     </DropdownMenu>
   );
 }
+

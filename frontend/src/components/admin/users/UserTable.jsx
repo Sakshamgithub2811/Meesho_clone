@@ -11,7 +11,8 @@ export default function UserTable({
   currentAdminId,
   actionLoadingId,
   onRoleChange,
-  onDeleteUser
+  onDeleteUser,
+  onEditUser,
 }) {
   const columns = [
     {
@@ -88,6 +89,7 @@ export default function UserTable({
           actionLoadingId={actionLoadingId}
           onRoleChange={onRoleChange}
           onDeleteUser={onDeleteUser}
+          onEditUser={onEditUser}
         />
       )
     }

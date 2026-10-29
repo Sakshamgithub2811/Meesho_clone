@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import FilterBar from '../../common/FilterBar';
 import UserTable from './UserTable';
+import EditUserModal from './EditUserModal';
 
 const ROLES = [
   { id: 'ALL', label: 'All Roles' },
@@ -20,7 +21,7 @@ const ROLES = [
 /**
  * AdminUsersManagement Component
  * Main coordinator for user management, orchestrating
- * UserFilterBar and UserTable.
+ * UserFilterBar, UserTable, and EditUserModal.
  */
 export default function AdminUsersManagement() {
   const currentUser = useSelector((state) => state.user?.currentUser);
@@ -31,6 +32,11 @@ export default function AdminUsersManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('ALL');
   const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Edit Modal State
+  const [editingUser, setEditingUser] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSavingUser, setIsSavingUser] = useState(false);
 
   // 1. Fetch Users from Backend
   const fetchUsers = async (isManual = false) => {
@@ -85,7 +91,53 @@ export default function AdminUsersManagement() {
     return () => clearTimeout(delayDebounce);
   }, [searchTerm]);
 
-  // 2. Change User Role
+  // 2. Open Edit User Modal
+  const handleOpenEdit = (user) => {
+    setEditingUser(user);
+    setIsEditModalOpen(true);
+  };
+
+  // 3. Save User Profile & Password
+  const handleSaveUser = async (formData) => {
+    if (!editingUser) return;
+    try {
+      setIsSavingUser(true);
+      const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+
+      const response = await axios.put(
+        `http://localhost:5000/api/v1/admin-users/${editingUser.id}`,
+        formData,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        const updated = response.data.user;
+        setUsers((prev) =>
+          prev.map((u) => (u.id === editingUser.id ? { ...u, ...updated } : u))
+        );
+        toast.success("User Updated", {
+          description: `Account details for ${updated.fullName || updated.email} have been saved.`
+        });
+        setIsEditModalOpen(false);
+        setEditingUser(null);
+      } else {
+        toast.error("Failed to update user", {
+          description: response.data.error || "Could not save user changes."
+        });
+      }
+    } catch (err) {
+      console.error("Save User Error:", err);
+      toast.error("Update Failed", {
+        description: err.response?.data?.error || "Failed to update user details."
+      });
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
+
+  // 4. Change User Role
   const handleRoleChange = async (userId, newRole) => {
     try {
       setActionLoadingId(userId);
@@ -115,7 +167,7 @@ export default function AdminUsersManagement() {
     }
   };
 
-  // 3. Delete User
+  // 5. Delete User
   const handleDeleteUser = async (userId, userName) => {
     if (!window.confirm(`Are you sure you want to delete user "${userName}"?`)) {
       return;
@@ -170,7 +222,21 @@ export default function AdminUsersManagement() {
         actionLoadingId={actionLoadingId}
         onRoleChange={handleRoleChange}
         onDeleteUser={handleDeleteUser}
+        onEditUser={handleOpenEdit}
+      />
+
+      {/* ── EDIT USER MODAL (NAME, EMAIL, PHONE, ROLE, PASSWORD) */}
+      <EditUserModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingUser(null);
+        }}
+        onSave={handleSaveUser}
+        user={editingUser}
+        isSaving={isSavingUser}
       />
     </div>
   );
 }
+
