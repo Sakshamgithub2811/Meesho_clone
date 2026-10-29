@@ -145,6 +145,14 @@ export default function AdminCategoriesManagement() {
   // 5. Delete Category with Confirmation & Safety Guard
   const handleDeleteCategory = async (category) => {
     const productCount = category._count?.products ?? 0;
+    const subcategoryCount = category._count?.subcategories ?? 0;
+
+    if (subcategoryCount > 0) {
+      toast.error(
+        `Cannot delete: "${category.name}" has ${subcategoryCount} subcategories attached. Reassign or delete those subcategories first.`
+      );
+      return;
+    }
 
     if (productCount > 0) {
       toast.error(
@@ -153,9 +161,10 @@ export default function AdminCategoriesManagement() {
       return;
     }
 
+    const typeLabel = category.parentId ? 'subcategory' : 'category';
     if (
       !window.confirm(
-        `Are you sure you want to permanently delete category "${category.name}"?`
+        `Are you sure you want to permanently delete ${typeLabel} "${category.name}"?`
       )
     ) {
       return;
@@ -201,7 +210,7 @@ export default function AdminCategoriesManagement() {
           />
           <input
             type="text"
-            placeholder="Search categories or slugs..."
+            placeholder="Search categories, subcategories, slugs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-500 focus:outline-none transition-all"
@@ -233,7 +242,7 @@ export default function AdminCategoriesManagement() {
             className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 active:scale-95 rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-1.5"
           >
             <Plus size={16} />
-            <span>Add Category</span>
+            <span>Add Category / Subcategory</span>
           </button>
         </div>
       </div>
@@ -254,6 +263,7 @@ export default function AdminCategoriesManagement() {
         onSubmit={handleFormSubmit}
         initialData={editingCategory}
         isSubmitting={isSubmitting}
+        parentCategories={categories.filter((c) => !c.parentId)}
       />
     </div>
   );

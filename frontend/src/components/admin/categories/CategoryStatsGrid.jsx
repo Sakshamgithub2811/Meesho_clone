@@ -1,43 +1,43 @@
 import React from 'react';
-import { Layers, Package, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Layers, Package, GitBranch, FolderTree } from 'lucide-react';
 
 export default function CategoryStatsGrid({ stats }) {
   const cards = [
     {
-      title: 'Total Categories',
+      title: 'Total Taxonomies',
       value: stats?.totalCategories ?? 0,
-      sub: 'Catalog taxonomies registered',
+      sub: 'All categories & subcategories',
       icon: Layers,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
       borderColor: 'border-purple-100',
     },
     {
-      title: 'Active in Catalog',
-      value: stats?.activeCategories ?? 0,
-      sub: 'Categories having live products',
-      icon: CheckCircle2,
+      title: 'Main Categories',
+      value: stats?.mainCategories ?? 0,
+      sub: 'Root-level departments',
+      icon: FolderTree,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-100',
+    },
+    {
+      title: 'Subcategories',
+      value: stats?.subCategories ?? 0,
+      sub: 'Child classification levels',
+      icon: GitBranch,
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-50',
       borderColor: 'border-emerald-100',
     },
     {
-      title: 'Total Linked Products',
+      title: 'Linked Products',
       value: stats?.totalProducts ?? 0,
-      sub: 'Mapped products across catalog',
+      sub: 'Active catalog products mapped',
       icon: Package,
       color: 'text-indigo-600',
       bgColor: 'bg-indigo-50',
       borderColor: 'border-indigo-100',
-    },
-    {
-      title: 'Empty Categories',
-      value: stats?.emptyCategories ?? 0,
-      sub: 'Categories with 0 products linked',
-      icon: AlertCircle,
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50',
-      borderColor: 'border-amber-100',
     },
   ];
 
@@ -66,3 +66,4 @@ export default function CategoryStatsGrid({ stats }) {
     </div>
   );
 }
+

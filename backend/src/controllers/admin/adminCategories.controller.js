@@ -1,22 +1,38 @@
 import prisma from '../../config/prisma.js';
 
 /**
- * 1. GET ALL CATEGORIES & STATS FOR ADMIN
+ * 1. GET ALL CATEGORIES & STATS FOR ADMIN (Including Parent/Subcategory Hierarchy)
  */
 export const getAllCategories = async (req, res) => {
   try {
     const categories = await prisma.category.findMany({
       include: {
+        parent: {
+          select: { id: true, name: true, slug: true }
+        },
+        subcategories: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            imageUrl: true,
+            _count: { select: { products: true } }
+          }
+        },
         _count: {
-          select: { products: true }
+          select: { products: true, subcategories: true }
         }
       },
       orderBy: { createdAt: 'desc' }
     });
 
     const totalCategories = categories.length;
+    const mainCategories = categories.filter(c => !c.parentId).length;
+    const subCategories = categories.filter(c => !!c.parentId).length;
     const totalProducts = categories.reduce((sum, cat) => sum + (cat._count?.products || 0), 0);
-    const emptyCategories = categories.filter(cat => (cat._count?.products || 0) === 0).length;
+    const emptyCategories = categories.filter(
+      cat => (cat._count?.products || 0) === 0 && (cat._count?.subcategories || 0) === 0
+    ).length;
 
     res.status(200).json({
       success: true,
@@ -24,6 +40,8 @@ export const getAllCategories = async (req, res) => {
       data: categories,
       stats: {
         totalCategories,
+        mainCategories,
+        subCategories,
         totalProducts,
         emptyCategories,
         activeCategories: totalCategories - emptyCategories
@@ -36,11 +54,11 @@ export const getAllCategories = async (req, res) => {
 };
 
 /**
- * 2. CREATE NEW CATEGORY
+ * 2. CREATE NEW CATEGORY OR SUBCATEGORY
  */
 export const createCategory = async (req, res) => {
   try {
-    const { name, imageUrl, slug } = req.body;
+    const { name, imageUrl, slug, parentId } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Category name is required' });
@@ -69,22 +87,42 @@ export const createCategory = async (req, res) => {
       });
     }
 
+    // Verify parent category if parentId is provided
+    if (parentId && parentId.trim()) {
+      const parentCat = await prisma.category.findUnique({
+        where: { id: parentId.trim() }
+      });
+      if (!parentCat) {
+        return res.status(400).json({
+          success: false,
+          message: 'Selected parent category does not exist'
+        });
+      }
+    }
+
     const newCategory = await prisma.category.create({
       data: {
         name: name.trim(),
         slug: generatedSlug,
-        imageUrl: imageUrl?.trim() || 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&q=80&w=400'
+        imageUrl: imageUrl && imageUrl.trim() ? imageUrl.trim() : null,
+        parentId: parentId && parentId.trim() ? parentId.trim() : null
       },
       include: {
+        parent: {
+          select: { id: true, name: true, slug: true }
+        },
+        subcategories: {
+          select: { id: true, name: true, slug: true }
+        },
         _count: {
-          select: { products: true }
+          select: { products: true, subcategories: true }
         }
       }
     });
 
     res.status(201).json({
       success: true,
-      message: 'Category created successfully',
+      message: parentId ? 'Subcategory created successfully' : 'Category created successfully',
       data: newCategory
     });
   } catch (error) {
@@ -94,16 +132,37 @@ export const createCategory = async (req, res) => {
 };
 
 /**
- * 3. UPDATE CATEGORY
+ * 3. UPDATE CATEGORY (Allows re-assigning parent or changing to main category)
  */
 export const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, slug, imageUrl } = req.body;
+    const { name, slug, imageUrl, parentId } = req.body;
 
     const existing = await prisma.category.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+
+    // A category cannot be its own parent
+    if (parentId && parentId === id) {
+      return res.status(400).json({
+        success: false,
+        message: 'A category cannot be its own parent category'
+      });
+    }
+
+    // Verify parent category if parentId provided
+    if (parentId && parentId.trim()) {
+      const parentCat = await prisma.category.findUnique({
+        where: { id: parentId.trim() }
+      });
+      if (!parentCat) {
+        return res.status(400).json({
+          success: false,
+          message: 'Selected parent category does not exist'
+        });
+      }
     }
 
     // Check if new name or slug conflicts with another category
@@ -135,11 +194,18 @@ export const updateCategory = async (req, res) => {
       data: {
         ...(name && { name: name.trim() }),
         ...(slug && { slug: slug.trim() }),
-        ...(imageUrl && { imageUrl: imageUrl.trim() })
+        ...(imageUrl !== undefined && { imageUrl: imageUrl ? imageUrl.trim() : null }),
+        ...(parentId !== undefined && { parentId: parentId && parentId.trim() ? parentId.trim() : null })
       },
       include: {
+        parent: {
+          select: { id: true, name: true, slug: true }
+        },
+        subcategories: {
+          select: { id: true, name: true, slug: true }
+        },
         _count: {
-          select: { products: true }
+          select: { products: true, subcategories: true }
         }
       }
     });
@@ -156,7 +222,7 @@ export const updateCategory = async (req, res) => {
 };
 
 /**
- * 4. DELETE CATEGORY (With Safety Guard for linked products)
+ * 4. DELETE CATEGORY (With Safety Guards for linked products & child subcategories)
  */
 export const deleteCategory = async (req, res) => {
   try {
@@ -164,14 +230,26 @@ export const deleteCategory = async (req, res) => {
 
     const category = await prisma.category.findUnique({
       where: { id },
-      include: { _count: { select: { products: true } } }
+      include: {
+        _count: {
+          select: { products: true, subcategories: true }
+        }
+      }
     });
 
     if (!category) {
       return res.status(404).json({ success: false, message: 'Category not found' });
     }
 
-    // Safety guard: Prevent deleting category that has active products
+    // Safety guard 1: Check if category has child subcategories
+    if (category._count.subcategories > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete: "${category.name}" has ${category._count.subcategories} subcategories linked to it. Please reassign or delete the subcategories first.`
+      });
+    }
+
+    // Safety guard 2: Prevent deleting category that has active products
     if (category._count.products > 0) {
       return res.status(400).json({
         success: false,
