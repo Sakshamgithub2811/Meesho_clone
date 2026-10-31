@@ -95,6 +95,7 @@ model Profile {
   referralsUsed   Referral[]     @relation("Referred")
   deliveryTasks   DeliveryTask[]
 
+  isActive        Boolean        @default(true) @map("is_active")
   isDeleted       Boolean        @default(false) @map("is_deleted")
   deletedAt       DateTime?      @map("deleted_at")
   createdAt       DateTime       @default(now()) @map("created_at")

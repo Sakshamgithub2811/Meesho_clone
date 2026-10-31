@@ -167,7 +167,46 @@ export default function AdminUsersManagement() {
     }
   };
 
-  // 5. Delete User
+  // 5. Toggle User Active / Deactivate Status
+  const handleToggleStatus = async (userId, newStatus, userName) => {
+    const actionLabel = newStatus ? 'activate' : 'deactivate';
+    if (!window.confirm(`Are you sure you want to ${actionLabel} account for "${userName}"?`)) {
+      return;
+    }
+
+    try {
+      setActionLoadingId(userId);
+      const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+
+      const response = await axios.put(
+        `http://localhost:5000/api/v1/admin-users/${userId}/status`,
+        { isActive: newStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, isActive: newStatus } : u))
+        );
+        toast.success(newStatus ? "Account Activated" : "Account Deactivated", {
+          description: `User "${userName}" has been ${newStatus ? 'activated' : 'deactivated'}.`
+        });
+      } else {
+        toast.error("Status Update Failed", {
+          description: response.data.error || "Failed to update user status."
+        });
+      }
+    } catch (err) {
+      console.error("Toggle Status Error:", err);
+      toast.error("Action Failed", {
+        description: err.response?.data?.error || `Could not ${actionLabel} user account.`
+      });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // 6. Delete User
   const handleDeleteUser = async (userId, userName) => {
     if (!window.confirm(`Are you sure you want to delete user "${userName}"?`)) {
       return;
@@ -223,9 +262,10 @@ export default function AdminUsersManagement() {
         onRoleChange={handleRoleChange}
         onDeleteUser={handleDeleteUser}
         onEditUser={handleOpenEdit}
+        onToggleStatus={handleToggleStatus}
       />
 
-      {/* ── EDIT USER MODAL (NAME, EMAIL, PHONE, ROLE, PASSWORD) */}
+      {/* ── EDIT USER MODAL (NAME, EMAIL, PHONE, ROLE, PASSWORD, STATUS) */}
       <EditUserModal
         isOpen={isEditModalOpen}
         onClose={() => {

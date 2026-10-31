@@ -3,16 +3,24 @@ import admin from '../../config/firebaseAdmin.js';
 
 const ALLOWED_ROLES = ['CUSTOMER', 'RESELLER', 'SUPPLIER', 'DRIVER', 'ADMIN', 'DROPSHIPPER'];
 
-// 1. GET ALL USERS (with Search & Role Filter)
+// 1. GET ALL USERS (with Search, Role, and Status Filter)
 export const getAllUsers = async (req, res) => {
   try {
-    const { search = '', role = '' } = req.query;
+    const { search = '', role = '', status = '' } = req.query;
 
     const where = {};
     if (role && role !== 'ALL') {
       const formattedRole = role.toUpperCase();
       if (ALLOWED_ROLES.includes(formattedRole)) {
         where.role = formattedRole;
+      }
+    }
+
+    if (status && status !== 'ALL') {
+      if (status === 'ACTIVE') {
+        where.isActive = true;
+      } else if (status === 'INACTIVE' || status === 'DEACTIVATED') {
+        where.isActive = false;
       }
     }
 
@@ -33,6 +41,7 @@ export const getAllUsers = async (req, res) => {
         fullName: true,
         phone: true,
         role: true,
+        isActive: true,
         avatarUrl: true,
         createdAt: true,
         _count: {
@@ -77,6 +86,7 @@ export const updateUserRole = async (req, res) => {
         fullName: true,
         phone: true,
         role: true,
+        isActive: true,
         avatarUrl: true,
         createdAt: true,
       }
@@ -93,11 +103,11 @@ export const updateUserRole = async (req, res) => {
   }
 };
 
-// 3. UPDATE USER DETAILS (Name, Email, Phone, Role, and Password)
+// 3. UPDATE USER DETAILS (Name, Email, Phone, Role, Password, and Status)
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullName, email, phone, role, password } = req.body;
+    const { fullName, email, phone, role, password, isActive } = req.body;
 
     // Check existing
     const existing = await prisma.profile.findUnique({ where: { id } });
@@ -135,7 +145,7 @@ export const updateUser = async (req, res) => {
       }
     }
 
-    // Update in Firebase Auth if password, email, or displayName changed
+    // Update in Firebase Auth if password, email, displayName, or disabled status changed
     if (admin?.auth) {
       const authInstance = admin.auth();
       const firebaseUpdates = {};
@@ -158,9 +168,16 @@ export const updateUser = async (req, res) => {
         firebaseUpdates.displayName = fullName.trim();
       }
 
+      if (typeof isActive === 'boolean' && isActive !== existing.isActive) {
+        firebaseUpdates.disabled = !isActive;
+      }
+
       if (Object.keys(firebaseUpdates).length > 0) {
         try {
           await authInstance.updateUser(id, firebaseUpdates);
+          if (firebaseUpdates.disabled) {
+            await authInstance.revokeRefreshTokens(id);
+          }
         } catch (firebaseErr) {
           console.warn('Firebase Auth updateUser notice:', firebaseErr.message);
         }
@@ -175,6 +192,7 @@ export const updateUser = async (req, res) => {
         ...(email !== undefined && { email: email?.trim() }),
         ...(phone !== undefined && { phone: phone?.trim() || null }),
         ...(role && { role: formattedRole }),
+        ...(typeof isActive === 'boolean' && { isActive }),
       },
       select: {
         id: true,
@@ -182,6 +200,7 @@ export const updateUser = async (req, res) => {
         fullName: true,
         phone: true,
         role: true,
+        isActive: true,
         avatarUrl: true,
         createdAt: true,
         _count: {
@@ -203,7 +222,79 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// 4. DELETE USER
+// 4. TOGGLE USER ACTIVE / DEACTIVATED STATUS
+export const toggleUserStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'isActive must be a boolean (true or false)'
+      });
+    }
+
+    // Safety guard: Prevent deactivating self
+    if (req.user && req.user.id === id && !isActive) {
+      return res.status(400).json({
+        success: false,
+        error: 'You cannot deactivate your own admin account!'
+      });
+    }
+
+    const existing = await prisma.profile.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'User profile not found' });
+    }
+
+    // 1. Firebase Auth sync
+    if (admin?.auth) {
+      try {
+        const authInstance = admin.auth();
+        await authInstance.updateUser(id, { disabled: !isActive });
+        if (!isActive) {
+          // Immediately revoke refresh tokens so user session terminates
+          await authInstance.revokeRefreshTokens(id);
+        }
+      } catch (fbErr) {
+        console.warn('Firebase Auth toggle status notice:', fbErr.message);
+      }
+    }
+
+    // 2. PostgreSQL update
+    const updatedUser = await prisma.profile.update({
+      where: { id },
+      data: { isActive },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        avatarUrl: true,
+        createdAt: true,
+        _count: {
+          select: {
+            orders: true
+          }
+        }
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `User account has been ${isActive ? 'activated' : 'deactivated'} successfully`,
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error("Toggle User Status Error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// 5. DELETE USER
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -239,4 +330,5 @@ export const deleteUser = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
 

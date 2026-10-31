@@ -53,11 +53,21 @@ export const verifyAuth = async (req, res, next) => {
             phone: true,
             avatarUrl: true,
             role: true,
+            isActive: true,
           }
         });
       }
     } catch (dbErr) {
       console.warn("Prisma profile lookup warning:", dbErr.message);
+    }
+
+    // Agar account deactivated ho, toh access block karein
+    if (profile && profile.isActive === false) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Your account has been deactivated by administrator. Please contact customer support.',
+        code: 'ACCOUNT_DEACTIVATED'
+      });
     }
 
     // Agar database me profile na ho toh Firebase payload se construct karein
@@ -67,6 +77,7 @@ export const verifyAuth = async (req, res, next) => {
         email: email || decodedToken?.email || `${uid}@meesho.clone`,
         fullName: decodedToken?.name || 'Meesho User',
         role: (decodedToken?.role || 'CUSTOMER').toUpperCase(),
+        isActive: true,
       };
     }
 

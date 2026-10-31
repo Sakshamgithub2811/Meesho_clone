@@ -11,6 +11,7 @@ import {
   Loader2,
   Check,
   AlertCircle,
+  Activity,
 } from 'lucide-react';
 import RoleBadge from '../../common/RoleBadge';
 
@@ -36,6 +37,7 @@ export default function EditUserModal({
     phone: '',
     role: 'CUSTOMER',
     password: '',
+    isActive: true,
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -49,6 +51,7 @@ export default function EditUserModal({
         phone: user.phone || '',
         role: user.role || 'CUSTOMER',
         password: '', // Clear password field on open
+        isActive: user.isActive !== false,
       });
       setShowPassword(false);
       setErrors({});
@@ -83,6 +86,7 @@ export default function EditUserModal({
       email: formData.email.trim(),
       phone: formData.phone.trim() || null,
       role: formData.role,
+      isActive: formData.isActive,
     };
 
     if (formData.password && formData.password.trim()) {
@@ -215,6 +219,56 @@ export default function EditUserModal({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Account Status Selection (Active vs Deactivated) */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <Activity size={13} className="text-gray-500" />
+              <span>Account Status</span>
+              <span className="text-rose-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, isActive: true }))}
+                className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
+                  formData.isActive
+                    ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-100'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+              >
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    formData.isActive ? 'bg-emerald-500 ring-4 ring-emerald-100' : 'bg-gray-300'
+                  }`}
+                />
+                <div>
+                  <div className="text-xs font-bold text-gray-900">Active Account</div>
+                  <div className="text-[10px] text-gray-500">Allowed to login & trade</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, isActive: false }))}
+                className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
+                  !formData.isActive
+                    ? 'border-rose-500 bg-rose-50/70 ring-2 ring-rose-100'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+              >
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    !formData.isActive ? 'bg-rose-500 ring-4 ring-rose-100' : 'bg-gray-300'
+                  }`}
+                />
+                <div>
+                  <div className="text-xs font-bold text-gray-900">Deactivated</div>
+                  <div className="text-[10px] text-gray-500">Access suspended</div>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Password Reset / Change Section */}

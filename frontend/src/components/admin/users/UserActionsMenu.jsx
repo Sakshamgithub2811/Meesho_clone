@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator 
 } from '../../ui/dropdown-menu';
 import { Button } from '../../ui/button';
-import { MoreVertical, Trash2, Edit } from 'lucide-react';
+import { MoreVertical, Trash2, Edit, UserCheck, UserX } from 'lucide-react';
 
 const ROLES = ['CUSTOMER', 'SUPPLIER', 'RESELLER', 'DROPSHIPPER', 'DRIVER', 'ADMIN'];
 
@@ -19,9 +19,11 @@ export default function UserActionsMenu({
   onRoleChange,
   onDeleteUser,
   onEditUser,
+  onToggleStatus,
 }) {
   const isCurrentAdmin = user.id === currentAdminId;
   const isLoading = actionLoadingId === user.id;
+  const isActive = user.isActive !== false;
 
   return (
     <DropdownMenu>
@@ -35,7 +37,7 @@ export default function UserActionsMenu({
           <MoreVertical className="h-4 w-4 text-gray-500" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
+      <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem
           onClick={() => onEditUser && onEditUser(user)}
           className="text-xs font-semibold text-gray-800 hover:text-[#b7004d] hover:bg-pink-50 cursor-pointer flex items-center gap-2"
@@ -43,6 +45,27 @@ export default function UserActionsMenu({
           <Edit className="h-3.5 w-3.5 text-[#b7004d]" />
           Edit User Profile & Pass
         </DropdownMenuItem>
+
+        {/* Activate / Deactivate Toggle Option */}
+        {!isCurrentAdmin && onToggleStatus && (
+          isActive ? (
+            <DropdownMenuItem
+              onClick={() => onToggleStatus(user.id, false, user.fullName || user.email)}
+              className="text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 cursor-pointer flex items-center gap-2"
+            >
+              <UserX className="h-3.5 w-3.5 text-amber-600" />
+              Deactivate User Account
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onClick={() => onToggleStatus(user.id, true, user.fullName || user.email)}
+              className="text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 cursor-pointer flex items-center gap-2"
+            >
+              <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
+              Activate User Account
+            </DropdownMenuItem>
+          )
+        )}
 
         <DropdownMenuSeparator />
 
@@ -76,4 +99,5 @@ export default function UserActionsMenu({
     </DropdownMenu>
   );
 }
+
 
