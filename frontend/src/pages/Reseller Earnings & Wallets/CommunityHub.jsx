@@ -9,14 +9,14 @@ const initialGroups = [
     name: "Saree Superstars",
     members: "50k members • 120 posts today",
     joined: false,
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuD-byQJgCrpMdrN2HKDo8Y4evjzqshvzpbh_X4EiazAuoRsqe6FqttxbZoFUrJhU98S4ElrASwALhIj42zeaJ0JJ0k8v8qc4ftfA4CtOb2CoSjSYNn2yXNdDxWkURMifcLmgE3BUk4mq8yuSD6VYUI5VJCUw5rpbJEGe3b_YL0stYmDqtF_CoDswO_LqW0vgv0LYPWXNQx0cA-3O_RH1FdYiGUOork3WM_CcV1by9a9B0ZuKsJUjyI2fdXcFVPg0R0zQTyy0ywn1T0"
+    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80"
   },
   {
     id: 2,
     name: "Home Decor Enthusiasts",
     members: "12k members • 45 posts today",
     joined: true,
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuD5Nxx-71wYf2CgfAWyVFyit2Vsj_hrmDe1aPHF7gmlBR7_y1y2e63gX5VzZoUTinawjOoDWxukcaih630NhS6FWtwqVenouQ2xnSlBAYzZjLSJvaK0upBhkMG2h75y7ErBf5JXwk6cX0eo2-3czd8r_-34H_bYwtpAjCZKbyMvfoYHdceheV9qylg-Voip213MWjTiePhOPoNsqNvQYnmqb68_-wAiqkrKyAd8QrlGqCNVJdIUWOV7xFy-yb_3H599Y1PJ9uas6II"
+    image: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=600&auto=format&fit=crop&q=80"
   }
 ];
 
@@ -143,7 +143,7 @@ export default function CommunityHub() {
                     <img
                       className="w-full h-full object-cover rounded-full"
                       alt="Priya Sharma"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQYMTNVYt0zeSF9IKh9X4yYoYYefEnBaXiHdyfvIYsfFgU8Jh9qCuoPK-FSvhBZFM7wgDnjLEq283e04Oxg4awuwOVuNF4zY-jt324MxemxDQ4qTkQSujNnB9gD_FqNeuNS0KS_eLNVVeomAztdumMm6S2vlXJfzXhIGNMqKaYYb72NQ0wLCAH3iO1lnaI6EY13gBkQaW2wMZ4KeML26wFw8LWuWEtw385WgXidYHrsj8pzncBpFRx8iQzx1LhMNBqbTSE3OJ2Qew"
+                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"
                     />
                   </div>
                   <div>
@@ -164,7 +164,7 @@ export default function CommunityHub() {
                 <img
                   className="w-full h-full object-cover"
                   alt="Ethnic Festive Collection"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAr-mgOFrjJ4EelX50zSyeaH4jG7k9Omdr27MwK_PK3yaqdc2bNvVgUDfa5WCumM8qLg8HWIHI-3mgjqg1DZOu-hT0sxY7WiwhQajEqgMb8c7YLw11V5BXP-63qhhkyfQVov7v94QE_93qpdV33GGYLJw_7xZn3WOs1bOLwAwBF7v0VteWi7snVvEi2LIZ7N3qBCKAiBXMzBhNW_-E8bdgPqgV71ucPmw7DdDc3vUiaem0zo69GAche8apZ6xOaOCedyBAcB_srt2g"
+                  src="https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=800&auto=format&fit=crop&q=80"
                 />
               </div>
               <div className="p-4 flex items-center justify-between border-t border-surface-container-low">
@@ -196,7 +196,7 @@ export default function CommunityHub() {
                     <img
                       className="w-full h-full object-cover rounded-full"
                       alt="Rajesh Mehra"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYIWJGvVF9x6xwSYsW2O8630jBgwN_qdKvO84ODHaNJ7cF-9atMuYOTbMBDcwBWYi6dYHmCcC-229NdNapDM65u-N9JW-U5Q8ChWzYkbfMKQazBNFbouQbe29Iuoi4itfJCqg3N1oRIR5xGJ_hCDMmHZssY7OZKiXA63_BpjjZ5Yw-rsnktqOgbIGIZvPsaqGBUbWWAHqSICezCy40Du_IkzJndaXXHfJm3VQizda9NxXNRuMk2XWLl97rCF4_yH2UphO7XyzEeTo"
+                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80"
                     />
                   </div>
                   <div>

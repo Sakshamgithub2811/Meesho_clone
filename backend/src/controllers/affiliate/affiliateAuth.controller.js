@@ -44,7 +44,7 @@ export const registerAffiliate = async (req, res) => {
       ...profile,
       role: "AFFILIATE",
       referralCode: partnerCode,
-      kycStatus: "APPROVED",
+      kycStatus: "NOT_SUBMITTED",
       tier: "Silver Tier",
       stats: {
         totalEarnings: 0,
@@ -104,17 +104,18 @@ export const loginAffiliate = async (req, res) => {
       };
     }
 
+    const existing = fallbackAffiliateStore.get(firebaseUid);
     const affiliateUser = {
       ...profile,
       role: "AFFILIATE",
-      referralCode: profile.referralCode || fallbackAffiliateStore.get(firebaseUid)?.referralCode || `AFF-${email.split('@')[0].toUpperCase().slice(0, 5)}999`,
-      kycStatus: "APPROVED",
-      tier: "Silver Tier",
-      stats: {
-        totalEarnings: 14850.50,
-        pendingPayout: 2340.00,
-        clicks: 1420,
-        conversions: 84
+      referralCode: profile.referralCode || existing?.referralCode || `AFF-${email.split('@')[0].toUpperCase().slice(0, 5)}999`,
+      kycStatus: existing?.kycStatus || "NOT_SUBMITTED",
+      tier: existing?.tier || "Silver Tier",
+      stats: existing?.stats || {
+        totalEarnings: 0,
+        pendingPayout: 0,
+        clicks: 0,
+        conversions: 0
       }
     };
 

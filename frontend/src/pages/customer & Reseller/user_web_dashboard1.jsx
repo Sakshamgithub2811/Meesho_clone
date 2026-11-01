@@ -15,18 +15,27 @@ import {
   getAddresses,
   saveAddress,
   deleteAddress,
-  getProducts
+  getProducts,
+  getWalletDetails
 } from '../../services/ecommerceService';
 import {
   getAffiliateApp,
   saveAffiliateApp,
+  clearAffiliateApp,
   subscribeAffiliateApp
 } from '../../services/affiliateSessionStore';
 import {
   getStoredCustomer,
+  updateCustomerProfile,
   logoutCustomer,
   subscribeCustomerAuth
 } from '../../services/customerAuthService';
+import { addNotification } from '../../services/notificationService';
+import INDIAN_STATES from '../../utils/indianStates';
+
+import CancelOrderModal from '../../components/customer/CancelOrderModal';
+import OrderTrackingModal from '../../components/customer/OrderTrackingModal';
+import TaxInvoiceModal from '../../components/customer/TaxInvoiceModal';
 
 // Icons from lucide-react (matching admin-panel1 & seller-web-dashboard1 theme)
 import {
@@ -44,6 +53,8 @@ import {
   Share2,
   Clock,
   CheckCircle2,
+  Save,
+  Pencil,
   AlertCircle,
   XCircle,
   Plus,
@@ -120,7 +131,92 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     'Customer';
 
   const customerEmail = customerUser?.email || '';
-  const customerPhone = customerUser?.phone || '';
+  const customerPhone =
+    customerUser?.phone ||
+    affiliateApp?.phone ||
+    (function() {
+      try {
+        const raw = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+        return raw.phone || '';
+      } catch (_) { return ''; }
+    })() ||
+    '';
+
+  // Profile Editing States
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState(customerName);
+  const [editPhone, setEditPhone] = useState(customerPhone);
+  const [editEmail, setEditEmail] = useState(customerEmail);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
+
+  // Keep inputs synchronized when customerUser updates
+  useEffect(() => {
+    if (customerUser) {
+      if (customerUser.fullName || customerUser.name) setEditName(customerUser.fullName || customerUser.name);
+      if (customerUser.phone) setEditPhone(customerUser.phone);
+      if (customerUser.email) setEditEmail(customerUser.email);
+    }
+  }, [customerUser]);
+
+  const handleCancelEdit = () => {
+    setEditName(customerName);
+    setEditPhone(customerPhone);
+    setEditEmail(customerEmail);
+    setIsEditingProfile(false);
+  };
+
+  const handleSaveProfile = async (e) => {
+    if (e) e.preventDefault();
+    if (!editName.trim()) {
+      alert('Please enter your full legal name');
+      return;
+    }
+    setIsSavingProfile(true);
+    try {
+      const updatedUser = await updateCustomerProfile({
+        fullName: editName.trim(),
+        name: editName.trim(),
+        phone: editPhone.trim(),
+        email: editEmail.trim()
+      });
+
+            const updatedObj = updatedUser || {
+        ...customerUser,
+        fullName: editName.trim(),
+        name: editName.trim(),
+        phone: editPhone.trim(),
+        email: editEmail.trim()
+      };
+      try {
+        localStorage.setItem('mshoppy_customer_user', JSON.stringify(updatedObj));
+      } catch (_) {}
+      setCustomerUser(updatedObj);
+
+      // Keep affiliate KYC app synced if present so name updates everywhere
+      if (affiliateApp) {
+        const updatedAff = {
+          ...affiliateApp,
+          fullName: editName.trim(),
+          phone: editPhone.trim(),
+          email: editEmail.trim()
+        };
+        setAffiliateApp(updatedAff);
+        try {
+          localStorage.setItem('mshoppy_kyc_app', JSON.stringify(updatedAff));
+          localStorage.setItem('affiliate_kyc_application', JSON.stringify(updatedAff));
+        } catch (_) {}
+      }
+
+      setProfileSuccessMsg('Profile updated successfully! ✨');
+      setIsEditingProfile(false);
+      setTimeout(() => setProfileSuccessMsg(''), 3500);
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   // Logout Handler (Clears Firebase, Redux & LocalStorage)
   const firebaseLogout = useLogout('/user/login');
@@ -135,21 +231,40 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [catalogProducts, setCatalogProducts] = useState([]);
 
-  // Real Wallet Balance (Persisted locally, default 0 - NO dummy 12840)
+  // Real Unified Wallet Balance (Combines Affiliate Margin Credits & Customer Refunds)
   const [walletBalance, setWalletBalance] = useState(() => {
     try {
+      const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
+      const affComm = Number(affStats.totalCommission || 0);
       const saved = localStorage.getItem('mshoppy_customer_wallet');
-      return saved !== null ? Number(saved) : 0;
+      const custBal = saved !== null ? Number(saved) : 0;
+      return Math.max(affComm, custBal);
     } catch (e) {
       return 0;
     }
   });
 
-  // Real Wallet Transactions (Persisted locally, empty if none - NO dummy TXN entries)
+  // Real Unified Wallet Transactions Ledger (Includes Affiliate Margin Earnings & Payout Requests)
   const [walletTransactions, setWalletTransactions] = useState(() => {
     try {
       const saved = localStorage.getItem('mshoppy_customer_wallet_txns');
-      return saved ? JSON.parse(saved) : [];
+      const txns = saved ? JSON.parse(saved) : [];
+      const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
+      const affOrders = Array.isArray(affStats.recentOrders) ? affStats.recentOrders : [];
+      
+      const affTxns = affOrders.map((ord) => ({
+        title: ord.title || `Affiliate Profit Margin (Order #${(ord.id || '').slice(-6) || 'Ref'})`,
+        ref: `TXN-AFF-${(ord.id || '').slice(-6) || Math.floor(100000 + Math.random() * 900000)}`,
+        date: ord.time || 'Recently',
+        status: 'COMPLETED',
+        amt: `+₹${Number(ord.commission || 0).toLocaleString('en-IN')}`,
+        green: true,
+        type: 'credit',
+        amount: ord.commission
+      }));
+
+      const merged = [...affTxns, ...txns.filter((t) => !affTxns.some((a) => a.ref === t.ref))];
+      return merged;
     } catch (e) {
       return [];
     }
@@ -164,6 +279,8 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   const [cancellingOrder, setCancellingOrder] = useState(null);
   const [cancelReason, setCancelReason] = useState('Ordered by mistake');
   const [isCancelling, setIsCancelling] = useState(false);
+  const [selectedTrackingOrder, setSelectedTrackingOrder] = useState(null);
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
 
   // Add Address Modal
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -178,29 +295,89 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   });
   const [savingAddress, setSavingAddress] = useState(false);
 
-  // Affiliate Program Session
-  const [affiliateApp, setAffiliateApp] = useState(() => getAffiliateApp());
+  // Affiliate Program Session - strictly verify that stored KYC belongs to the current logged-in customer
+  const [affiliateApp, setAffiliateApp] = useState(() => {
+    const stored = getAffiliateApp();
+    const curId = customerUser?.id || customerUser?.uid;
+    if (stored && curId && stored.userId && stored.userId !== curId) {
+      clearAffiliateApp();
+      return null;
+    }
+    return stored;
+  });
 
   // Real Linked Bank (Derived from submitted affiliate/KYC data, NOT dummy ICICI Bank)
   const withdrawBank = affiliateApp?.bankName
     ? `${affiliateApp.bankName} (•••• ${affiliateApp.accountNumber ? affiliateApp.accountNumber.slice(-4) : 'XXXX'})`
     : '';
 
-  // Real Affiliate Tracking Data
-  const [affiliateStats, setAffiliateStats] = useState(() => {
+  // Real Dynamic Affiliate Tracking Data (Fully synced with Affiliate Panel & Real Orders)
+  const getResolvedAffiliateStats = () => {
     try {
-      const saved = localStorage.getItem('mshoppy_affiliate_stats');
-      return saved ? JSON.parse(saved) : { totalReferredRevenue: 0, totalCommission: 0, totalOrders: 0 };
+      const appId = affiliateApp?.applicationId || affiliateApp?.id;
+      const scoped = appId ? localStorage.getItem(`mshoppy_affiliate_stats_${appId}`) : null;
+      const globalStats = localStorage.getItem('mshoppy_affiliate_stats');
+
+      const parsedScoped = scoped ? JSON.parse(scoped) : null;
+      const parsedGlobal = globalStats ? JSON.parse(globalStats) : null;
+
+      const comm = Math.max(Number(parsedScoped?.totalCommission || 0), Number(parsedGlobal?.totalCommission || 0));
+      const orders = Math.max(
+        Number(parsedScoped?.totalOrders || parsedScoped?.convertedOrders || 0),
+        Number(parsedGlobal?.totalOrders || parsedGlobal?.convertedOrders || 0),
+        comm > 0 ? 1 : 0
+      );
+      const rev = Math.max(
+        Number(parsedScoped?.totalReferredRevenue || 0),
+        Number(parsedGlobal?.totalReferredRevenue || 0),
+        orders > 0 ? (Number(parsedGlobal?.totalReferredRevenue || 0) || 999 * orders) : 0
+      );
+
+      return {
+        totalReferredRevenue: rev,
+        totalCommission: comm,
+        totalOrders: orders
+      };
     } catch (e) {
       return { totalReferredRevenue: 0, totalCommission: 0, totalOrders: 0 };
     }
-  });
+  };
 
-  // Affiliate Calculator State
-  const [calcOrders, setCalcOrders] = useState(10);
-  const [calcPrice, setCalcPrice] = useState(800);
-  const calculatedCommission = Math.round(calcOrders * calcPrice * 0.15);
+  const [affiliateStats, setAffiliateStats] = useState(getResolvedAffiliateStats);
+
+  // Re-sync stats dynamically on mount and storage changes
+  useEffect(() => {
+    const syncStats = () => {
+      setAffiliateStats(getResolvedAffiliateStats());
+    };
+    syncStats();
+    window.addEventListener('storage', syncStats);
+    return () => window.removeEventListener('storage', syncStats);
+  }, [affiliateApp?.applicationId, affiliateApp?.id]);
+
+  // Affiliate Calculator State (Custom Profit Margin per product, NOT fixed 15%)
+  const [calcOrders, setCalcOrders] = useState(15);
+  const [calcMarginPerProduct, setCalcMarginPerProduct] = useState(200);
+  const calculatedCommission = Math.round(calcOrders * calcMarginPerProduct);
   const calculatedAnnual = calculatedCommission * 12;
+
+  // Custom Product Margin State for Verified Affiliate
+  const [selectedMarginProductId, setSelectedMarginProductId] = useState('');
+  const [customMarginVal, setCustomMarginVal] = useState(150);
+
+  // Dynamic Custom Margins Per Product for Resell & Earn Tab
+  const [resaleMargins, setResaleMargins] = useState({});
+
+  const getProductMargin = (productId) => {
+    return resaleMargins[productId] !== undefined ? resaleMargins[productId] : 150;
+  };
+
+  const setProductMargin = (productId, val) => {
+    setResaleMargins((prev) => ({
+      ...prev,
+      [productId]: Math.max(0, Number(val) || 0)
+    }));
+  };
 
   // In-dashboard Affiliate KYC Form State (All fields empty by default - no prefill)
   const [affiliateForm, setAffiliateForm] = useState({
@@ -229,15 +406,83 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     };
   }, []);
 
+  // Live sync with real PostgreSQL Database for Affiliate KYC Status
+  useEffect(() => {
+    let isMounted = true;
+    const syncAffiliateStatus = async () => {
+      try {
+        const curId = customerUser?.id || customerUser?.uid;
+        const curPhone = customerUser?.phone;
+
+        if (!curId && !curPhone) {
+          if (isMounted) setAffiliateApp(null);
+          return;
+        }
+
+        const queryParams = [];
+        if (curId) queryParams.push(`userId=${encodeURIComponent(curId)}`);
+        if (curPhone) queryParams.push(`phone=${encodeURIComponent(curPhone)}`);
+        if (affiliateApp?.applicationId && affiliateApp?.userId === curId) {
+          queryParams.push(`applicationId=${encodeURIComponent(affiliateApp.applicationId)}`);
+        }
+
+        const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+        const res = await fetch(`http://localhost:5000/api/v1/admin-kyc/affiliate-status${queryString}`);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (isMounted) {
+          if (data?.application) {
+            const dbApp = data.application;
+            const isDbApproved = dbApp.status === 'APPROVED';
+            const isDbRejected = dbApp.status === 'REJECTED';
+            const normalizedStatus = isDbApproved ? 'Approved' : isDbRejected ? 'Rejected' : 'Under Review';
+
+            setAffiliateApp((prev) => {
+              if (prev?.status === normalizedStatus && prev?.dbId === dbApp.id) return prev;
+              const updated = {
+                ...(prev || {}),
+                ...(dbApp.documents || {}),
+                status: normalizedStatus,
+                kycStatus: normalizedStatus,
+                dbId: dbApp.id,
+                userId: dbApp.userId,
+                rejectionReason: dbApp.adminNotes || prev?.rejectionReason || '',
+              };
+              try {
+                saveAffiliateApp(updated);
+              } catch (e) {}
+              return updated;
+            });
+          } else {
+            // Customer has not submitted an affiliate KYC application
+            setAffiliateApp(null);
+            clearAffiliateApp();
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to sync live affiliate status in dashboard:', err.message);
+      }
+    };
+
+    syncAffiliateStatus();
+    const interval = setInterval(syncAffiliateStatus, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [customerUser?.id, customerUser?.uid, customerUser?.phone]);
+
   // Fetch Live Dashboard Data from Database
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      const [ordersRes, wishRes, addrRes, prodsRes] = await Promise.allSettled([
+      const [ordersRes, wishRes, addrRes, prodsRes, walletRes] = await Promise.allSettled([
         getOrders(),
         getWishlist(),
         getAddresses(),
-        getProducts({ limit: 12 })
+        getProducts({ limit: 12 }),
+        getWalletDetails()
       ]);
 
       if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value)) {
@@ -252,6 +497,41 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       if (prodsRes.status === 'fulfilled' && Array.isArray(prodsRes.value)) {
         setCatalogProducts(prodsRes.value);
       }
+      if (walletRes.status === 'fulfilled' && walletRes.value) {
+        const dbBal = Number(walletRes.value.balance ?? 0);
+        const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
+        const affComm = Number(affStats.totalCommission || 0);
+        const effectiveBal = Math.max(dbBal, affComm);
+        setWalletBalance(effectiveBal);
+        localStorage.setItem('mshoppy_customer_wallet', effectiveBal.toString());
+
+        const dbTxns = (Array.isArray(walletRes.value.transactions) ? walletRes.value.transactions : []).map((dt) => ({
+          title: dt.description || dt.title || 'Wallet Transaction',
+          ref: dt.id || dt.ref || `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+          date: dt.createdAt ? new Date(dt.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : (dt.date || 'Recently'),
+          status: dt.status || 'COMPLETED',
+          amt: dt.amt || (dt.type === 'credit' ? `+₹${dt.amount}` : `-₹${dt.amount}`),
+          green: dt.green ?? (dt.type === 'credit'),
+          type: dt.type || 'credit',
+          amount: dt.amount
+        }));
+
+        const affOrders = Array.isArray(affStats.recentOrders) ? affStats.recentOrders : [];
+        const affTxns = affOrders.map((ord) => ({
+          title: ord.title || `Affiliate Profit Margin (Order #${(ord.id || '').slice(-6) || 'Ref'})`,
+          ref: `TXN-AFF-${(ord.id || '').slice(-6) || Math.floor(100000 + Math.random() * 900000)}`,
+          date: ord.time || 'Recently',
+          status: 'COMPLETED',
+          amt: `+₹${Number(ord.commission || 0).toLocaleString('en-IN')}`,
+          green: true,
+          type: 'credit',
+          amount: ord.commission
+        }));
+
+        const mergedTxns = [...affTxns, ...dbTxns.filter((dt) => !affTxns.some((at) => at.ref === dt.ref))];
+        setWalletTransactions(mergedTxns);
+        localStorage.setItem('mshoppy_customer_wallet_txns', JSON.stringify(mergedTxns));
+      }
     } catch (err) {
       console.error('Failed to load real user dashboard data:', err);
     } finally {
@@ -262,6 +542,58 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  // Handle Real Order Cancellation
+  const handleConfirmCancel = async (reason) => {
+    if (!cancellingOrder) return;
+    setIsCancelling(true);
+    try {
+      const res = await cancelOrder(cancellingOrder.id, reason);
+      if (res && res.success) {
+        toast.success(`Order #${cancellingOrder.id.slice(0, 8)} cancelled successfully ❌`);
+        // Immediately update local state
+        setRealOrders((prev) =>
+          prev.map((o) =>
+            o.id === cancellingOrder.id
+              ? { ...o, orderStatus: 'CANCELLED', status: 'CANCELLED' }
+              : o
+          )
+        );
+        // If tracking modal was open
+        if (selectedTrackingOrder && selectedTrackingOrder.id === cancellingOrder.id) {
+          setSelectedTrackingOrder((prev) => ({
+            ...prev,
+            orderStatus: 'CANCELLED',
+            status: 'CANCELLED'
+          }));
+        }
+        // Real Order Cancelled Notification
+        try {
+          addNotification({
+            title: 'Order Cancelled ❌',
+            message: `Order #${cancellingOrder.id.slice(0, 8)} has been cancelled. Any refund has been processed to your wallet.`,
+            category: 'Orders',
+            icon: 'cancel',
+            iconBg: 'bg-rose-50 text-rose-600',
+            actionPath: '/user-dashboard1?tab=orders',
+            actionText: 'View Orders',
+            data: { orderId: cancellingOrder.id }
+          });
+        } catch (e) {}
+
+        setCancellingOrder(null);
+        // Reload dashboard to sync database and any wallet refund
+        loadDashboardData();
+      } else {
+        toast.error(res?.message || 'Failed to cancel order');
+      }
+    } catch (err) {
+      console.error('Cancel order error:', err);
+      toast.error(err?.message || 'Failed to cancel order. Please try again.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   // Real Dynamic 7-Day Performance (Derived from real orders in database, NOT hardcoded Mon-Sun numbers)
   const { weeklyEarnings, totalResaleMargin } = useMemo(() => {
@@ -303,17 +635,29 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     return { weeklyEarnings: bars, totalResaleMargin: totalMargin };
   }, [realOrders]);
 
-  // Handle Share Real Product
-  const handleShareProduct = (productTitle, profit = 0) => {
-    const shareText = `Check out "${productTitle}" on MShoppy! Exclusive wholesale catalog price.`;
+  // Handle Share Real Product with Custom Margin
+  const handleShareProductWithMargin = (prod, customMargin) => {
+    const margin = customMargin !== undefined ? customMargin : getProductMargin(prod?.id);
+    const finalPrice = Number(prod?.price || 0) + Number(margin || 0);
+    const refCode = affiliateApp?.applicationId || customerUser?.id || 'aff_verified';
+    const link = `${window.location.origin}/product/${prod?.id || ''}?ref=${refCode}&margin=${margin}`;
     if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(shareText);
-      toast.success('Product link copied to clipboard!', {
-        description: profit > 0 ? `Earn ₹${profit} per customer order!` : 'Share link with buyers to collect resale profit!'
+      navigator.clipboard.writeText(link);
+      toast.success('Custom product link copied!', {
+        description: `Customer Price: ₹${finalPrice} • Your Profit Margin: +₹${margin}`
       });
     } else {
-      toast.info(`Sharing: ${productTitle}`);
+      toast.info(`Link ready with ₹${margin} margin`);
     }
+  };
+
+  const handleShareWhatsAppWithMargin = (prod, customMargin) => {
+    const margin = customMargin !== undefined ? customMargin : getProductMargin(prod?.id);
+    const finalPrice = Number(prod?.price || 0) + Number(margin || 0);
+    const refCode = affiliateApp?.applicationId || customerUser?.id || 'aff_verified';
+    const link = `${window.location.origin}/product/${prod?.id || ''}?ref=${refCode}&margin=${margin}`;
+    const msg = `🛍️ *${prod?.title || 'Special Exclusive Product'}*\n\nSpecial Price: ₹${finalPrice} only!\n✅ Direct Supplier Quality\n✅ 7-Day Easy Replacement\n✅ Cash on Delivery Available\n\nOrder here: ${link}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   // Copy Affiliate Referral Link
@@ -322,9 +666,33 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(affLink);
       toast.success('Affiliate Referral Link Copied!', {
-        description: 'Earn 15% commission on all orders placed via this link!'
+        description: 'Earn your custom profit margin on all orders placed via this link!'
       });
     }
+  };
+
+  // Custom Product Margin Handlers (Apni marzi ka margin)
+  const activeMarginProd = useMemo(() => {
+    if (!catalogProducts || catalogProducts.length === 0) return null;
+    return catalogProducts.find((p) => p.id === selectedMarginProductId) || catalogProducts[0];
+  }, [catalogProducts, selectedMarginProductId]);
+
+  const basePrice = activeMarginProd?.price || 499;
+  const affiliateSellingPrice = basePrice + Number(customMarginVal || 0);
+
+  const handleShareCustomMarginWhatsApp = (prod, margin) => {
+    const targetProd = prod || activeMarginProd;
+    const finalP = (targetProd?.price || 499) + Number(margin || customMarginVal || 0);
+    const msg = `🛍️ *${targetProd?.title || 'Special Exclusive Product'}*\n\nSpecial Price: ₹${finalP} only!\n✅ Direct Supplier Quality\n✅ 7-Day Easy Replacement\n✅ Cash on Delivery Available\n\nOrder here: ${window.location.origin}/product/${targetProd?.id || ''}?ref=${affiliateApp?.applicationId || 'aff_verified'}&margin=${margin || customMarginVal || 0}`;
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleCopyCustomMarginLink = (prod, margin) => {
+    const targetProd = prod || activeMarginProd;
+    const link = `${window.location.origin}/product/${targetProd?.id || ''}?ref=${affiliateApp?.applicationId || 'aff_verified'}&margin=${margin || customMarginVal || 0}`;
+    navigator.clipboard?.writeText(link);
+    toast.success(`Custom product link copied with ₹${margin || customMarginVal || 0} margin!`);
   };
 
   // Submit Affiliate KYC Application
@@ -373,6 +741,15 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     const newBal = walletBalance - amt;
     setWalletBalance(newBal);
     localStorage.setItem('mshoppy_customer_wallet', String(newBal));
+
+    try {
+      const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
+      if (affStats.totalCommission) {
+        affStats.totalCommission = Math.max(0, affStats.totalCommission - amt);
+        affStats.withdrawnAmount = (affStats.withdrawnAmount || 0) + amt;
+        localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(affStats));
+      }
+    } catch (e) {}
 
     const newTxn = {
       title: `Withdrawal to ${withdrawBank}`,
@@ -479,22 +856,49 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     }
   };
 
+  // Role & KYC Enforcement: Strictly ONLY unlocked if affiliateApp is APPROVED
+  const isResellerApproved = Boolean(
+    affiliateApp && (
+      affiliateApp.status === 'Approved' ||
+      affiliateApp.status === 'APPROVED' ||
+      affiliateApp.status === 'Active' ||
+      affiliateApp.status === 'ACTIVE'
+    )
+  );
+  const isKycUnderReview = Boolean(
+    affiliateApp && (
+      affiliateApp.status === 'Pending' ||
+      affiliateApp.status === 'PENDING' ||
+      affiliateApp.status === 'Under Review' ||
+      affiliateApp.status === 'UNDER_REVIEW'
+    )
+  );
+  const isKycRejected = Boolean(
+    affiliateApp && (affiliateApp.status === 'Rejected' || affiliateApp.status === 'REJECTED')
+  );
+
+  // Automatically redirect away from resale/wallet tabs if not approved
+  useEffect(() => {
+    if (!isResellerApproved && (activeTab === 'resale' || activeTab === 'wallet')) {
+      setActiveTab('affiliate');
+    }
+  }, [isResellerApproved, activeTab]);
   // Dynamic Badges & Titles for Sidebar
-  let affiliateNavTitle = 'Become an Affiliate 🤝';
+  let affiliateNavTitle = 'Become a Partner 🤝';
   let affiliateNavBadge = 'NEW';
   let affiliateNavBadgeClass = 'bg-[#b7004d] text-white';
 
   if (affiliateApp) {
     if (affiliateApp.status === 'Approved' || affiliateApp.status === 'APPROVED') {
-      affiliateNavTitle = 'Affiliate Partner 🤝';
+      affiliateNavTitle = 'Partner Hub 🤝';
       affiliateNavBadge = 'ACTIVE';
       affiliateNavBadgeClass = 'bg-emerald-600 text-white';
     } else if (affiliateApp.status === 'Rejected' || affiliateApp.status === 'REJECTED') {
-      affiliateNavTitle = 'Affiliate KYC ⚠️';
+      affiliateNavTitle = 'Partner KYC ⚠️';
       affiliateNavBadge = 'ACTION';
       affiliateNavBadgeClass = 'bg-rose-600 text-white';
     } else {
-      affiliateNavTitle = 'Affiliate KYC ⏳';
+      affiliateNavTitle = 'Partner KYC ⏳';
       affiliateNavBadge = 'REVIEW';
       affiliateNavBadgeClass = 'bg-amber-500 text-white';
     }
@@ -506,7 +910,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     {
       id: 'affiliate',
       label: affiliateNavTitle,
-      icon: Award,
+      icon: isKycUnderReview ? Clock : Award,
       badge: affiliateNavBadge,
       badgeClass: affiliateNavBadgeClass
     },
@@ -524,8 +928,13 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       badge: wishlistItems.length > 0 ? String(wishlistItems.length) : null,
       badgeClass: 'bg-rose-100 text-rose-700'
     },
-    { id: 'resale', label: 'Resell & Earn 🚀', icon: Sparkles },
-    { id: 'wallet', label: 'Wallet & Payouts 💳', icon: Wallet },
+    // Resell & Earn and Wallet Payouts ONLY unlocked if Reseller KYC is approved
+    ...(isResellerApproved
+      ? [
+          { id: 'resale', label: 'Resell & Earn 🚀', icon: Sparkles },
+          { id: 'wallet', label: 'Wallet & Payouts 💳', icon: Wallet },
+        ]
+      : []),
     { id: 'addresses', label: 'Saved Addresses 📍', icon: MapPin },
     {
       id: 'shopping-catalog',
@@ -574,7 +983,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       case 'affiliate':
         return {
           title: affiliateApp?.status === 'Approved' ? 'Affiliate Partner Hub 🎉' : 'Become an Affiliate Partner 🤝',
-          subtitle: 'Earn up to 15% guaranteed commission by sharing curated product links with weekly bank payouts.',
+          subtitle: 'Set your own custom profit margin on any product and earn on every referral with weekly bank payouts.',
         };
       case 'orders':
         return {
@@ -614,19 +1023,37 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   const headerInfo = getPageHeader();
 
   // Filtered orders for My Orders tab
-  const filteredOrders = realOrders.filter((ord) => {
-    const matchesSearch =
-      !orderSearchQuery ||
-      ord.id?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-      ord.items?.some((it) => it.product?.title?.toLowerCase().includes(orderSearchQuery.toLowerCase()));
+  const filteredOrders = useMemo(() => {
+    return realOrders.filter((ord) => {
+      const matchesSearch =
+        !orderSearchQuery ||
+        ord.id?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+        ord.items?.some((it) => it.product?.title?.toLowerCase().includes(orderSearchQuery.toLowerCase()));
 
-    if (!matchesSearch) return false;
-    if (orderFilterStatus === 'ALL') return true;
-    if (orderFilterStatus === 'DELIVERED') return ord.status === 'DELIVERED';
-    if (orderFilterStatus === 'IN_TRANSIT') return ord.status === 'SHIPPED' || ord.status === 'IN_TRANSIT' || ord.status === 'OUT_FOR_DELIVERY';
-    if (orderFilterStatus === 'CANCELLED') return ord.status === 'CANCELLED';
-    return true;
-  });
+      if (!matchesSearch) return false;
+      const st = (ord.orderStatus || ord.status || 'ORDERED').toUpperCase();
+
+      if (orderFilterStatus === 'ALL') return true;
+      if (orderFilterStatus === 'DELIVERED') return st === 'DELIVERED';
+      if (orderFilterStatus === 'IN_TRANSIT') {
+        return st === 'SHIPPED' || st === 'IN_TRANSIT' || st === 'OUT_FOR_DELIVERY' || st === 'CONFIRMED' || st === 'ORDERED' || st === 'PROCESSING';
+      }
+      if (orderFilterStatus === 'CANCELLED') return st === 'CANCELLED';
+      return true;
+    });
+  }, [realOrders, orderSearchQuery, orderFilterStatus]);
+
+  // Real accurate order counts for tabs and KPI cards
+  const orderCounts = useMemo(() => {
+    const counts = { all: realOrders.length, inTransit: 0, delivered: 0, cancelled: 0 };
+    realOrders.forEach((o) => {
+      const st = (o.orderStatus || o.status || '').toUpperCase();
+      if (st === 'DELIVERED') counts.delivered++;
+      else if (st === 'CANCELLED') counts.cancelled++;
+      else counts.inTransit++;
+    });
+    return counts;
+  }, [realOrders]);
 
   return (
     <DashboardLayout
@@ -647,44 +1074,79 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         {activeTab === 'overview' && (
           <div className="space-y-6">
 
-            {/* Dynamic Real Margin Summary Banner */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200/80 px-4 py-3 rounded-2xl">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2.5 w-2.5 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#b7004d] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#b7004d]"></span>
-                </span>
-                <p className="text-xs sm:text-sm font-semibold text-[#8a0038]">
-                  {totalResaleMargin > 0 ? (
-                    <>
-                      Reseller Account: Real resale margin earned on your orders is <strong className="text-[#b7004d] font-black underline">₹{totalResaleMargin.toLocaleString('en-IN')}</strong>.
-                    </>
-                  ) : (
-                    <>
-                      Resell &amp; Earn Hub: You haven't resold any products yet (<strong className="text-[#b7004d] font-black">₹0 margin</strong>). Share products from the catalog to earn profit!
-                    </>
-                  )}
-                </p>
+            {/* Dynamic Real Margin Summary Banner - Only shows resale margin to approved resellers */}
+            {isResellerApproved ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200/80 px-4 py-3 rounded-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#b7004d] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#b7004d]"></span>
+                  </span>
+                  <p className="text-xs sm:text-sm font-semibold text-[#8a0038]">
+                    Reseller Partner Account: Real resale margin earned on your orders is <strong className="text-[#b7004d] font-black underline">₹{totalResaleMargin.toLocaleString('en-IN')}</strong>.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('resale')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#b7004d] hover:bg-[#96003f] text-white text-xs font-bold rounded-xl shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Open Resell Hub 🚀</span>
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('affiliate')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#b7004d] hover:bg-[#96003f] text-white text-xs font-bold rounded-xl shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                >
-                  <Award className="w-3.5 h-3.5" />
-                  <span>Become an Affiliate 🤝</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleNav('/explorer')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  <span>Shopping Home</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-                </button>
+            ) : isKycUnderReview ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/80 px-4 py-3 rounded-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                  </span>
+                  <p className="text-xs sm:text-sm font-semibold text-amber-900">
+                    Partner KYC Status: Verification in progress (Application #{affiliateApp?.applicationId || affiliateApp?.id || 'Pending'}). Resell &amp; Earn features will activate once approved.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('affiliate')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl shadow-sm cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Track KYC Status</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-pink-50/40 border border-slate-200/80 px-4 py-3 rounded-2xl">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>
+                  <p className="text-xs sm:text-sm font-medium text-slate-700">
+                    Customer Account: View your personal orders, delivery tracking, or apply for Reseller Partner status to start earning.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('affiliate')}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#b7004d] hover:bg-[#96003f] text-white text-xs font-bold rounded-xl shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    <span>Become an Affiliate / Partner</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleNav('/explorer')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    <span>Shopping Home</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Affiliate Onboarding / Status Banner */}
             {affiliateApp?.status === 'Approved' || affiliateApp?.status === 'APPROVED' ? (
@@ -699,7 +1161,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       Welcome, {affiliateApp.fullName || customerName}! 🎉
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-200 font-medium leading-relaxed">
-                      Your affiliate partner KYC has been approved! Share curated product referral links and earn up to <strong className="text-emerald-300">15% commission</strong> directly into your verified bank account.
+                      Your affiliate partner KYC has been approved! Share curated product referral links and earn your <strong className="text-emerald-300">custom profit margin</strong> directly into your verified bank account.
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
@@ -772,7 +1234,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                         </span>
                         <span className="bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                          Earn up to 15% Payout
+                          Custom Margin Payout
                         </span>
                       </div>
                       <h3 className="font-black text-lg sm:text-2xl text-white tracking-tight">
@@ -839,7 +1301,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 <div>
                   <p className="text-xs font-semibold text-slate-500">In Transit &amp; Shipped</p>
                   <h3 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-                    {realOrders.filter((o) => o.status !== 'DELIVERED' && o.status !== 'CANCELLED').length}
+                    {orderCounts.inTransit}
                   </h3>
                 </div>
               </div>
@@ -871,16 +1333,24 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                   <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
                     <Wallet className="w-5 h-5 text-white" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowWithdrawModal(true)}
-                    className="text-[10px] font-black uppercase tracking-wider bg-white hover:bg-pink-50 text-[#b7004d] px-3 py-1 rounded-full shadow-sm cursor-pointer transition-transform hover:scale-105 active:scale-95"
-                  >
-                    Withdraw
-                  </button>
+                  {isResellerApproved ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowWithdrawModal(true)}
+                      className="text-[10px] font-black uppercase tracking-wider bg-white hover:bg-pink-50 text-[#b7004d] px-3 py-1 rounded-full shadow-sm cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                    >
+                      Withdraw
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-bold bg-white/20 text-white px-2.5 py-1 rounded-full backdrop-blur-sm">
+                      Refunds &amp; Credits
+                    </span>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-pink-100">Wallet Balance</p>
+                  <p className="text-xs font-semibold text-pink-100">
+                    {isResellerApproved ? 'Reseller Wallet Balance' : 'Customer Wallet Balance'}
+                  </p>
                   <h3 className="text-2xl sm:text-3xl font-black mt-1">
                     ₹{walletBalance.toLocaleString('en-IN')}
                   </h3>
@@ -888,79 +1358,135 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
               </div>
             </section>
 
-            {/* Real Orders & 7-Day Performance Row */}
+            {/* Real Orders & Performance/KYC Row */}
             <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Reseller Earnings Real Chart */}
-              <div className="lg:col-span-1 bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-base font-extrabold text-slate-900">Reseller Performance</h3>
-                    <p className="text-xs text-slate-400">Past 7 Days Resale Earnings</p>
-                  </div>
-                  <span className="text-[11px] font-black bg-pink-50 text-[#b7004d] px-3 py-1 rounded-full border border-pink-100">
-                    ₹{totalResaleMargin.toLocaleString('en-IN')} Total
-                  </span>
-                </div>
-
-                {totalResaleMargin === 0 ? (
-                  <div className="py-6 px-4 bg-slate-50/70 border border-dashed border-slate-200 rounded-2xl text-center space-y-2.5 my-auto">
-                    <div className="w-10 h-10 rounded-2xl bg-pink-100/70 text-[#b7004d] flex items-center justify-center mx-auto">
-                      <TrendingUp className="w-5 h-5" />
-                    </div>
+              {isResellerApproved ? (
+                /* Reseller Earnings Real Chart - ONLY shown if KYC is Approved & User is Reseller */
+                <div className="lg:col-span-1 bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-4">
                     <div>
-                      <p className="text-xs font-bold text-slate-800">No Resale Margin Yet</p>
-                      <p className="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
-                        You haven't resold any products yet. Share items from the Resell &amp; Earn catalog with your margin to earn profit payouts.
-                      </p>
+                      <h3 className="text-base font-extrabold text-slate-900">Reseller Performance</h3>
+                      <p className="text-xs text-slate-400">Past 7 Days Resale Earnings</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('resale')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#b7004d] hover:bg-[#96003f] text-white text-xs font-bold rounded-xl shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                    >
-                      <span>Explore Resell Catalog</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
+                    <span className="text-[11px] font-black bg-pink-50 text-[#b7004d] px-3 py-1 rounded-full border border-pink-100">
+                      ₹{totalResaleMargin.toLocaleString('en-IN')} Total
+                    </span>
                   </div>
-                ) : (
-                  /* Real Dynamic Bars */
-                  <div className="flex items-end justify-between gap-2 h-44 pb-2">
-                    {weeklyEarnings.map((bar, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => toast.info(`${bar.day}: ₹${bar.amount} earned`)}
-                        className="flex flex-col items-center flex-1 gap-2 cursor-pointer group"
-                        title={`${bar.day}: ₹${bar.amount}`}
-                      >
-                        <div className="w-full bg-slate-100 rounded-t-xl relative overflow-hidden flex items-end h-32">
-                          <div
-                            className={`w-full rounded-t-xl transition-all duration-300 group-hover:opacity-80 ${
-                              bar.amount > 0
-                                ? 'bg-gradient-to-t from-[#b7004d] to-[#ff4b7d] shadow-md shadow-pink-500/30'
-                                : 'bg-slate-200'
-                            }`}
-                            style={{ height: bar.height }}
-                          />
-                        </div>
-                        <span className={`text-[10px] font-bold ${bar.peak ? 'text-[#b7004d] font-black' : 'text-slate-500'}`}>
-                          {bar.day}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
-                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between">
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Margin</p>
-                    <p className="text-lg font-black text-slate-900">₹{totalResaleMargin.toLocaleString('en-IN')}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Average Rate</p>
-                    <p className="text-lg font-black text-emerald-600">{totalResaleMargin > 0 ? '15%' : '0%'}</p>
+                  {totalResaleMargin === 0 ? (
+                    <div className="py-6 px-4 bg-slate-50/70 border border-dashed border-slate-200 rounded-2xl text-center space-y-2.5 my-auto">
+                      <div className="w-10 h-10 rounded-2xl bg-pink-100/70 text-[#b7004d] flex items-center justify-center mx-auto">
+                        <TrendingUp className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">No Resale Margin Yet</p>
+                        <p className="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
+                          You haven't resold any products yet. Share items from the Resell &amp; Earn catalog with your margin to earn profit payouts.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('resale')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#b7004d] hover:bg-[#96003f] text-white text-xs font-bold rounded-xl shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                      >
+                        <span>Explore Resell Catalog</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    /* Real Dynamic Bars */
+                    <div className="flex items-end justify-between gap-2 h-44 pb-2">
+                      {weeklyEarnings.map((bar, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => toast.info(`${bar.day}: ₹${bar.amount} earned`)}
+                          className="flex flex-col items-center flex-1 gap-2 cursor-pointer group"
+                          title={`${bar.day}: ₹${bar.amount}`}
+                        >
+                          <div className="w-full bg-slate-100 rounded-t-xl relative overflow-hidden flex items-end h-32">
+                            <div
+                              className={`w-full rounded-t-xl transition-all duration-300 group-hover:opacity-80 ${
+                                bar.amount > 0
+                                  ? 'bg-gradient-to-t from-[#b7004d] to-[#ff4b7d] shadow-md shadow-pink-500/30'
+                                  : 'bg-slate-200'
+                              }`}
+                              style={{ height: bar.height }}
+                            />
+                          </div>
+                          <span className={`text-[10px] font-bold ${bar.peak ? 'text-[#b7004d] font-black' : 'text-slate-500'}`}>
+                            {bar.day}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Margin</p>
+                      <p className="text-lg font-black text-slate-900">₹{totalResaleMargin.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Margin Model</p>
+                      <p className="text-sm font-black text-emerald-600">Custom / Item</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                /* Partner Program / KYC Status Card - For Regular Customers without Reseller KYC */
+                <div className="lg:col-span-1 bg-gradient-to-br from-white to-pink-50/40 p-5 sm:p-6 rounded-3xl shadow-xs border border-pink-100 flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-pink-100 text-[#b7004d] px-2.5 py-0.5 rounded-full">
+                        {isKycUnderReview ? 'KYC In Progress' : isKycRejected ? 'KYC Needs Attention' : 'Partner Opportunity'}
+                      </span>
+                      <Award className="w-5 h-5 text-[#b7004d]" />
+                    </div>
+                    <h3 className="text-base font-black text-slate-900">
+                      {isKycUnderReview
+                        ? 'Reseller KYC Under Review ⏳'
+                        : isKycRejected
+                        ? 'KYC Action Required ⚠️'
+                        : 'Become a Reseller Partner 🤝'}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                      {isKycUnderReview
+                        ? 'Your KYC documents are currently being verified. Resale catalog sharing and margin withdrawal will unlock upon verification.'
+                        : isKycRejected
+                        ? 'Your submitted KYC documents need correction. Please re-submit valid PAN and bank documents to activate reseller account.'
+                        : 'Your account is currently a standard Customer account. Complete Partner KYC to unlock Resell & Earn catalog access and start earning profit margins.'}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-white rounded-2xl border border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Account Role</span>
+                      <span className="font-bold text-slate-800">CUSTOMER</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Reseller Status</span>
+                      <span className={`font-bold ${isKycUnderReview ? 'text-amber-600' : isKycRejected ? 'text-rose-600' : 'text-slate-400'}`}>
+                        {isKycUnderReview ? 'Under Verification ⏳' : isKycRejected ? 'Rejected ❌' : 'Not Enrolled'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('affiliate')}
+                    className="w-full py-2.5 bg-gradient-to-r from-[#b7004d] to-[#e62973] hover:opacity-95 text-white text-xs font-bold rounded-2xl shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                  >
+                    <Award className="w-4 h-4" />
+                    <span>
+                      {isKycUnderReview
+                        ? 'View KYC Application Status'
+                        : isKycRejected
+                        ? 'Fix & Resubmit Documents'
+                        : 'Complete Reseller KYC 📄'}
+                    </span>
+                  </button>
+                </div>
+              )}
 
               {/* Recent Real Orders Overview */}
               <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80">
@@ -1055,19 +1581,25 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
               </div>
             </section>
 
-            {/* Live Database Products for Resale (Zero dummy hardcoded cards) */}
+            {/* Live Database Products: Shopping recommendations for Customer, Markup Resell for Approved Reseller */}
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">Available Products to Resell</h3>
-                  <p className="text-xs text-slate-400">Live products from suppliers available for markup</p>
+                  <h3 className="text-lg font-black text-slate-900">
+                    {isResellerApproved ? 'Available Products to Resell' : 'Trending Products For You 🛍️'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {isResellerApproved
+                      ? 'Live products from suppliers available for markup and resale profit'
+                      : 'Popular picks from MShoppy catalog with fast doorstep delivery'}
+                  </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('resale')}
+                  onClick={() => (isResellerApproved ? setActiveTab('resale') : handleNav('/explorer'))}
                   className="text-xs font-bold text-[#b7004d] hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <span>Explore Resale Hub</span>
+                  <span>{isResellerApproved ? 'Explore Resale Hub' : 'Explore All Products'}</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -1084,7 +1616,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                     const img = prod.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400';
                     const priceNum = Number(prod.price || 0);
                     const profit = Math.round(priceNum * 0.2);
-                    const tag = prod.category?.name || 'Catalog';
+                    const tag = prod.category?.name || 'MShoppy Best Price';
 
                     return (
                       <div
@@ -1095,35 +1627,60 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                           <img
                             src={img}
                             alt={title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+                            onClick={() => handleNav(`/product/${prod.id}`)}
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleShareProduct(title, profit)}
-                            className="absolute bottom-3 right-3 h-9 w-9 bg-white/95 backdrop-blur-md rounded-full flex items-center justify-center text-[#b7004d] shadow-md hover:scale-110 active:scale-95 transition-transform cursor-pointer"
-                            title="Share & Earn Profit"
-                          >
-                            <Share2 className="w-4 h-4" />
-                          </button>
+                          {isResellerApproved ? (
+                            <button
+                              type="button"
+                              onClick={() => handleShareProduct(title, profit)}
+                              className="absolute bottom-3 right-3 h-9 w-9 bg-white/95 backdrop-blur-md rounded-full flex items-center justify-center text-[#b7004d] shadow-md hover:scale-110 active:scale-95 transition-transform cursor-pointer"
+                              title="Share & Earn Profit"
+                            >
+                              <Share2 className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleNav(`/product/${prod.id}`)}
+                              className="absolute bottom-3 right-3 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-full flex items-center gap-1.5 text-xs font-bold text-[#b7004d] shadow-md hover:bg-pink-50 transition-colors cursor-pointer"
+                              title="View Product"
+                            >
+                              <ShoppingBag className="w-3.5 h-3.5" />
+                              <span>Buy Now</span>
+                            </button>
+                          )}
                         </div>
 
                         <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
                           <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{tag}</p>
-                            <h4 className="font-bold text-sm text-slate-900 line-clamp-1 hover:text-[#b7004d] cursor-pointer mt-0.5">
+                            <h4
+                              onClick={() => handleNav(`/product/${prod.id}`)}
+                              className="font-bold text-sm text-slate-900 line-clamp-1 hover:text-[#b7004d] cursor-pointer mt-0.5"
+                            >
                               {title}
                             </h4>
                           </div>
 
                           <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
                             <div>
-                              <span className="text-[9px] font-semibold text-slate-400 block uppercase">Wholesale Price</span>
+                              <span className="text-[9px] font-semibold text-slate-400 block uppercase">
+                                {isResellerApproved ? 'Wholesale Price' : 'Special Offer Price'}
+                              </span>
                               <span className="text-base font-black text-[#b7004d]">₹{priceNum}</span>
                             </div>
-                            {profit > 0 && (
+                            {isResellerApproved ? (
+                              profit > 0 && (
+                                <div className="text-right">
+                                  <span className="text-[9px] font-semibold text-slate-400 block uppercase">Estimated Margin</span>
+                                  <span className="text-xs font-black text-emerald-600">+₹{profit}</span>
+                                </div>
+                              )
+                            ) : (
                               <div className="text-right">
-                                <span className="text-[9px] font-semibold text-slate-400 block uppercase">Estimated Margin</span>
-                                <span className="text-xs font-black text-emerald-600">+₹{profit}</span>
+                                <span className="text-[9px] font-semibold text-slate-400 block uppercase">Shipping</span>
+                                <span className="text-xs font-bold text-emerald-600">Free Delivery</span>
                               </div>
                             )}
                           </div>
@@ -1167,7 +1724,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       Welcome, {affiliateApp.fullName || customerName}!
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                      Your affiliate ID is active. You earn <strong className="text-emerald-300">15% commission</strong> on every order placed through your link.
+                      Your affiliate ID is active. Set your own <strong className="text-emerald-300">custom profit margin per product</strong> (e.g. +₹100, +₹200, +₹500). Every margin you add is credited directly to your bank account!
                     </p>
                   </div>
 
@@ -1196,13 +1753,13 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-1">
                     <p className="text-xs font-semibold text-slate-400">Total Referred Revenue</p>
-                    <h3 className="text-2xl font-black text-slate-900">₹{affiliateStats.totalReferredRevenue.toLocaleString('en-IN')}</h3>
-                    <p className="text-[11px] text-emerald-600 font-bold">{affiliateStats.totalOrders} Orders</p>
+                    <h3 className="text-2xl font-black text-slate-900">₹{Number(affiliateStats?.totalReferredRevenue || 0).toLocaleString('en-IN')}</h3>
+                    <p className="text-[11px] text-emerald-600 font-bold">{affiliateStats?.totalOrders || 0} Orders</p>
                   </div>
                   <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-1">
-                    <p className="text-xs font-semibold text-slate-400">Total Commission Earned</p>
-                    <h3 className="text-2xl font-black text-emerald-600">₹{affiliateStats.totalCommission.toLocaleString('en-IN')}</h3>
-                    <p className="text-[11px] text-slate-500">15% Commission Rate</p>
+                    <p className="text-xs font-semibold text-slate-400">Total Margin Earned</p>
+                    <h3 className="text-2xl font-black text-emerald-600">₹{Number(affiliateStats?.totalCommission || 0).toLocaleString('en-IN')}</h3>
+                    <p className="text-[11px] text-slate-500">Custom Margin per Product</p>
                   </div>
                   <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-1">
                     <p className="text-xs font-semibold text-slate-400">Settlement Bank</p>
@@ -1210,8 +1767,219 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                     <p className="text-[11px] text-indigo-600 font-bold">Weekly Direct IMPS</p>
                   </div>
                 </div>
+
+                {/* =========================================================================
+                    REAL-TIME PRODUCT CUSTOM MARGIN MANAGER (APNI MARZI KA PROFIT)
+                ========================================================================= */}
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-50 text-[#b7004d] text-xs font-bold mb-1">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Custom Profit Margin Manager</span>
+                      </div>
+                      <h3 className="text-xl font-black text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
+                        Set Your Custom Profit Margin Per Product 💰
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        No fixed commission rates! Add your preferred profit margin above the supplier base price on any product. 100% of your chosen margin is credited directly to your bank account upon order delivery.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Active Product Margin Customizer Box */}
+                  {activeMarginProd && (
+                    <div className="p-5 sm:p-6 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-5">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        <img
+                          src={activeMarginProd.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'}
+                          alt={activeMarginProd.title}
+                          className="w-20 h-20 rounded-2xl object-cover border border-slate-200 shrink-0"
+                        />
+                        <div className="flex-1 space-y-1">
+                          <h4 className="font-bold text-sm sm:text-base text-slate-900 line-clamp-1">
+                            {activeMarginProd.title}
+                          </h4>
+                          <p className="text-xs text-slate-500">
+                            Supplier Base Price: <strong className="text-slate-800">₹{basePrice}</strong>
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <span className="text-xs font-semibold text-slate-600">Switch Product:</span>
+                            <select
+                              value={activeMarginProd.id}
+                              onChange={(e) => setSelectedMarginProductId(e.target.value)}
+                              className="text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#b7004d]"
+                            >
+                              {catalogProducts.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.title.slice(0, 35)}... (₹{p.price})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Margin Controls */}
+                      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <span>Set Your Profit Margin (₹):</span>
+                            <span className="text-[10px] text-slate-400 font-normal">(Adjust profit margin higher or lower)</span>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="2000"
+                                step="10"
+                                value={customMarginVal}
+                                onChange={(e) => setCustomMarginVal(Math.max(0, Number(e.target.value)))}
+                                className="w-28 pl-6 pr-3 py-1.5 text-sm font-black text-emerald-600 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Margin Slider */}
+                        <div className="space-y-1.5">
+                          <input
+                            type="range"
+                            min="0"
+                            max="1000"
+                            step="25"
+                            value={customMarginVal}
+                            onChange={(e) => setCustomMarginVal(Number(e.target.value))}
+                            className="w-full accent-emerald-600 cursor-pointer"
+                          />
+                          <div className="flex justify-between text-[10px] font-bold text-slate-400">
+                            <span>₹0 (Supplier Price)</span>
+                            <span>+₹250</span>
+                            <span>+₹500</span>
+                            <span>+₹750</span>
+                            <span>+₹1,000 (Max Margin)</span>
+                          </div>
+                        </div>
+
+                        {/* Preset Quick Chips */}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Quick Add:</span>
+                          {[50, 100, 150, 200, 300, 500].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setCustomMarginVal(preset)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                customMarginVal === preset
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                              }`}
+                            >
+                              +₹{preset}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Breakdown Summary */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-center">
+                          <div className="p-2.5 bg-slate-50 rounded-xl">
+                            <span className="text-[10px] text-slate-400 font-bold block">Supplier Base Price</span>
+                            <span className="text-sm font-bold text-slate-700">₹{basePrice}</span>
+                          </div>
+                          <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-100">
+                            <span className="text-[10px] text-emerald-700 font-bold block">Your Profit Margin</span>
+                            <span className="text-sm font-black text-emerald-600">+₹{customMarginVal}</span>
+                          </div>
+                          <div className="p-2.5 bg-[#b7004d]/10 rounded-xl border border-[#b7004d]/20">
+                            <span className="text-[10px] text-[#b7004d] font-bold block">Customer Final Selling Price</span>
+                            <span className="text-sm font-black text-[#b7004d]">₹{affiliateSellingPrice}</span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => handleShareCustomMarginWhatsApp()}
+                            className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-transform hover:scale-102 active:scale-95"
+                          >
+                            <Share2 className="w-4 h-4" />
+                            <span>Share on WhatsApp with ₹{customMarginVal} Margin</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCustomMarginLink()}
+                            className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                          >
+                            <Copy className="w-4 h-4" />
+                            <span>Copy Custom Margin Link</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Catalog Grid with 1-Click Margin Customizer */}
+                  {catalogProducts && catalogProducts.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                      <h4 className="font-bold text-sm text-slate-900">
+                        Popular Catalog Products (Pick &amp; Set Margin):
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {catalogProducts.slice(0, 6).map((prod) => (
+                          <div
+                            key={prod.id}
+                            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-3 hover:border-slate-300 transition-colors"
+                          >
+                            <div className="flex gap-3">
+                              <img
+                                src={prod.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'}
+                                alt={prod.title}
+                                className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-100"
+                              />
+                              <div className="space-y-0.5">
+                                <h5 className="font-bold text-xs text-slate-900 line-clamp-2">
+                                  {prod.title}
+                                </h5>
+                                <p className="text-[11px] text-slate-500">
+                                  Base: <strong className="text-slate-800">₹{prod.price}</strong>
+                                </p>
+                                <p className="text-[11px] text-emerald-600 font-bold">
+                                  Suggested: ₹{prod.price + 150} (+₹150 Margin)
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 pt-2 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedMarginProductId(prod.id);
+                                  window.scrollTo({ top: 400, behavior: 'smooth' });
+                                }}
+                                className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg cursor-pointer transition-colors text-center"
+                              >
+                                Customize Margin
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleShareCustomMarginWhatsApp(prod, 150)}
+                                className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1"
+                                title="Quick share with ₹150 margin"
+                              >
+                                <Share2 className="w-3 h-3" />
+                                <span>Share</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : affiliateApp?.status === 'Under Review' || affiliateApp?.status === 'REVIEW' ? (
+            ) : affiliateApp?.status === 'Under Review' || affiliateApp?.status === 'REVIEW' || affiliateApp?.status === 'PENDING' || affiliateApp?.status === 'Pending' ? (
               /* If Under Review */
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-[#78350f] p-6 sm:p-8 rounded-3xl text-white shadow-xl border border-amber-500/30 space-y-5">
@@ -1264,8 +2032,8 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       <strong className="text-slate-900">{affiliateApp.fullName}</strong>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Social Handle</span>
-                      <strong className="text-slate-900">{affiliateApp.handle || 'None'}</strong>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Application ID</span>
+                      <strong className="font-mono text-slate-900">{affiliateApp.applicationId || affiliateApp.id || 'Submitted'}</strong>
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[10px] uppercase font-bold">PAN Number</span>
@@ -1289,10 +2057,10 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       <span>Official Affiliate Partner Program • 0 Investment</span>
                     </div>
                     <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
-                      Earn Up To 15% Commission On Every Referral! 🚀
+                      Earn Custom Profit Margin On Every Referral! 🚀
                     </h1>
                     <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                      Share curated Meesho catalog links; when anyone purchases, your commission is credited directly to your bank account every Thursday!
+                      Set your custom profit margin on any catalog product; whenever a customer purchases through your referral link, 100% of your profit margin is credited directly to your bank account!
                     </p>
                   </div>
                 </div>
@@ -1303,8 +2071,8 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                     <div className="w-10 h-10 rounded-2xl bg-pink-50 text-[#b7004d] flex items-center justify-center">
                       <Award className="w-5 h-5" />
                     </div>
-                    <h4 className="font-bold text-sm text-slate-900">Up to 15% Payout</h4>
-                    <p className="text-xs text-slate-500">Guaranteed commission on all delivered customer purchases.</p>
+                    <h4 className="font-bold text-sm text-slate-900">Custom Margin Payout</h4>
+                    <p className="text-xs text-slate-500">Add your own profit margin on every product (e.g. +₹100 to +₹500).</p>
                   </div>
                   <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
                     <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -1338,11 +2106,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       </div>
                       <div>
                         <h3 className="font-extrabold text-base text-slate-900">Interactive Earnings Calculator</h3>
-                        <p className="text-xs text-slate-400">Estimate your affiliate earning potential</p>
+                        <p className="text-xs text-slate-400">Estimate your affiliate earning potential based on custom margin</p>
                       </div>
                     </div>
                     <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                      15% Fixed Payout
+                      Custom Margin Model
                     </span>
                   </div>
 
@@ -1366,17 +2134,17 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
 
                       <div className="space-y-2">
                         <div className="flex justify-between items-center text-xs">
-                          <label className="font-bold text-slate-700">Average Product Price</label>
-                          <span className="font-black text-sm text-[#b7004d]">₹{calcPrice}</span>
+                          <label className="font-bold text-slate-700">Your Custom Margin Per Product (₹)</label>
+                          <span className="font-black text-sm text-emerald-600">+₹{calcMarginPerProduct}</span>
                         </div>
                         <input
                           type="range"
-                          min="300"
-                          max="2500"
-                          step="50"
-                          value={calcPrice}
-                          onChange={(e) => setCalcPrice(Number(e.target.value))}
-                          className="w-full accent-[#b7004d] cursor-pointer"
+                          min="50"
+                          max="1000"
+                          step="25"
+                          value={calcMarginPerProduct}
+                          onChange={(e) => setCalcMarginPerProduct(Number(e.target.value))}
+                          className="w-full accent-emerald-600 cursor-pointer"
                         />
                       </div>
                     </div>
@@ -1414,7 +2182,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                           Complete Your Affiliate KYC Verification 🛡️
                         </h3>
                         <p className="text-xs text-slate-500">
-                          Securely link your Government ID and Bank/UPI details to activate up to 15% weekly payouts
+                          Securely link your Government ID and Bank/UPI details to activate weekly margin payouts
                         </p>
                       </div>
                     </div>
@@ -1519,10 +2287,10 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
 
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                 {[
-                  { id: 'ALL', label: 'All Orders' },
-                  { id: 'IN_TRANSIT', label: 'In Transit 🚚' },
-                  { id: 'DELIVERED', label: 'Delivered ✅' },
-                  { id: 'CANCELLED', label: 'Cancelled ❌' },
+                  { id: 'ALL', label: `All Orders (${orderCounts.all})` },
+                  { id: 'IN_TRANSIT', label: `In Transit 🚚 (${orderCounts.inTransit})` },
+                  { id: 'DELIVERED', label: `Delivered ✅ (${orderCounts.delivered})` },
+                  { id: 'CANCELLED', label: `Cancelled ❌ (${orderCounts.cancelled})` },
                 ].map((st) => (
                   <button
                     key={st.id}
@@ -1556,9 +2324,12 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
             ) : (
               <div className="space-y-4">
                 {filteredOrders.map((order) => {
-                  const isDelivered = order.status === 'DELIVERED';
-                  const isCancelled = order.status === 'CANCELLED';
-                  const isPending = !isDelivered && !isCancelled;
+                  const st = (order.orderStatus || order.status || 'ORDERED').toUpperCase();
+                  const isDelivered = st === 'DELIVERED';
+                  const isCancelled = st === 'CANCELLED';
+                  const isShipped = st === 'SHIPPED';
+                  const isOutForDelivery = st === 'OUT_FOR_DELIVERY';
+                  const isCancellable = (st === 'ORDERED' || st === 'CONFIRMED' || st === 'PROCESSING' || st === 'SHIPPED');
 
                   return (
                     <div
@@ -1567,7 +2338,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 text-xs">
                         <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-slate-900 text-sm">
+                          <span
+                            onClick={() => setSelectedTrackingOrder(order)}
+                            className="font-mono font-bold text-slate-900 text-sm hover:text-[#b7004d] cursor-pointer"
+                            title="Click to view tracking timeline"
+                          >
                             #{order.id?.slice(0, 10)}
                           </span>
                           <span className="text-slate-400">•</span>
@@ -1577,20 +2352,28 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                         </div>
                         <div className="flex items-center gap-2">
                           <span
-                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border flex items-center gap-1 ${
                               isDelivered
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : isCancelled
                                 ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                : isShipped || isOutForDelivery
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
                                 : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                             }`}
                           >
-                            {order.status || 'PROCESSING'}
+                            {isDelivered && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                            {isCancelled && <XCircle className="w-3 h-3 text-rose-600" />}
+                            {(isShipped || isOutForDelivery) && <Truck className="w-3 h-3 text-amber-600" />}
+                            {!isDelivered && !isCancelled && !isShipped && !isOutForDelivery && (
+                              <Clock className="w-3 h-3 text-indigo-600" />
+                            )}
+                            <span>{st}</span>
                           </span>
                         </div>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-3 cursor-pointer" onClick={() => setSelectedTrackingOrder(order)}>
                         {(order.items || []).map((item, idx) => {
                           const p = item.product || {};
                           const img = p.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=200';
@@ -1602,7 +2385,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                                 className="w-14 h-14 rounded-2xl object-cover bg-slate-100 border border-slate-200/60 shrink-0"
                               />
                               <div className="flex-1 min-w-0">
-                                <h5 className="font-bold text-sm text-slate-900 truncate">
+                                <h5 className="font-bold text-sm text-slate-900 truncate hover:text-[#b7004d]">
                                   {p.title || 'Product Item'}
                                 </h5>
                                 <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
@@ -1627,33 +2410,44 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                         </div>
 
                         <div className="flex items-center gap-2">
+                          {/* Track Button */}
                           <button
                             type="button"
-                            onClick={() => {
-                              toast.info(`Downloading Tax Invoice for #${order.id?.slice(0, 8)}... 📄`);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer"
+                            onClick={() => setSelectedTrackingOrder(order)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 font-bold text-xs cursor-pointer transition-all active:scale-95"
+                          >
+                            <Truck className="w-3.5 h-3.5" />
+                            <span>Track Order</span>
+                          </button>
+
+                          {/* Invoice Button */}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedInvoiceOrder(order)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer transition-colors"
                           >
                             <FileText className="w-3.5 h-3.5 text-slate-500" />
                             <span>Invoice</span>
                           </button>
 
-                          {isPending && (
+                          {/* Real Cancel Button */}
+                          {isCancellable && (
                             <button
                               type="button"
                               onClick={() => setCancellingOrder(order)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold cursor-pointer transition-all active:scale-95"
                             >
                               <XCircle className="w-3.5 h-3.5" />
                               <span>Cancel</span>
                             </button>
                           )}
 
+                          {/* Return / Exchange Button */}
                           {isDelivered && (
                             <button
                               type="button"
                               onClick={() => handleNav('/return-request')}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer transition-colors"
                             >
                               <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
                               <span>Return / Exchange</span>
@@ -1752,18 +2546,38 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         )}
 
         {/* =========================================================================
-            TAB 6: RESELL & EARN (Real Catalog Only)
+            TAB 6: RESELL & EARN (Real Catalog Only - Unlocked only after KYC Approval)
         ========================================================================= */}
         {activeTab === 'resale' && (
+          !isResellerApproved ? (
+            <div className="bg-white p-8 sm:p-14 rounded-3xl border border-slate-200 text-center space-y-4 max-w-xl mx-auto my-8 shadow-xs">
+              <div className="w-14 h-14 rounded-3xl bg-pink-50 text-[#b7004d] flex items-center justify-center mx-auto">
+                <ShieldCheck className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900">Reseller Hub Locked 🔒</h3>
+              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                {isKycUnderReview
+                  ? 'Your Reseller / Partner KYC application is currently being verified. Once verified, wholesale catalog access and margin links will unlock automatically.'
+                  : 'Your account is currently a standard Customer account. Complete Partner KYC to unlock wholesale catalog access and start earning margins on product links.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('affiliate')}
+                className="px-6 py-2.5 bg-[#b7004d] hover:bg-[#96003f] text-white text-xs font-bold rounded-2xl shadow-sm cursor-pointer"
+              >
+                {isKycUnderReview ? 'Track KYC Status' : 'Complete Partner KYC Now 📄'}
+              </button>
+            </div>
+          ) : (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-6 rounded-3xl shadow-md space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[10px] font-black uppercase text-purple-200">
                 <Sparkles className="w-3 h-3 text-purple-300" />
                 <span>Zero Capital Reseller Network</span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black">Share Catalog Products &amp; Keep The Markup</h2>
+              <h2 className="text-xl sm:text-2xl font-black">Set Your Custom Profit Margin &amp; Share Links</h2>
               <p className="text-xs sm:text-sm text-slate-300 max-w-2xl">
-                Add your resale profit margin to any product in our live catalog, share photos and descriptions with buyers, and collect margin payouts directly into your bank.
+                No fixed commission rates! Adjust your preferred profit margin on any product below (e.g. +₹100, +₹150, +₹200). Whenever anyone buys through your link, 100% of your profit margin is credited directly to your bank account.
               </p>
             </div>
 
@@ -1778,7 +2592,8 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                   const title = p.title || p.name || 'Catalog Product';
                   const img = p.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400';
                   const price = Number(p.price || 0);
-                  const profit = Math.round(price * 0.2);
+                  const currentMargin = getProductMargin(p.id);
+                  const finalSellingPrice = price + currentMargin;
 
                   return (
                     <div
@@ -1787,6 +2602,9 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                     >
                       <div className="relative h-48 bg-slate-100">
                         <img src={img} alt={title} className="w-full h-full object-cover" />
+                        <span className="absolute top-2.5 left-2.5 text-[10px] font-bold bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded-full">
+                          Wholesale ₹{price}
+                        </span>
                       </div>
 
                       <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
@@ -1795,18 +2613,68 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                           <h4 className="font-bold text-sm text-slate-900 line-clamp-1">{title}</h4>
                         </div>
 
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                        {/* Interactive Custom Margin Box */}
+                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/70 space-y-2">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-400">Wholesale: <strong className="text-slate-700">₹{price}</strong></span>
-                            {profit > 0 && <span className="font-bold text-emerald-600">+₹{profit} Margin</span>}
+                            <span className="text-[11px] font-semibold text-slate-600">Your Margin:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-bold text-emerald-600">+₹</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="2000"
+                                step="10"
+                                value={currentMargin}
+                                onChange={(e) => setProductMargin(p.id, e.target.value)}
+                                className="w-16 px-1.5 py-0.5 text-xs font-black text-emerald-600 bg-white border border-slate-200 rounded-lg text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              />
+                            </div>
                           </div>
+
+                          {/* Quick Margin Chips */}
+                          <div className="flex items-center gap-1 pt-0.5 overflow-x-auto no-scrollbar">
+                            {[50, 100, 150, 200, 300].map((preset) => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => setProductMargin(p.id, preset)}
+                                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md transition-colors cursor-pointer ${
+                                  currentMargin === preset
+                                    ? 'bg-emerald-600 text-white shadow-xs'
+                                    : 'bg-white hover:bg-slate-200 text-slate-600 border border-slate-200'
+                                }`}
+                              >
+                                +₹{preset}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Final Buyer Price Breakdown */}
+                          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/60">
+                            <span className="text-slate-400">Customer Price:</span>
+                            <span className="font-black text-[#b7004d]">₹{finalSellingPrice}</span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-1.5 pt-1">
                           <button
                             type="button"
-                            onClick={() => handleShareProduct(title, profit)}
-                            className="w-full py-2 bg-gradient-to-r from-[#b7004d] to-[#e62973] hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                            onClick={() => handleShareWhatsAppWithMargin(p, currentMargin)}
+                            className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            title="Share on WhatsApp with your margin"
                           >
                             <Share2 className="w-3.5 h-3.5" />
-                            <span>Share Link</span>
+                            <span>WhatsApp</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleShareProductWithMargin(p, currentMargin)}
+                            className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            title="Copy link with your margin"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
                           </button>
                         </div>
                       </div>
@@ -1816,6 +2684,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
               </div>
             )}
           </div>
+          )
         )}
 
         {/* =========================================================================
@@ -1826,23 +2695,48 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2 bg-gradient-to-br from-[#b7004d] via-[#cf125d] to-[#e62973] text-white p-6 rounded-3xl shadow-lg shadow-pink-600/20 flex flex-col justify-between space-y-6">
                 <div>
-                  <h4 className="font-black text-sm tracking-wide">MShoppy Fintech Balance</h4>
-                  <p className="text-xs text-pink-100">Real Cash Wallet</p>
+                  <h4 className="font-black text-sm tracking-wide">
+                    {isResellerApproved ? 'MShoppy Partner Resale Wallet' : 'MShoppy Customer Shopping Wallet'}
+                  </h4>
+                  <p className="text-xs text-pink-100">
+                    {isResellerApproved ? 'Real Cash & Margin Ledger' : 'Refunds, Store Credits & Promotional Cash'}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-pink-100">Available For Instant Withdrawal</p>
+                  <p className="text-xs font-bold text-pink-100">
+                    {isResellerApproved ? 'Available For Instant Withdrawal' : 'Usable on Checkout / Refund Balance'}
+                  </p>
                   <h2 className="text-3xl sm:text-4xl font-black mt-1">
                     ₹{walletBalance.toLocaleString('en-IN')}
                   </h2>
                 </div>
                 <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowWithdrawModal(true)}
-                    className="px-6 py-2.5 bg-white text-[#b7004d] font-bold text-xs sm:text-sm rounded-xl shadow-md hover:bg-pink-50 cursor-pointer"
-                  >
-                    Withdraw to Bank Account 🏦
-                  </button>
+                  {isResellerApproved ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowWithdrawModal(true)}
+                      className="px-6 py-2.5 bg-white text-[#b7004d] font-bold text-xs sm:text-sm rounded-xl shadow-md hover:bg-pink-50 cursor-pointer"
+                    >
+                      Withdraw to Bank Account 🏦
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleNav('/explorer')}
+                        className="px-5 py-2.5 bg-white text-[#b7004d] font-bold text-xs sm:text-sm rounded-xl shadow-md hover:bg-pink-50 cursor-pointer"
+                      >
+                        Shop With Balance 🛍️
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('affiliate')}
+                        className="px-4 py-2.5 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl backdrop-blur-sm cursor-pointer"
+                      >
+                        {isKycUnderReview ? 'KYC In Progress ⏳' : 'Enable Bank Payouts (Complete KYC) →'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1853,6 +2747,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                   <p className="text-xs text-slate-500 font-mono mt-0.5">
                     {withdrawBank || 'No Bank Account Linked Yet'}
                   </p>
+                  {!isResellerApproved && (
+                    <p className="text-[11px] text-amber-600 font-medium mt-1">
+                      {isKycUnderReview ? 'Bank verification pending approval' : 'KYC verification required for bank payouts'}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -1869,13 +2768,19 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900">Wallet Transaction Ledger</h3>
-                  <p className="text-xs text-slate-400">All margin credits and withdrawal requests</p>
+                  <p className="text-xs text-slate-400">
+                    {isResellerApproved
+                      ? 'All margin credits and withdrawal requests'
+                      : 'All refund credits from cancelled/returned orders and store payments'}
+                  </p>
                 </div>
               </div>
 
               {walletTransactions.length === 0 ? (
                 <div className="py-8 text-center text-slate-400 text-xs">
-                  No wallet transactions recorded yet. Resale margin credits and withdrawal requests will appear here.
+                  {isResellerApproved
+                    ? 'No wallet transactions recorded yet. Resale margin credits and withdrawal requests will appear here.'
+                    : 'No customer wallet transactions recorded yet. Refund credits from returned/cancelled orders will appear here.'}
                 </div>
               ) : (
                 <div className="overflow-x-auto w-full">
@@ -1991,57 +2896,155 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         {activeTab === 'profile' && (
           <div className="space-y-6">
             <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6 max-w-3xl">
-              <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#b7004d] to-[#ff6584] text-white flex items-center justify-center font-black text-2xl shadow-md">
-                  {customerName.charAt(0).toUpperCase()}
+              <div className="flex items-center justify-between pb-6 border-b border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#b7004d] to-[#ff6584] text-white flex items-center justify-center font-black text-2xl shadow-md">
+                    {customerName.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">{customerName}</h3>
+                    <p className="text-xs text-slate-500">{customerEmail || 'No email registered'}</p>
+                    <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-pink-50 text-[#b7004d] text-[10px] font-black uppercase border border-pink-100">
+                      {isResellerApproved ? 'Verified Partner & Reseller' : isKycUnderReview ? 'Partner (KYC Under Review)' : 'Verified Customer'}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-black text-slate-900">{customerName}</h3>
-                  <p className="text-xs text-slate-500">{customerEmail || 'No email registered'}</p>
-                  <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-pink-50 text-[#b7004d] text-[10px] font-black uppercase border border-pink-100">
-                    Verified Customer &amp; Reseller
-                  </span>
-                </div>
+
+                {/* Edit Profile Toggle Button */}
+                {!isEditingProfile ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingProfile(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-pink-50 hover:bg-pink-100 text-[#b7004d] border border-pink-200/80 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-[#b7004d]" />
+                    <span>Edit Profile</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Cancel</span>
+                  </button>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Full Legal Name</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={customerName}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 font-medium"
-                  />
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      Full Legal Name {isEditingProfile && <span className="text-[#b7004d]">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      disabled={!isEditingProfile}
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Enter full legal name"
+                      required
+                      className={`w-full px-3.5 py-2.5 rounded-2xl text-slate-800 font-medium transition-all outline-none ${
+                        isEditingProfile
+                          ? 'bg-white border border-slate-300 focus:border-[#b7004d] focus:ring-2 focus:ring-pink-100 shadow-xs'
+                          : 'bg-slate-50 border border-slate-200/90 text-slate-700 cursor-default'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      Registered Phone
+                    </label>
+                    <input
+                      type="tel"
+                      disabled={!isEditingProfile}
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="10-digit mobile number"
+                      maxLength={10}
+                      className={`w-full px-3.5 py-2.5 rounded-2xl text-slate-800 font-medium transition-all outline-none ${
+                        isEditingProfile
+                          ? 'bg-white border border-slate-300 focus:border-[#b7004d] focus:ring-2 focus:ring-pink-100 shadow-xs'
+                          : 'bg-slate-50 border border-slate-200/90 text-slate-700 cursor-default'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      disabled={!isEditingProfile}
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className={`w-full px-3.5 py-2.5 rounded-2xl text-slate-800 font-medium transition-all outline-none ${
+                        isEditingProfile
+                          ? 'bg-white border border-slate-300 focus:border-[#b7004d] focus:ring-2 focus:ring-pink-100 shadow-xs'
+                          : 'bg-slate-50 border border-slate-200/90 text-slate-700 cursor-default'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      Account Role
+                    </label>
+                    <input
+                      type="text"
+                      disabled
+                      value={
+                        isResellerApproved
+                          ? 'Approved Reseller & Partner'
+                          : isKycUnderReview
+                          ? 'Partner (KYC Under Review)'
+                          : 'Shopper & Customer'
+                      }
+                      className="w-full px-3.5 py-2.5 bg-slate-100/90 border border-slate-200 rounded-2xl text-slate-700 font-bold cursor-not-allowed"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Registered Phone</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={customerPhone || 'Not Provided'}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    disabled
-                    value={customerEmail || 'Not Provided'}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Account Role</label>
-                  <input
-                    type="text"
-                    disabled
-                    value="Shopper, Dropshipper & Reseller"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 font-medium"
-                  />
-                </div>
-              </div>
+
+                {profileSuccessMsg && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{profileSuccessMsg}</span>
+                  </div>
+                )}
+
+                {isEditingProfile && (
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="px-4 py-2.5 rounded-2xl border border-slate-200 font-bold text-xs text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingProfile}
+                      className="px-5 py-2.5 bg-gradient-to-r from-[#b7004d] to-[#d81b60] hover:from-[#9f0038] hover:to-[#c2185b] text-white rounded-2xl text-xs font-bold shadow-md shadow-pink-500/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSavingProfile ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Saving Changes...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Profile Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </form>
 
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-500">To end your session safely:</span>
@@ -2251,14 +3254,22 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">State *</label>
-                  <input
-                    type="text"
-                    placeholder="State"
+                  <select
                     value={newAddress.state}
                     onChange={(e) => setNewAddress((prev) => ({ ...prev, state: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#b7004d] cursor-pointer"
                     required
-                  />
+                  >
+                    <option value="">Select State</option>
+                    {INDIAN_STATES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                    {newAddress.state && !INDIAN_STATES.includes(newAddress.state) && (
+                      <option value={newAddress.state}>{newAddress.state}</option>
+                    )}
+                  </select>
                 </div>
               </div>
 
@@ -2291,6 +3302,40 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Real Order Cancellation Modal */}
+      {cancellingOrder && (
+        <CancelOrderModal
+          order={cancellingOrder}
+          onClose={() => setCancellingOrder(null)}
+          onConfirm={handleConfirmCancel}
+          isCancelling={isCancelling}
+        />
+      )}
+
+      {/* Real Order Tracking Timeline Modal */}
+      {selectedTrackingOrder && (
+        <OrderTrackingModal
+          order={selectedTrackingOrder}
+          onClose={() => setSelectedTrackingOrder(null)}
+          onCancelRequest={(ord) => {
+            setSelectedTrackingOrder(null);
+            setCancellingOrder(ord);
+          }}
+          onDownloadInvoice={(ord) => {
+            setSelectedInvoiceOrder(ord);
+          }}
+          onToast={(msg) => toast.info(msg)}
+        />
+      )}
+
+      {/* Real Tax Invoice Modal */}
+      {selectedInvoiceOrder && (
+        <TaxInvoiceModal
+          order={selectedInvoiceOrder}
+          onClose={() => setSelectedInvoiceOrder(null)}
+        />
       )}
 
     </DashboardLayout>

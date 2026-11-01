@@ -1,34 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
-
-const affiliateProducts = [
-  {
-    id: 1,
-    title: "Premium Quartz Watch",
-    commissionRate: "12%",
-    maxEarn: "₹450/sale",
-    code: "AFF-WATCH-89",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBrcNuIWxjyyKLS-BgOPoozPh62q1yC8cEOIdnaciIgw5pym48RaNNbCJFPfWDkrewgNLiVlj_1AgvCOi9t4eL4rWT1V5ZRacyRtIE9uUgQJIpIMxe-xP-LXmYdK4lWHhURbHm9L0Vf7wnl4Qwb5a0ziAdFjtSpcByYdI_SV6gBjXXfgRLb_lh8zrxfhf_bZfDIOsSnIsCh_7uofLROWus5kgeK0OwcEHUzriM4yQCaR4i3-rfsxpS0vjhmSD4h0Es4J5cNUMtM_U4"
-  },
-  {
-    id: 2,
-    title: "Ultra-Light Sports Sneakers",
-    commissionRate: "15%",
-    maxEarn: "₹290/sale",
-    code: "AFF-SNEAK-32",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuB3_8ZOO_rGEA4Ew8OyI60VoxNLVmp16xo1vSyzeX1FrKnrgbGmD4VWI5f9JThMwf3qFEuOwRTze7ft49f4xOpIAnYrs-b3DpYVkoXdI57h9mgdb2SL70A5bS3cYVzT1DOTSmiY3s2Iv-0ZoTvdTyxy5msJci8ELPVdImFsJxq8GwtS8jFifs_q4wce3_p5nPYtQpt6egJO-qBaZ6wjvVMMG1SlFuJnTfXgicfGgDPz_JSNSRc3lvnWmTyJkwxisQJ6ZQrxNX66aqI"
-  },
-  {
-    id: 3,
-    title: "Organic Vitamin C Serum",
-    commissionRate: "20%",
-    maxEarn: "₹180/sale",
-    code: "AFF-GLOW-11",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCHSLa0kcwcYkzDmUKRl6Ja6YTEEwpAqwCiMePFc7t0C3YbN6IutQd5UxHkO57A7gj7P2I4z2t4BlRwe1DhYqQBzOTb1MQln-6R-w040wzmHroBmqevm7Q4vIass1lTzHNrL9xXWSubKKnbBIlmmltF14FFwhO9vkwz0SqVHByBsPd49QUi51AoVHU72XyIsMM9LU6nG2IMV6FG7cdgVuvItT0fBtbxuT9epX2tuSCEU2j4v_qlWvEPjgr37yNn4OLJjcR3MM8wwYw"
-  }
-];
+import { getProducts } from '../../services/ecommerceService';
+import { getAffiliateStats, subscribeAffiliateAuth, getStoredAffiliate } from '../../services/affiliateAuthService';
+import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import { getStoredCustomer } from '../../services/customerAuthService';
 
 export default function AffiliateProgram() {
   const navigate = useNavigate();
@@ -36,12 +13,75 @@ export default function AffiliateProgram() {
   const [chartPeriod, setChartPeriod] = useState('weekly');
   const [copiedId, setCopiedId] = useState(null);
   const [copiedToast, setCopiedToast] = useState('');
+  const [products, setProducts] = useState([]);
+
+  // Dynamic real wallet and live stats
+  const [walletBalance, setWalletBalance] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mshoppy_customer_wallet');
+      if (saved !== null) return Number(saved);
+    } catch (e) {}
+    return 0;
+  });
+
+  const [affiliateStats, setAffiliateStats] = useState(() => getAffiliateStats());
+
+  useEffect(() => {
+    const unsub = subscribeAffiliateAuth(() => {
+      setAffiliateStats(getAffiliateStats());
+      try {
+        const saved = localStorage.getItem('mshoppy_customer_wallet');
+        if (saved !== null) setWalletBalance(Number(saved));
+      } catch (e) {}
+    });
+
+    const handleStorage = (e) => {
+      if (e.key === 'mshoppy_affiliate_stats' || e.key === 'mshoppy_customer_wallet') {
+        setAffiliateStats(getAffiliateStats());
+        try {
+          const saved = localStorage.getItem('mshoppy_customer_wallet');
+          if (saved !== null) setWalletBalance(Number(saved));
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      unsub();
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    getProducts({ limit: 6 })
+      .then((data) => {
+        if (data && data.length > 0) setProducts(data);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleCopyLink = (prod) => {
-    const affiliateUrl = `https://meesho.com/affiliate/${prod.code}?ref=RESELLER_PRO`;
+    const storedAff = getStoredAffiliate();
+    const affApp = getAffiliateApp();
+    const dynamicFallbackCode = (() => {
+      const existing = localStorage.getItem('mshoppy_affiliate_dyn_code');
+      if (existing) return existing;
+      const prefix = custUser?.user?.fullName 
+        ? custUser.user.fullName.replace(/[^a-zA-Z]/g, '').slice(0, 5).toUpperCase()
+        : (custUser?.user?.email ? custUser.user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() : 'PARTNER');
+      const gen = `AFF-${prefix}${Math.floor(100 + Math.random() * 900)}`;
+      localStorage.setItem('mshoppy_affiliate_dyn_code', gen);
+      return gen;
+    })();
+
+    const activeRefCode = storedAff?.user?.referralCode 
+      || affApp?.referralCode 
+      || affApp?.applicationId
+      || dynamicFallbackCode;
+    const affiliateUrl = `${window.location.origin}/product/${prod.id}?ref=${activeRefCode}`;
     navigator.clipboard.writeText(affiliateUrl);
     setCopiedId(prod.id);
-    setCopiedToast(`Copied tracking link for "${prod.title}"!`);
+    setCopiedToast(`Copied affiliate link for "${prod.title}"! (Ref: ${activeRefCode})`);
 
     setTimeout(() => {
       setCopiedId(null);
@@ -92,10 +132,10 @@ export default function AffiliateProgram() {
                 Available Balance
               </p>
               <h2 className="font-headline text-3xl md:text-5xl font-extrabold text-white">
-                ₹12,450.00
+                ₹{walletBalance.toLocaleString('en-IN')}
               </h2>
               <p className="text-sm opacity-90 text-white/90 font-medium">
-                +₹840 earned this week
+                {walletBalance > 0 ? '✓ Ready for withdrawal to linked bank' : 'Share product links below to start earning your custom profit margin'}
               </p>
             </div>
             <button 
@@ -118,11 +158,8 @@ export default function AffiliateProgram() {
               <span className="font-headline font-bold text-on-surface-variant text-sm">Total Sales Generated</span>
             </div>
             <div>
-              <p className="text-3xl font-extrabold text-on-surface">1,284</p>
-              <p className="text-emerald-600 text-xs font-bold flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">trending_up</span>
-                +12% vs last month
-              </p>
+              <p className="text-3xl font-extrabold text-on-surface">{affiliateStats.totalOrders || 0}</p>
+              <p className="text-slate-400 text-xs font-semibold mt-1">Verified partner orders</p>
             </div>
           </div>
 
@@ -134,11 +171,8 @@ export default function AffiliateProgram() {
               <span className="font-headline font-bold text-on-surface-variant text-sm">Lifetime Commission</span>
             </div>
             <div>
-              <p className="text-3xl font-extrabold text-on-surface">₹48,200</p>
-              <p className="text-emerald-600 text-xs font-bold flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">trending_up</span>
-                +8.4% growth
-              </p>
+              <p className="text-3xl font-extrabold text-on-surface">₹{(affiliateStats.totalCommission || 0).toLocaleString('en-IN')}</p>
+              <p className="text-emerald-600 text-xs font-bold mt-1">Custom Margin Model</p>
             </div>
           </div>
 
@@ -150,11 +184,8 @@ export default function AffiliateProgram() {
               <span className="font-headline font-bold text-on-surface-variant text-sm">Link Clicks</span>
             </div>
             <div>
-              <p className="text-3xl font-extrabold text-on-surface">14.2k</p>
-              <p className="text-amber-600 text-xs font-bold flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-sm">trending_up</span>
-                +4.5% conversion rate
-              </p>
+              <p className="text-3xl font-extrabold text-on-surface">{affiliateStats.clicks || 0}</p>
+              <p className="text-slate-400 text-xs font-semibold mt-1">Real-time tracked link visits</p>
             </div>
           </div>
         </section>
@@ -188,35 +219,66 @@ export default function AffiliateProgram() {
             </div>
           </div>
 
-          {/* Visualization Bars */}
-          <div className="h-56 w-full flex items-end justify-between gap-2 md:gap-4 px-2 pt-6">
-            {[
-              { day: "MON", height: "35%", val: "₹650" },
-              { day: "TUE", height: "48%", val: "₹920" },
-              { day: "WED", height: "65%", val: "₹1,450" },
-              { day: "THU", height: "92%", val: "₹2,100", active: true },
-              { day: "FRI", height: "55%", val: "₹1,200" },
-              { day: "SAT", height: "78%", val: "₹1,780" },
-              { day: "SUN", height: "40%", val: "₹820" }
-            ].map((item) => (
-              <div key={item.day} className="flex-1 group relative flex flex-col items-center justify-end h-full">
-                <span className="text-[10px] font-bold text-on-surface-variant mb-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {item.val}
-                </span>
-                <div 
-                  style={{ height: item.height }} 
-                  className={`w-full max-w-[48px] rounded-t-xl transition-all duration-300 ${
-                    item.active 
-                      ? 'bg-primary shadow-lg shadow-primary/30' 
-                      : 'bg-surface-container-high group-hover:bg-primary/30'
-                  }`}
-                />
-                <p className={`text-[11px] text-center mt-2 font-bold ${item.active ? 'text-primary font-black' : 'text-on-surface-variant'}`}>
-                  {item.day}
-                </p>
-              </div>
-            ))}
-          </div>
+          {/* Visualization Bars (Dynamic) */}
+          {(() => {
+            const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+            const todayName = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][new Date().getDay()];
+            const dailyComms = affiliateStats?.dailyCommissions || {};
+            const maxDayVal = Math.max(...DAYS.map((d) => dailyComms[d] || 0), 1);
+            const hasAnyEarnings = (affiliateStats?.totalCommission || 0) > 0;
+
+            const chartBars = DAYS.map((day) => {
+              const val = dailyComms[day] || 0;
+              const heightPercent = hasAnyEarnings && val > 0 
+                ? Math.max(22, Math.round((val / maxDayVal) * 88)) + '%' 
+                : '8%';
+              return {
+                day,
+                height: heightPercent,
+                val: `₹${val.toLocaleString('en-IN')}`,
+                active: day === todayName,
+                hasValue: val > 0
+              };
+            });
+
+            return (
+              <>
+                <div className="h-56 w-full flex items-end justify-between gap-2 md:gap-4 px-2 pt-6">
+                  {chartBars.map((item) => (
+                    <div key={item.day} className="flex-1 group relative flex flex-col items-center justify-end h-full">
+                      <span className={`text-[10px] font-bold mb-1.5 transition-opacity ${item.hasValue ? 'opacity-100 text-emerald-600 font-extrabold' : 'opacity-0 group-hover:opacity-100 text-on-surface-variant'}`}>
+                        {item.val}
+                      </span>
+                      <div 
+                        style={{ height: item.height }} 
+                        className={`w-full max-w-[48px] rounded-t-xl transition-all duration-500 ${
+                          item.hasValue
+                            ? (item.active ? 'bg-primary shadow-lg shadow-primary/30' : 'bg-emerald-500 hover:bg-emerald-600')
+                            : (item.active ? 'bg-primary/30' : 'bg-surface-container-high group-hover:bg-primary/20')
+                        }`}
+                      />
+                      <p className={`text-[11px] text-center mt-2 font-bold ${item.active ? 'text-primary font-black' : 'text-on-surface-variant'}`}>
+                        {item.day}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Status Insight Banner */}
+                {!hasAnyEarnings ? (
+                  <div className="mt-5 p-3.5 bg-surface-container-low rounded-2xl border border-gray-100 text-center text-xs text-on-surface-variant flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-base text-primary">insights</span>
+                    <span>No margin earned yet this week. Share any product link below to start earning your custom margin on every purchase!</span>
+                  </div>
+                ) : (
+                  <div className="mt-5 p-3.5 bg-emerald-50 rounded-2xl border border-emerald-100 text-center text-xs text-emerald-800 font-bold flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-base text-emerald-600">trending_up</span>
+                    <span>Live Performance: ₹{affiliateStats.totalCommission.toLocaleString('en-IN')} earned across {affiliateStats.convertedOrders || 1} verified referral sale(s)!</span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </section>
 
         {/* Active High-Commission Products */}
@@ -227,43 +289,52 @@ export default function AffiliateProgram() {
           </div>
 
           <div className="space-y-3">
-            {affiliateProducts.map((prod) => {
-              const isCopied = copiedId === prod.id;
-              return (
-                <div
-                  key={prod.id}
-                  className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 transition-all hover:shadow-md"
-                >
-                  <div className="w-16 h-16 rounded-xl bg-surface-container-low overflow-hidden flex-shrink-0">
-                    <img className="w-full h-full object-cover" alt={prod.title} src={prod.image} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-on-surface text-sm truncate">{prod.title}</h4>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                        {prod.commissionRate} Comm.
-                      </span>
-                      <span className="text-xs text-on-surface-variant font-medium">
-                        Earn up to {prod.maxEarn}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleCopyLink(prod)}
-                    className={`transition-all px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm ${
-                      isCopied
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-primary/10 text-primary hover:bg-primary hover:text-white'
-                    }`}
+            {products.length === 0 ? (
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 text-center text-xs text-slate-400">
+                Loading live catalog products for affiliate links...
+              </div>
+            ) : (
+              products.map((prod) => {
+                const isCopied = copiedId === prod.id;
+                const prodImage = prod.images?.[0] || prod.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300';
+                const estCommission = 150;
+
+                return (
+                  <div
+                    key={prod.id}
+                    className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 transition-all hover:shadow-md"
                   >
-                    <span className="material-symbols-outlined text-base">
-                      {isCopied ? 'check' : 'link'}
-                    </span>
-                    {isCopied ? 'Copied!' : 'Get Link'}
-                  </button>
-                </div>
-              );
-            })}
+                    <div className="w-16 h-16 rounded-xl bg-surface-container-low overflow-hidden flex-shrink-0">
+                      <img className="w-full h-full object-cover" alt={prod.title} src={prodImage} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-on-surface text-sm truncate">{prod.title}</h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                          Custom Margin
+                        </span>
+                        <span className="text-xs text-on-surface-variant font-medium">
+                          Set margin (e.g. +₹{estCommission}) • Base: ₹{prod.price}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleCopyLink(prod)}
+                      className={`transition-all px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                        isCopied
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-primary/10 text-primary hover:bg-primary hover:text-white'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base">
+                        {isCopied ? 'check' : 'link'}
+                      </span>
+                      {isCopied ? 'Copied!' : 'Get Link'}
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         </section>
       </main>

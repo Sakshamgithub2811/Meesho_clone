@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
-import { getAffiliateApp, saveAffiliateApp, subscribeAffiliateApp } from '../../services/affiliateSessionStore';
+import {
+  getAffiliateApp,
+  saveAffiliateApp,
+  subscribeAffiliateApp,
+  clearAffiliateApp,
+} from '../../services/affiliateSessionStore';
+import { getStoredCustomer } from '../../services/customerAuthService';
+import { getStoredAffiliate } from '../../services/affiliateAuthService';
 
 export default function AffiliateKycStatus({ onNavigate, onBack }) {
   const navigate = useNavigate();
@@ -32,37 +39,8 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
     }
   };
 
-  // Live synced affiliate app state
-  const [app, setApp] = useState(() => {
-    const current = getAffiliateApp();
-    if (current) return current;
-    // Sensible fallback for Sarah James if opened directly
-    return {
-      applicationId: 'AFF-KYC-6291',
-      id: 'AFF-KYC-6291',
-      fullName: 'Sarah James',
-      email: 'sarah.james@auratrends.in',
-      phone: '+91 98765 43210',
-      handle: '@sarah_luxe_curator',
-      platform: 'Instagram & Creator Shop',
-      followers: '85K Followers',
-      panNumber: 'BKWPS9821K',
-      panDocName: 'PAN_Card_Sarah_James.pdf',
-      aadhaarNumber: '4829 1920 3810',
-      aadhaarDocName: 'Aadhaar_Proof_Front_Back.pdf',
-      bankName: 'HDFC Bank, Fort Branch',
-      accountHolderName: 'Sarah James',
-      accountNumber: '50100482910291',
-      ifscCode: 'HDFC0001248',
-      upiId: 'sarahjames@okaxis',
-      status: 'Under Review',
-      submittedAt: 'Today, 02:45 PM',
-      riskScore: 97,
-      rejectionReason: '',
-      tier: 'Gold Affiliate Partner',
-      commissionRate: 15,
-    };
-  });
+  // Live synced affiliate app state - strictly scoped to active user
+  const [app, setApp] = useState(() => getAffiliateApp());
 
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -71,63 +49,121 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
 
   useEffect(() => {
     const unsubscribe = subscribeAffiliateApp((updated) => {
-      if (updated) setApp(updated);
+      setApp(updated);
     });
     return unsubscribe;
   }, []);
 
-  const triggerToast = (msg) => {
-    setToastMessage(msg);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2600);
-  };
-
+  // Live sync with real PostgreSQL database backend scoped to the currently logged in user
   useEffect(() => {
-    const current = getAffiliateApp();
-    if (!current) {
-      handleNav('affiliate-kyc');
-    }
+    let isMounted = true;
+
+    const syncLiveStatus = async () => {
+      try {
+        const storedCust = getStoredCustomer();
+        const storedAff = getStoredAffiliate();
+        const currentUser = storedCust?.user || storedAff?.user;
+
+        const curId = currentUser?.id || currentUser?.uid;
+        const curEmail = currentUser?.email;
+        const curPhone = currentUser?.phone;
+
+        if (!curId && !curEmail && !curPhone) {
+          if (isMounted) setApp(null);
+          return;
+        }
+
+        const queryParams = [];
+        if (curId) queryParams.push(`userId=${encodeURIComponent(curId)}`);
+        if (curEmail) queryParams.push(`email=${encodeURIComponent(curEmail)}`);
+        if (curPhone) queryParams.push(`phone=${encodeURIComponent(curPhone)}`);
+        if (app?.applicationId) queryParams.push(`applicationId=${encodeURIComponent(app.applicationId)}`);
+
+        const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+        const res = await fetch(`http://localhost:5000/api/v1/admin-kyc/affiliate-status${queryString}`);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (isMounted) {
+          if (data?.application) {
+            const dbApp = data.application;
+            const isDbApproved = dbApp.status === 'APPROVED';
+            const isDbRejected = dbApp.status === 'REJECTED';
+            const currentStatus = isDbApproved ? 'Approved' : isDbRejected ? 'Rejected' : 'Under Review';
+
+            const updated = {
+              ...(dbApp.documents || {}),
+              id: dbApp.id,
+              dbId: dbApp.id,
+              applicationId: dbApp.documents?.applicationId || dbApp.id,
+              fullName: dbApp.documents?.fullName || dbApp.user?.fullName || '',
+              status: currentStatus,
+              kycStatus: isDbApproved ? 'Approved' : isDbRejected ? 'Rejected' : 'Pending',
+              rejectionReason: dbApp.adminNotes || '',
+              userId: dbApp.userId,
+            };
+            setApp(updated);
+            saveAffiliateApp(updated);
+          } else {
+            // No affiliate application in DB for this authenticated user
+            setApp(null);
+            clearAffiliateApp();
+          }
+        }
+      } catch (err) {
+        console.warn('Live KYC sync network error:', err.message);
+      }
+    };
+
+    syncLiveStatus();
+    const interval = setInterval(syncLiveStatus, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const status = app?.status || 'Under Review';
-  const isApproved = status === 'Approved' || status === 'APPROVED';
-  const isRejected = status === 'Rejected' || status === 'REJECTED';
-  const isUnderReview = !isApproved && !isRejected;
+  const isApproved = Boolean(app) && (status === 'Approved' || status === 'APPROVED');
+  const isRejected = Boolean(app) && (status === 'Rejected' || status === 'REJECTED');
+  const isUnderReview = Boolean(app) && !isApproved && !isRejected;
 
-  const verificationStages = [
-    {
-      id: 1,
-      title: 'Application & Dossier Submitted',
-      description: 'Identity proofs and bank mandate received securely via 256-bit SSL.',
-      status: 'completed',
-      timestamp: app.submittedAt || 'Today, 02:45 PM',
-      icon: 'cloud_done',
-    },
-    {
-      id: 2,
-      title: 'Automated Govt NSDL & UIDAI OCR Check',
-      description: 'PAN card format and name matching with National Securities Depository Limited.',
-      status: isRejected ? 'failed' : 'completed',
-      timestamp: 'Today, 02:48 PM',
-      icon: isRejected ? 'cancel' : 'verified_user',
-    },
-    {
-      id: 3,
-      title: '₹1 Bank Account Verification',
-      description: 'NPCI ₹1 test deposit check to ensure seamless commission payout disbursement.',
-      status: isApproved ? 'completed' : isRejected ? 'failed' : 'in_progress',
-      timestamp: isApproved ? 'Today, 03:02 PM' : 'Verification underway',
-      icon: 'account_balance',
-    },
-    {
-      id: 4,
-      title: 'Admin Desk Sign-off & Commission Activation',
-      description: 'Final compliance desk approval and generation of trackable affiliate referral URLs.',
-      status: isApproved ? 'completed' : 'pending',
-      timestamp: isApproved ? 'Active & Approved' : 'Estimated ~24 hrs',
-      icon: 'verified',
-    },
-  ];
+  const verificationStages = app
+    ? [
+        {
+          id: 1,
+          title: 'Application & Dossier Submitted',
+          description: 'Identity proofs and bank mandate received securely via 256-bit SSL.',
+          status: 'completed',
+          timestamp: app.submittedAt || 'Submitted',
+          icon: 'cloud_done',
+        },
+        {
+          id: 2,
+          title: 'Automated Govt NSDL & UIDAI OCR Check',
+          description: 'PAN card format and name matching with National Securities Depository Limited.',
+          status: isRejected ? 'failed' : 'completed',
+          timestamp: app.submittedAt || 'Verified',
+          icon: isRejected ? 'cancel' : 'verified_user',
+        },
+        {
+          id: 3,
+          title: '₹1 Bank Account Verification',
+          description: 'NPCI ₹1 test deposit check to ensure seamless commission payout disbursement.',
+          status: isApproved ? 'completed' : isRejected ? 'failed' : 'in_progress',
+          timestamp: isApproved ? 'Completed' : 'Verification underway',
+          icon: 'account_balance',
+        },
+        {
+          id: 4,
+          title: 'Final Verification & Commission Activation',
+          description: 'Final compliance desk approval and generation of trackable affiliate referral URLs.',
+          status: isApproved ? 'completed' : 'pending',
+          timestamp: isApproved ? 'Active & Approved' : 'Estimated ~24 hrs',
+          icon: 'verified',
+        },
+      ]
+    : [];
 
   return (
     <div className="min-h-screen bg-[#0d0914] text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
@@ -156,8 +192,14 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
                 <h1 className="text-base sm:text-lg font-black text-white tracking-tight">
                   Affiliate KYC Verification Desk
                 </h1>
-                <span className="bg-pink-500/20 text-[#FF3F6C] border border-pink-500/30 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">
-                  App #{app?.applicationId || app?.id || 'AFF-6291'}
+                <span
+                  className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                    app
+                      ? 'bg-pink-500/20 text-[#FF3F6C] border-pink-500/30'
+                      : 'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                  }`}
+                >
+                  {app ? `App #${app.applicationId || app.id}` : 'Not Submitted'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
@@ -167,20 +209,21 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
           </div>
 
           <div className="flex items-center gap-2">
+            {app && (
+              <button
+                onClick={() => setShowSlipModal(true)}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold border border-white/15 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">receipt_long</span>
+                <span>View Slip</span>
+              </button>
+            )}
             <button
-              onClick={() => setShowSlipModal(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold border border-white/15 transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-base">receipt_long</span>
-              <span>View Slip</span>
-            </button>
-            <button
-              onClick={() => handleNav('/affiliate-kyc?edit=true')}
+              onClick={() => handleNav(app ? '/affiliate-kyc?edit=true' : '/affiliate-kyc')}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#FF3F6C] to-[#b90041] text-white text-xs font-extrabold hover:opacity-95 shadow-md shadow-[#FF3F6C]/25 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-base">edit_document</span>
-              <span className="hidden sm:inline">Edit Details</span>
-              <span className="sm:hidden">Edit</span>
+              <span className="material-symbols-outlined text-base">{app ? 'edit_document' : 'add_task'}</span>
+              <span>{app ? 'Edit Details' : 'Submit KYC'}</span>
             </button>
           </div>
         </div>
@@ -202,7 +245,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                KYC submissions are verified and approved exclusively by the MShoppy Admin Team. Applicants cannot self-approve.
+                KYC submissions are processed by our verification team within 24 to 48 business hours.
               </p>
             </div>
           </div>
@@ -211,7 +254,9 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
             <span className="text-[11px] text-slate-400 font-medium">Status:</span>
             <span
               className={`font-black uppercase px-3 py-1 rounded-xl text-xs flex items-center gap-1.5 ${
-                isApproved
+                !app
+                  ? 'bg-slate-500/20 text-slate-300 border border-slate-500/40'
+                  : isApproved
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                   : isRejected
                   ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
@@ -220,16 +265,61 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
             >
               <span
                 className={`w-2 h-2 rounded-full ${
-                  isApproved ? 'bg-emerald-400' : isRejected ? 'bg-rose-400' : 'bg-amber-400 animate-ping'
+                  !app
+                    ? 'bg-slate-400'
+                    : isApproved
+                    ? 'bg-emerald-400'
+                    : isRejected
+                    ? 'bg-rose-400'
+                    : 'bg-amber-400 animate-ping'
                 }`}
               ></span>
-              {isApproved ? 'Approved by Admin' : isRejected ? 'Action Needed' : 'Under Admin Review'}
+              {!app
+                ? 'Not Submitted'
+                : isApproved
+                ? 'Verified & Approved'
+                : isRejected
+                ? 'Action Needed'
+                : 'Under Verification'}
             </span>
           </div>
         </div>
 
         {/* Dynamic Status Hero Card */}
-        {isApproved ? (
+        {!app ? (
+          <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#1b1226] via-[#160d20] to-[#22102e] p-8 sm:p-10 text-white shadow-2xl border border-pink-500/30 text-center space-y-6">
+            <div className="w-16 h-16 rounded-3xl bg-pink-500/20 text-[#FF3F6C] flex items-center justify-center mx-auto border border-pink-500/30 shadow-lg shadow-pink-500/10">
+              <span className="material-symbols-outlined text-3xl">assignment_late</span>
+            </div>
+            <div className="max-w-xl mx-auto space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/15 border border-pink-400/30 text-[11px] font-black text-pink-300 uppercase tracking-wider">
+                <span>KYC Verification Required</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+                No Affiliate KYC Application Found
+              </h2>
+              <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                You haven't submitted your KYC verification yet. Submit your personal identity, PAN number, and bank account mandate to get verified and start earning affiliate commissions.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => handleNav('/affiliate-kyc')}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#FF3F6C] to-[#e0004d] hover:brightness-110 text-white font-extrabold text-sm shadow-xl shadow-[#FF3F6C]/25 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">how_to_reg</span>
+                <span>Start Affiliate KYC Application</span>
+              </button>
+              <button
+                onClick={handleGoBack}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-sm border border-white/15 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                <span>Back to Dashboard</span>
+              </button>
+            </div>
+          </section>
+        ) : isApproved ? (
           <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#023b20] via-[#092b1a] to-[#044026] p-6 sm:p-8 text-white shadow-2xl border border-emerald-500/40">
             <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-80 h-80 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -239,16 +329,21 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
                   <span>Verified Affiliate Partner • Active</span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
-                  Congratulations, {app.fullName || 'Sarah James'}! 🎉
+                  Congratulations, {app.fullName || 'Partner'}! 🎉
                 </h2>
                 <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed font-medium">
-                  Your KYC documents and bank mandate have been fully authenticated by the MShoppy merchant compliance
-                  desk. You are now officially enrolled in the <strong>{app.tier || 'Gold Creator Partner'}</strong> tier with{' '}
-                  <strong className="text-emerald-300 font-extrabold">{app.commissionRate || 15}% commission rate</strong>.
+                  Your KYC documents and bank mandate have been fully authenticated by the MShoppy compliance desk.
+                  You are now officially enrolled in the <strong>{app.tier || 'Affiliate Partner'}</strong> tier with{' '}
+                  <strong className="text-emerald-300 font-extrabold">Dynamic Profit Margins on Every Shared Product</strong>.
                 </p>
                 <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
                   <span className="px-3 py-1.5 rounded-xl bg-black/30 border border-emerald-500/30 font-mono text-emerald-200">
-                    Referral Code: <strong>{app.handle ? app.handle.replace('@', '').toUpperCase() : 'SARAH15'}</strong>
+                    Referral Code:{' '}
+                    <strong>
+                      {app.handle
+                        ? app.handle.replace('@', '').toUpperCase()
+                        : ((app.fullName || 'AFF').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8) + 'AFF')}
+                    </strong>
                   </span>
                   <span className="text-emerald-300 font-bold">Weekly Bank Auto-Payouts Active</span>
                 </div>
@@ -285,14 +380,14 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
                   KYC Verification Needs Attention ⚠️
                 </h2>
                 <div className="p-4 bg-black/40 rounded-2xl border border-rose-500/40 text-xs sm:text-sm space-y-1">
-                  <span className="text-rose-300 font-extrabold block">Admin Compliance Feedback:</span>
+                  <span className="text-rose-300 font-extrabold block">Verification Feedback:</span>
                   <p className="text-rose-100 font-medium">
                     {app.rejectionReason ||
-                      'PAN card photo was blurred or name did not match bank account records. Please upload a clear original photo.'}
+                      'Document photo was unclear or details did not match records. Please upload a clear photo and resubmit.'}
                   </p>
                 </div>
                 <p className="text-xs text-slate-300">
-                  Don't worry! You can easily update your document proof or correct details and re-submit for instant review.
+                  Don't worry! You can easily update your document proof or correct details and re-submit for review.
                 </p>
               </div>
 
@@ -320,9 +415,15 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
                   Your Affiliate KYC is Under Review ⏳
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
-                  Submitted for <strong className="text-white">{app.fullName || 'Sarah James'}</strong> (
-                  <span className="font-mono text-pink-300 font-bold">{app.handle || '@sarah_luxe_curator'}</span>).
-                  The compliance desk is verifying your government ID and ₹1 bank account verification. Estimated turnaround is{' '}
+                  Submitted for <strong className="text-white">{app.fullName || 'Applicant'}</strong>
+                  {app.handle ? (
+                    <>
+                      {' ('}
+                      <span className="font-mono text-pink-300 font-bold">{app.handle}</span>
+                      {')'}
+                    </>
+                  ) : null}
+                  . The compliance desk is verifying your government ID and bank account details. Estimated turnaround is{' '}
                   <strong className="text-amber-300 font-extrabold">24-48 hours</strong>.
                 </p>
                 <div className="flex items-center gap-3 pt-1 text-xs text-slate-300 flex-wrap">
@@ -332,14 +433,14 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
                   </div>
                   <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-lg">
                     <span className="material-symbols-outlined text-sm text-amber-400 animate-spin">sync</span>
-                    <span>₹1 Bank Verification in Progress</span>
+                    <span>Bank Verification in Progress</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0">
                 <button
-                  onClick={() => triggerToast('Checking live status with NSDL & Banking Gateway... All checks normal!')}
+                  onClick={() => triggerToast('Checking live status... All checks normal!')}
                   className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-lg">refresh</span>
@@ -358,208 +459,216 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
         )}
 
         {/* 4-Stage Visual Verification Pipeline */}
-        <section className="bg-[#170e22] rounded-3xl p-6 sm:p-7 border border-pink-500/20 shadow-xl space-y-5">
-          <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-pink-400">timeline</span>
-              <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
-                Live Verification Stage Timeline
-              </h3>
+        {app && (
+          <section className="bg-[#170e22] rounded-3xl p-6 sm:p-7 border border-pink-500/20 shadow-xl space-y-5">
+            <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-pink-400">timeline</span>
+                <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
+                  Live Verification Stage Timeline
+                </h3>
+              </div>
+              <span className="text-[11px] font-bold text-slate-400">
+                Tracking ID: <span className="font-mono text-pink-300 font-extrabold">{app.applicationId || app.id}</span>
+              </span>
             </div>
-            <span className="text-[11px] font-bold text-slate-400">
-              Tracking ID: <span className="font-mono text-pink-300 font-extrabold">{app.applicationId || app.id}</span>
-            </span>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
-            {verificationStages.map((stage) => {
-              const isDone = stage.status === 'completed';
-              const isCurrent = stage.status === 'in_progress';
-              const isFail = stage.status === 'failed';
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+              {verificationStages.map((stage) => {
+                const isDone = stage.status === 'completed';
+                const isCurrent = stage.status === 'in_progress';
+                const isFail = stage.status === 'failed';
 
-              return (
-                <div
-                  key={stage.id}
-                  className={`rounded-2xl p-4 transition-all border flex flex-col justify-between space-y-3 ${
-                    isDone
-                      ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-100 shadow-sm'
-                      : isFail
-                      ? 'bg-rose-950/30 border-rose-500/40 text-rose-100 shadow-sm'
-                      : isCurrent
-                      ? 'bg-amber-950/40 border-amber-500/50 text-amber-100 shadow-md ring-1 ring-amber-500/30'
-                      : 'bg-white/5 border-white/10 text-slate-400'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-                        isDone
-                          ? 'bg-emerald-500 text-white'
-                          : isFail
-                          ? 'bg-rose-500 text-white'
-                          : isCurrent
-                          ? 'bg-amber-500 text-slate-950 font-black animate-pulse'
-                          : 'bg-white/10 text-slate-400'
-                      }`}
-                    >
-                      {isDone ? '✓' : isFail ? '✕' : stage.id}
-                    </span>
-                    <span
-                      className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        isDone
-                          ? 'bg-emerald-500/20 text-emerald-300'
-                          : isFail
-                          ? 'bg-rose-500/20 text-rose-300'
-                          : isCurrent
-                          ? 'bg-amber-500/20 text-amber-300 animate-pulse'
-                          : 'bg-white/10 text-slate-400'
-                      }`}
-                    >
-                      {isDone ? 'Done' : isFail ? 'Flagged' : isCurrent ? 'Active' : 'Queued'}
-                    </span>
+                return (
+                  <div
+                    key={stage.id}
+                    className={`rounded-2xl p-4 transition-all border flex flex-col justify-between space-y-3 ${
+                      isDone
+                        ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-100 shadow-sm'
+                        : isFail
+                        ? 'bg-rose-950/30 border-rose-500/40 text-rose-100 shadow-sm'
+                        : isCurrent
+                        ? 'bg-amber-950/40 border-amber-500/50 text-amber-100 shadow-md ring-1 ring-amber-500/30'
+                        : 'bg-white/5 border-white/10 text-slate-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                          isDone
+                            ? 'bg-emerald-500 text-white'
+                            : isFail
+                            ? 'bg-rose-500 text-white'
+                            : isCurrent
+                            ? 'bg-amber-500 text-slate-950 font-black animate-pulse'
+                            : 'bg-white/10 text-slate-400'
+                        }`}
+                      >
+                        {isDone ? '✓' : isFail ? '✕' : stage.id}
+                      </span>
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          isDone
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : isFail
+                            ? 'bg-rose-500/20 text-rose-300'
+                            : isCurrent
+                            ? 'bg-amber-500/20 text-amber-300 animate-pulse'
+                            : 'bg-white/10 text-slate-400'
+                        }`}
+                      >
+                        {isDone ? 'Done' : isFail ? 'Flagged' : isCurrent ? 'Active' : 'Queued'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-extrabold text-white leading-snug">{stage.title}</h4>
+                      <p className="text-[11px] leading-relaxed opacity-80">{stage.description}</p>
+                    </div>
+
+                    <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px]">
+                      <span className="opacity-70">Timestamp:</span>
+                      <span className="font-mono font-bold">{stage.timestamp}</span>
+                    </div>
                   </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-extrabold text-white leading-snug">{stage.title}</h4>
-                    <p className="text-[11px] leading-relaxed opacity-80">{stage.description}</p>
-                  </div>
-
-                  <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px]">
-                    <span className="opacity-70">Timestamp:</span>
-                    <span className="font-mono font-bold">{stage.timestamp}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Submitted Dossier & Identity Proofs Breakdown */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Card 1: Personal & Channel Identity */}
-          <div className="bg-[#170e22] rounded-3xl p-5 sm:p-6 border border-pink-500/20 space-y-4">
-            <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#FF3F6C] to-[#b90041] flex items-center justify-center text-white shadow-md">
-                <span className="material-symbols-outlined text-xl">person</span>
+        {app && (
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Card 1: Personal & Channel Identity */}
+            <div className="bg-[#170e22] rounded-3xl p-5 sm:p-6 border border-pink-500/20 space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#FF3F6C] to-[#b90041] flex items-center justify-center text-white shadow-md">
+                  <span className="material-symbols-outlined text-xl">person</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-white">Creator &amp; Profile</h4>
+                  <p className="text-[11px] text-slate-400">Personal &amp; channel identity</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-white">Creator &amp; Profile</h4>
-                <p className="text-[11px] text-slate-400">Personal &amp; channel identity</p>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">Full Legal Name:</span>
+                  <span className="font-extrabold text-white">{app.fullName || '—'}</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">Application ID:</span>
+                  <span className="font-mono font-bold text-pink-300">{app.applicationId || app.id || '—'}</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">Phone Number:</span>
+                  <span className="font-bold text-white">{app.phone || '—'}</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">Email Address:</span>
+                  <span className="font-bold text-slate-200 truncate max-w-[160px]">
+                    {app.email || '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-slate-400">Audience Scope:</span>
+                  <span className="font-bold text-emerald-400">
+                    {app.followers && app.followers !== '0'
+                      ? `${app.followers} (${app.platform || 'Social'})`
+                      : (app.platform || 'Direct / Social')}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">Full Legal Name:</span>
-                <span className="font-extrabold text-white">{app.fullName || 'Sarah James'}</span>
+            {/* Card 2: Government Documents */}
+            <div className="bg-[#170e22] rounded-3xl p-5 sm:p-6 border border-pink-500/20 space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shadow-md">
+                  <span className="material-symbols-outlined text-xl">badge</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-white">Government ID Proofs</h4>
+                  <p className="text-[11px] text-slate-400">Income Tax &amp; Identity Vault</p>
+                </div>
               </div>
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">Channel / Handle:</span>
-                <span className="font-bold font-mono text-pink-300">{app.handle || '@sarah_luxe_curator'}</span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">Phone Number:</span>
-                <span className="font-bold text-white">{app.phone || '+91 98765 43210'}</span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">Email Address:</span>
-                <span className="font-bold text-slate-200 truncate max-w-[160px]">
-                  {app.email || 'sarah.james@auratrends.in'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-1">
-                <span className="text-slate-400">Audience Scope:</span>
-                <span className="font-bold text-emerald-400">{app.followers || '85K Followers (Instagram)'}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Card 2: Government Documents */}
-          <div className="bg-[#170e22] rounded-3xl p-5 sm:p-6 border border-pink-500/20 space-y-4">
-            <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shadow-md">
-                <span className="material-symbols-outlined text-xl">badge</span>
-              </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-white">Government ID Proofs</h4>
-                <p className="text-[11px] text-slate-400">Income Tax &amp; Identity Vault</p>
-              </div>
-            </div>
-
-            <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">PAN Identifier:</span>
-                <span className="font-mono font-bold text-white tracking-widest">
-                  {app.panNumber || 'BKWPS9821K'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">PAN Verification:</span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-                  <span className="material-symbols-outlined text-xs">verified</span>
-                  NSDL Live Authenticated
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">Aadhaar Mandate:</span>
-                <span className="font-mono font-bold text-slate-200">
-                  •••• •••• {app.aadhaarNumber ? app.aadhaarNumber.slice(-4) : '3810'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">Uploaded Proofs:</span>
-                <span className="font-medium text-pink-300 truncate max-w-[140px]">
-                  {app.panDocName || 'PAN_Document.pdf'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-1">
-                <span className="text-slate-400">Security:</span>
-                <span className="text-[11px] font-bold text-slate-300">AES-256 Cloud Vault</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Bank Account & Payout Details */}
-          <div className="bg-[#170e22] rounded-3xl p-5 sm:p-6 border border-pink-500/20 space-y-4">
-            <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shadow-md">
-                <span className="material-symbols-outlined text-xl">account_balance</span>
-              </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-white">Bank Payout Mandate</h4>
-                <p className="text-[11px] text-slate-400">Direct weekly payout routing</p>
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">PAN Identifier:</span>
+                  <span className="font-mono font-bold text-white tracking-widest">
+                    {app.panNumber || '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">PAN Verification:</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                    <span className="material-symbols-outlined text-xs">verified</span>
+                    NSDL Authenticated
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">Aadhaar Mandate:</span>
+                  <span className="font-mono font-bold text-slate-200">
+                    {app.aadhaarNumber ? `•••• •••• ${app.aadhaarNumber.slice(-4)}` : 'Submitted'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">Uploaded Proofs:</span>
+                  <span className="font-medium text-pink-300 truncate max-w-[140px]">
+                    {app.panDocName || 'PAN_Document.pdf'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-slate-400">Security:</span>
+                  <span className="text-[11px] font-bold text-slate-300">AES-256 Cloud Vault</span>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">Bank Name:</span>
-                <span className="font-bold text-white">{app.bankName || 'HDFC Bank'}</span>
+            {/* Card 3: Bank Account & Payout Details */}
+            <div className="bg-[#170e22] rounded-3xl p-5 sm:p-6 border border-pink-500/20 space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shadow-md">
+                  <span className="material-symbols-outlined text-xl">account_balance</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-white">Bank Payout Mandate</h4>
+                  <p className="text-[11px] text-slate-400">Direct weekly payout routing</p>
+                </div>
               </div>
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">Account Number:</span>
-                <span className="font-mono font-bold text-white">
-                  ••••••••{app.accountNumber ? app.accountNumber.slice(-4) : '1029'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">IFSC Code:</span>
-                <span className="font-mono font-bold text-slate-200">{app.ifscCode || 'HDFC0001248'}</span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">₹1 Bank Verification:</span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-                  <span className="material-symbols-outlined text-xs">check_circle</span>
-                  ₹1 NPCI Test Success
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-1">
-                <span className="text-slate-400">Payout Cycle:</span>
-                <span className="font-bold text-amber-300">Every Tuesday (Automated)</span>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">Bank Name:</span>
+                  <span className="font-bold text-white">{app.bankName || '—'}</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">Account Number:</span>
+                  <span className="font-mono font-bold text-white">
+                    {app.accountNumber ? `••••••••${app.accountNumber.slice(-4)}` : '••••••••'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">IFSC Code:</span>
+                  <span className="font-mono font-bold text-slate-200">{app.ifscCode || '—'}</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/5">
+                  <span className="text-slate-400">Bank Verification:</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                    <span className="material-symbols-outlined text-xs">check_circle</span>
+                    ₹1 NPCI Test Mandate
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-slate-400">Payout Cycle:</span>
+                  <span className="font-bold text-amber-300">Every Tuesday (Automated)</span>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Frequently Asked Questions Accordion */}
         <section className="bg-[#170e22] rounded-3xl p-6 sm:p-7 border border-pink-500/20 space-y-4">
@@ -578,7 +687,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
               },
               {
                 q: 'Can I start generating referral links before KYC approval?',
-                a: 'You can explore products and bookmark them, but commission earnings and active tracking links will only begin tracking after Admin verification is approved.',
+                a: 'You can explore products and bookmark them, but commission earnings and active tracking links will activate once your verification is completed.',
               },
               {
                 q: 'How and when are affiliate commissions paid out?',
@@ -586,7 +695,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
               },
               {
                 q: 'What should I do if my KYC is rejected or marked "Action Needed"?',
-                a: 'Review the Admin feedback box shown at the top of this status tracker, click "Fix & Resubmit KYC", and upload clearer photos of your document proofs.',
+                a: 'Review the feedback box shown at the top of this status tracker, click "Fix & Resubmit KYC", and upload clearer photos of your document proofs.',
               },
             ].map((faq, idx) => (
               <div
@@ -661,25 +770,25 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Application Number:</span>
-                <span className="font-mono font-bold text-slate-900">{app.applicationId || app.id}</span>
+                <span className="font-mono font-bold text-slate-900">{app?.applicationId || app?.id || '—'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Applicant Legal Name:</span>
-                <span className="font-bold text-slate-900">{app.fullName}</span>
+                <span className="font-bold text-slate-900">{app?.fullName || '—'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">PAN Number:</span>
-                <span className="font-mono font-bold text-slate-900">{app.panNumber}</span>
+                <span className="font-mono font-bold text-slate-900">{app?.panNumber || '—'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Bank Account:</span>
                 <span className="font-mono font-bold text-slate-900">
-                  {app.bankName} (••••{app.accountNumber ? app.accountNumber.slice(-4) : '1029'})
+                  {app?.bankName || 'Bank'} (••••{app?.accountNumber ? app.accountNumber.slice(-4) : '••••'})
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Submission Date:</span>
-                <span className="font-bold text-slate-900">{app.submittedAt}</span>
+                <span className="font-bold text-slate-900">{app?.submittedAt || '—'}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-slate-500">Current Status:</span>

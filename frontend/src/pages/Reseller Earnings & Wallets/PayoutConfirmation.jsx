@@ -1,17 +1,65 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 
 export default function PayoutConfirmation() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [copiedTxn, setCopiedTxn] = useState(false);
-  const txnId = "TXN-8829103";
+
+  const [payoutInfo, setPayoutInfo] = useState(() => {
+    if (location.state && location.state.amount) {
+      return location.state;
+    }
+    try {
+      const stored = sessionStorage.getItem('mshoppy_last_payout');
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+
+    try {
+      const history = localStorage.getItem('mshoppy_payout_history');
+      if (history) {
+        const list = JSON.parse(history);
+        if (Array.isArray(list) && list.length > 0) return list[0];
+      }
+    } catch (e) {}
+
+    try {
+      const txns = localStorage.getItem('mshoppy_wallet_txns');
+      if (txns) {
+        const list = JSON.parse(txns);
+        const wTx = list.find(t => t.type === 'withdrawal');
+        if (wTx) {
+          return {
+            amount: Math.abs(wTx.amount || 1200),
+            method: 'bank',
+            destination: 'Verified Bank Account (•••• 4921)',
+            txnId: wTx.id || `TXN-${Date.now().toString().slice(-7)}`
+          };
+        }
+      }
+    } catch (e) {}
+
+    return {
+      amount: 1450,
+      method: 'bank',
+      destination: 'HDFC Bank (•••• 4921)',
+      txnId: `TXN-${Date.now().toString().slice(-7)}`
+    };
+  });
+
+  const txnId = payoutInfo.txnId || `TXN-${Date.now().toString().slice(-7)}`;
 
   const handleCopyTxn = () => {
     navigator.clipboard.writeText(txnId);
     setCopiedTxn(true);
     setTimeout(() => setCopiedTxn(false), 2000);
   };
+
+  const formattedAmount = (payoutInfo.amount || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
   return (
     <div className="bg-surface text-on-surface min-h-screen flex flex-col font-sans selection:bg-primary/20">
@@ -42,10 +90,10 @@ export default function PayoutConfirmation() {
             </div>
           </div>
           <h2 className="font-headline font-extrabold text-3xl tracking-tight text-on-surface mb-2">
-            ₹12,450.50 Sent!
+            ₹{formattedAmount} Transferred!
           </h2>
           <p className="text-on-surface-variant font-medium max-w-[280px] mx-auto text-sm leading-relaxed">
-            Your payout is on its way to your bank account.
+            Your withdrawal is being processed to your account.
           </p>
         </div>
 
@@ -64,7 +112,7 @@ export default function PayoutConfirmation() {
                   </div>
                   <span className="text-on-surface-variant font-medium">Amount</span>
                 </div>
-                <span className="font-headline font-bold text-on-surface">₹12,450.50</span>
+                <span className="font-headline font-bold text-on-surface">₹{formattedAmount}</span>
               </div>
 
               <div className="flex justify-between items-center">
@@ -72,11 +120,11 @@ export default function PayoutConfirmation() {
                   <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-secondary">
                     <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>account_balance</span>
                   </div>
-                  <span className="text-on-surface-variant font-medium">Bank</span>
+                  <span className="text-on-surface-variant font-medium">Destination</span>
                 </div>
                 <div className="text-right">
-                  <span className="block font-headline font-bold text-on-surface">HDFC Bank</span>
-                  <span className="text-[10px] font-bold text-on-surface-variant/70 tracking-tighter">**** 4321</span>
+                  <span className="block font-headline font-bold text-on-surface">{payoutInfo.destination || 'Settlement Account'}</span>
+                  <span className="text-[10px] font-bold text-emerald-600 tracking-tighter">IMPS / Instant RTGS</span>
                 </div>
               </div>
 

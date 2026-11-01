@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 
-// Mock Reseller Margin Reversal Records (Connected to Panel 1 Customer Returns)
+const getRecentDate = (daysAgo) => {
+  const d = new Date(Date.now() - daysAgo * 86400000);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+// Reseller Margin Reversal Records (Connected to Panel 1 Customer Returns)
 const INITIAL_REVERSALS = [
   {
     id: 'REV-9921',
@@ -17,8 +22,8 @@ const INITIAL_REVERSALS = [
     reversedMargin: 300,
     formattedReversed: '-₹300.00',
     returnReason: 'Size too small / Fitting issue',
-    returnDate: '24 Oct 2024',
-    reversalDate: '25 Oct 2024',
+    returnDate: getRecentDate(3),
+    reversalDate: getRecentDate(2),
     status: 'Deducted', // 'Deducted' | 'Pending Reversal' | 'Dispute Under Review'
     walletDeductionStatus: 'Debited from Current Balance',
     imageUrl:
@@ -39,8 +44,8 @@ const INITIAL_REVERSALS = [
     reversedMargin: 150,
     formattedReversed: '-₹150.00',
     returnReason: 'Fabric color variation from photo',
-    returnDate: '23 Oct 2024',
-    reversalDate: '24 Oct 2024',
+    returnDate: getRecentDate(4),
+    reversalDate: getRecentDate(3),
     status: 'Deducted',
     walletDeductionStatus: 'Debited from Current Balance',
     imageUrl:
@@ -61,7 +66,7 @@ const INITIAL_REVERSALS = [
     reversedMargin: 200,
     formattedReversed: '-₹200.00',
     returnReason: 'Customer changed mind at delivery',
-    returnDate: '22 Oct 2024',
+    returnDate: getRecentDate(5),
     reversalDate: 'Pending Warehouse Delivery',
     status: 'Pending Reversal',
     walletDeductionStatus: 'Will be adjusted upon warehouse intake',
@@ -83,8 +88,8 @@ const INITIAL_REVERSALS = [
     reversedMargin: 450,
     formattedReversed: '-₹450.00',
     returnReason: 'Defective zipper / Fabric tear',
-    returnDate: '19 Oct 2024',
-    reversalDate: '21 Oct 2024',
+    returnDate: getRecentDate(8),
+    reversalDate: getRecentDate(6),
     status: 'Deducted',
     walletDeductionStatus: 'Debited from Current Balance',
     imageUrl:
@@ -105,8 +110,8 @@ const INITIAL_REVERSALS = [
     reversedMargin: 350,
     formattedReversed: '-₹350.00',
     returnReason: 'Customer claims dial was damaged in transit',
-    returnDate: '16 Oct 2024',
-    reversalDate: '18 Oct 2024',
+    returnDate: getRecentDate(11),
+    reversalDate: getRecentDate(9),
     status: 'Dispute Under Review',
     walletDeductionStatus: 'Margin withheld pending dispute audit',
     imageUrl:

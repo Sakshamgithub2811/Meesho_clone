@@ -226,3 +226,23 @@ export const generateNewCoupon = async (req, res) => {
     });
   }
 };
+
+/**
+ * Server-side helper to calculate verified coupon discount
+ */
+export const calculateCouponDiscount = (code, cartTotal) => {
+  if (!code || typeof code !== 'string') return 0;
+  const cleanCode = code.trim().toUpperCase();
+  const total = parseFloat(cartTotal) || 0;
+
+  const coupon = activeCoupons.find(c => c.code.toUpperCase() === cleanCode);
+  if (!coupon) return 0;
+  if (new Date(coupon.expiresAt) <= new Date()) return 0;
+  if (total < coupon.minOrder) return 0;
+
+  if (coupon.type === 'PERCENT') {
+    const calculated = Math.round((total * coupon.value) / 100);
+    return Math.min(coupon.maxDiscount || calculated, calculated);
+  }
+  return Math.min(total, coupon.value);
+};

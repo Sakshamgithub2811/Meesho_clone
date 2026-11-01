@@ -6,6 +6,11 @@ export default function HomeScreenFlutterLuxe({ onNavigate = () => {} }) {
   const [activeCategory, setActiveCategory] = useState('Sarees');
   const [activeTab, setActiveTab] = useState('Home');
 
+  const isReseller = Boolean(
+    typeof window !== 'undefined' &&
+    (localStorage.getItem('mshoppy_reseller_token') || localStorage.getItem('mshoppy_affiliate_token'))
+  );
+
   const handleSearch = (e) => {
     if (e.key === 'Enter' || e.type === 'click') {
       if (searchQuery.trim()) {
@@ -236,14 +241,14 @@ export default function HomeScreenFlutterLuxe({ onNavigate = () => {} }) {
                   alt={product.title}
                   src={product.image}
                 />
-                <div className="absolute top-3 left-3 bg-[#008644] text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow-md">
+                <div className="absolute top-3 left-3 bg-[#FF3F6C] text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow-md">
                   <span
                     className="material-symbols-outlined text-[12px]"
                     style={{ fontVariationSettings: "'FILL' 1" }}
                   >
-                    payments
+                    local_shipping
                   </span>
-                  Resell &amp; Earn ₹{product.margin}
+                  Free Delivery
                 </div>
               </div>
 
@@ -283,7 +288,7 @@ export default function HomeScreenFlutterLuxe({ onNavigate = () => {} }) {
       </main>
 
       {/* Universal Responsive Bottom Navigation Bar */}
-      <AppBottomNav activeNav="home" onNavigate={onNavigate} />
+      <AppBottomNav activeNav="home" onNavigate={onNavigate} role={isReseller ? 'reseller' : 'customer'} />
     </div>
   );
 }

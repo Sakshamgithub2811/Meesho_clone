@@ -25,6 +25,11 @@ import wishlistRoutes from './wishlist.routes.js';
 import addressRoutes from './address.routes.js';
 import reviewRoutes from './review.routes.js';
 import couponRoutes from './coupon.routes.js';
+import flashSaleRoutes from './flashSale.routes.js';
+import returnRoutes from './return.routes.js';
+import paymentRoutes from './payment.routes.js';
+import walletRoutes from './wallet.routes.js';
+import bannerRoutes from './banner.routes.js';
 
 const apiRouter = Router();
 
@@ -72,5 +77,11 @@ apiRouter.use('/wishlist', wishlistRoutes);
 apiRouter.use('/addresses', addressRoutes);
 apiRouter.use('/reviews', reviewRoutes);
 apiRouter.use('/coupons', couponRoutes);
+apiRouter.use('/flash-sale', flashSaleRoutes);
+apiRouter.use('/returns', returnRoutes);
+apiRouter.use('/payment', paymentRoutes);
+apiRouter.use('/wallet', walletRoutes);
+apiRouter.use('/wallets', walletRoutes);
+apiRouter.use('/banners', bannerRoutes);
 
 export default apiRouter;

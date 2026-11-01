@@ -43,7 +43,7 @@ export default function AdminDashboardOverview({ onNavigateTab }) {
         setStats(res.data.stats);
         if (isManual) {
           toast.success("Dashboard Refreshed", {
-            description: "Real-time analytics database se sync ho gaya!"
+            description: "Real-time analytics synchronized with database!"
           });
         }
       }

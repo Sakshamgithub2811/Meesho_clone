@@ -8,7 +8,7 @@ const initialConversations = [
     id: 1,
     name: "Alex Rivera",
     role: "Verified Supplier",
-    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCYIWJGvVF9x6xwSYsW2O8630jBgwN_qdKvO84ODHaNJ7cF-9atMuYOTbMBDcwBWYi6dYHmCcC-229NdNapDM65u-N9JW-U5Q8ChWzYkbfMKQazBNFbouQbe29Iuoi4itfJCqg3N1oRIR5xGJ_hCDMmHZssY7OZKiXA63_BpjjZ5Yw-rsnktqOgbIGIZvPsaqGBUbWWAHqSICezCy40Du_IkzJndaXXHfJm3VQizda9NxXNRuMk2XWLl97rCF4_yH2UphO7XyzEeTo",
+    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80",
     online: true,
     lastMsg: "Yes, we just restocked! 12 units of XL remaining.",
     time: "10:20 AM",
@@ -19,7 +19,7 @@ const initialConversations = [
     id: 2,
     name: "Varanasi Silks",
     role: "Top Saree Supplier",
-    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuC3CXmiCJTkUBgfAZD78N7CQvDchFlfGI51TEstPAjPveHqZGaXDvH5m5ESZndZg9-Wrx7IKuL3wPe4WHTn_qi3UJaCCwc27TtouBGajzX4msFFwZXbfvbvKnLpu00www7Vtfo-i9aRgL3bt6qpXn0d1WmIEcKuJfXjenL45le1T6r9Nj_D0qpOWTZRBfY60gVuyJ3NV-iDWSCNn8Leh7lpEGG07f1JM5O6xrmAoxUOiaxnYb--JdIDFzNKl1jOIxI-di5oyJBmCNU",
+    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80",
     online: true,
     lastMsg: "Is this saree in stock for bulk order?",
     time: "10:30 AM",
@@ -30,7 +30,7 @@ const initialConversations = [
     id: 3,
     name: "Aditi Designer Hub",
     role: "Kurti Manufacturer",
-    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuBuOGkFkQ5ltfyNu5mBrHZah1cm9PsvZO8Ct2mTJp6uaYUgGO0tZ3zPuAAxdWgENdu9NWod4KZtcCfFzNRRphUmBGwXlhULYIDg7PBB5p4wrjpxAk68eZOzrkPuu0UvizRQRs1SANpfiPJTBDCzamGNIdIi-puaRs6CxOV_l4MrjpoQviDS04CpnfGrpXhTlI6CVM9Ol3lktpzLr0Az-aPlRzMGKz5mV8lAXaiDcaWJ1wnGPI8gIuhQxSCrvd2LZ_pqHkEM5a4HXMg",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80",
     online: false,
     lastMsg: "Price updated for the Kurti set. Check catalog.",
     time: "09:15 AM",
@@ -53,7 +53,7 @@ const initialConversations = [
     id: 5,
     name: "Global Fashion Hub",
     role: "Western Wear Supplier",
-    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCrD5qWXRR8JmBzXMO-k0bU9qhCAcnrfJ-z5Cw6BvB2UEDZ_VwtTr3XYktc-1SP44i1XcXqHKqzIio-AFMnCzDz5gHLbdG3TEUnD0DgK0rBr1DLvhl2Mxjqv1IgMiHwepc88vTIWZDjtX38XeQEW2Xkotvx9rhm8OkCzIPRSzKKKGVzVdcL9mT8E-fh7FuDukTFftGugCLKZ76Tv3JMFqb0d8jMw8qGcKF9ybR-17FpDJL7qQ4be0ukjAkEtXUKWnpAXIdjU4BzCo4",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
     online: false,
     lastMsg: "Your customer shipment #MS452 has been dispatched.",
     time: "OCT 24",
@@ -117,9 +117,9 @@ export default function MeeshoMessengerChatHub() {
           </div>
 
           {[
-            { name: "Alex (Supplier)", online: true, img: "https://lh3.googleusercontent.com/aida-public/AB6AXuCYIWJGvVF9x6xwSYsW2O8630jBgwN_qdKvO84ODHaNJ7cF-9atMuYOTbMBDcwBWYi6dYHmCcC-229NdNapDM65u-N9JW-U5Q8ChWzYkbfMKQazBNFbouQbe29Iuoi4itfJCqg3N1oRIR5xGJ_hCDMmHZssY7OZKiXA63_BpjjZ5Yw-rsnktqOgbIGIZvPsaqGBUbWWAHqSICezCy40Du_IkzJndaXXHfJm3VQizda9NxXNRuMk2XWLl97rCF4_yH2UphO7XyzEeTo" },
-            { name: "Varanasi Silk", online: true, img: "https://lh3.googleusercontent.com/aida-public/AB6AXuC3CXmiCJTkUBgfAZD78N7CQvDchFlfGI51TEstPAjPveHqZGaXDvH5m5ESZndZg9-Wrx7IKuL3wPe4WHTn_qi3UJaCCwc27TtouBGajzX4msFFwZXbfvbvKnLpu00www7Vtfo-i9aRgL3bt6qpXn0d1WmIEcKuJfXjenL45le1T6r9Nj_D0qpOWTZRBfY60gVuyJ3NV-iDWSCNn8Leh7lpEGG07f1JM5O6xrmAoxUOiaxnYb--JdIDFzNKl1jOIxI-di5oyJBmCNU" },
-            { name: "Priya (Reseller)", online: false, img: "https://lh3.googleusercontent.com/aida-public/AB6AXuALrag4BONFCklaNRkaSvO2vAnW7K1zAqcI_bzrGluc64rHWx-WrlnXMxJ80tglJohRyT07xo8_ztEq5TaBrTqsJpYrMxhFq99TlRBUlIl7b2Vbtqv7XQbbWttu63IgUwjQiis7cWP4J-NPkCYnsXcee3UGVOngoMeD_pgz7e7n0NaeXiV9TjDdbMwPDoeztBt2M_SvmGjCgbDpquo76CqfVCRIQ84bMOaXM_HHVLb0cj_rjc9qqmn6BLLd1DuTxjuPuJ35huFbyME" }
+            { name: "Alex (Supplier)", online: true, img: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80" },
+            { name: "Varanasi Silk", online: true, img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80" },
+            { name: "Priya (Reseller)", online: false, img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80" }
           ].map((item, idx) => (
             <div 
               key={idx}

@@ -83,7 +83,7 @@ export default function ConversationScreen() {
               <img
                 alt="Alex Rivera"
                 className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYIWJGvVF9x6xwSYsW2O8630jBgwN_qdKvO84ODHaNJ7cF-9atMuYOTbMBDcwBWYi6dYHmCcC-229NdNapDM65u-N9JW-U5Q8ChWzYkbfMKQazBNFbouQbe29Iuoi4itfJCqg3N1oRIR5xGJ_hCDMmHZssY7OZKiXA63_BpjjZ5Yw-rsnktqOgbIGIZvPsaqGBUbWWAHqSICezCy40Du_IkzJndaXXHfJm3VQizda9NxXNRuMk2XWLl97rCF4_yH2UphO7XyzEeTo"
+                src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80"
               />
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></div>
             </div>
@@ -130,7 +130,7 @@ export default function ConversationScreen() {
             <img
               alt="Embroidered Silk Saree"
               className="w-14 h-14 rounded-xl object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-zmSpVIahy8KGiSdimC_yd04lqZI2JErL2m3pbtCEvoBIoBRUqZz-xqhR8p4BC-LbSna0AeB94hqCgEd014RTteoa15n-Pjtt7HyoUxYdUTIkixfeQa2ZZvwtIo5QLUbTiVrqgd8eAaI0_4vDt4pHqnAhutqLM7R7iR06auoPiISKJjEJ1iPxaEXXfMKgpbW0fufAm7gxcO52jXDrnttz7XvDPD0PLnsZ1CWHvIAOO81nMSyvoPRpOl55owCTyXDxdBG04BYwedI"
+              src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&auto=format&fit=crop&q=80"
             />
             <div className="flex-1 min-w-0">
               <span className="text-[10px] font-bold uppercase tracking-wider text-primary block">Active Resell Item</span>

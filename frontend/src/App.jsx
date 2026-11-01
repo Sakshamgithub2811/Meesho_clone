@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
+import { recordAffiliateClick } from './services/affiliateAuthService';
 
 // Reseller & Fintech Pages (Shruti Branch)
 import HomeUserReseller from './pages/Reseller Earnings & Wallets/HomeUserReseller';
@@ -172,6 +173,8 @@ const screenCatalog = [
   { path: '/user-dashboard1?tab=profile', name: 'Account Profile & Settings', icon: '👤', group: 'Shopping' },
   { path: '/orders', name: 'Customer My Orders', icon: '📦', group: 'Shopping' },
   { path: '/return-request', name: 'Return / Exchange Flow', icon: '🔄', group: 'Shopping' },
+  { path: '/support-center', name: 'Customer Support Center', icon: '🎧', group: 'Shopping' },
+  { path: '/raise-a-ticket', name: 'Raise Support Ticket', icon: '🎫', group: 'Shopping' },
 
   // 4. Logistics & Driver Fleet
   { path: '/driver-dashboard', name: 'Driver Dashboard', icon: '🛵', group: 'Logistics' },
@@ -505,6 +508,25 @@ function FloatingNavigator() {
 // Router Bridge Component
 function AppRoutes() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Real-time Referral & Affiliate Link Attribution Engine
+  React.useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(location.search);
+      const refCode = searchParams.get('ref') || searchParams.get('aff');
+      const customMargin = searchParams.get('margin') || searchParams.get('m');
+      if (refCode && refCode.trim()) {
+        const cleanRef = refCode.trim().toUpperCase();
+        localStorage.setItem('mshoppy_referral_code', cleanRef);
+        localStorage.setItem('mshoppy_referral_timestamp', Date.now().toString());
+        if (customMargin && !isNaN(Number(customMargin))) {
+          localStorage.setItem('mshoppy_affiliate_margin', Number(customMargin).toString());
+        }
+        recordAffiliateClick(cleanRef);
+      }
+    } catch (e) {}
+  }, [location.search]);
 
   // Helper navigate prop for legacy components expecting onNavigate/onBack
   const handleNav = (pathOrId) => {
@@ -796,6 +818,7 @@ function AppRoutes() {
         {/* Customer Shopping Routes */}
         <Route path="/user-home" element={<HomeUserCustomer />} />
         <Route path="/product" element={<ProductDetail onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/product/:id" element={<ProductDetail onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/cart" element={<ShoppingCart onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/address" element={<CheckoutAddressSelection onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/payment" element={<CheckoutPayment onNavigate={handleNav} onBack={handleBack} />} />
@@ -852,6 +875,11 @@ function AppRoutes() {
           } 
         />
         <Route path="/return-request" element={<ReturnRequest onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/support-center" element={<SupportCenter onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/support" element={<SupportCenter onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/help" element={<SupportCenter onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/raise-a-ticket" element={<RaiseATicket onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/raise-ticket" element={<RaiseATicket onNavigate={handleNav} onBack={handleBack} />} />
 
         {/* Logistics & Driver Fleet Routes */}
         <Route path="/driver-dashboard" element={<DriverDashboardMobile onNavigate={handleNav} />} />

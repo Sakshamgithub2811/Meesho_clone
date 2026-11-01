@@ -38,8 +38,12 @@ export default function SearchResults({ onNavigate, onBack }) {
 
   useEffect(() => {
     const q = searchParams.get('q');
+    const cat = searchParams.get('category');
     if (q !== null) {
       setSearchQuery(q);
+    }
+    if (cat) {
+      setActiveFilter(cat);
     }
   }, [searchParams]);
 
@@ -314,7 +318,7 @@ export default function SearchResults({ onNavigate, onBack }) {
         )}
       </main>
 
-      <AppBottomNav activeNav="search" onNavigate={handleNav} />
+      <AppBottomNav activeNav="categories" onNavigate={handleNav} role="customer" homePath="/user-home" />
     </div>
   );
 }

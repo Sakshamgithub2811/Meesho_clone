@@ -20,7 +20,14 @@ export default class ErrorBoundary extends React.Component {
   };
 
   handleGoHome = () => {
-    window.location.href = '/seller-web-dashboard1';
+    const path = window.location.pathname;
+    if (path.includes('/seller')) {
+      window.location.href = '/seller-web-dashboard1';
+    } else if (path.includes('/admin')) {
+      window.location.href = '/admin-panel';
+    } else {
+      window.location.href = '/user-dashboard1';
+    }
   };
 
   render() {
@@ -33,7 +40,7 @@ export default class ErrorBoundary extends React.Component {
             </div>
             <h2 className="text-xl font-black text-slate-900 mb-2">Something went wrong</h2>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-              An unexpected render issue occurred. Your data is safe. Please refresh the page or return to the supplier dashboard.
+              An unexpected render issue occurred. Your data is safe. Please refresh the page or return to the dashboard.
             </p>
             {this.state.error?.message && (
               <div className="mb-6 p-3 rounded-xl bg-slate-100 text-[11px] font-mono text-slate-700 text-left overflow-auto max-h-24">

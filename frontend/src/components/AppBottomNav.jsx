@@ -19,7 +19,23 @@ export default function AppBottomNav({ activeNav, active, onNavigate, role = 're
     }
   };
 
-  const isCustomer = role === 'customer' || homePath === '/user-home';
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isCustomerPath = [
+    '/user-home',
+    '/flash',
+    '/explorer',
+    '/categories',
+    '/search',
+    '/product',
+    '/cart',
+    '/wishlist',
+    '/orders',
+    '/sarees',
+    '/western',
+    '/spotlight'
+  ].some((p) => currentPath.startsWith(p));
+
+  const isCustomer = role === 'customer' || homePath === '/user-home' || isCustomerPath;
   const effectiveHome = homePath || (isCustomer ? '/user-home' : '/reseller-home');
 
   const navItems = isCustomer ? [

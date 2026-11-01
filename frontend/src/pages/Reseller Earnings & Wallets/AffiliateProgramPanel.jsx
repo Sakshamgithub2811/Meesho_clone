@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
-import { getStoredAffiliate, logoutAffiliate, subscribeAffiliateAuth } from '../../services/affiliateAuthService';
+import { getStoredAffiliate, logoutAffiliate, subscribeAffiliateAuth, getAffiliateStats } from '../../services/affiliateAuthService';
+import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import { getStoredCustomer } from '../../services/customerAuthService';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
+import { getUnreadCount, subscribeNotifications } from '../../services/notificationService';
 
 export default function AffiliateProgramPanel() {
   const navigate = useNavigate();
@@ -18,14 +21,119 @@ export default function AffiliateProgramPanel() {
 
   useEffect(() => {
     const unsub = subscribeAffiliateAuth((sess) => {
-      setAffiliateSession(sess);
+      setAffiliateSession(sess || { stats: getAffiliateStats() });
+    });
+    return unsub;
+  }, []);
+
+  // KYC Access Guard: User must have Approved KYC to access this panel
+  useEffect(() => {
+    const customer = getStoredCustomer()?.user;
+    const app = getAffiliateApp();
+    const storedUser = affiliateSession?.user;
+
+    // Strict ownership check: prevent other users' leftover affiliate sessions
+    if (customer) {
+      if (app && app.userId && app.userId !== customer.id) {
+        logoutAffiliate();
+        navigate('/affiliate-kyc', { replace: true });
+        return;
+      }
+      if (
+        storedUser &&
+        storedUser.id &&
+        storedUser.id !== `affiliate_${customer.phone}` &&
+        storedUser.email !== customer.email &&
+        storedUser.id !== customer.id
+      ) {
+        logoutAffiliate();
+        navigate('/affiliate-kyc', { replace: true });
+        return;
+      }
+    }
+
+    const currentStatus = app?.status || app?.kycStatus || storedUser?.kycStatus;
+
+    if (!app && (!storedUser || storedUser?.kycStatus === 'NOT_SUBMITTED' || !storedUser?.kycStatus)) {
+      // User has not submitted KYC yet
+      navigate('/affiliate-kyc', { replace: true });
+    } else if (currentStatus === 'Under Review' || currentStatus === 'Pending' || currentStatus === 'PENDING') {
+      // Submitted but waiting for admin approval
+      navigate('/affiliate-kyc-status', { replace: true });
+    } else if (currentStatus === 'Rejected' || currentStatus === 'REJECTED') {
+      // KYC was rejected
+      navigate('/affiliate-kyc-status', { replace: true });
+    }
+  }, [affiliateSession, navigate]);
+
+  const [unreadNotifs, setUnreadNotifs] = useState(() => getUnreadCount());
+
+  useEffect(() => {
+    const unsub = subscribeNotifications(() => {
+      setUnreadNotifs(getUnreadCount());
     });
     return unsub;
   }, []);
 
   const currentAffiliate = affiliateSession?.user;
-  const affiliateStats = affiliateSession?.stats;
-  const referralCode = currentAffiliate?.referralCode || "MEESHO500";
+  const affiliateStats = affiliateSession?.stats || getAffiliateStats();
+  
+  const affiliateApp = getAffiliateApp();
+  const customerUser = getStoredCustomer();
+  const customer = customerUser?.user;
+
+  // Resolve real partner name dynamically from KYC submission or customer profile (NO HARDCODED DUMMY)
+  const partnerName = (
+    affiliateApp?.fullName ||
+    currentAffiliate?.fullName ||
+    customer?.fullName ||
+    customer?.name ||
+    JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}')?.fullName ||
+    JSON.parse(localStorage.getItem('user') || '{}')?.fullName ||
+    JSON.parse(localStorage.getItem('user') || '{}')?.name ||
+    (affiliateApp?.email ? affiliateApp.email.split('@')[0] : '') ||
+    (customer?.email ? customer.email.split('@')[0] : '') ||
+    'Partner'
+  );
+
+  const partnerInitial = partnerName ? partnerName.trim().charAt(0).toUpperCase() : 'P';
+
+  const dynamicFallbackCode = (() => {
+    const existing = localStorage.getItem('mshoppy_affiliate_dyn_code');
+    if (existing) return existing;
+    const prefix = partnerName 
+      ? partnerName.replace(/[^a-zA-Z]/g, '').slice(0, 5).toUpperCase()
+      : (customer?.email ? customer.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() : 'PARTNER');
+    const gen = `AFF-${prefix}${Math.floor(100 + Math.random() * 900)}`;
+    localStorage.setItem('mshoppy_affiliate_dyn_code', gen);
+    return gen;
+  })();
+
+  const computedCode = currentAffiliate?.referralCode 
+    || affiliateApp?.applicationId 
+    || dynamicFallbackCode;
+  const referralCode = computedCode;
+
+  // Sync real partner identity to affiliate session so all reseller pages use real name
+  useEffect(() => {
+    if (partnerName && (!currentAffiliate?.fullName || currentAffiliate?.fullName === 'SOVEREIGN' || currentAffiliate?.fullName === 'Sovereign Partner')) {
+      const updatedUser = {
+        ...(currentAffiliate || {}),
+        id: currentAffiliate?.id || affiliateApp?.userId || customer?.id || `affiliate_${Date.now()}`,
+        fullName: partnerName,
+        email: currentAffiliate?.email || affiliateApp?.email || customer?.email || '',
+        phone: currentAffiliate?.phone || affiliateApp?.phone || customer?.phone || '',
+        referralCode: referralCode,
+        kycStatus: affiliateApp?.status || currentAffiliate?.kycStatus || 'Approved',
+        role: 'AFFILIATE',
+      };
+      localStorage.setItem('mshoppy_affiliate_user', JSON.stringify(updatedUser));
+      setAffiliateSession((prev) => ({
+        ...(prev || {}),
+        user: updatedUser,
+      }));
+    }
+  }, [partnerName, referralCode]);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(referralCode);
@@ -34,7 +142,7 @@ export default function AffiliateProgramPanel() {
   };
 
   const handleCopyBannerLink = (category) => {
-    const link = `https://meesho.com/campaign/${category.toLowerCase()}?aff=${referralCode}`;
+    const link = `${window.location.origin}/explorer?ref=${referralCode}&category=${category.toLowerCase()}`;
     navigator.clipboard.writeText(link);
     setCopiedBanner(category);
     setTimeout(() => setCopiedBanner(null), 2000);
@@ -61,24 +169,27 @@ export default function AffiliateProgramPanel() {
               <span className="material-symbols-outlined text-2xl">arrow_back</span>
             </button>
             <div className="w-10 h-10 rounded-full border-2 border-[#f6b630] overflow-hidden flex items-center justify-center bg-[#251f33] font-bold text-sm text-[#f6b630]">
-              {currentAffiliate?.fullName ? currentAffiliate.fullName.charAt(0).toUpperCase() : 'A'}
+              {partnerInitial}
             </div>
             <div>
               <span className="text-base sm:text-lg font-black tracking-[0.05em] uppercase text-[#f6b630] font-['Plus_Jakarta_Sans'] block leading-none">
-                {currentAffiliate?.fullName || 'SOVEREIGN'}
+                {partnerName}
               </span>
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                {currentAffiliate?.kycStatus ? `KYC: ${currentAffiliate.kycStatus}` : 'Verified Partner'}
+                {currentAffiliate?.kycStatus === 'Approved' || affiliateApp?.status === 'Approved' ? 'Verified Partner' : (currentAffiliate?.kycStatus || affiliateApp?.status || 'Verified Partner')}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/notifications')}
-              className="material-symbols-outlined text-[#f6b630] hover:bg-[#282430] transition-colors duration-300 p-2 rounded-full active:scale-95 transition-transform cursor-pointer"
+              className="relative p-2 rounded-full hover:bg-[#282430] transition-colors duration-300 active:scale-95 cursor-pointer text-[#f6b630]"
               title="Notifications"
             >
-              notifications
+              <span className="material-symbols-outlined text-2xl">notifications</span>
+              {unreadNotifs > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#FF3F6C] rounded-full ring-2 ring-[#100d15] animate-pulse"></span>
+              )}
             </button>
             <button
               onClick={() => setShowLogoutConfirm(true)}
@@ -152,11 +263,13 @@ export default function AffiliateProgramPanel() {
               </div>
               <div>
                 <p className="text-4xl md:text-6xl font-black text-white tracking-tight">
-                  ₹12,450.50
+                  ₹{(affiliateStats?.totalCommission || 0).toLocaleString('en-IN')}
                 </p>
                 <p className="text-emerald-400 text-xs font-bold mt-2 flex items-center gap-1">
                   <span className="material-symbols-outlined text-sm">trending_up</span>
-                  +₹2,450 earned in the last 7 days
+                  {affiliateStats?.totalCommission > 0
+                    ? `₹${affiliateStats.totalCommission} earned via referral sales`
+                    : 'Share your referral code to start earning weekly commissions'}
                 </p>
               </div>
             </div>
@@ -170,7 +283,7 @@ export default function AffiliateProgramPanel() {
               </div>
               <div>
                 <p className="text-gray-400 text-[11px] font-bold uppercase tracking-wider">Total Link Clicks</p>
-                <p className="text-3xl font-black text-white mt-0.5">1,240</p>
+                <p className="text-3xl font-black text-white mt-0.5">{affiliateStats?.clicks || 0}</p>
               </div>
             </div>
 
@@ -180,7 +293,7 @@ export default function AffiliateProgramPanel() {
               </div>
               <div>
                 <p className="text-gray-400 text-[11px] font-bold uppercase tracking-wider">Converted Orders</p>
-                <p className="text-3xl font-black text-white mt-0.5">84</p>
+                <p className="text-3xl font-black text-white mt-0.5">{affiliateStats?.convertedOrders || 0}</p>
               </div>
             </div>
           </div>
@@ -192,42 +305,32 @@ export default function AffiliateProgramPanel() {
             <h3 className="text-xl font-bold text-white tracking-tight">Recent Activity</h3>
             <span className="text-xs text-gray-400">Real-time tracker</span>
           </div>
-          <div className="bg-[#1c1724]/90 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
-            <div className="p-4 flex items-center gap-4 hover:bg-white/5 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
-                <span className="material-symbols-outlined text-lg">person_add</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white">New registration via link</p>
-                <p className="text-xs text-gray-400">10m ago • Referral Network</p>
-              </div>
-              <span className="text-xs bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full">
-                Active
-              </span>
+          {Array.isArray(affiliateStats?.recentOrders) && affiliateStats.recentOrders.length > 0 ? (
+            <div className="bg-[#1c1724]/90 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
+              {affiliateStats.recentOrders.map((act, i) => (
+                <div key={i} className="p-4 flex items-center gap-4 hover:bg-white/5 transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400">
+                    <span className="material-symbols-outlined text-lg">shopping_bag</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white">{act.title || 'Referral Order'}</p>
+                    <p className="text-xs text-gray-400">{act.time || 'Recently'}</p>
+                  </div>
+                  <span className="text-sm font-black text-[#f6b630]">+₹{act.commission}</span>
+                </div>
+              ))}
             </div>
-
-            <div className="p-4 flex items-center gap-4 hover:bg-white/5 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400">
-                <span className="material-symbols-outlined text-lg">shopping_bag</span>
+          ) : (
+            <div className="bg-[#1c1724]/90 border border-white/10 rounded-2xl p-6 text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-white/5 text-[#f6b630] flex items-center justify-center mx-auto">
+                <span className="material-symbols-outlined text-2xl">insights</span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white">Order placed by Rahul V.</p>
-                <p className="text-xs text-gray-400">2h ago • Kurti Catalog</p>
-              </div>
-              <span className="text-sm font-black text-[#f6b630]">+₹150</span>
+              <p className="text-white font-bold text-sm">No Referral Activity Yet</p>
+              <p className="text-gray-400 text-xs">
+                Share your referral code <strong className="text-[#f6b630] font-mono">{referralCode}</strong> or promote the campaign links below. Your tracked clicks and commissions will update here in real-time!
+              </p>
             </div>
-
-            <div className="p-4 flex items-center gap-4 hover:bg-white/5 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400">
-                <span className="material-symbols-outlined text-lg">shopping_bag</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white">Order placed by Priya S.</p>
-                <p className="text-xs text-gray-400">5h ago • Silk Saree Catalog</p>
-              </div>
-              <span className="text-sm font-black text-[#f6b630]">+₹250</span>
-            </div>
-          </div>
+          )}
         </section>
 
         {/* Marketing Material: Promote Now */}
@@ -238,8 +341,8 @@ export default function AffiliateProgramPanel() {
             <div className="h-64 relative rounded-3xl overflow-hidden group border border-white/10 shadow-xl">
               <img
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                alt="Fashion Campaign"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJBu2Q0VHbgQcCdjY9oKLJTtMW9mnbg56JY2XvO2mPM7uJ7LM4K-Q_BAyfcIflU5Nw4UStZ5p8dBDgvVcVIeP6IRTow2G-cEVJjkNfMagoj8tp6cDJ0CBIs58ck8Nns2LEpRm4dnudeY9mheaR6h8_rNoyUG0NDcGuQvimcDp0xfs_mMQOK9Mz_F1mNxCFPXigHyU1Icegk54RiNs7igqXiDR7WMwQZ_Ap8D54rFksf8hLzAiBFTluSfWUE1LUXGrLYrDM2UNJSXU"
+                alt="Festive Fashion Campaign"
+                src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
               <div className="absolute bottom-0 p-6 w-full space-y-3">
@@ -247,16 +350,16 @@ export default function AffiliateProgramPanel() {
                   Ethnic Festive '26
                 </span>
                 <h4 className="text-lg font-bold text-white leading-tight">
-                  Grand Festive Ethnic Wear (15% Commission)
+                  Grand Festive Ethnic Wear (Custom Margin)
                 </h4>
                 <button
-                  onClick={() => handleCopyBannerLink('FestiveFashion')}
+                  onClick={() => handleCopyBannerLink('Ethnic Wear')}
                   className="w-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-white hover:text-black transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-sm">
-                    {copiedBanner === 'FestiveFashion' ? 'check' : 'link'}
+                    {copiedBanner === 'Ethnic Wear' ? 'check' : 'link'}
                   </span>
-                  {copiedBanner === 'FestiveFashion' ? 'Link Copied!' : 'Copy Campaign Link'}
+                  {copiedBanner === 'Ethnic Wear' ? 'Link Copied!' : 'Copy Campaign Link'}
                 </button>
               </div>
             </div>
@@ -266,7 +369,7 @@ export default function AffiliateProgramPanel() {
               <img
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 alt="Home Living Campaign"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHqKClIM-SdwJTWo2EKQbZ5UcZLq50pmwHKw_Rj8hQiuPwDrHomg_bIfFz__z3jhw8C0Y5fZWuGPIGz2EFgxWC4oS33OUGNynw8DK4ViJmqkd53YtPRcEdRnkKEMvNEHFfCCS9UPOycYszZ3GdPP04O6o0-tWPfCIGVhH5nY0ADvwnE9-dSVAu8x6F1Ca_GIAeNSrFXM4aGp0OHYB6Jjk_eO1n2Frf2Qpt5PfkN_ferdZmZ4HFpAhFKrJvkC6buR5a_hso3WVyeJs"
+                src="https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&auto=format&fit=crop&q=80"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
               <div className="absolute bottom-0 p-6 w-full space-y-3">
@@ -274,16 +377,16 @@ export default function AffiliateProgramPanel() {
                   Home Decor
                 </span>
                 <h4 className="text-lg font-bold text-white leading-tight">
-                  Modern Living & Decor Essentials (18% Comm)
+                  Modern Living & Decor Essentials (Custom Margin)
                 </h4>
                 <button
-                  onClick={() => handleCopyBannerLink('HomeLiving')}
+                  onClick={() => handleCopyBannerLink('Home Decor')}
                   className="w-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-white hover:text-black transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-sm">
-                    {copiedBanner === 'HomeLiving' ? 'check' : 'link'}
+                    {copiedBanner === 'Home Decor' ? 'check' : 'link'}
                   </span>
-                  {copiedBanner === 'HomeLiving' ? 'Link Copied!' : 'Copy Campaign Link'}
+                  {copiedBanner === 'Home Decor' ? 'Link Copied!' : 'Copy Campaign Link'}
                 </button>
               </div>
             </div>

@@ -1,11 +1,23 @@
 import prisma from '../config/prisma.js';
+import redisClient from '../config/redisClient.js';
 
 /**
  * Controller to fetch all products with optional filters, search, and sorting.
  */
 export const getProducts = async (req, res) => {
   try {
-    const { category, search, minPrice, maxPrice, sort, page = 1, limit = 50 } = req.query;
+    const { category, search, minPrice, maxPrice, sort, page = 1, limit = 1000 } = req.query;
+
+    // Fast-path: Check Redis cache if running
+    const cacheKey = `products:${category || 'all'}:${search || ''}:${minPrice || ''}:${maxPrice || ''}:${sort || 'default'}:${page}:${limit}`;
+    if (redisClient?.isOpen) {
+      try {
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+          return res.status(200).json(JSON.parse(cached));
+        }
+      } catch (cacheErr) {}
+    }
 
     const conditions = [];
 
@@ -95,12 +107,18 @@ export const getProducts = async (req, res) => {
       prisma.product.count({ where })
     ]);
 
-    return res.status(200).json({
+    const responsePayload = {
       success: true,
       count: products.length,
       total,
       data: products
-    });
+    };
+
+    if (redisClient?.isOpen) {
+      redisClient.setEx(cacheKey, 60, JSON.stringify(responsePayload)).catch(() => {});
+    }
+
+    return res.status(200).json(responsePayload);
   } catch (error) {
     console.error('Error fetching products:', error);
     return res.status(500).json({

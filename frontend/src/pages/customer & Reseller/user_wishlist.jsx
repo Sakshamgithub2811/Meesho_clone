@@ -229,7 +229,7 @@ export default function UserWishlist({ onNavigate, onBack }) {
         )}
       </main>
 
-      <AppBottomNav activeNav="home" onNavigate={handleNav} />
+      <AppBottomNav activeNav="wishlist" onNavigate={handleNav} role="customer" homePath="/user-home" />
     </div>
   );
 }

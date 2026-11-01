@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAddresses, saveAddress } from '../../services/ecommerceService';
+import INDIAN_STATES from '../../utils/indianStates';
 
 export default function CheckoutAddressSelection({ onNavigate, onBack }) {
   const navigate = useNavigate();
@@ -339,14 +340,22 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-600 block mb-1">State *</label>
-                  <input
-                    type="text"
+                  <select
                     value={newAddress.state}
                     onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
-                    className="w-full bg-[#f8f9fb] border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
-                    placeholder="e.g. Karnataka"
+                    className="w-full bg-[#f8f9fb] border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 cursor-pointer"
                     required
-                  />
+                  >
+                    <option value="">Select State</option>
+                    {INDIAN_STATES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                    {newAddress.state && !INDIAN_STATES.includes(newAddress.state) && (
+                      <option value={newAddress.state}>{newAddress.state}</option>
+                    )}
+                  </select>
                 </div>
               </div>
 

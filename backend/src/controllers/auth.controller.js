@@ -72,14 +72,14 @@ export const resellerLogin = async (req, res) => {
         role: 'RESELLER',
         avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
         wallet: {
-          balance: 24850.50,
-          pendingAmount: 1240.00,
-          totalEarned: 48920.00,
-          withdrawnAmount: 24069.50,
-          upiId: `${cleanPhone}@upi`,
-          bankLinked: true,
-          bankName: 'HDFC Bank',
-          accountLast4: '4192',
+          balance: 0.00,
+          pendingAmount: 0.00,
+          totalEarned: 0.00,
+          withdrawnAmount: 0.00,
+          upiId: cleanPhone ? `${cleanPhone}@upi` : '',
+          bankLinked: false,
+          bankName: '',
+          accountLast4: '',
         },
         createdAt: new Date().toISOString(),
       };
@@ -159,25 +159,133 @@ export const customerLogin = async (req, res) => {
       });
     }
 
-    let customer = customerStore.get(userId);
+    let customer = null;
 
-    if (!customer) {
+    // 1. Try persisting directly to real Prisma PostgreSQL database
+    try {
+      let profile = await prisma.profile.findFirst({
+        where: {
+          OR: [
+            ...(cleanPhone ? [{ phone: cleanPhone }] : []),
+            ...(email ? [{ email: email.toLowerCase() }] : []),
+            { id: userId }
+          ]
+        },
+        include: {
+          wallet: true,
+          _count: {
+            select: {
+              orders: true,
+              wishlist: true,
+              cart: true
+            }
+          }
+        }
+      });
+
+      if (!profile) {
+        // Create new customer profile in Prisma
+        profile = await prisma.profile.create({
+          data: {
+            id: userId,
+            phone: cleanPhone || null,
+            email: email ? email.toLowerCase() : (cleanPhone ? `${cleanPhone}@customer.mshoppy` : null),
+            fullName: fullName || (cleanPhone ? `Customer +91 ${cleanPhone.slice(0, 2)}****${cleanPhone.slice(-4)}` : 'Valued Customer'),
+            role: 'CUSTOMER',
+            avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+            wallet: {
+              create: {
+                balance: 500.0,
+                pending: 0.0
+              }
+            }
+          },
+          include: {
+            wallet: true,
+            _count: {
+              select: {
+                orders: true,
+                wishlist: true,
+                cart: true
+              }
+            }
+          }
+        });
+      } else {
+        // Update customer profile details if provided
+        const updateData = {};
+        if (fullName && (!profile.fullName || profile.fullName.startsWith('Customer +91'))) {
+          updateData.fullName = fullName;
+        }
+        if (email && !profile.email) {
+          updateData.email = email.toLowerCase();
+        }
+        if (Object.keys(updateData).length > 0) {
+          profile = await prisma.profile.update({
+            where: { id: profile.id },
+            data: updateData,
+            include: {
+              wallet: true,
+              _count: {
+                select: {
+                  orders: true,
+                  wishlist: true,
+                  cart: true
+                }
+              }
+            }
+          });
+        }
+
+        // Ensure wallet exists for this customer
+        if (!profile.wallet) {
+          await prisma.wallet.create({
+            data: {
+              userId: profile.id,
+              balance: 500.0,
+              pending: 0.0
+            }
+          }).catch(() => {});
+        }
+      }
+
       customer = {
-        id: userId,
-        phone: cleanPhone || '',
-        email: email || `${cleanPhone}@mshoppy.user`,
-        fullName: fullName || (cleanPhone ? `Customer +91 ${cleanPhone.slice(0, 2)}****${cleanPhone.slice(-4)}` : 'Valued Customer'),
-        role: 'CUSTOMER',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-        walletBalance: 12840,
-        ordersCount: 4,
-        wishlistCount: 3,
-        createdAt: new Date().toISOString(),
+        id: profile.id,
+        phone: profile.phone || cleanPhone || '',
+        email: profile.email || '',
+        fullName: profile.fullName || 'Valued Customer',
+        role: profile.role || 'CUSTOMER',
+        avatarUrl: profile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        walletBalance: profile.wallet?.balance ?? 500.0,
+        ordersCount: profile._count?.orders ?? 0,
+        wishlistCount: profile._count?.wishlist ?? 0,
+        cartCount: profile._count?.cart ?? 0,
+        createdAt: profile.createdAt?.toISOString?.() || new Date().toISOString()
       };
-      customerStore.set(userId, customer);
-    } else {
-      if (fullName) customer.fullName = fullName;
-      if (email) customer.email = email;
+      customerStore.set(customer.id, customer);
+    } catch (dbError) {
+      console.warn('⚠️ Prisma DB notice in customerLogin, falling back to memory store:', dbError.message);
+      customer = customerStore.get(userId);
+
+      if (!customer) {
+        customer = {
+          id: userId,
+          phone: cleanPhone || '',
+          email: email || `${cleanPhone}@mshoppy.user`,
+          fullName: fullName || (cleanPhone ? `Customer +91 ${cleanPhone.slice(0, 2)}****${cleanPhone.slice(-4)}` : 'Valued Customer'),
+          role: 'CUSTOMER',
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          walletBalance: 500.0,
+          ordersCount: 0,
+          wishlistCount: 0,
+          cartCount: 0,
+          createdAt: new Date().toISOString(),
+        };
+        customerStore.set(userId, customer);
+      } else {
+        if (fullName) customer.fullName = fullName;
+        if (email) customer.email = email;
+      }
     }
 
     const token = await generateFirebaseToken(customer.id, {
@@ -201,6 +309,7 @@ export const customerLogin = async (req, res) => {
         walletBalance: customer.walletBalance,
         ordersCount: customer.ordersCount,
         wishlistCount: customer.wishlistCount,
+        cartCount: customer.cartCount,
       },
     });
   } catch (error) {
@@ -251,21 +360,17 @@ export const affiliateLogin = async (req, res) => {
         fullName: fullName || `Affiliate Partner ${cleanPhone ? `+91 ${cleanPhone.slice(-4)}` : ''}`.trim(),
         role: 'AFFILIATE',
         referralCode: generatedCode,
-        kycStatus: 'APPROVED',
+        kycStatus: 'NOT_SUBMITTED',
         avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
         stats: {
-          totalCommission: 12450.50,
-          pendingCommission: 2450.00,
-          withdrawnAmount: 10000.00,
-          clicks: 1240,
-          convertedOrders: 84,
-          conversionRate: '6.77%',
+          totalCommission: 0,
+          pendingCommission: 0,
+          withdrawnAmount: 0,
+          clicks: 0,
+          convertedOrders: 0,
+          conversionRate: '0%',
         },
-        payoutDetails: {
-          upiId: cleanPhone ? `${cleanPhone}@okaxis` : 'affiliate@upi',
-          bankName: 'HDFC Bank Ltd',
-          accountNumber: 'XXXXXX5891',
-        },
+        payoutDetails: null,
         createdAt: new Date().toISOString(),
       };
       affiliateStore.set(userId, affiliate);
@@ -328,13 +433,55 @@ export const getCurrentUser = async (req, res) => {
         extraData = { wallet: userObj.wallet };
       }
     } else if (role === 'CUSTOMER') {
-      userObj = customerStore.get(id);
-      if (userObj) {
-        extraData = { 
-          walletBalance: userObj.walletBalance,
-          ordersCount: userObj.ordersCount,
-          wishlistCount: userObj.wishlistCount,
-        };
+      try {
+        const profile = await prisma.profile.findUnique({
+          where: { id },
+          include: {
+            wallet: true,
+            _count: {
+              select: {
+                orders: true,
+                wishlist: true,
+                cart: true
+              }
+            }
+          }
+        });
+
+        if (profile) {
+          userObj = {
+            id: profile.id,
+            phone: profile.phone || '',
+            email: profile.email || '',
+            fullName: profile.fullName || 'Valued Customer',
+            role: profile.role || 'CUSTOMER',
+            avatarUrl: profile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+            walletBalance: profile.wallet?.balance ?? 500.0,
+            ordersCount: profile._count?.orders ?? 0,
+            wishlistCount: profile._count?.wishlist ?? 0,
+            cartCount: profile._count?.cart ?? 0,
+          };
+          extraData = { 
+            walletBalance: userObj.walletBalance,
+            ordersCount: userObj.ordersCount,
+            wishlistCount: userObj.wishlistCount,
+            cartCount: userObj.cartCount,
+          };
+        }
+      } catch (err) {
+        console.warn('Prisma fetch notice in getCurrentUser:', err.message);
+      }
+
+      if (!userObj) {
+        userObj = customerStore.get(id);
+        if (userObj) {
+          extraData = { 
+            walletBalance: userObj.walletBalance,
+            ordersCount: userObj.ordersCount,
+            wishlistCount: userObj.wishlistCount,
+            cartCount: userObj.cartCount || 0,
+          };
+        }
       }
     } else if (role === 'AFFILIATE') {
       userObj = affiliateStore.get(id);
@@ -436,13 +583,55 @@ export const updateResellerProfile = async (req, res) => {
 export const updateCustomerProfile = async (req, res) => {
   try {
     const { id } = req.user;
-    const { fullName, email, avatarUrl } = req.body;
+    const { fullName, email, avatarUrl, phone } = req.body;
+    const cleanPhone = phone ? phone.toString().replace(/\D/g, '').slice(-10) : '';
+
+    let updatedUser = null;
+    try {
+      const updateData = {};
+      if (fullName) updateData.fullName = fullName;
+      if (email) updateData.email = email.toLowerCase();
+      if (avatarUrl) updateData.avatarUrl = avatarUrl;
+      if (cleanPhone) updateData.phone = cleanPhone;
+
+      if (Object.keys(updateData).length > 0) {
+        const profile = await prisma.profile.update({
+          where: { id },
+          data: updateData,
+          include: {
+            wallet: true,
+            _count: {
+              select: {
+                orders: true,
+                wishlist: true,
+                cart: true
+              }
+            }
+          }
+        });
+
+        updatedUser = {
+          id: profile.id,
+          phone: profile.phone || cleanPhone || '',
+          email: profile.email || email || '',
+          fullName: profile.fullName || fullName || 'Valued Customer',
+          role: profile.role || 'CUSTOMER',
+          avatarUrl: profile.avatarUrl || avatarUrl,
+          walletBalance: profile.wallet?.balance ?? 500.0,
+          ordersCount: profile._count?.orders ?? 0,
+          wishlistCount: profile._count?.wishlist ?? 0,
+          cartCount: profile._count?.cart ?? 0,
+        };
+      }
+    } catch (dbErr) {
+      console.warn('Prisma update notice in updateCustomerProfile:', dbErr.message);
+    }
 
     let customer = customerStore.get(id);
     if (!customer) {
       customer = {
         id,
-        phone: req.user.phone || '',
+        phone: cleanPhone || req.user.phone || '',
         email: email || req.user.email || '',
         fullName: fullName || req.user.fullName || 'Valued Customer',
         role: 'CUSTOMER',
@@ -453,11 +642,12 @@ export const updateCustomerProfile = async (req, res) => {
     if (fullName) customer.fullName = fullName;
     if (email) customer.email = email;
     if (avatarUrl) customer.avatarUrl = avatarUrl;
+    if (cleanPhone) customer.phone = cleanPhone;
 
     return res.status(200).json({
       success: true,
       message: 'Customer profile updated successfully',
-      user: customer,
+      user: updatedUser || customer,
     });
   } catch (error) {
     return res.status(500).json({
@@ -554,23 +744,25 @@ export const googleAuth = async (req, res) => {
     const userId = firebaseUid || `google_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
 
     if (isAffiliate) {
-      const partnerCode = `AFF-${email.split('@')[0].toUpperCase().slice(0, 5)}${Math.floor(100 + Math.random() * 900)}`;
+      const existingAffiliate = affiliateStore.get(userId);
+      const partnerCode = existingAffiliate?.referralCode || `AFF-${email.split('@')[0].toUpperCase().slice(0, 5)}${Math.floor(100 + Math.random() * 900)}`;
+      
       profile = {
         id: userId,
         email: email,
-        fullName: name || 'Affiliate Partner',
-        avatarUrl: avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        fullName: name || existingAffiliate?.fullName || 'Affiliate Partner',
+        avatarUrl: avatar || existingAffiliate?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
         role: 'AFFILIATE',
         referralCode: partnerCode,
-        kycStatus: 'APPROVED',
-        tier: 'Silver Tier',
-        stats: {
-          totalEarnings: 14850.50,
-          pendingPayout: 2340.00,
-          clicks: 1420,
-          conversions: 84
+        kycStatus: existingAffiliate?.kycStatus || 'NOT_SUBMITTED',
+        tier: existingAffiliate?.tier || 'Silver Tier',
+        stats: existingAffiliate?.stats || {
+          totalEarnings: 0,
+          pendingPayout: 0,
+          clicks: 0,
+          conversions: 0
         },
-        createdAt: new Date().toISOString(),
+        createdAt: existingAffiliate?.createdAt || new Date().toISOString(),
       };
       affiliateStore.set(userId, profile);
     } else {

@@ -41,7 +41,7 @@ export async function getProducts(params = {}) {
     if (params.minPrice) query.set('minPrice', params.minPrice);
     if (params.maxPrice) query.set('maxPrice', params.maxPrice);
     if (params.sort) query.set('sort', params.sort);
-    if (params.limit) query.set('limit', params.limit);
+    query.set('limit', params.limit || '1000');
 
     const res = await fetch(`${API_BASE_URL}/products?${query.toString()}`);
     const data = await res.json();
@@ -70,6 +70,28 @@ export async function getCategories() {
     return data?.data || [];
   } catch (error) {
     console.error('Failed to fetch categories:', error);
+    return [];
+  }
+}
+
+export async function getCategoryBySlug(slug) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/categories/${slug}`);
+    const data = await res.json();
+    return data?.data || null;
+  } catch (error) {
+    console.error(`Failed to fetch category ${slug}:`, error);
+    return null;
+  }
+}
+
+export async function getBanners() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/banners`);
+    const data = await res.json();
+    return data?.data || [];
+  } catch (error) {
+    console.error('Failed to fetch banners:', error);
     return [];
   }
 }
@@ -268,6 +290,30 @@ export async function cancelOrder(orderId, reason = '') {
   }
 }
 
+export async function submitReturnRequest(payload) {
+  try {
+    // Ensure images are formatted cleanly as string URLs/names
+    const formattedPayload = {
+      ...payload,
+      images: Array.isArray(payload.images)
+        ? payload.images.map((img) => (typeof img === 'string' ? img : img?.url || img?.name || '')).filter(Boolean)
+        : []
+    };
+
+    const res = await fetch(`${API_BASE_URL}/returns`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(formattedPayload),
+    });
+    const data = await res.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to submit return request:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+
 
 
 // ── Addresses API ─────────────────────────────────────────────
@@ -411,4 +457,98 @@ export async function generateNewCoupon(payload = {}) {
   }
 }
 
+// ── Review Helpful API ────────────────────────────────────────
+export async function toggleReviewHelpful(reviewId) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/reviews/${reviewId}/helpful`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error(`Failed to vote helpful on review ${reviewId}:`, error);
+    throw error;
+  }
+}
+
+// ── Flash Sale Active Configuration API ───────────────────────
+export async function getFlashSaleConfig() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/flash-sale/active`);
+    const data = await res.json();
+    return data?.data || null;
+  } catch (error) {
+    console.error('Failed to fetch flash sale config from backend:', error);
+    return null;
+  }
+}
+
+// ── Razorpay Payment Gateway API ──────────────────────────────
+export async function getRazorpayConfig() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/payment/razorpay/config`, {
+      headers: getAuthHeaders(),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Failed to get Razorpay config:', error);
+    return { success: false, isConfigured: false };
+  }
+}
+
+export async function createRazorpayOrder({ amount, currency = 'INR', receipt, notes }) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/payment/razorpay/create-order`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ amount, currency, receipt, notes }),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Failed to create Razorpay order:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+export async function verifyRazorpayPayment(payload) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/payment/razorpay/verify`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Failed to verify Razorpay payment:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+// ── Real PostgreSQL Wallet & Payout API ───────────────────────────
+export async function getWalletDetails() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/wallet`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    return data?.data || null;
+  } catch (error) {
+    console.error('Failed to fetch wallet:', error);
+    return null;
+  }
+}
+
+export async function requestWalletWithdrawal({ amount, method, destination }) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/wallet/withdraw`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ amount, method, destination }),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Failed to request withdrawal:', error);
+    return { success: false, message: error.message };
+  }
+}
 

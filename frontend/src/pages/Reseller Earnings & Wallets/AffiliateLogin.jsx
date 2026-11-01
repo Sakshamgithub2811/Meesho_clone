@@ -5,7 +5,7 @@ import { loginSuccess } from '../../redux/userSlice';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../utils/firebase';
 import { loginAffiliate } from '../../services/affiliateAuthService';
-import { saveAffiliateApp } from '../../services/affiliateSessionStore';
+import { getAffiliateApp, saveAffiliateApp } from '../../services/affiliateSessionStore';
 import axios from 'axios';
 import AuthLayout from '../../components/layout/AuthLayout';
 import { Button } from "@/components/ui/button";
@@ -76,21 +76,24 @@ export default function AffiliateLogin() {
       // Save to Redux & Affiliate Session Storage
       dispatch(loginSuccess(affiliateData));
       
-      saveAffiliateApp({
-        fullName: affiliateData.fullName,
-        email: affiliateData.email,
-        kycStatus: 'APPROVED',
-        referralCode: affiliateData.referralCode || 'MEESHO500',
-        role: 'AFFILIATE'
-      });
-
       await loginAffiliate({
         email: affiliateData.email,
         fullName: affiliateData.fullName,
         referralCode: affiliateData.referralCode
       }).catch(() => {});
 
-      navigate(redirectParam);
+      const existingKyc = getAffiliateApp();
+      const currentKycStatus = existingKyc?.status || existingKyc?.kycStatus || affiliateData.kycStatus;
+
+      if (currentKycStatus === 'Approved' || currentKycStatus === 'APPROVED') {
+        navigate(redirectParam || '/affiliate-panel');
+      } else if (currentKycStatus === 'Under Review' || currentKycStatus === 'Pending' || currentKycStatus === 'PENDING') {
+        navigate('/affiliate-kyc-status');
+      } else if (currentKycStatus === 'Rejected' || currentKycStatus === 'REJECTED') {
+        navigate('/affiliate-kyc-status');
+      } else {
+        navigate('/affiliate-kyc');
+      }
 
     } catch (err) {
       console.error('Affiliate auth error:', err);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getProductReviews, checkCanReview } from '../../services/ecommerceService';
+import { getProductReviews, checkCanReview, toggleReviewHelpful } from '../../services/ecommerceService';
 
 export default function RatingsReviews({ onNavigate = () => {}, onBack }) {
   const [searchParams] = useSearchParams();
@@ -83,19 +83,29 @@ export default function RatingsReviews({ onNavigate = () => {}, onBack }) {
     loadReviews();
   }, [productId]);
 
-  const handleHelpful = (id) => {
-    if (helpfulClicked.has(id)) {
+  const handleHelpful = async (id) => {
+    const isCurrentlyClicked = helpfulClicked.has(id);
+    if (isCurrentlyClicked) {
       setHelpfulClicked((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
-      setHelpfulCounts((prev) => ({ ...prev, [id]: (prev[id] || 1) - 1 }));
+      setHelpfulCounts((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] || 1) - 1) }));
       triggerToast('Removed feedback');
     } else {
       setHelpfulClicked((prev) => new Set(prev).add(id));
       setHelpfulCounts((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
       triggerToast('Marked review as Helpful! 👍');
+    }
+
+    try {
+      const res = await toggleReviewHelpful(id);
+      if (res?.helpfulCount !== undefined) {
+        setHelpfulCounts((prev) => ({ ...prev, [id]: res.helpfulCount }));
+      }
+    } catch (e) {
+      // optimistic UI handles fallback
     }
   };
 

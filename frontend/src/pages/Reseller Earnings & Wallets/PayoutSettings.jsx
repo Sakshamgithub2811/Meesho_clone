@@ -3,21 +3,35 @@ import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
 import BankAutocompleteSelect from '../../components/BankAutocompleteSelect';
+import { getAffiliateApp } from '../../services/affiliateSessionStore';
 
 export default function PayoutSettings() {
   const navigate = useNavigate();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [bankDetails, setBankDetails] = useState({
-    bankName: "HDFC Bank",
-    accountNumber: "•••• 4321",
-    holderName: "Rahul Sharma",
-    ifsc: "HDFC0001234"
+  const [bankDetails, setBankDetails] = useState(() => {
+    try {
+      const affApp = getAffiliateApp();
+      if (affApp?.bankName && affApp?.accountNumber) {
+        return {
+          bankName: affApp.bankName,
+          accountNumber: `•••• ${affApp.accountNumber.slice(-4)}`,
+          holderName: affApp.accountHolderName || affApp.fullName || 'Verified Partner',
+          ifsc: affApp.ifscCode || 'VERIFIED'
+        };
+      }
+      const saved = localStorage.getItem('mshoppy_payout_bank');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
   });
 
-  const [upiList, setUpiList] = useState([
-    { id: 1, upiId: "partner@upi", verified: true },
-    { id: 2, upiId: "rahul@okaxis", verified: true }
-  ]);
+  const [upiList, setUpiList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mshoppy_payout_upis');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
 
   const [showAddBankModal, setShowAddBankModal] = useState(false);
   const [showAddUpiModal, setShowAddUpiModal] = useState(false);
@@ -39,12 +53,16 @@ export default function PayoutSettings() {
   const handleSaveBank = (e) => {
     e.preventDefault();
     if (!newBank.bankName || !newBank.accountNumber) return;
-    setBankDetails({
+    const updated = {
       bankName: newBank.bankName,
       accountNumber: `•••• ${newBank.accountNumber.slice(-4)}`,
-      holderName: newBank.holderName || "Rahul Sharma",
-      ifsc: newBank.ifsc || "SBIN0002145"
-    });
+      holderName: newBank.holderName || "Account Holder",
+      ifsc: newBank.ifsc || "VERIFIED"
+    };
+    setBankDetails(updated);
+    try {
+      localStorage.setItem('mshoppy_payout_bank', JSON.stringify(updated));
+    } catch (err) {}
     setShowAddBankModal(false);
     showToast("Bank account updated successfully!");
   };
@@ -105,34 +123,53 @@ export default function PayoutSettings() {
           <h2 className="font-headline font-bold text-lg mb-4 text-on-surface">
             Primary Payout Bank Account
           </h2>
-          <div className="bg-white rounded-3xl p-6 shadow-[0_12px_32px_rgba(25,28,30,0.04)] border border-gray-100 relative overflow-hidden">
-            <div className="absolute top-4 right-4">
-              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
-                Primary
-              </span>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="w-14 h-14 bg-surface-container-low rounded-2xl flex items-center justify-center text-primary">
-                <span className="material-symbols-outlined text-3xl">account_balance</span>
+          {bankDetails ? (
+            <div className="bg-white rounded-3xl p-6 shadow-[0_12px_32px_rgba(25,28,30,0.04)] border border-gray-100 relative overflow-hidden">
+              <div className="absolute top-4 right-4">
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+                  Primary
+                </span>
               </div>
-              <div className="flex-1">
-                <p className="font-headline font-bold text-xl text-on-surface">{bankDetails.bankName}</p>
-                <p className="text-on-surface-variant font-medium mt-1 tracking-widest text-sm">
-                  {bankDetails.accountNumber} • {bankDetails.holderName}
-                </p>
-                <p className="text-xs text-outline mt-0.5">IFSC: {bankDetails.ifsc}</p>
-                <div className="mt-4 flex gap-3">
-                  <button
-                    onClick={() => setShowAddBankModal(true)}
-                    className="bg-surface-container-high hover:bg-surface-container-highest transition-colors px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-sm">edit</span>
-                    Edit Bank Details
-                  </button>
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 bg-surface-container-low rounded-2xl flex items-center justify-center text-primary">
+                  <span className="material-symbols-outlined text-3xl">account_balance</span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-headline font-bold text-xl text-on-surface">{bankDetails.bankName}</p>
+                  <p className="text-on-surface-variant font-medium mt-1 tracking-widest text-sm">
+                    {bankDetails.accountNumber} • {bankDetails.holderName}
+                  </p>
+                  <p className="text-xs text-outline mt-0.5">IFSC: {bankDetails.ifsc}</p>
+                  <div className="mt-4 flex gap-3">
+                    <button
+                      onClick={() => setShowAddBankModal(true)}
+                      className="bg-surface-container-high hover:bg-surface-container-highest transition-colors px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-sm">edit</span>
+                      Edit Bank Details
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-dashed border-gray-300 text-center space-y-3">
+              <div className="w-14 h-14 bg-rose-50 text-[#FF3F6C] rounded-2xl flex items-center justify-center mx-auto">
+                <span className="material-symbols-outlined text-3xl">account_balance</span>
+              </div>
+              <div>
+                <p className="font-bold text-base text-slate-800">No Bank Account Linked Yet</p>
+                <p className="text-xs text-slate-400 mt-0.5">Link your savings/current bank account to receive direct commissions.</p>
+              </div>
+              <button
+                onClick={() => setShowAddBankModal(true)}
+                className="px-6 py-2.5 bg-[#FF3F6C] hover:bg-pink-600 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-sm">add</span>
+                Link Bank Account
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Linked UPI IDs Section */}
@@ -147,6 +184,12 @@ export default function PayoutSettings() {
               Add UPI
             </button>
           </div>
+
+          {upiList.length === 0 && (
+            <div className="p-4 bg-white rounded-2xl border border-dashed border-gray-300 text-center text-xs text-slate-400 mb-3">
+              No UPI ID linked yet. Click 'Add UPI' to link your UPI handle for instant settlements.
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {upiList.map(upi => (

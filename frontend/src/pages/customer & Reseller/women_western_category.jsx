@@ -245,7 +245,7 @@ export default function WomenWesternCategory({ onNavigate, onBack }) {
         )}
       </main>
 
-      <AppBottomNav activeNav="search" onNavigate={handleNav} />
+      <AppBottomNav activeNav="categories" onNavigate={handleNav} role="customer" homePath="/user-home" />
     </div>
   );
 }

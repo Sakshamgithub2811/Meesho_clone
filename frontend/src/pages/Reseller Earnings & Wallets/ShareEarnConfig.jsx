@@ -1,15 +1,41 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
+import { getProducts } from '../../services/ecommerceService';
 
 export default function ShareEarnConfig() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const supplierPrice = 500;
+
+  const [activeProduct, setActiveProduct] = useState({
+    title: 'Banarasi Silk Saree with Gold Zari Work',
+    price: 500,
+    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
+  });
+
+  const supplierPrice = activeProduct.price || 500;
   const [profitMargin, setProfitMargin] = useState(150);
   const [shareMode, setShareMode] = useState('with-prices'); // 'images', 'desc', 'with-prices'
   const [toastMsg, setToastMsg] = useState('');
+
+  useEffect(() => {
+    getProducts().then((prods) => {
+      if (prods && prods.length > 0) {
+        const queryParams = new URLSearchParams(location.search);
+        const prodId = queryParams.get('id');
+        const matched = prodId ? prods.find(p => p.id === prodId) : prods[0];
+        const selected = matched || prods[0];
+        
+        setActiveProduct({
+          title: selected.title || 'Banarasi Silk Saree with Gold Zari Work',
+          price: selected.price || 500,
+          image: selected.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
+        });
+      }
+    }).catch(() => {});
+  }, [location.search]);
 
   const numericMargin = Number(profitMargin) || 0;
   const finalPrice = supplierPrice + numericMargin;
@@ -33,11 +59,11 @@ export default function ShareEarnConfig() {
   const handleShareToWhatsApp = () => {
     let msg = '';
     if (shareMode === 'images') {
-      msg = `📸 Banarasi Silk Saree with Gold Zari Work!\nPure quality fabric with exquisite craftsmanship. Reply to see details or book!`;
+      msg = `📸 ${activeProduct.title}!\nPure quality fabric with exquisite craftsmanship. Reply to see details or book!`;
     } else if (shareMode === 'desc') {
-      msg = `✨ *Banarasi Silk Saree with Gold Zari Work*\n\nFabric: Pure Banarasi Silk\nWork: Woven Zari Embroidery with unstitched blouse\nCare: Dry Clean Only\n\nDirect supplier dispatch with Free Shipping! DM to order.`;
+      msg = `✨ *${activeProduct.title}*\n\nVerified authentic marketplace quality.\nDirect supplier dispatch with Free Shipping! DM to order.`;
     } else {
-      msg = `✨ *Banarasi Silk Saree with Gold Zari Work*\n\nSpecial Price: ₹${finalPrice} only (Free Shipping!)\n\n✅ 7-Day Easy Replacement Guarantee\n✅ Cash on Delivery Available\n\nReply directly with your address to place order!`;
+      msg = `✨ *${activeProduct.title}*\n\nSpecial Price: ₹${finalPrice} only (Free Shipping!)\n\n✅ 7-Day Easy Replacement Guarantee\n✅ Cash on Delivery Available\n\nReply directly with your address to place order!`;
     }
 
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
@@ -87,13 +113,17 @@ export default function ShareEarnConfig() {
           <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-[0_12px_40px_rgba(74,33,53,0.06)] flex flex-col sm:flex-row gap-4 items-center border border-gray-100">
             <div className="w-full sm:w-28 h-32 rounded-xl overflow-hidden flex-shrink-0 bg-surface-container-low">
               <img
-                alt="Silk Saree"
+                alt={activeProduct.title}
                 className="w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAr-mgOFrjJ4EelX50zSyeaH4jG7k9Omdr27MwK_PK3yaqdc2bNvVgUDfa5WCumM8qLg8HWIHI-3mgjqg1DZOu-hT0sxY7WiwhQajEqgMb8c7YLw11V5BXP-63qhhkyfQVov7v94QE_93qpdV33GGYLJw_7xZn3WOs1bOLwAwBF7v0VteWi7snVvEi2LIZ7N3qBCKAiBXMzBhNW_-E8bdgPqgV71ucPmw7DdDc3vUiaem0zo69GAche8apZ6xOaOCedyBAcB_srt2g"
+                src={activeProduct.image}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80';
+                }}
               />
             </div>
             <div className="flex-grow w-full">
-              <h2 className="font-bold text-base leading-snug">Banarasi Silk Saree with Gold Zari Work</h2>
+              <h2 className="font-bold text-base leading-snug">{activeProduct.title}</h2>
               <p className="text-on-surface-variant text-xs mt-1">
                 Supplier Base Price: <span className="font-bold text-on-surface text-sm">₹{supplierPrice}</span>
               </p>

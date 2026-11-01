@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meesho Clone - Customer Panel Pending Audit & Implementation Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #9f0038;
+      --primary-gradient: linear-gradient(135deg, #9f0038 0%, #e11d48 100%);
+      --accent: #2563eb;
+      --bg: #ffffff;
+      --surface: #f8fafc;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --code-bg: #f1f5f9;
+      --badge-red-bg: #fee2e2;
+      --badge-red-text: #991b1b;
+      --badge-green-bg: #dcfce7;
+      --badge-green-text: #166534;
+      --badge-yellow-bg: #fef3c7;
+      --badge-yellow-text: #92400e;
+      --badge-blue-bg: #e0f2fe;
+      --badge-blue-text: #075985;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #ffffff;
+      color: var(--text-main);
+      line-height: 1.5;
+      font-size: 13px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 14mm 12mm 14mm 12mm;
+    }
+
+    .report-container {
+      max-width: 100%;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+
+    /* Header */
+    .header {
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .header-left {
+      max-width: 75%;
+    }
+
+    .brand-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #fdf2f8;
+      border: 1px solid #fbcfe8;
+      color: var(--primary);
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      margin-bottom: 0.5rem;
+    }
+
+    .report-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.2;
+      margin-bottom: 0.4rem;
+    }
+
+    .report-subtitle {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .meta-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: #64748b;
+      background: #f8fafc;
+      padding: 0.35rem 0.6rem;
+      border-radius: 0.35rem;
+      border: 1px solid #e2e8f0;
+      display: inline-block;
+      margin-bottom: 0.3rem;
+    }
+
+    /* Executive KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--card-border);
+      border-radius: 0.6rem;
+      padding: 0.85rem 1rem;
+    }
+
+    .kpi-card.green { border-left: 4px solid #16a34a; }
+    .kpi-card.red { border-left: 4px solid #dc2626; }
+    .kpi-card.yellow { border-left: 4px solid #d97706; }
+    .kpi-card.blue { border-left: 4px solid #2563eb; }
+
+    .kpi-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-muted);
+      margin-bottom: 0.2rem;
+    }
+
+    .kpi-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: baseline;
+      gap: 0.3rem;
+    }
+
+    .kpi-desc {
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-top: 0.15rem;
+    }
+
+    /* Section Styles */
+    .section-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 1.5rem 0 0.75rem 0;
+      padding-bottom: 0.35rem;
+      border-bottom: 1.5px solid #e2e8f0;
+      color: #0f172a;
+      page-break-after: avoid;
+    }
+
+    .section-desc {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.25rem;
+      font-size: 0.78rem;
+      page-break-inside: auto;
+    }
+
+    tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #1e293b;
+      font-weight: 700;
+      text-align: left;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid #cbd5e1;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.78rem;
+    }
+
+    td {
+      padding: 0.55rem 0.65rem;
+      border: 1px solid #e2e8f0;
+      vertical-align: top;
+      line-height: 1.45;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .badge-critical { background: var(--badge-red-bg); color: var(--badge-red-text); border: 1px solid #fca5a5; }
+    .badge-done { background: var(--badge-green-bg); color: var(--badge-green-text); border: 1px solid #86efac; }
+    .badge-medium { background: var(--badge-yellow-bg); color: var(--badge-yellow-text); border: 1px solid #fde68a; }
+    .badge-low { background: var(--badge-blue-bg); color: var(--badge-blue-text); border: 1px solid #bae6fd; }
+
+    .file-ref {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: #0369a1;
+      background: #f0f9ff;
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.25rem;
+      border: 1px solid #bae6fd;
+      display: inline-block;
+      margin-top: 0.2rem;
+      word-break: break-all;
+    }
+
+    /* Callout Card */
+    .callout {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-left: 4px solid #ef4444;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+
+    .callout strong {
+      color: #991b1b;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    /* Roadmap List */
+    .roadmap-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .roadmap-item {
+      background: #ffffff;
+      border: 1px solid var(--card-border);
+      border-radius: 0.5rem;
+      padding: 0.75rem 0.9rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    .roadmap-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.35rem;
+    }
+
+    .roadmap-step {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 0.82rem;
+      color: var(--primary);
+    }
+
+    .roadmap-title {
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: #0f172a;
+      margin-bottom: 0.25rem;
+    }
+
+    .roadmap-desc {
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="report-container">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="brand-tag">🛍️ Meesho SuperApp Clone • Engineering Audit</div>
+        <h1 class="report-title">Customer Panel: Pending Features & Gap Analysis Report</h1>
+        <p class="report-subtitle">Comprehensive verification of implemented screens vs. missing backend endpoints, unpersisted workflows, and core e-commerce capabilities.</p>
+      </div>
+      <div class="header-right">
+        <div class="meta-badge">Date: October 2026</div><br/>
+        <div class="meta-badge">Scope: Customer & Shopping Module</div><br/>
+        <div class="meta-badge">Stack: React 19 + Express + Prisma</div>
+      </div>
+    </header>
+
+    <!-- KPI Summary Grid -->
+    <div class="kpi-grid">
+      <div class="kpi-card green">
+        <div class="kpi-title">Implemented Core</div>
+        <div class="kpi-val">~75%</div>
+        <div class="kpi-desc">Catalog, Cart, Orders, Reviews, Address</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-title">Critical Gaps</div>
+        <div class="kpi-val">4 Items</div>
+        <div class="kpi-desc">Return DB sync, Gateway, Hardcoded URLs</div>
+      </div>
+      <div class="kpi-card yellow">
+        <div class="kpi-title">Missing Features</div>
+        <div class="kpi-val">7 Items</div>
+        <div class="kpi-desc">Pincode check, Phone OTP, Seller Store</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-title">Polish Needed</div>
+        <div class="kpi-val">4 Screens</div>
+        <div class="kpi-desc">Flash sale DB query, Bottom nav roles</div>
+      </div>
+    </div>
+
+    <!-- Section 1: Executive Summary & Completed Work -->
+    <h2 class="section-title">✅ 1. Completed & Functional Customer Modules</h2>
+    <p class="section-desc">The following customer screens are already developed and integrated with the live PostgreSQL/Prisma database via REST APIs:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25%;">Screen & Route</th>
+          <th style="width: 45%;">Implemented Capabilities</th>
+          <th style="width: 30%;">File Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Customer Home</strong><br/><code>/user-home</code></td>
+          <td>Database products fetching, category carousel, hero banner slider, live search autocomplete, cart counter badge, instant wishlist toggle.</td>
+          <td><span class="file-ref">HomeUserCustomer.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Categories Explorer</strong><br/><code>/explorer</code>, <code>/categories</code></td>
+          <td>Split drawer category selection, subcategory chip filters, real-time products grid, direct Add-to-Cart.</td>
+          <td><span class="file-ref">search_categories_explorer.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Search Results</strong><br/><code>/search</code></td>
+          <td>Keyword search query handling, price & rating filters, sort options (Popularity, Price Low to High, High to Low).</td>
+          <td><span class="file-ref">search_results.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Product Detail (PDP)</strong><br/><code>/product</code></td>
+          <td>Image gallery, size selector with dynamic category size charts, color swatch selector, reviews preview, sticky CTA buttons.</td>
+          <td><span class="file-ref">product_detail.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Shopping Cart</strong><br/><code>/cart</code></td>
+          <td>Server-synchronized cart, quantity modifiers, item deletion, live coupon validation with DB coupons (<code>/api/v1/coupons</code>).</td>
+          <td><span class="file-ref">shopping_cart.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Checkout Address</strong><br/><code>/address</code></td>
+          <td>Saved delivery addresses from DB, Add New Address modal with form validation, default address selection.</td>
+          <td><span class="file-ref">checkout_address_selection.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Checkout Payment</strong><br/><code>/payment</code></td>
+          <td>Payment methods UI (COD, UPI, Card, NetBanking), Reseller margin toggle, backend order creation (<code>POST /orders</code>).</td>
+          <td><span class="file-ref">checkout_payment.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Customer Orders History</strong><br/><code>/orders</code></td>
+          <td>Active / Delivered / Cancelled tabs, timeline tracking modal, order cancellation with live DB update, PDF Tax Invoice modal.</td>
+          <td><span class="file-ref">CustomerOrders.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Ratings & Reviews</strong><br/><code>/reviews</code>, <code>/write-review</code></td>
+          <td>Verified buyer validation (<code>checkCanReview</code>), star rating input, photo upload, fabric/fit sub-ratings.</td>
+          <td><span class="file-ref">ratings_reviews.jsx</span><br/><span class="file-ref">write_a_review.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>User Dashboard (Multi-Tab)</strong><br/><code>/user-dashboard1</code></td>
+          <td>Unified consumer hub with Overview, Orders, Addresses, Wishlist, Profile settings, Wallet, and Affiliate links.</td>
+          <td><span class="file-ref">user_web_dashboard1.jsx</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Callout Box -->
+    <div class="callout">
+      <strong>⚠️ Critical Architecture Notice:</strong> While the user interface covers the complete purchase funnel, there are several backend database disconnects (notably Return Requests and Payment Processing) where data remains trapped in local React state or <code>localStorage</code> instead of entering the server database.
+    </div>
+
+    <!-- Section 2: Critical Backend & Database Gaps -->
+    <h2 class="section-title">🔴 2. Critical Backend & Data Integration Gaps (Must Fix First)</h2>
+    <p class="section-desc">These are high-priority structural issues where frontend actions fail to persist in the PostgreSQL database:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 24%;">Gap / Issue</th>
+          <th style="width: 14%;">Severity</th>
+          <th style="width: 38%;">Current Technical Flaw</th>
+          <th style="width: 24%;">Required Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Return Request Database Disconnect</strong></td>
+          <td><span class="badge badge-critical">Critical</span></td>
+          <td><code>ReturnRequest.jsx</code> updates order status to <code>RETURN_REQUESTED</code> and saves data to browser <code>localStorage</code>, but does <strong>NOT insert a row into the Prisma <code>ReturnRequest</code> table</strong>.</td>
+          <td>Create <code>POST /api/v1/returns</code> endpoint in backend and link <code>handleSubmitReturn()</code> so Admin Panel's <code>/admin-returns</code> sees customer defect photos, reason & UPI.</td>
+        </tr>
+        <tr>
+          <td><strong>Hardcoded Localhost URLs</strong></td>
+          <td><span class="badge badge-critical">Critical</span></td>
+          <td>In <code>ReturnRequest.jsx</code> (lines 233 & 270), <code>http://localhost:5000/api/v1</code> is hardcoded instead of using Vite's <code>import.meta.env.VITE_BACKEND_URL</code>.</td>
+          <td>Replace with dynamic environment variable; otherwise network requests fail on production, tunnels, or LAN testing.</td>
+        </tr>
+        <tr>
+          <td><strong>Payment Gateway Integration</strong></td>
+          <td><span class="badge badge-critical">Critical</span></td>
+          <td>In <code>checkout_payment.jsx</code>, UPI, Debit Card, and NetBanking payments are <strong>simulated with mock timeouts</strong>. No real payment transaction happens.</td>
+          <td>Integrate Razorpay or Cashfree SDK with server-side order generation and webhook signature verification (COD is currently fully operational).</td>
+        </tr>
+        <tr>
+          <td><strong>Review Helpful Votes Not Persisted</strong></td>
+          <td><span class="badge badge-medium">Medium</span></td>
+          <td>On the reviews page, clicking "Helpful" upvotes is stored only in React component memory. Refreshing the browser resets the vote count.</td>
+          <td>Add a <code>POST /api/v1/reviews/:id/vote</code> route to store user upvotes in the database.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="page-break"></div>
+
+    <!-- Section 3: Missing Core Features -->
+    <h2 class="section-title">🟡 3. Missing Core Meesho Customer Features</h2>
+    <p class="section-desc">Standard e-commerce features present on Meesho India that are currently absent from the customer panel:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25%;">Feature Name</th>
+          <th style="width: 15%;">Impact</th>
+          <th style="width: 40%;">Description & Missing Logic</th>
+          <th style="width: 20%;">Target Screen</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Pincode Delivery Estimator</strong></td>
+          <td><span class="badge badge-critical">High</span></td>
+          <td>Missing an <em>"Enter Pincode to check delivery date & COD availability"</em> widget on the PDP. Customers cannot check transit duration or eligibility prior to checkout.</td>
+          <td><code>product_detail.jsx</code></td>
+        </tr>
+        <tr>
+          <td><strong>Phone Number + OTP Login</strong></td>
+          <td><span class="badge badge-critical">High</span></td>
+          <td>Meesho's primary sign-in mechanism is SMS/WhatsApp OTP. Current system only provides Email/Password and Google OAuth.</td>
+          <td><code>UserLogin.jsx</code></td>
+        </tr>
+        <tr>
+          <td><strong>Supplier Storefront View</strong></td>
+          <td><span class="badge badge-medium">Medium</span></td>
+          <td>Clicking <em>"Sold by: [Supplier Name]"</em> on the product page does not open a dedicated seller profile page with all products from that merchant.</td>
+          <td><code>product_detail.jsx</code> ➔ <code>/store/:id</code></td>
+        </tr>
+        <tr>
+          <td><strong>Similar / Recommended Products</strong></td>
+          <td><span class="badge badge-medium">Medium</span></td>
+          <td>The bottom of the Product Detail page lacks a dynamic recommendation algorithm (matching categorySlug or shared tags from the database).</td>
+          <td><code>product_detail.jsx</code></td>
+        </tr>
+        <tr>
+          <td><strong>Customer Notifications Feed</strong></td>
+          <td><span class="badge badge-medium">Medium</span></td>
+          <td>The existing <code>/notifications</code> center is configured for resellers (margin credits, withdrawals). Missing customer alerts (Dispatched, Out for Delivery, Wishlist Price Drops).</td>
+          <td><code>NotificationCenter.jsx</code></td>
+        </tr>
+        <tr>
+          <td><strong>Live Delivery GPS Map for Customer</strong></td>
+          <td><span class="badge badge-low">Low</span></td>
+          <td>Driver app has live route GPS maps, but customer's order tracking modal only displays linear text milestones without rider position display.</td>
+          <td><code>CustomerOrders.jsx</code></td>
+        </tr>
+        <tr>
+          <td><strong>Order Support / Ticket Redirection</strong></td>
+          <td><span class="badge badge-low">Low</span></td>
+          <td>No one-click "Need Help with this Order" button on orders that passes the <code>orderId</code> directly to the support center ticket modal.</td>
+          <td><code>CustomerOrders.jsx</code> ➔ <code>/support-center</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 4: Frontend Polish & Mock Screens -->
+    <h2 class="section-title">🟢 4. Frontend Polish & Mock/Static Pages</h2>
+    <p class="section-desc">Screens that exist in the navigation catalog but currently render hardcoded mock data:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25%;">Screen / Route</th>
+          <th style="width: 50%;">Current State & Required Polish</th>
+          <th style="width: 25%;">File Path</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Flash Sale Landing Page</strong><br/><code>/flash</code></td>
+          <td>Uses static <code>initialProducts</code> array with hardcoded items. Needs to fetch live database products with <code>discountPercentage >= 50</code>.</td>
+          <td><span class="file-ref">flash_sale_landing_page.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Curated Spotlight</strong><br/><code>/spotlight</code></td>
+          <td>Contains static fashion lookbooks; header back button incorrectly points to <code>reseller</code> instead of customer home.</td>
+          <td><span class="file-ref">curated_spotlight.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Flutter Luxe Theme</strong><br/><code>/luxe</code></td>
+          <td>Concept theme page with mock static products. Can be linked to database or maintained as an alternate aesthetic showcase.</td>
+          <td><span class="file-ref">home_screen_flutter_luxe.jsx</span></td>
+        </tr>
+        <tr>
+          <td><strong>Bottom Nav Role Consistency</strong><br/><code>/explorer</code>, <code>/orders</code>, <code>/wishlist</code></td>
+          <td>Several customer pages render <code>&lt;AppBottomNav /&gt;</code> without explicitly passing <code>role="customer"</code>, causing the Reseller "Earnings" tab to appear instead of "Wishlist".</td>
+          <td><span class="file-ref">AppBottomNav.jsx</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 5: Implementation Roadmap -->
+    <h2 class="section-title">🚀 5. Recommended Priority Implementation Roadmap</h2>
+    <p class="section-desc">Structured 4-phase rollout to achieve 100% production readiness for the Customer Panel:</p>
+
+    <div class="roadmap-list">
+      <div class="roadmap-item">
+        <div class="roadmap-header">
+          <span class="roadmap-step">PHASE 1 • PRIORITY 1</span>
+          <span class="badge badge-critical">Immediate</span>
+        </div>
+        <div class="roadmap-title">Fix Return Request Backend & Admin Sync</div>
+        <div class="roadmap-desc">Build <code>POST /api/v1/returns</code> endpoint in backend. Insert into Prisma <code>ReturnRequest</code> table so Admin Panel displays uploaded defect photos, reasons, and UPI details. Fix localhost URLs.</div>
+      </div>
+
+      <div class="roadmap-item">
+        <div class="roadmap-header">
+          <span class="roadmap-step">PHASE 2 • PRIORITY 2</span>
+          <span class="badge badge-critical">High</span>
+        </div>
+        <div class="roadmap-title">Pincode Estimator & Seller Store</div>
+        <div class="roadmap-desc">Implement Pincode lookup on Product Detail Page with standard delivery date calculation. Add customer-facing Seller Storefront page (<code>/store/:supplierName</code>).</div>
+      </div>
+
+      <div class="roadmap-item">
+        <div class="roadmap-header">
+          <span class="roadmap-step">PHASE 3 • PRIORITY 3</span>
+          <span class="badge badge-medium">Medium</span>
+        </div>
+        <div class="roadmap-title">Dynamic Flash Sale & Bottom Nav Fix</div>
+        <div class="roadmap-desc">Connect <code>/flash</code> to real discounted database products. Pass <code>role="customer"</code> across all customer pages so bottom dock shows correct tabs (Wishlist instead of Earnings).</div>
+      </div>
+
+      <div class="roadmap-item">
+        <div class="roadmap-header">
+          <span class="roadmap-step">PHASE 4 • PRIORITY 4</span>
+          <span class="badge badge-low">Finishing</span>
+        </div>
+        <div class="roadmap-title">Payment Gateway SDK & OTP Login</div>
+        <div class="roadmap-desc">Integrate live Razorpay/Cashfree checkout modal with server signature validation. Add optional Firebase Phone OTP authentication widget for mobile-first users.</div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

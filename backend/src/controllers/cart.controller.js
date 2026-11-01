@@ -6,18 +6,23 @@ const getUserId = (req) => {
 
 const ensureProfile = async (userId) => {
   if (!userId) return null;
-  const existing = await prisma.profile.findUnique({ where: { id: userId } });
-  if (!existing) {
-    return await prisma.profile.create({
-      data: {
+  try {
+    return await prisma.profile.upsert({
+      where: { id: userId },
+      update: {},
+      create: {
         id: userId,
         fullName: 'Customer',
         email: `${userId}@customer.meesho`,
         role: 'CUSTOMER'
       }
     });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return await prisma.profile.findUnique({ where: { id: userId } });
+    }
+    throw err;
   }
-  return existing;
 };
 
 export const getCart = async (req, res) => {
@@ -77,31 +82,53 @@ export const addToCart = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    const existing = await prisma.cartItem.findFirst({
-      where: {
-        userId,
-        productId,
-        size
-      }
-    });
+    if (product.stock <= 0) {
+      return res.status(400).json({ success: false, message: 'Product is out of stock' });
+    }
 
+    const qty = Math.max(1, parseInt(quantity, 10) || 1);
+    const safeSize = size || 'Free Size';
+
+    // Atomic upsert with concurrency retry: Prevents P2002 collisions under simultaneous clicks
     let cartItem;
-    if (existing) {
-      cartItem = await prisma.cartItem.update({
-        where: { id: existing.id },
-        data: { quantity: existing.quantity + parseInt(quantity) },
-        include: { product: true }
-      });
-    } else {
-      cartItem = await prisma.cartItem.create({
-        data: {
+    try {
+      cartItem = await prisma.cartItem.upsert({
+        where: {
+          userId_productId_size: {
+            userId,
+            productId,
+            size: safeSize
+          }
+        },
+        update: {
+          quantity: { increment: qty }
+        },
+        create: {
           userId,
           productId,
-          quantity: parseInt(quantity),
-          size
+          quantity: qty,
+          size: safeSize
         },
         include: { product: true }
       });
+    } catch (upsertErr) {
+      if (upsertErr.code === 'P2002') {
+        cartItem = await prisma.cartItem.update({
+          where: {
+            userId_productId_size: {
+              userId,
+              productId,
+              size: safeSize
+            }
+          },
+          data: {
+            quantity: { increment: qty }
+          },
+          include: { product: true }
+        });
+      } else {
+        throw upsertErr;
+      }
     }
 
     return res.status(200).json({
@@ -121,11 +148,20 @@ export const addToCart = async (req, res) => {
 
 export const updateCartItem = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { id } = req.params;
     const { quantity, size } = req.body;
 
+    const existingItem = await prisma.cartItem.findUnique({ where: { id } });
+    if (!existingItem) {
+      return res.status(404).json({ success: false, message: 'Cart item not found' });
+    }
+    if (existingItem.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to update this cart item' });
+    }
+
     const data = {};
-    if (quantity !== undefined) data.quantity = Math.max(1, parseInt(quantity));
+    if (quantity !== undefined) data.quantity = Math.max(1, parseInt(quantity, 10) || 1);
     if (size !== undefined) data.size = size;
 
     const updated = await prisma.cartItem.update({
@@ -151,7 +187,16 @@ export const updateCartItem = async (req, res) => {
 
 export const removeFromCart = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { id } = req.params;
+
+    const existingItem = await prisma.cartItem.findUnique({ where: { id } });
+    if (!existingItem) {
+      return res.status(404).json({ success: false, message: 'Cart item not found' });
+    }
+    if (existingItem.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to delete this cart item' });
+    }
 
     await prisma.cartItem.delete({
       where: { id }

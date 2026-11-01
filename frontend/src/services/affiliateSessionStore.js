@@ -1,69 +1,124 @@
 // frontend/src/services/affiliateSessionStore.js
 
-const STORAGE_KEY = 'current_session_affiliate_app';
-const LOCAL_STORAGE_KEY = 'affiliate_kyc_application';
-
-// Detect if this specific browser page load was a reload (F5 / browser refresh)
-let isPageReload = false;
-try {
-  if (typeof performance !== 'undefined' && performance.getEntriesByType) {
-    const navEntries = performance.getEntriesByType('navigation');
-    if (navEntries.length > 0 && navEntries[0].type === 'reload') {
-      isPageReload = true;
-    }
-  } else if (typeof window !== 'undefined' && window.performance?.navigation?.type === 1) {
-    isPageReload = true;
-  }
-} catch (e) {
-  isPageReload = false;
-}
-
-// On page refresh/reload, reset all state back to initial clean default (no KYC submitted yet)
-if (isPageReload) {
-  try {
-    sessionStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-  } catch (e) {}
-}
-
-let inMemoryApp = null;
-try {
-  if (!isPageReload) {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      inMemoryApp = JSON.parse(stored);
-    }
-  }
-} catch (e) {}
-
 const listeners = new Set();
+let inMemoryApp = null;
 
-export function getAffiliateApp() {
-  if (inMemoryApp) return inMemoryApp;
+function getCurrentUserIdentifier() {
   try {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      inMemoryApp = JSON.parse(stored);
-      return inMemoryApp;
+    const custRaw = localStorage.getItem('mshoppy_customer_user');
+    if (custRaw) {
+      const u = JSON.parse(custRaw);
+      if (u?.id || u?.uid || u?.email) {
+        return {
+          id: u.id || u.uid,
+          email: (u.email || '').toLowerCase(),
+          phone: (u.phone || '').toString().replace(/\D/g, '').slice(-10),
+        };
+      }
+    }
+    const affRaw = localStorage.getItem('mshoppy_affiliate_user');
+    if (affRaw) {
+      const u = JSON.parse(affRaw);
+      if (u?.id || u?.uid || u?.email) {
+        return {
+          id: u.id || u.uid,
+          email: (u.email || '').toLowerCase(),
+          phone: (u.phone || '').toString().replace(/\D/g, '').slice(-10),
+        };
+      }
     }
   } catch (e) {}
   return null;
 }
 
-export function saveAffiliateApp(app) {
-  inMemoryApp = app;
+function isAppOwnedByCurrent(app, currentUser) {
+  if (!app || !currentUser) return false;
+  if (app.userId && currentUser.id && app.userId === currentUser.id) return true;
+  if (app.email && currentUser.email && app.email.toLowerCase() === currentUser.email) return true;
+  if (app.phone && currentUser.phone && app.phone.toString().replace(/\D/g, '').slice(-10) === currentUser.phone) return true;
+  return false;
+}
+
+export function getAffiliateApp() {
+  const currentUser = getCurrentUserIdentifier();
+  if (!currentUser) {
+    inMemoryApp = null;
+    return null;
+  }
+
+  // Check inMemoryApp
+  if (inMemoryApp && isAppOwnedByCurrent(inMemoryApp, currentUser)) {
+    return inMemoryApp;
+  }
+
+  // Check scoped storage
   try {
-    if (app) {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(app));
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(app));
-    } else {
-      sessionStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
+    const scopedKey = `affiliate_kyc_app_${currentUser.id || currentUser.email}`;
+    const stored = sessionStorage.getItem(scopedKey) || localStorage.getItem(scopedKey);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (isAppOwnedByCurrent(parsed, currentUser)) {
+        if (parsed.handle && parsed.fullName && parsed.handle === ('@' + parsed.fullName.toLowerCase().replace(/[^a-z0-9]/g, '_'))) {
+          parsed.handle = '';
+        }
+        inMemoryApp = parsed;
+        return inMemoryApp;
+      }
     }
   } catch (e) {}
+
+  inMemoryApp = null;
+  return null;
+}
+
+export function saveAffiliateApp(app) {
+  if (app && app.handle && app.fullName && app.handle === ('@' + app.fullName.toLowerCase().replace(/[^a-z0-9]/g, '_'))) {
+    app.handle = '';
+  }
+  const currentUser = getCurrentUserIdentifier();
+  inMemoryApp = app;
+
+  try {
+    if (app && currentUser) {
+      const scopedKey = `affiliate_kyc_app_${currentUser.id || currentUser.email}`;
+      sessionStorage.setItem(scopedKey, JSON.stringify(app));
+      localStorage.setItem(scopedKey, JSON.stringify(app));
+      localStorage.setItem('affiliate_kyc_application', JSON.stringify(app));
+    } else {
+      inMemoryApp = null;
+      if (currentUser) {
+        const scopedKey = `affiliate_kyc_app_${currentUser.id || currentUser.email}`;
+        sessionStorage.removeItem(scopedKey);
+        localStorage.removeItem(scopedKey);
+      }
+      sessionStorage.removeItem('current_session_affiliate_app');
+      localStorage.removeItem('affiliate_kyc_application');
+    }
+  } catch (e) {}
+
   listeners.forEach((listener) => {
     try {
       listener(inMemoryApp);
+    } catch (e) {}
+  });
+}
+
+export function clearAffiliateApp() {
+  const currentUser = getCurrentUserIdentifier();
+  inMemoryApp = null;
+  try {
+    if (currentUser) {
+      const scopedKey = `affiliate_kyc_app_${currentUser.id || currentUser.email}`;
+      sessionStorage.removeItem(scopedKey);
+      localStorage.removeItem(scopedKey);
+    }
+    sessionStorage.removeItem('current_session_affiliate_app');
+    localStorage.removeItem('affiliate_kyc_application');
+  } catch (e) {}
+
+  listeners.forEach((listener) => {
+    try {
+      listener(null);
     } catch (e) {}
   });
 }

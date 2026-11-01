@@ -1,330 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
 import { getAffiliateApp, saveAffiliateApp, subscribeAffiliateApp } from '../../services/affiliateSessionStore';
+import { addNotification } from '../../services/notificationService';
 
-// Realistic Mock Data for Affiliate KYC & Program Management
-const INITIAL_AFFILIATES = [
-  {
-    id: 'AFF-301',
-    name: 'Priya Sharma',
-    handle: '@priya_couture_vibe',
-    platform: 'Instagram',
-    followers: '142K Followers',
-    email: 'priya.creator@gmail.com',
-    phone: '+91 97112 34567',
-    location: 'Jaipur, Rajasthan',
-    referralCode: 'PRIYALUXE',
-    tier: 'Gold Creator',
-    commissionRate: 15,
-    totalEarnings: '₹1,84,500',
-    monthlyConversions: 840,
-    conversionRate: '4.8%',
-    appliedAt: '21 Sep 2026, 05:40 PM',
-    kycStatus: 'Approved', // 'Pending' | 'Approved' | 'Rejected' | 'Re-upload'
-    isEnabled: true, // Affiliate Access Enabled / Disabled toggle
-    riskScore: 99,
-    documents: {
-      pan: {
-        number: 'BKWPS9821K',
-        nameOnDoc: 'PRIYA SHARMA',
-        status: 'NSDL Verified',
-        image:
-          'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
-      },
-      bank: {
-        accountNumber: '••••••••1109',
-        ifsc: 'SBIN0004032',
-        bankName: 'State Bank of India',
-        holderName: 'PRIYA SHARMA',
-        pennyDrop: '₹1 Credited Successfully',
-        image:
-          'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600&auto=format&fit=crop&q=80',
-      },
-      aadhaar: {
-        number: '•••• •••• 4410',
-        status: 'UIDAI OTP Verified',
-        image:
-          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-      },
-      channelProof: {
-        url: 'https://instagram.com/priya_couture_vibe',
-        engagementRate: '5.2%',
-        status: 'Audience Authenticity 98%',
-      },
-    },
-    disableReason: null,
-  },
-  {
-    id: 'AFF-302',
-    name: 'Rahul Verma',
-    handle: '@deals_express_hub',
-    platform: 'Telegram',
-    followers: '95K Members',
-    email: 'rahul.deals@expresshub.in',
-    phone: '+91 98980 11223',
-    location: 'Bengaluru, Karnataka',
-    referralCode: 'DEALSHUB',
-    tier: 'Mega Affiliate',
-    commissionRate: 18,
-    totalEarnings: '₹3,42,000',
-    monthlyConversions: 1650,
-    conversionRate: '6.1%',
-    appliedAt: '21 Sep 2026, 02:15 PM',
-    kycStatus: 'Pending',
-    isEnabled: false, // Pending approval, currently not enabled
-    riskScore: 88,
-    documents: {
-      pan: {
-        number: 'ALKPZ7781N',
-        nameOnDoc: 'RAHUL VERMA',
-        status: 'NSDL Verified',
-        image:
-          'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
-      },
-      bank: {
-        accountNumber: '••••••••6642',
-        ifsc: 'HDFC0001824',
-        bankName: 'HDFC Bank, Koramangala',
-        holderName: 'RAHUL VERMA',
-        pennyDrop: '₹1 Credited Successfully',
-        image:
-          'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600&auto=format&fit=crop&q=80',
-      },
-      aadhaar: {
-        number: '•••• •••• 9920',
-        status: 'UIDAI OTP Verified',
-        image:
-          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-      },
-      channelProof: {
-        url: 'https://t.me/deals_express_hub',
-        engagementRate: '12.4%',
-        status: 'High Direct Traffic',
-      },
-    },
-    disableReason: 'Awaiting initial KYC verification before enabling commission tracking.',
-  },
-  {
-    id: 'AFF-303',
-    name: 'Ananya Roy',
-    handle: '@ananya_saree_tales',
-    platform: 'YouTube',
-    followers: '280K Subscribers',
-    email: 'ananya@sareetales.com',
-    phone: '+91 94140 33445',
-    location: 'Kolkata, West Bengal',
-    referralCode: 'ROYALSAREE',
-    tier: 'Diamond Partner',
-    commissionRate: 20,
-    totalEarnings: '₹6,12,000',
-    monthlyConversions: 2420,
-    conversionRate: '5.9%',
-    appliedAt: '20 Sep 2026, 08:30 PM',
-    kycStatus: 'Approved',
-    isEnabled: false, // Disabled by Admin
-    riskScore: 92,
-    documents: {
-      pan: {
-        number: 'AROPR4412B',
-        nameOnDoc: 'ANANYA ROY',
-        status: 'NSDL Verified',
-        image:
-          'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
-      },
-      bank: {
-        accountNumber: '••••••••4892',
-        ifsc: 'ICIC0000104',
-        bankName: 'ICICI Bank, Park Street',
-        holderName: 'ANANYA ROY',
-        pennyDrop: '₹1 Credited Successfully',
-        image:
-          'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600&auto=format&fit=crop&q=80',
-      },
-      channelProof: {
-        url: 'https://youtube.com/@ananya_saree_tales',
-        engagementRate: '8.1%',
-        status: 'Audience Authenticity 99%',
-      },
-    },
-    disableReason: 'Account temporarily disabled: High return/RTO rate detected on shared links.',
-  },
-  {
-    id: 'AFF-304',
-    name: 'Kabir Sethi',
-    handle: '@delhi_fashion_daily',
-    platform: 'Instagram',
-    followers: '78K Followers',
-    email: 'kabir.sethi@fashiondaily.in',
-    phone: '+91 98110 55667',
-    location: 'New Delhi, Delhi NCR',
-    referralCode: 'KABIR50',
-    tier: 'Silver Creator',
-    commissionRate: 12,
-    totalEarnings: '₹78,400',
-    monthlyConversions: 410,
-    conversionRate: '3.9%',
-    appliedAt: '20 Sep 2026, 04:10 PM',
-    kycStatus: 'Approved',
-    isEnabled: true,
-    riskScore: 96,
-    documents: {
-      pan: {
-        number: 'CWJPK8812Q',
-        nameOnDoc: 'KABIR SETHI',
-        status: 'NSDL Verified',
-        image:
-          'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
-      },
-      bank: {
-        accountNumber: '••••••••9832',
-        ifsc: 'KKBK0000180',
-        bankName: 'Kotak Mahindra Bank',
-        holderName: 'KABIR SETHI',
-        pennyDrop: '₹1 Credited Successfully',
-        image:
-          'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600&auto=format&fit=crop&q=80',
-      },
-      channelProof: {
-        url: 'https://instagram.com/delhi_fashion_daily',
-        engagementRate: '4.5%',
-        status: 'Verified Creator',
-      },
-    },
-    disableReason: null,
-  },
-  {
-    id: 'AFF-305',
-    name: 'Pooja Nair',
-    handle: '@nair_home_hacks',
-    platform: 'Pinterest & Blog',
-    followers: '45K Monthly Readers',
-    email: 'pooja@nairhomehacks.com',
-    phone: '+91 98450 77889',
-    location: 'Kochi, Kerala',
-    referralCode: 'HOMEHACKS',
-    tier: 'Silver Creator',
-    commissionRate: 12,
-    totalEarnings: '₹42,100',
-    monthlyConversions: 210,
-    conversionRate: '3.4%',
-    appliedAt: '19 Sep 2026, 09:30 PM',
-    kycStatus: 'Pending',
-    isEnabled: false,
-    riskScore: 74,
-    documents: {
-      pan: {
-        number: 'BPRPS4412R',
-        nameOnDoc: 'POOJA NAIR',
-        status: 'NSDL Verified',
-        image:
-          'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
-      },
-      bank: {
-        accountNumber: '••••••••5512',
-        ifsc: 'FDRL0001042',
-        bankName: 'Federal Bank, Marine Drive',
-        holderName: 'POOJA NAIR',
-        pennyDrop: 'Pending Confirmation',
-        image:
-          'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600&auto=format&fit=crop&q=80',
-      },
-      channelProof: {
-        url: 'https://nairhomehacks.com',
-        engagementRate: '2.8%',
-        status: 'Blog Verification Pending',
-      },
-    },
-    disableReason: 'Bank account ₹1 verification pending.',
-  },
-  {
-    id: 'AFF-306',
-    name: 'Vikram Rajput',
-    handle: '@rajput_fitness_deals',
-    platform: 'Instagram',
-    followers: '62K Followers',
-    email: 'vikram.rajput@fitdeals.in',
-    phone: '+91 91234 88990',
-    location: 'Chandigarh, Punjab',
-    referralCode: 'FITDEALS',
-    tier: 'Bronze Creator',
-    commissionRate: 10,
-    totalEarnings: '₹14,500',
-    monthlyConversions: 95,
-    conversionRate: '1.8%',
-    appliedAt: '18 Sep 2026, 11:20 AM',
-    kycStatus: 'Rejected',
-    isEnabled: false,
-    riskScore: 35,
-    documents: {
-      pan: {
-        number: 'AMMPM4412B',
-        nameOnDoc: 'UNKNOWN HOLDER',
-        status: 'NSDL Name Mismatch',
-        image:
-          'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
-      },
-      bank: {
-        accountNumber: '••••••••1289',
-        ifsc: 'PUNB0021400',
-        bankName: 'Punjab National Bank',
-        holderName: 'SINGH TEXTILES',
-        pennyDrop: 'Failed - Name Mismatch',
-        image:
-          'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600&auto=format&fit=crop&q=80',
-      },
-      channelProof: {
-        url: 'https://instagram.com/rajput_fitness_deals',
-        engagementRate: '0.4%',
-        status: 'Suspicious Bot Activity Detected',
-      },
-    },
-    disableReason: 'Fraudulent activity flagged: Inconsistent PAN & Bank mandate.',
-  },
-  {
-    id: 'AFF-307',
-    name: 'Sneha Kulkarni',
-    handle: '@sneha_lifestyle_buzz',
-    platform: 'Instagram',
-    followers: '115K Followers',
-    email: 'sneha@kulkarnilifestyle.com',
-    phone: '+91 98220 99881',
-    location: 'Pune, Maharashtra',
-    referralCode: 'SNEHALUXE',
-    tier: 'Gold Creator',
-    commissionRate: 15,
-    totalEarnings: '₹2,15,800',
-    monthlyConversions: 920,
-    conversionRate: '5.1%',
-    appliedAt: '18 Sep 2026, 09:10 AM',
-    kycStatus: 'Approved',
-    isEnabled: true,
-    riskScore: 97,
-    documents: {
-      pan: {
-        number: 'CLKPS3312Z',
-        nameOnDoc: 'SNEHA KULKARNI',
-        status: 'NSDL Verified',
-        image:
-          'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
-      },
-      bank: {
-        accountNumber: '••••••••7731',
-        ifsc: 'MAHB0000412',
-        bankName: 'Bank of Maharashtra',
-        holderName: 'SNEHA KULKARNI',
-        pennyDrop: '₹1 Credited Successfully',
-        image:
-          'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600&auto=format&fit=crop&q=80',
-      },
-      channelProof: {
-        url: 'https://instagram.com/sneha_lifestyle_buzz',
-        engagementRate: '6.4%',
-        status: 'Verified Influencer',
-      },
-    },
-    disableReason: null,
-  },
-];
+// Live KYC applications loaded from backend database
+const INITIAL_AFFILIATES = [];
 
 const SIDEBAR_NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -355,53 +35,136 @@ const mapUserAppToAdminRecord = (userApp) => {
   const isRejected = userApp.status === 'Rejected' || userApp.status === 'REJECTED';
   const kycStatus = isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending';
 
+  const name = userApp.fullName || 'User Applicant';
+  const handle = userApp.handle || userApp.socialHandle || '—';
+
   return {
-    id: userApp.applicationId || 'AFF-USER-LIVE',
+    id: userApp.applicationId || userApp.id || 'AFF-APP',
     isLiveUserApp: true,
-    name: userApp.fullName || 'User Applicant',
-    handle: '@' + (userApp.fullName || 'affiliate').toLowerCase().replace(/[^a-z0-9]/g, '_'),
-    platform: 'Instagram / Direct Community',
-    followers: '50K+ Audience',
-    email: userApp.email || 'user.applicant@meesho.com',
-    phone: userApp.phone || '+91 98765 43210',
-    location: [userApp.city, userApp.state].filter(Boolean).join(', ') || 'Delhi, India',
-    referralCode: ((userApp.fullName ? userApp.fullName.slice(0, 5) : 'MEE') + '50').toUpperCase(),
-    tier: 'Gold Creator',
-    commissionRate: 15,
-    totalEarnings: '₹0',
-    monthlyConversions: 0,
-    conversionRate: '0.0%',
+    name: name,
+    handle: handle,
+    platform: userApp.platform || userApp.socialPlatform || 'Direct / Social',
+    followers: userApp.followers || userApp.followersCount || '0',
+    email: userApp.email || 'Not Provided',
+    phone: userApp.phone || 'Not Provided',
+    location: [userApp.city, userApp.state].filter(Boolean).join(', ') || userApp.address || 'Not Provided',
+    referralCode: userApp.referralCode || ((userApp.fullName ? userApp.fullName.slice(0, 5) : 'MEE') + '50').toUpperCase(),
+    tier: userApp.tier || 'New Creator',
+    marginModel: 'Custom Profit Margin',
+    commissionRate: 0,
+    totalEarnings: userApp.totalEarnings || '₹0',
+    monthlyConversions: userApp.monthlyConversions || 0,
+    conversionRate: userApp.conversionRate || '0.0%',
     appliedAt: userApp.submittedAt || 'Today, Just now',
     kycStatus: kycStatus,
     isEnabled: isApproved,
-    riskScore: isRejected ? 42 : 94,
+    riskScore: isRejected ? 42 : isApproved ? 96 : 75,
     documents: {
       pan: {
-        number: (userApp.panNumber || 'BKWPS9821K').toUpperCase(),
-        nameOnDoc: (userApp.fullName || 'USER APPLICANT').toUpperCase(),
-        status: isRejected ? 'NSDL Verification Failed' : 'NSDL Verified',
-        image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
+        number: (userApp.panNumber || '').toUpperCase() || 'Not Uploaded',
+        nameOnDoc: (userApp.accountHolderName || userApp.fullName || '').toUpperCase() || 'Not Provided',
+        status: isRejected ? 'NSDL Verification Failed' : isApproved ? 'NSDL Verified' : 'Under Review',
+        docName: userApp.panDocName || 'PAN_Document',
+        image: userApp.panPreview || userApp.panFile?.previewUrl || null,
       },
       bank: {
-        accountNumber: userApp.accountNumber ? `••••••••${userApp.accountNumber.slice(-4)}` : '••••••••4892',
-        ifsc: (userApp.ifscCode || 'HDFC0001824').toUpperCase(),
-        bankName: userApp.bankName || 'HDFC Bank Ltd',
-        holderName: (userApp.accountHolderName || userApp.fullName || 'USER APPLICANT').toUpperCase(),
-        pennyDrop: isRejected ? '₹1 Bank Verification Failed' : '₹1 Credited Successfully',
-        image: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600&auto=format&fit=crop&q=80',
+        accountNumber: userApp.accountNumber ? (userApp.accountNumber.startsWith('•') ? userApp.accountNumber : `••••••••${userApp.accountNumber.slice(-4)}`) : 'Not Provided',
+        ifsc: (userApp.ifscCode || '').toUpperCase() || 'Not Provided',
+        bankName: userApp.bankName || 'Not Provided',
+        holderName: (userApp.accountHolderName || userApp.fullName || '').toUpperCase() || 'Not Provided',
+        pennyDrop: isRejected ? '₹1 Bank Verification Failed' : isApproved ? '₹1 Credited Successfully' : 'Pending Verification',
+        upiId: userApp.upiId || 'Not Provided',
+        image: userApp.chequePreview || userApp.chequeFile?.previewUrl || null,
       },
       aadhaar: {
-        number: userApp.aadhaarNumber ? `•••• •••• ${userApp.aadhaarNumber.slice(-4)}` : '•••• •••• 9920',
-        status: isRejected ? 'UIDAI Manual Check Failed' : 'UIDAI OTP Verified',
-        image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
+        number: userApp.aadhaarNumber ? (userApp.aadhaarNumber.startsWith('•') ? userApp.aadhaarNumber : `•••• •••• ${userApp.aadhaarNumber.slice(-4)}`) : 'Not Provided',
+        status: isRejected ? 'UIDAI Manual Check Failed' : isApproved ? 'UIDAI OTP Verified' : 'Under Review',
+        docName: userApp.aadhaarDocName || 'Aadhaar_Document',
+        image: userApp.aadhaarPreview || userApp.aadhaarFile?.previewUrl || null,
       },
       channelProof: {
-        url: 'https://instagram.com/verified_creator',
-        engagementRate: '5.8%',
-        status: 'Audience Authenticity 98%',
+        url: userApp.channelUrl || (handle ? `https://instagram.com/${handle.replace('@', '')}` : 'Not Provided'),
+        engagementRate: userApp.engagementRate || 'N/A',
+        status: userApp.channelStatus || (isApproved ? 'Audience Verified' : 'Pending Verification'),
       },
     },
     disableReason: isRejected ? (userApp.rejectionReason || 'KYC Document verification failed.') : null,
+  };
+};
+
+const mapDbKycToAdminRecord = (dbApp) => {
+  if (!dbApp) return null;
+  const isApproved = dbApp.status === 'APPROVED' || dbApp.status === 'Approved';
+  const isRejected = dbApp.status === 'REJECTED' || dbApp.status === 'Rejected';
+  const kycStatus = isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending';
+
+  const docs = dbApp.documents || {};
+  const user = dbApp.user || {};
+
+  const name = docs.fullName || user.fullName || 'Affiliate Applicant';
+  const handle = docs.handle || '—';
+  const phone = docs.phone || user.phone || 'Not Provided';
+  const email = docs.email || user.email || 'Not Provided';
+  const appId = docs.applicationId || dbApp.id;
+
+  return {
+    id: appId,
+    dbId: dbApp.id,
+    isLiveUserApp: true,
+    name: name,
+    handle: handle,
+    platform: docs.platform || 'Direct / Social',
+    followers: docs.followers || '0',
+    email: email,
+    phone: phone,
+    location: [docs.city, docs.state].filter(Boolean).join(', ') || docs.address || 'Location Not Provided',
+    referralCode: docs.referralCode || ((name ? name.slice(0, 5) : 'MEE') + '50').toUpperCase(),
+    tier: docs.tier || user.tier || 'New Creator',
+    marginModel: 'Custom Profit Margin',
+    commissionRate: 0,
+    totalEarnings: docs.totalEarnings || '₹0',
+    monthlyConversions: docs.monthlyConversions || 0,
+    conversionRate: docs.conversionRate || '0.0%',
+    appliedAt: docs.submittedAt || new Date(dbApp.createdAt).toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }),
+    kycStatus: kycStatus,
+    isEnabled: isApproved,
+    riskScore: isRejected ? 42 : isApproved ? 96 : 75,
+    documents: {
+      pan: {
+        number: (docs.panNumber || docs.pan?.number || '').toUpperCase() || 'Not Uploaded',
+        nameOnDoc: (docs.accountHolderName || docs.pan?.nameOnDoc || name || '').toUpperCase() || 'Not Provided',
+        status: isRejected ? 'NSDL Verification Failed' : isApproved ? 'NSDL Verified' : 'Under Review',
+        docName: docs.panDocName || 'PAN_Document',
+        image: docs.panPreview || docs.pan?.image || null,
+      },
+      bank: {
+        accountNumber: docs.accountNumber ? (docs.accountNumber.startsWith('•') ? docs.accountNumber : `••••••••${docs.accountNumber.slice(-4)}`) : (docs.bank?.accountNumber ? (docs.bank.accountNumber.startsWith('•') ? docs.bank.accountNumber : `••••••••${docs.bank.accountNumber.slice(-4)}`) : 'Not Provided'),
+        ifsc: (docs.ifscCode || docs.bank?.ifsc || '').toUpperCase() || 'Not Provided',
+        bankName: docs.bankName || docs.bank?.bankName || 'Not Provided',
+        holderName: (docs.accountHolderName || docs.bank?.holderName || name || '').toUpperCase() || 'Not Provided',
+        pennyDrop: isRejected ? '₹1 Bank Verification Failed' : isApproved ? '₹1 Credited Successfully' : 'Pending Verification',
+        upiId: docs.upiId || docs.bank?.upiId || 'Not Provided',
+        image: docs.chequePreview || docs.bank?.image || null,
+      },
+      aadhaar: {
+        number: docs.aadhaarNumber ? (docs.aadhaarNumber.startsWith('•') ? docs.aadhaarNumber : `•••• •••• ${docs.aadhaarNumber.slice(-4)}`) : (docs.aadhaar?.number ? (docs.aadhaar.number.startsWith('•') ? docs.aadhaar.number : `•••• •••• ${docs.aadhaar.number.slice(-4)}`) : 'Not Provided'),
+        status: isRejected ? 'UIDAI Manual Check Failed' : isApproved ? 'UIDAI OTP Verified' : 'Under Review',
+        docName: docs.aadhaarDocName || 'Aadhaar_Document',
+        image: docs.aadhaarPreview || docs.aadhaar?.image || null,
+      },
+      channelProof: {
+        url: docs.channelUrl || (handle ? `https://instagram.com/${handle.replace('@', '')}` : 'Not Provided'),
+        engagementRate: docs.engagementRate || 'N/A',
+        status: docs.channelStatus || (isApproved ? 'Audience Verified' : 'Pending Verification'),
+      },
+    },
+    disableReason: isRejected ? (dbApp.adminNotes || 'KYC Document verification failed.') : null,
   };
 };
 
@@ -410,24 +173,52 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
     const userApp = getAffiliateApp();
     if (userApp) {
       const liveRecord = mapUserAppToAdminRecord(userApp);
-      return [liveRecord, ...INITIAL_AFFILIATES.filter((a) => a.id !== liveRecord.id)];
+      return liveRecord ? [liveRecord] : [];
     }
-    return INITIAL_AFFILIATES;
+    return [];
   };
 
   const [affiliates, setAffiliates] = useState(buildInitialList);
+
+  // Real database fetch effect
+  useEffect(() => {
+    let isMounted = true;
+    const fetchRealAffiliates = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/v1/admin-kyc/affiliates');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.applications && isMounted) {
+          const liveRecords = data.applications.map(mapDbKycToAdminRecord).filter(Boolean);
+          setAffiliates(liveRecords);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch affiliates from backend:', err);
+      }
+    };
+
+    fetchRealAffiliates();
+    const interval = setInterval(fetchRealAffiliates, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeAffiliateApp((updatedApp) => {
       if (updatedApp) {
         const liveRecord = mapUserAppToAdminRecord(updatedApp);
-        setAffiliates((prev) => [liveRecord, ...prev.filter((a) => a.id !== liveRecord.id)]);
+        if (liveRecord) {
+          setAffiliates((prev) => [liveRecord, ...prev.filter((a) => a.id !== liveRecord.id)]);
+        }
       }
     });
     return unsubscribe;
   }, []);
   const [selectedStatus, setSelectedStatus] = useState('All'); // 'All' | 'Pending' | 'Approved' | 'Enabled' | 'Disabled' | 'Rejected'
   const [selectedPlatform, setSelectedPlatform] = useState('All');
+  const [showLiveOnly, setShowLiveOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [activeModalItem, setActiveModalItem] = useState(null);
@@ -452,12 +243,18 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
     const enabled = affiliates.filter((a) => a.isEnabled).length;
     const disabled = affiliates.filter((a) => !a.isEnabled).length;
     const approved = affiliates.filter((a) => a.kycStatus === 'Approved').length;
-    return { total, pending, enabled, disabled, approved };
+    const totalDisbursed = affiliates.reduce((sum, a) => {
+      const val = parseFloat((a.totalEarnings || '0').toString().replace(/[^0-9.]/g, '')) || 0;
+      return sum + val;
+    }, 0);
+    return { total, pending, enabled, disabled, approved, totalDisbursed };
   }, [affiliates]);
 
   // Filtering
   const filteredAffiliates = useMemo(() => {
     return affiliates.filter((item) => {
+      if (showLiveOnly && !item.isLiveUserApp) return false;
+
       let matchStatus = true;
       if (selectedStatus === 'Pending') matchStatus = item.kycStatus === 'Pending';
       else if (selectedStatus === 'Approved') matchStatus = item.kycStatus === 'Approved';
@@ -521,15 +318,43 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
   };
 
   // KYC Approval
-  const handleApproveKyc = (id) => {
+  const handleApproveKyc = async (id) => {
+    const item = affiliates.find((a) => a.id === id || a.dbId === id);
+    const targetDbId = item?.dbId || id;
+
+    // 1. Optimistic UI update
     setAffiliates((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, kycStatus: 'Approved', isEnabled: true, disableReason: null } : a))
+      prev.map((a) =>
+        a.id === id || a.dbId === id
+          ? { ...a, kycStatus: 'Approved', isEnabled: true, disableReason: null }
+          : a
+      )
     );
+
+    // 2. Persist to Real PostgreSQL Database
+    try {
+      await fetch(`http://localhost:5000/api/v1/admin-kyc/${targetDbId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'APPROVED' })
+      });
+    } catch (apiErr) {
+      console.error('Failed to update KYC status in DB:', apiErr);
+    }
+
     const userApp = getAffiliateApp();
-    if (userApp && (id === userApp.applicationId || id === 'AFF-USER-LIVE' || (typeof id === 'string' && id.startsWith('KYC-AFF-')))) {
+    if (
+      userApp &&
+      (id === userApp.applicationId ||
+        id === userApp.id ||
+        id === 'AFF-USER-LIVE' ||
+        targetDbId === userApp.dbId ||
+        (typeof id === 'string' && (id.startsWith('KYC-AFF-') || id.startsWith('AFF-KYC-'))))
+    ) {
       saveAffiliateApp({
         ...userApp,
         status: 'Approved',
+        kycStatus: 'Approved',
         approvedAt: new Date().toLocaleString('en-IN', {
           day: 'numeric',
           month: 'short',
@@ -539,9 +364,24 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
         }),
         rejectionReason: null,
       });
+
+      // Real Earnings Notification for Affiliate
+      try {
+        addNotification({
+          title: 'Affiliate KYC Approved! 🎉',
+          message:
+            'Congratulations! Your KYC documents and bank mandate have been verified by Admin. Custom product margin sharing is now active.',
+          category: 'Earnings',
+          icon: 'check_circle',
+          iconBg: 'bg-emerald-50 text-emerald-600',
+          actionPath: '/user-dashboard1?tab=affiliate',
+          actionText: 'Open Affiliate Hub',
+          data: { status: 'Approved' }
+        });
+      } catch (e) {}
     }
-    showToast(`Affiliate KYC #${id} Approved & Account Enabled! 🎉`);
-    if (activeModalItem?.id === id) {
+    showToast(`Affiliate KYC #${id} Approved in Database & Account Enabled! 🎉`);
+    if (activeModalItem?.id === id || activeModalItem?.dbId === id) {
       setActiveModalItem((prev) =>
         prev ? { ...prev, kycStatus: 'Approved', isEnabled: true, disableReason: null } : null
       );
@@ -549,11 +389,15 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
   };
 
   // KYC Rejection
-  const handleRejectKyc = (id) => {
-    const reason = 'Document verification failed: PAN Card or Bank details could not be authenticated. Please re-upload.';
+  const handleRejectKyc = async (id) => {
+    const reason =
+      'Document verification failed: PAN Card or Bank details could not be authenticated. Please re-upload.';
+    const item = affiliates.find((a) => a.id === id || a.dbId === id);
+    const targetDbId = item?.dbId || id;
+
     setAffiliates((prev) =>
       prev.map((a) =>
-        a.id === id
+        a.id === id || a.dbId === id
           ? {
               ...a,
               kycStatus: 'Rejected',
@@ -563,16 +407,51 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
           : a
       )
     );
+
+    // Persist to Real PostgreSQL Database
+    try {
+      await fetch(`http://localhost:5000/api/v1/admin-kyc/${targetDbId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'REJECTED', adminNotes: reason })
+      });
+    } catch (apiErr) {
+      console.error('Failed to update KYC rejection in DB:', apiErr);
+    }
+
     const userApp = getAffiliateApp();
-    if (userApp && (id === userApp.applicationId || id === 'AFF-USER-LIVE' || (typeof id === 'string' && id.startsWith('KYC-AFF-')))) {
+    if (
+      userApp &&
+      (id === userApp.applicationId ||
+        id === userApp.id ||
+        id === 'AFF-USER-LIVE' ||
+        targetDbId === userApp.dbId ||
+        (typeof id === 'string' && (id.startsWith('KYC-AFF-') || id.startsWith('AFF-KYC-'))))
+    ) {
       saveAffiliateApp({
         ...userApp,
         status: 'Rejected',
+        kycStatus: 'Rejected',
         rejectionReason: reason,
       });
+
+      // Real Earnings Notification for Affiliate
+      try {
+        addNotification({
+          title: 'Affiliate KYC Action Required ⚠️',
+          message:
+            'Document verification failed. Please review the compliance feedback and re-upload your documents.',
+          category: 'Earnings',
+          icon: 'error',
+          iconBg: 'bg-rose-50 text-rose-600',
+          actionPath: '/affiliate-kyc-status',
+          actionText: 'Fix & Resubmit',
+          data: { status: 'Rejected' }
+        });
+      } catch (e) {}
     }
-    showToast(`Affiliate KYC #${id} Rejected & Access Disabled.`);
-    if (activeModalItem?.id === id) {
+    showToast(`Affiliate KYC #${id} Rejected in Database & Access Disabled.`);
+    if (activeModalItem?.id === id || activeModalItem?.dbId === id) {
       setActiveModalItem(null);
     }
   };
@@ -1120,9 +999,9 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
               </p>
               <div className="flex items-end gap-2">
                 <h3 className="text-3xl font-black text-[#191c1e] font-['Plus_Jakarta_Sans',sans-serif]">
-                  ₹14.5L
+                  ₹{metrics.totalDisbursed > 0 ? (metrics.totalDisbursed >= 100000 ? `${(metrics.totalDisbursed / 100000).toFixed(1)}L` : metrics.totalDisbursed.toLocaleString('en-IN')) : '0'}
                 </h3>
-                <span className="text-emerald-500 text-xs font-bold pb-1">MTD</span>
+                <span className="text-emerald-500 text-xs font-bold pb-1">Real Total</span>
               </div>
               <div className="mt-4 w-full bg-slate-100 h-1 rounded-full overflow-hidden">
                 <div className="bg-[#4d41df] h-full rounded-full w-[65%]"></div>
@@ -1170,6 +1049,27 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
                 <option value="Telegram">Telegram</option>
                 <option value="Pinterest">Pinterest / Blog</option>
               </select>
+
+              {/* Toggle Real Live Applicants vs All */}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !showLiveOnly;
+                  setShowLiveOnly(next);
+                  showToast(next ? 'Showing Real Applicants Only 🟢' : 'Showing All (Including Demo Creators)');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  showLiveOnly
+                    ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400/50'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                }`}
+                title="Filter to show only genuine user applicants"
+              >
+                <span className="material-symbols-outlined text-sm">
+                  {showLiveOnly ? 'verified_user' : 'group'}
+                </span>
+                <span>{showLiveOnly ? 'Real Applicants Only 🟢' : 'Show Real Only'}</span>
+              </button>
             </div>
 
             {/* Search Input */}
@@ -1343,7 +1243,7 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
                               {item.referralCode}
                             </span>
                             <span className="block text-[10px] text-slate-400 mt-1 font-semibold">
-                              {item.tier} ({item.commissionRate}%)
+                              {item.tier} • Custom Margin
                             </span>
                           </td>
                           <td className="py-3.5 px-4">
@@ -1585,8 +1485,8 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
                   {/* Creator Stats */}
                   <div className="bg-[#f8f9fb] p-4 rounded-xl border border-slate-100 space-y-2 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-slate-500 font-medium">Commission Rate:</span>
-                      <span className="font-bold text-slate-800">{activeModalItem.commissionRate}%</span>
+                      <span className="text-slate-500 font-medium">Margin Model:</span>
+                      <span className="font-bold text-emerald-600">Custom Margin / Item</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500 font-medium">Monthly Referrals:</span>

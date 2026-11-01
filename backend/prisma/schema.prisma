@@ -146,6 +146,7 @@ model Product {
   reviewsCount       Int      @default(0) @map("reviews_count")
   categorySlug       String   @map("category_slug")
   category           Category @relation(fields: [categorySlug], references: [slug])
+  subCategory        String?  @map("sub_category")
   images             String[]
   sizes              String[] @default(["S", "M", "L", "XL", "Free Size"])
   colors             String[] @default([])

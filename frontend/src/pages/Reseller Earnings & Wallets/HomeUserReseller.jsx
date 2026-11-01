@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from "../../components/NavDrawer";
 import AppBottomNav from "../../components/AppBottomNav";
+import { getUnreadCount, subscribeNotifications } from '../../services/notificationService';
+import { getProducts } from '../../services/ecommerceService';
 
 const initialProducts = [
   {
@@ -14,7 +16,7 @@ const initialProducts = [
     discount: "64% OFF",
     margin: 65,
     tag: "NEW",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuD0zqmw7ba_XFDIMO6oyX-ILUKOJgIMuPHjQHmER1KSXi4yclRGSPaFRWJJc7uqCXrLyuOZB5pF6W9WnzFkT4T60VwY7uLrFzTvD9dwE04M23l7pGMu2N9_mNh3dIciAjlMaq4CCNHCtjsjPsAXVnUWIzuy88jS-AXIyF662WcDdlDcTQBqikiQkpbng2C7siDr0Cfpn4tI2OPGK5ut0GiQ2urqGnEEsMeCKdoSG60Mzopnd90gu9Axj_jDhaDAqbSN79R6G9BIo88"
+    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80"
   },
   {
     id: 2,
@@ -26,7 +28,7 @@ const initialProducts = [
     discount: "64% OFF",
     margin: 120,
     tag: "HOT",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCDPmD9-ovlIa-MD4BO39HPO96wxIRmWrYe8qYWvqkgptxYMCtQfivT9lWRbcMeXNi-Be7aT1fSOpzmtPE6QJMQbmsK-caGrrcQyM1aGztg5q70fVH5vVSd-huuv4T10VbeNArAzmgX_bWCzTnnnzDjfxd0bhLnV1OjRGwViGcBWLwJ0r76tf9TqTUqy3kSdVBeusII5UfWmQaFa2mxVvqsetPyMOBZibBWGA9Jw1D2ZeqkjFgFCzihuFUgTfa_BFgo9W_AOQ8dQP8"
+    image: "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=600&auto=format&fit=crop&q=80"
   },
   {
     id: 3,
@@ -38,7 +40,7 @@ const initialProducts = [
     discount: "75% OFF",
     margin: 35,
     tag: "BESTSELLER",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuB1RPNZ5nwbtLEh9sRMXLEaAEIdTk4Rz87Q3LYHQACDChwDYaR8qhBMhkVXuJkluTpsA_aaidWyOn_Upemc_IEw654SWRijV6kdGXhbsCPZ3UhkejAz4FIrdnhjgG1ifYPo0YdbnGt5COpD-LQQyqfDwSnkJ0dkPcTaNVzH115l9iYi5Pc9TiAWEMNhbEpfNrAygCBaT0wKcRpJ2lTs8T3YWfNEVx_G2PSS9BSwywJKSOx1KzmuJzD-O2_IlBG3VUOyDDgmMHnV9lg"
+    image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=600&auto=format&fit=crop&q=80"
   },
   {
     id: 4,
@@ -50,7 +52,7 @@ const initialProducts = [
     discount: "64% OFF",
     margin: 180,
     tag: "TRENDING",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuAnLVYeQpmW-W1dgZwHUgCQvF69izifWPEnVWhThVqzW-CIir5KRuUKR24bNfPIWDaQDUHLUUES63-xwoI5c5J6s9tRYCALvPPQFLXnY4vrcRNjR_rmp-ahMXmBFoMRAAHYmDnK_G91roDCgOjgFgmQuoYXoEbt-P6qlh70aroZJkRr6MSNVJgIcN5lweJDacGDeM9VzRY7bb6c6lFGvb2j12eevSjL676RRot4COi_sM79j9zSxTuFr0F6aZx2vsyTnOPggmoL9m4"
+    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=80"
   },
   {
     id: 5,
@@ -161,6 +163,14 @@ export default function HomeUserReseller() {
   const [favorites, setFavorites] = useState([1]);
   const [activeNav, setActiveNav] = useState("home");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(() => getUnreadCount());
+
+  useEffect(() => {
+    const unsub = subscribeNotifications(() => {
+      setUnreadNotifs(getUnreadCount());
+    });
+    return unsub;
+  }, []);
 
   React.useEffect(() => {
     const handleClickOutside = (e) => {
@@ -207,9 +217,31 @@ export default function HomeUserReseller() {
     }
   };
 
+  const [products, setProducts] = useState(initialProducts);
+
+  useEffect(() => {
+    getProducts().then((data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        const mapped = data.map((item, idx) => ({
+          id: item.id || idx + 1,
+          title: item.title,
+          category: item.category || 'Women',
+          brand: item.brand || 'Libas',
+          price: item.price || 499,
+          originalPrice: item.originalPrice || Math.round((item.price || 499) * 1.8),
+          discount: item.discount || '45% OFF',
+          margin: item.margin || Math.round((item.price || 499) * 0.2),
+          tag: item.tag || (idx % 2 === 0 ? 'BESTSELLER' : 'HOT'),
+          image: (item.images && item.images[0]) || item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
+        }));
+        setProducts(mapped);
+      }
+    }).catch(() => {});
+  }, []);
+
   const normalize = (text) => (text || '').toLowerCase().replace(/kurtas?|kurti/g, 'kurt').replace(/sarees?/g, 'saree').trim();
 
-  const filteredProducts = initialProducts.filter(p => {
+  const filteredProducts = products.filter(p => {
     const q = normalize(searchQuery);
     const titleNorm = normalize(p.title);
     const brandNorm = normalize(p.brand);
@@ -385,8 +417,15 @@ export default function HomeUserReseller() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/notifications')} className="text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" title="Notifications">
+            <button 
+              onClick={() => navigate('/notifications')} 
+              className="relative text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
+              title="Notifications"
+            >
               <span className="material-symbols-outlined">notifications</span>
+              {unreadNotifs > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#FF3F6C] rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse"></span>
+              )}
             </button>
             <button onClick={() => navigate('/cart')} className="text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" title="Shopping Cart">
               <span className="material-symbols-outlined">shopping_bag</span>
@@ -480,7 +519,7 @@ export default function HomeUserReseller() {
                     alt="Stylish traditional clothing display" 
                     src="/banner_img.jpg"
                     onError={(e) => {
-                      e.target.src = "https://lh3.googleusercontent.com/aida-public/AB6AXuDN93jQ_xg0f6-zb955ibV_Vb2ULlDkhzoh7rBba28sFScTWcts5B8jpHC7NtiNzGHNpKedaH-un9MEt5W8QLlyc-8DRZe845t9OpyidNTC3c31yU08q_1eSgxokC3S-EUFIdI20bFmysBA9yl1WBRExCen1GgQwViLxACjnMTO3dwAWldb4zfUxOtAMqcj6ShvldTXqHqmr58GN8GVS4fFtQ04e6FhQzFO6xmhnB3GechbsrGchpdGqVEAUjcQN5CjVnyhiv2MxCg";
+                      e.target.src = "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=1000&auto=format&fit=crop&q=80";
                     }}
                   />
                 </div>
@@ -607,7 +646,7 @@ export default function HomeUserReseller() {
                     key={p.id} 
                     className="bg-surface-container-lowest rounded-2xl p-3 border border-outline-variant/10 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
                   >
-                    <div onClick={() => navigate('/product')} className="cursor-pointer" title="View Product Details">
+                    <div onClick={() => navigate(`/product?id=${p.id}`)} className="cursor-pointer" title="View Product Details">
                       <div className="aspect-[3/4] rounded-xl overflow-hidden relative mb-3 bg-surface-container-high">
                         <img 
                           src={p.image} 
@@ -653,7 +692,7 @@ export default function HomeUserReseller() {
                     </div>
 
                     <div 
-                      onClick={() => navigate('/share-earn-config')}
+                      onClick={() => navigate(`/share-earn-config?id=${p.id}`)}
                       className="bg-tertiary-container/10 border border-tertiary/10 rounded-xl px-3 py-1.5 flex items-center justify-between cursor-pointer"
                     >
                       <span className="text-[10px] font-bold text-tertiary font-label uppercase tracking-wider">Earn ₹{p.margin}</span>

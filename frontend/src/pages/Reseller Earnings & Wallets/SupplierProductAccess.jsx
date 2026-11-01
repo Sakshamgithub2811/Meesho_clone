@@ -30,8 +30,8 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'in_stock', // 'in_stock' | 'low_stock' | 'out_of_stock'
     fastDispatch: true,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC0ZnPCaQs1V-mDSDM7ur2kI3Dz5Nbk7XDFuZH3o4lRL3dsUn6O1yaEEHy-VLMCln7Sd6be5Qrq94Zfg63DDyBzVhYJePlmHDXghznQTyuuKMUm5Mm87Ajqce1Y0O-aCUAclPK1J3ONzX2FEjylGuRwxAPi7MjwxctToYvQMizwARfCrJZ5eBA2dlEycS3G6fvLnnmrYBrguUZ5NFiw9091KDpVXtHLkqcVjyakyCacLuB5sq9QG0-dXjlee_MI1KD7fzfqJZ9hE7U',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuD0zqmw7ba_XFDIMO6oyX-ILUKOJgIMuPHjQHmER1KSXi4yclRGSPaFRWJJc7uqCXrLyuOZB5pF6W9WnzFkT4T60VwY7uLrFzTvD9dwE04M23l7pGMu2N9_mNh3dIciAjlMaq4CCNHCtjsjPsAXVnUWIzuy88jS-AXIyF662WcDdlDcTQBqikiQkpbng2C7siDr0Cfpn4tI2OPGK5ut0GiQ2urqGnEEsMeCKdoSG60Mzopnd90gu9Axj_jDhaDAqbSN79R6G9BIo88',
+      'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       'Exquisite handcrafted Chanderi Silk Anarkali Kurti crafted with authentic Sanganeri handblock floral prints. Features delicate zari piping along the neckline, matching cotton dupatta with gold gotta patti borders, and comfortable matching straight pants.',
@@ -76,7 +76,7 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'in_stock',
     fastDispatch: true,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAV-4ZvD8edFl9Lx7SCSwdFXrKFRysgbseviqrpcYwlPpsVwMh6SSVFORqFmVJG-aZH3i_-DNWbVQptPCLNiw8CTD_e9BbXD_we51x_ztnvwqIFVYXuiWj1_76nc8HgnYAsh_NOyFmzhPkVBnuaDIMKYijWD3twWldxefTiqS5RyroofWD7VV-jq8Jy9lWB_UNzy4C6eMCN8Fe-E5cybIAqaGsHyVSSqqW9YOfZUAqay8ve_ELMRJJ6OGJT6aGbgx_BiY6aPqBpTQ8',
+      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       'Ultra-thin luxury minimalist analog watch engineered with Japanese quartz movement, scratch-resistant sapphire mineral glass, and genuine vegan leather straps with quick-release spring bars.',
@@ -119,7 +119,7 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'low_stock',
     fastDispatch: true,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCpf1xhClgaViwcD1tvJ8p52cL4Sfmkw06XotfX5KuzSAjOTm_EMVii_2t3xgDxVZVxopFmW1AoX5deQyT3NfgotaNOV1BXKtjZ6P8KiurUdzcHKva6xDoBWJ1zkouAgd1UP4lCSyiTGZ_dDecQuqUZCyiQrFFs0O-9ag4PFXAW2DsoBNIOmx3SZd3InVuStS1n5kvFjKO3B_pZqsnTGJ-VhXQzpF6zdSZIltKaMTjFGR_Gq6vtL28cmdp6n3PsIgI4B2lIa2sJ6tM',
+      'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       'True wireless stereo earbuds featuring environmental noise cancellation (ENC), 13mm dynamic bass drivers, 40 hours playtime with fast USB-C charging pod, and IPX5 sweat-resistant nano coating.',
@@ -161,7 +161,7 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'out_of_stock',
     fastDispatch: false,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBipv6iOh1No-Sk3kO1yZMB7VukLBZ-u8dbBQHAMyzIj7JNYevlScCb96BGSGBn9sUqPmj7KuCqnFnyXh2pdewmdHWUt31PKGsQ0Uasut7qrCn0TcOl1y-qoRwZOs8xBIIs-f8CyPi6r2ED0japxIZ7BTNFwns-q8mTXBUGnM5B-mPbFbPHt5FcypbupUeFT6BG6VvH_LusAebLRrD1OduDEREx1cRdIOEcpyyGCSzHdTDcDoIjMmVsVhI92yLJCIIig9vyEWsn7Ng',
+      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       'Lightweight engineered mesh running shoes with responsive EVA foam cushion sole, shock absorption heel bridge, and anti-skid rubber traction pods. Ideal for daily training, running, and casual athleisure.',
@@ -204,7 +204,7 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'in_stock',
     fastDispatch: true,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDHrYMcC-EEgrXqS1mkRlJvIiMJPwcEwPiiRQ_MZZqD-ha5M_yvOZYQLUyzmxhW5B_Wb4Z7vVkc7YctBI39fFI0RI_dOyNa59KlrsQtFAqeBkNjTHcEV6mzwwlM2-8R8chDMgFt5gK6kSNvmsGlS_WT8O2_3OwBhbWabtxZEtJsWliDGhep3lN691t0GsPCFtAlorMmMVjZ32z5u5v6NtLxEXkOfH5Rttm6gPoN2dlLCljSW_nZpkTgYqWK4vshasXyI9LaMB-52Wo',
+      'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       'Heavy-duty water-resistant vintage canvas backpack with padded 15.6-inch laptop compartment, ergonomic S-curve shoulder straps, metal alloy buckles, and hidden anti-theft back pocket for travel and daily commute.',
@@ -246,7 +246,7 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'in_stock',
     fastDispatch: true,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCDPmD9-ovlIa-MD4BO39HPO96wxIRmWrYe8qYWvqkgptxYMCtQfivT9lWRbcMeXNi-Be7aT1fSOpzmtPE6QJMQbmsK-caGrrcQyM1aGztg5q70fVH5vVSd-huuv4T10VbeNArAzmgX_bWCzTnnnzDjfxd0bhLnV1OjRGwViGcBWLwJ0r76tf9TqTUqy3kSdVBeusII5UfWmQaFa2mxVvqsetPyMOBZibBWGA9Jw1D2ZeqkjFgFCzihuFUgTfa_BFgo9W_AOQ8dQP8',
+      'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       'Classic trucker cut vintage denim jacket tailored from 100% cotton ring-spun denim. Finished with authentic stone enzyme wash, brass logo shank buttons, twin flap chest pockets, and adjustable waist tabs.',
@@ -288,7 +288,7 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'out_of_stock',
     fastDispatch: false,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCv6DgYAFvGbNJ5APR46xls7W7pN8o67LV_V8M5UUB3Wg82Y35C7rJLKqw75qntSEhXK9Ac79emuJ4yu6ynPkR2JydFC6jiz4hX9YKLKuNXBWzZw0kd6-gTNGPGPIVTUu2jWoo-_IZeK2TFB_ztWZHpxLskwKn1VFX5JVtEDngEEoOxNZEBXYgFu750hJPiqgqEdeQQsYhxshiBMwzme2PxnQurkxYsJBvCm1XRNK2YYfbuw2CqeAw_PTqWgD1a-zv-uQ18YTCL9Ek',
+      'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       'Luxurious authentic Banarasi silk saree enriched with woven metallic zari floral motifs, contrast designer pallu, and matching unstitched blouse fabric. Ideal for wedding seasons and festive celebrations.',
@@ -330,7 +330,7 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'out_of_stock',
     fastDispatch: false,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDjMHrBBEaOKIaIxs-krCV8r98eScU7K8WD2ssKdbpMS3VW3A0oI_lvyCen00es3iKUWB5nJqn6FmQXPx3F3eAqR610Qe6djt3e0oFC7-UdI8bgs6DlOuJi9pm5qHbrPdN3UMOvwuaFC8EAmPkWPT_hQxo9L3pFSRuctjRjBQ_qekaPu-2bTYSSKr6hK25KISmNQl1lt-FDl7rmGsBfBb4Kjjto8Kt5E_NNuTjPjueyHTibBpPS--j-xqMV9xWe0bC1AWbvqWFdcNs',
+      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       'Professional hybrid active noise cancellation headphones with 40mm beryllium drivers, memory foam earcups, 60 hours battery backup, and dedicated gaming low latency mode.',
@@ -371,7 +371,7 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'out_of_stock',
     fastDispatch: false,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCRTty01mkjoiq24vG7JCv67mTgkB7lUXxFoiqUs_NruWp7TRi9kyFVti-Q8FxVFXZMxzH2kALIFEMvmsJG1ZD32g2mpFXHIhlP0AbFLDNsWpfuy-2Tag0dQHZ3m9I7xSfHtIp8XJH4jFO7Ysi5cLTxylwAWQXvNVg2G-C0YwF-1sGgCeVOsq1lgSssmigBCKxuQ8euHmXNKQuHTm2-tleA4ENttn6k5HdXGQ4mQBuS8I7A04qzGhNx-CgKErSOAuv4bJYF5eiohe4',
+      'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       '100% authentic hand-carved pink Himalayan crystal rock salt lamp mounted on a polished neem wood base. Releases negative air ions to reduce stress and improve ambient bedroom atmosphere.',
@@ -412,7 +412,7 @@ const SUPPLIER_PRODUCTS = [
     stockStatus: 'low_stock',
     fastDispatch: true,
     images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBX-Oxg3tIQjqdjNYMY_pihafWimHmYMcVgO1rLRx7FPQ-goP04XXTctzrP1EUSgiz2Jn5kz3WMVptCQvptirIdlET4u4VdQGQDZ0fl83N6tuSS0bBXW-MRY4efXvkGVJfmMly4zDgrkXKhoqEXjA2oE0f5PNLQ1_T0g1qHJVSEUYpca-vBnqeKJodW6IODtvR5Jyku3okYm2C5q48nT846n7GkYVK8g8REFli2rJ6HZ1vYnO22yYWGJQI950O4_9pkfKgKoVfKVeI',
+      'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=800&auto=format&fit=crop&q=80',
     ],
     description:
       '1.96-inch curved AMOLED display smartwatch featuring Bluetooth calling with noise-canceling mic, 110+ sports modes, 24/7 health tracking, and 7-day battery life.',
@@ -1396,10 +1396,10 @@ export default function SupplierProductAccess({ onNavigate, onBack }) {
               <span className="material-symbols-outlined text-3xl">storefront</span>
             </div>
             <h3 className="text-base font-extrabold text-gray-900">
-              Abhi {connectedStore.storeName} par koi product sync nahi hai
+              No products synced to {connectedStore.storeName} yet
             </h3>
             <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
-              Supplier catalog me kisi bhi product ke neeche <strong>"⚡ 1-Click Sync to {connectedStore.storeName}"</strong> button dabakar product turant apne store par live karein!
+              Click the <strong>"⚡ 1-Click Sync to {connectedStore.storeName}"</strong> button below any product in the supplier catalog to publish it directly to your store!
             </p>
             <button
               onClick={() => setStockFilter('all')}
@@ -2864,10 +2864,10 @@ export default function SupplierProductAccess({ onNavigate, onBack }) {
                     <span className="material-symbols-outlined text-2xl">storefront</span>
                   </div>
                   <h4 className="font-extrabold text-gray-900 text-base">
-                    Aapke store par abhi koi product sync nahi hai
+                    No products synced to your store yet
                   </h4>
                   <p className="text-xs text-gray-500 max-w-md mx-auto">
-                    Supplier catalog me kisi bhi product ke neeche "1-Click Sync to {connectedStore.storeName}" click karein aur product direct aapke store par live ho jayega.
+                    Click "1-Click Sync to {connectedStore.storeName}" below any product in the supplier catalog to instantly publish it live to your store.
                   </p>
                   <button
                     onClick={() => {

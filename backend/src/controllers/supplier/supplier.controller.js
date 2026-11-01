@@ -3,6 +3,7 @@ import path from 'path';
 import prisma from '../../config/prisma.js';
 import supabase from '../../config/supabaseClient.js';
 import slugify from 'slugify';
+import { dispatchDeliveryOtpEmail } from '../order.controller.js';
 
 // Helper to save base64 data URLs as static files in uploads/
 const saveBase64Image = (base64Str, baseUrl) => {
@@ -486,6 +487,12 @@ export const updateOrderStatus = async (req, res, next) => {
       where: { id },
       data: { orderStatus },
     });
+
+    if (orderStatus === 'OUT_FOR_DELIVERY') {
+      dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' })
+        .then((result) => console.log(`🚚 [Supplier Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${result.sentTo}`))
+        .catch((err) => console.error(`⚠️ [Supplier Order ${id}] OTP email failed:`, err.message));
+    }
 
     return res.status(200).json({
       success: true,

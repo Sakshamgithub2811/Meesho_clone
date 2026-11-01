@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import {
   getProductById,
   getProducts,
-  addToCart,
-  getCart,
   toggleWishlist,
   checkCanReview
 } from '../../services/ecommerceService';
+import { useCart } from '../../hooks/useCart';
 
 // Category-specific variant configuration & labels
 const CATEGORY_META = {
@@ -165,16 +164,17 @@ const resolveColorHex = (colorName) => {
 };
 
 export default function ProductDetail({ onNavigate = () => {}, onBack }) {
+  const { id: routeId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const productId = searchParams.get('id');
+  const productId = routeId || searchParams.get('id');
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
-  const [cartCount, setCartCount] = useState(0);
+  const { cartCount, addItem } = useCart();
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
@@ -184,13 +184,82 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
   const [userOrderId, setUserOrderId] = useState(null);
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
 
+  // Dynamic Custom Affiliate Margin Support
+  const urlMargin = Number(searchParams.get('margin') || searchParams.get('m') || 0);
+  const affiliateMargin = urlMargin > 0 ? urlMargin : Number(localStorage.getItem('mshoppy_affiliate_margin') || 0);
+  const effectivePrice = (product?.price || 0) + (affiliateMargin > 0 ? affiliateMargin : 0);
+
+  // Pincode & Delivery Estimator States - Empty by default, loads from saved address if available
+  const [pincode, setPincode] = useState(() => {
+    try {
+      const savedPin = localStorage.getItem('mshoppy_user_pincode');
+      if (savedPin && /^[1-9][0-9]{5}$/.test(savedPin.trim())) return savedPin.trim();
+      const savedAddr = localStorage.getItem('mshoppy_selected_address');
+      if (savedAddr) {
+        const parsed = JSON.parse(savedAddr);
+        if (parsed?.pincode && /^[1-9][0-9]{5}$/.test(String(parsed.pincode).trim())) {
+          return String(parsed.pincode).trim();
+        }
+      }
+    } catch (e) {}
+    return '';
+  });
+
+  const [isPincodeValid, setIsPincodeValid] = useState(true);
+  const [deliveryEstimate, setDeliveryEstimate] = useState(() => {
+    try {
+      const savedPin = localStorage.getItem('mshoppy_user_pincode');
+      const savedAddr = localStorage.getItem('mshoppy_selected_address');
+      let pin = null;
+      if (savedPin && /^[1-9][0-9]{5}$/.test(savedPin.trim())) {
+        pin = savedPin.trim();
+      } else if (savedAddr) {
+        const parsed = JSON.parse(savedAddr);
+        if (parsed?.pincode && /^[1-9][0-9]{5}$/.test(String(parsed.pincode).trim())) {
+          pin = String(parsed.pincode).trim();
+        }
+      }
+      if (pin) {
+        const d = new Date();
+        const daysToAdd = (parseInt(pin.slice(-1), 10) % 3) + 2; // 2 to 4 days
+        d.setDate(d.getDate() + daysToAdd);
+        return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+      }
+    } catch (e) {}
+    return null;
+  });
+
+  // Similar Products States
+  const [similarProducts, setSimilarProducts] = useState([]);
+
   const triggerToast = (msg) => {
     setToastMessage(msg);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2500);
   };
 
-  // Fetch product from database
+  const handlePincodeCheck = (e) => {
+    if (e) e.preventDefault();
+    const cleanPin = pincode ? pincode.trim() : '';
+    if (!cleanPin || cleanPin.length !== 6 || !/^[1-9][0-9]{5}$/.test(cleanPin)) {
+      triggerToast('Please enter a valid 6-digit Indian Pincode');
+      setIsPincodeValid(false);
+      setDeliveryEstimate(null);
+      return;
+    }
+    setIsPincodeValid(true);
+    const d = new Date();
+    const daysToAdd = (parseInt(cleanPin.slice(-1), 10) % 3) + 2; // 2 to 4 days
+    d.setDate(d.getDate() + daysToAdd);
+    const dateStr = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+    setDeliveryEstimate(dateStr);
+    try {
+      localStorage.setItem('mshoppy_user_pincode', cleanPin);
+    } catch (err) {}
+    triggerToast(`✓ Delivery available by ${dateStr}! Free Delivery & COD active.`);
+  };
+
+  // Fetch product & similar items from database
   useEffect(() => {
     let isMounted = true;
     async function fetchProduct() {
@@ -216,6 +285,17 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
             setSelectedColor('');
           }
 
+          // Fetch similar products in same category
+          if (p.categorySlug) {
+            getProducts({ category: p.categorySlug, limit: 8 })
+              .then((sim) => {
+                if (isMounted && sim) {
+                  setSimilarProducts(sim.filter((item) => item.id !== p.id));
+                }
+              })
+              .catch(() => {});
+          }
+
           // Check if current user has received this product (orderStatus === DELIVERED)
           checkCanReview(p.id)
             .then((elig) => {
@@ -226,11 +306,6 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
               }
             })
             .catch(() => {});
-        }
-
-        const cartData = await getCart();
-        if (isMounted && cartData?.totalItems !== undefined) {
-          setCartCount(cartData.totalItems);
         }
       } catch (err) {
         console.error("Error loading product detail:", err);
@@ -248,8 +323,7 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
     setAddingToCart(true);
     try {
       const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
-      await addToCart(product.id, 1, sizeToPass);
-      setCartCount((c) => c + 1);
+      await addItem(product.id, 1, sizeToPass);
 
       const catMeta = getCategoryMeta(product.categorySlug);
       const details = [];
@@ -268,13 +342,15 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
   const handleBuyNow = async () => {
     if (!product) return;
     try {
-      await addToCart(product.id, 1, selectedSize);
+      const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
+      await addItem(product.id, 1, sizeToPass);
       if (onNavigate) {
         onNavigate('address');
       } else {
         navigate('/address');
       }
     } catch (err) {
+      console.error('Buy Now failed to add item:', err);
       if (onNavigate) onNavigate('address');
       else navigate('/address');
     }
@@ -529,19 +605,24 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
             {product.title}
           </h1>
 
-          <p className="text-xs text-slate-400 font-medium mb-4">
-            Sold by: <span className="font-bold text-slate-700">{product.supplierName || 'Verified Supplier'}</span>
-          </p>
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <span className="text-xs text-slate-400 font-medium">Sold by:</span>
+            <div className="font-bold text-xs text-slate-800 flex items-center gap-1.5 bg-slate-50 px-3 py-1 rounded-full border border-slate-200">
+              <span>{(product.supplierName && !product.supplierName.toLowerCase().includes('meesho')) ? product.supplierName : 'Official Store'}</span>
+              <span className="material-symbols-outlined text-xs text-emerald-600">verified</span>
+              <span className="text-[10px] bg-white text-slate-700 font-bold px-1.5 py-0.2 rounded-full border border-slate-200">★ 4.8</span>
+            </div>
+          </div>
 
           {/* Price Block */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs mb-5 space-y-2">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs mb-4 space-y-2">
             <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-3xl sm:text-4xl font-black text-slate-900">
-                ₹{product.price}
+                ₹{effectivePrice}
               </span>
-              {product.originalPrice && product.originalPrice > product.price && (
+              {product.originalPrice && (product.originalPrice + (affiliateMargin > 0 ? affiliateMargin : 0)) > effectivePrice && (
                 <span className="text-base sm:text-lg text-slate-400 line-through">
-                  ₹{product.originalPrice}
+                  ₹{product.originalPrice + (affiliateMargin > 0 ? affiliateMargin : 0)}
                 </span>
               )}
               {product.discountPercentage > 0 && (
@@ -549,6 +630,7 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
                   {product.discountPercentage}% OFF
                 </span>
               )}
+
               <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
                 Free Delivery 🚚
               </span>
@@ -562,9 +644,77 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
               <span className="text-slate-300">•</span>
               <span className="flex items-center gap-1 text-slate-600">
                 <span className="material-symbols-outlined text-sm">schedule</span>
-                Estimated Delivery in 3-5 Business Days
+                Easy 7 Days Return / Exchange
               </span>
             </div>
+          </div>
+
+          {/* Delivery & Pincode Checker Card (Meesho Core Feature) */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs mb-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#FF3F6C] text-lg">local_shipping</span>
+                <h3 className="font-bold text-sm text-slate-900">Delivery &amp; Serviceability</h3>
+              </div>
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+                Free Delivery
+              </span>
+            </div>
+
+            <form onSubmit={handlePincodeCheck} className="flex gap-2 items-center">
+              <div className="relative flex-1">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <span className="material-symbols-outlined text-base">pin_drop</span>
+                </span>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={pincode}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    setPincode(val);
+                    if (!isPincodeValid) setIsPincodeValid(true);
+                    if (val.length < 6 && deliveryEstimate) {
+                      setDeliveryEstimate(null);
+                    }
+                  }}
+                  placeholder="Enter 6-digit Pincode"
+                  className={`w-full pl-9 pr-3 py-2 text-xs sm:text-sm font-mono font-bold rounded-xl border bg-slate-50 outline-none transition-all ${
+                    isPincodeValid ? 'border-slate-200 focus:border-[#FF3F6C] focus:bg-white' : 'border-rose-400 bg-rose-50'
+                  }`}
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-[#FF3F6C] hover:bg-[#e0355f] text-white text-xs font-bold rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              >
+                {deliveryEstimate ? 'Change' : 'Check'}
+              </button>
+            </form>
+
+            {deliveryEstimate ? (
+              <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5 text-xs animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 text-slate-800 font-bold">
+                  <span className="material-symbols-outlined text-emerald-600 text-sm">schedule</span>
+                  <span>Estimated Delivery by <strong className="text-emerald-700">{deliveryEstimate}</strong></span>
+                </div>
+                <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium">
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-emerald-600 text-xs">check_circle</span>
+                    COD Available
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-emerald-600 text-xs">verified</span>
+                    Dispatched in 1 Day
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                <span className="material-symbols-outlined text-slate-400 text-xs">info</span>
+                <span>Enter 6-digit pincode to check exact delivery date &amp; COD availability</span>
+              </div>
+            )}
           </div>
 
           {/* Color / Shade Selection Section - Only rendered if product has color variants */}
@@ -760,8 +910,65 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
                 </button>
               </div>
             )}
-
           </div>
+
+          {/* Similar Products Recommendation Carousel (Meesho Core Feature) */}
+          {similarProducts.length > 0 && (
+            <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-xs mb-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-black text-sm text-slate-900 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[#FF3F6C] text-lg">auto_awesome</span>
+                    <span>Similar Products</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">Customers also viewed these items</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate(`/search?category=${product.categorySlug}`)}
+                  className="text-xs font-bold text-[#b90041] hover:underline cursor-pointer flex items-center gap-0.5"
+                >
+                  <span>View All</span>
+                  <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                </button>
+              </div>
+
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {similarProducts.map((sim) => (
+                  <div
+                    key={sim.id}
+                    onClick={() => {
+                      navigate(`/product?id=${sim.id}`);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="w-36 sm:w-44 shrink-0 bg-slate-50 border border-slate-200/80 rounded-2xl p-2 cursor-pointer hover:shadow-md hover:border-pink-300 transition-all group"
+                  >
+                    <div className="w-full aspect-[4/5] bg-white rounded-xl overflow-hidden mb-2 p-1">
+                      <img
+                        src={sim.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400'}
+                        alt={sim.title}
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400';
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs font-bold text-slate-800 line-clamp-1">{sim.title}</p>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-xs font-black text-slate-900">₹{sim.price}</span>
+                      {sim.originalPrice && sim.originalPrice > sim.price && (
+                        <span className="text-[10px] text-slate-400 line-through">₹{sim.originalPrice}</span>
+                      )}
+                    </div>
+                    <span className="inline-block text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100 mt-1">
+                      Free Delivery
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       </main>
 
@@ -812,6 +1019,8 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
           />
         </div>
       )}
+
+
 
       {/* Size Chart Modal - Dynamically adapted to Apparel / Footwear */}
       {showSizeChart && (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logout from '../auth/logout';
 import NavDrawer from "../../components/NavDrawer";
@@ -8,23 +8,76 @@ import {
   getCategories,
   getWishlist,
   toggleWishlist,
-  getCart
+  getBanners,
 } from "../../services/ecommerceService";
+import { useCart } from "../../hooks/useCart";
+import { getUnreadCount, subscribeNotifications } from "../../services/notificationService";
+
+const DEFAULT_BANNERS = [
+  {
+    id: 'banner_flash',
+    badge: '⚡ Lightning Flash Sale',
+    badgeStatus: 'Live Now',
+    title: 'Mega Flash Deals! Up to 75% Off',
+    subtitle: 'Limited-time lightning drops with verified factory pricing & Free Delivery on all orders.',
+    buttonText: 'View Flash Deals',
+    targetUrl: '/flash',
+    imageUrl: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800&auto=format&fit=crop&q=80',
+    gradient: 'from-red-600 via-rose-600 to-pink-600',
+    accentColor: 'text-rose-600',
+  },
+  {
+    id: 'banner_festive',
+    badge: 'Special Festive Deals 🛍️',
+    badgeStatus: 'Special Offer',
+    title: 'Grand Festive Sale! Up to 70% Off',
+    subtitle: '100% verified factory direct prices with Free Delivery & Easy 7-day returns.',
+    buttonText: 'Explore Catalog',
+    targetUrl: '/explorer',
+    imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=1000&auto=format&fit=crop&q=80',
+    gradient: 'from-pink-600 via-rose-600 to-red-600',
+    accentColor: 'text-pink-600',
+  },
+  {
+    id: 'banner_men',
+    badge: 'Lowest Price Guarantee',
+    badgeStatus: 'Best Value',
+    title: 'Trending Menswear & Gadgets',
+    subtitle: 'Casual shirts, sneakers, audio gear & everyday essentials directly at wholesale rates.',
+    buttonText: 'Shop Men',
+    targetCategory: 'Men',
+    targetUrl: '/user-home?category=Men',
+    imageUrl: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1000&auto=format&fit=crop&q=80',
+    gradient: 'from-indigo-700 via-blue-600 to-cyan-600',
+    accentColor: 'text-indigo-700',
+  }
+];
 
 export default function HomeUserCustomer() {
   const navigate = useNavigate();
   const bannerRef = React.useRef(null);
   const searchContainerRef = React.useRef(null);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [isBannerPaused, setIsBannerPaused] = useState(false);
+  const [banners, setBanners] = useState(DEFAULT_BANNERS);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedSubcat, setSelectedSubcat] = useState("All");
   const [products, setProducts] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
   const [favorites, setFavorites] = useState([]);
-  const [cartCount, setCartCount] = useState(0);
+  const { cartCount } = useCart();
   const [loading, setLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(() => getUnreadCount());
+
+  useEffect(() => {
+    const unsub = subscribeNotifications(() => {
+      setUnreadNotifs(getUnreadCount());
+    });
+    return unsub;
+  }, []);
 
   // Load Categories & Initial Products from Database
   useEffect(() => {
@@ -32,14 +85,17 @@ export default function HomeUserCustomer() {
     async function loadData() {
       setLoading(true);
       try {
-        const [catsData, prodsData, wishData, cartData] = await Promise.all([
+        const [catsData, prodsData, wishData, bannersData] = await Promise.all([
           getCategories(),
           getProducts(),
           getWishlist(),
-          getCart()
+          getBanners(),
         ]);
 
         if (isMounted) {
+          if (bannersData && bannersData.length > 0) {
+            setBanners(bannersData);
+          }
           if (catsData && catsData.length > 0) {
             setDbCategories(catsData);
           }
@@ -48,9 +104,6 @@ export default function HomeUserCustomer() {
           }
           if (wishData) {
             setFavorites(wishData.map(w => w.productId));
-          }
-          if (cartData?.totalItems !== undefined) {
-            setCartCount(cartData.totalItems);
           }
         }
       } catch (err) {
@@ -82,6 +135,7 @@ export default function HomeUserCustomer() {
         if (isMounted) setLoading(false);
       }
     }
+    setSelectedSubcat("All");
     filterByCategory();
     return () => { isMounted = false; };
   }, [selectedCategory]);
@@ -96,23 +150,14 @@ export default function HomeUserCustomer() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleBannerScroll = () => {
-    if (bannerRef.current) {
-      const { scrollLeft, clientWidth } = bannerRef.current;
-      const index = Math.round(scrollLeft / clientWidth);
-      setActiveSlide(index);
-    }
-  };
-
-  const scrollToSlide = (index) => {
-    if (bannerRef.current) {
-      bannerRef.current.scrollTo({
-        left: index * bannerRef.current.clientWidth,
-        behavior: 'smooth'
-      });
-      setActiveSlide(index);
-    }
-  };
+  // Auto-scroll hero banner carousel dynamically across all active banners
+  useEffect(() => {
+    if (isBannerPaused || !banners || banners.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % banners.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [isBannerPaused, banners]);
 
   const handleToggleFavorite = async (id, e) => {
     e.stopPropagation();
@@ -149,7 +194,30 @@ export default function HomeUserCustomer() {
     'Electronics & Gadgets': 'earbuds'
   };
 
-  // Map category list with "All" option
+  // Dynamic subcategories from live Database Category query
+  const activeCategoryObj = useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'All') return null;
+    return dbCategories.find(c => c.name === selectedCategory || c.slug === selectedCategory);
+  }, [dbCategories, selectedCategory]);
+
+  const activeSubcats = useMemo(() => {
+    if (!activeCategoryObj) return [];
+    return activeCategoryObj.subcategories || ['All'];
+  }, [activeCategoryObj]);
+
+  const displayedProducts = useMemo(() => {
+    if (!products) return [];
+    if (selectedSubcat === 'All') return products;
+    const term = selectedSubcat.toLowerCase().trim();
+    return products.filter((p) => {
+      const pSub = (p.subCategory || '').toLowerCase().trim();
+      if (pSub === term) return true;
+      if (pSub) return false;
+      const full = `${p.title || ''} ${p.description || ''}`.toLowerCase();
+      return full.includes(term);
+    });
+  }, [products, selectedSubcat]);
+
   const categoryChips = [
     { name: "All", slug: "All", icon: "dashboard" },
     ...dbCategories.map(c => ({
@@ -322,13 +390,24 @@ export default function HomeUserCustomer() {
           </div>
 
           {/* Action Icons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            <button 
+              onClick={() => navigate('/notifications')} 
+              className="relative text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
+              title="Notifications"
+            >
+              <span className="material-symbols-outlined text-2xl">notifications</span>
+              {unreadNotifs > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-[#FF3F6C] text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                  {unreadNotifs}
+                </span>
+              )}
+            </button>
             <button 
               onClick={() => navigate('/wishlist')} 
               className="relative text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
               title="My Wishlist"
             >
-
               <span className="material-symbols-outlined text-2xl">favorite</span>
               {favorites.length > 0 && (
                 <span className="absolute top-1 right-1 w-4 h-4 bg-[#FF3F6C] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
@@ -382,73 +461,115 @@ export default function HomeUserCustomer() {
           </form>
         </div>
 
-        {/* Hero Carousel */}
-        <div className="relative mt-2">
+        {/* Hero Carousel - Dynamic Backend Banners */}
+        <div 
+          className="relative mt-2 overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm group select-none"
+          onMouseEnter={() => setIsBannerPaused(true)}
+          onMouseLeave={() => setIsBannerPaused(false)}
+        >
           <div 
-            ref={bannerRef}
-            onScroll={handleBannerScroll}
-            className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar rounded-2xl sm:rounded-3xl shadow-sm"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            className="flex transition-transform duration-500 ease-in-out h-48 sm:h-64 md:h-80"
+            style={{ transform: `translateX(-${activeSlide * 100}%)` }}
           >
-            {/* Slide 1 */}
-            <div className="min-w-full snap-start relative h-48 sm:h-64 md:h-80 overflow-hidden bg-gradient-to-r from-pink-600 via-rose-600 to-red-600 flex items-center px-6 sm:px-12 md:px-16 text-white">
-              <div className="max-w-md z-10">
-                <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2 inline-block">
-                  Special Festive Deals 🛍️
-                </span>
-                <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
-                  Grand Festive Sale! Up to 70% Off
-                </h2>
-                <p className="text-xs sm:text-sm text-pink-100 mb-4 line-clamp-2">
-                  100% verified factory direct prices with Free Delivery & Easy 7-day returns.
-                </p>
-                <button 
-                  onClick={() => navigate('/explorer')}
-                  className="bg-white text-pink-600 font-bold px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm hover:bg-pink-50 transition-colors shadow-md cursor-pointer active:scale-95"
-                >
-                  Explore Catalog
-                </button>
+            {banners.map((banner, idx) => (
+              <div 
+                key={banner.id || idx}
+                onClick={() => {
+                  if (banner.targetCategory) {
+                    setSelectedCategory(banner.targetCategory);
+                  } else if (banner.targetUrl) {
+                    navigate(banner.targetUrl);
+                  }
+                }}
+                className={`w-full shrink-0 relative h-full bg-gradient-to-r ${banner.gradient || 'from-rose-600 via-pink-600 to-red-600'} flex items-center px-6 sm:px-12 md:px-16 text-white cursor-pointer`}
+              >
+                <div className="max-w-md z-10">
+                  {banner.badge && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 shadow-xs">
+                        {banner.badge.includes('⚡') && <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />}
+                        {banner.badge}
+                      </span>
+                      {banner.badgeStatus && (
+                        <span className="bg-yellow-400 text-slate-900 text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs">
+                          {banner.badgeStatus}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
+                    {banner.title}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-white/90 mb-4 line-clamp-2">
+                    {banner.subtitle}
+                  </p>
+                  {banner.buttonText && (
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (banner.targetCategory) {
+                          setSelectedCategory(banner.targetCategory);
+                        } else if (banner.targetUrl) {
+                          navigate(banner.targetUrl);
+                        }
+                      }}
+                      className={`bg-white ${banner.accentColor || 'text-rose-600'} font-extrabold px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm hover:bg-rose-50 transition-all shadow-md cursor-pointer active:scale-95 flex items-center gap-1.5`}
+                    >
+                      <span>{banner.buttonText}</span>
+                      <span>➔</span>
+                    </button>
+                  )}
+                </div>
+                {banner.imageUrl && (
+                  <img 
+                    src={banner.imageUrl} 
+                    alt={banner.title} 
+                    className="absolute right-0 top-0 h-full w-1/2 object-cover object-center mask-gradient-left opacity-90 hidden sm:block"
+                  />
+                )}
               </div>
-              <img 
-                src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800" 
-                alt="Festive Fashion" 
-                className="absolute right-0 top-0 h-full w-1/2 object-cover mask-gradient-left opacity-90 hidden sm:block"
-              />
-            </div>
-
-            {/* Slide 2 */}
-            <div className="min-w-full snap-start relative h-48 sm:h-64 md:h-80 overflow-hidden bg-gradient-to-r from-indigo-700 via-blue-600 to-cyan-600 flex items-center px-6 sm:px-12 md:px-16 text-white">
-              <div className="max-w-md z-10">
-                <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2 inline-block">
-                  Lowest Price Guarantee
-                </span>
-                <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
-                  Trending Menswear & Gadgets
-                </h2>
-                <p className="text-xs sm:text-sm text-blue-100 mb-4 line-clamp-2">
-                  Casual shirts, sneakers, audio gear & everyday essentials directly at wholesale rates.
-                </p>
-                <button 
-                  onClick={() => setSelectedCategory("Men")}
-                  className="bg-white text-indigo-700 font-bold px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm hover:bg-indigo-50 transition-colors shadow-md cursor-pointer active:scale-95"
-                >
-                  Shop Men
-                </button>
-              </div>
-              <img 
-                src="https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=800" 
-                alt="Men Collection" 
-                className="absolute right-0 top-0 h-full w-1/2 object-cover mask-gradient-left opacity-90 hidden sm:block"
-              />
-            </div>
+            ))}
           </div>
 
-          {/* Dots Indicator */}
+          {/* Previous Arrow Button */}
+          {banners.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveSlide((prev) => (prev - 1 + banners.length) % banners.length);
+              }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-md z-20"
+              aria-label="Previous slide"
+            >
+              <span className="material-symbols-outlined text-lg">chevron_left</span>
+            </button>
+          )}
+
+          {/* Next Arrow Button */}
+          {banners.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveSlide((prev) => (prev + 1) % banners.length);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-md z-20"
+              aria-label="Next slide"
+            >
+              <span className="material-symbols-outlined text-lg">chevron_right</span>
+            </button>
+          )}
+        </div>
+
+        {/* Dots Indicator for dynamic Banners */}
+        {banners.length > 1 && (
           <div className="flex justify-center gap-1.5 mt-3">
-            {[0, 1].map((idx) => (
+            {banners.map((_, idx) => (
               <button
                 key={idx}
-                onClick={() => scrollToSlide(idx)}
+                onClick={() => setActiveSlide(idx)}
                 className={`h-2 rounded-full transition-all cursor-pointer ${
                   activeSlide === idx ? 'w-6 bg-[#FF3F6C]' : 'w-2 bg-slate-300 dark:bg-slate-700'
                 }`}
@@ -456,10 +577,10 @@ export default function HomeUserCustomer() {
               />
             ))}
           </div>
-        </div>
+        )}
 
         {/* Feature Badges */}
-        <section className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <section className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-3 flex items-center gap-3 shadow-2xs">
             <div className="w-10 h-10 rounded-xl bg-pink-50 dark:bg-pink-950/30 flex items-center justify-center text-[#FF3F6C] shrink-0">
               <span className="material-symbols-outlined text-xl">local_shipping</span>
@@ -534,6 +655,25 @@ export default function HomeUserCustomer() {
               </div>
             ))}
           </div>
+                  {/* Subcategory Filter Chips */}
+          {activeSubcats.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pt-3 pb-1">
+              {activeSubcats.map((sub, sIdx) => (
+                <button
+                  key={sIdx}
+                  type="button"
+                  onClick={() => setSelectedSubcat(sub)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                    selectedSubcat === sub
+                      ? 'bg-[#FF3F6C] text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-[#FF3F6C]/40'
+                  }`}
+                >
+                  {sub}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Real Products Grid from PostgreSQL Database */}
@@ -548,7 +688,7 @@ export default function HomeUserCustomer() {
               </p>
             </div>
             <span className="text-xs text-slate-400 font-medium">
-              {products.length} products
+              {displayedProducts.length} products
             </span>
           </div>
 
@@ -580,7 +720,7 @@ export default function HomeUserCustomer() {
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-              {products.map((p) => {
+              {displayedProducts.map((p) => {
                 const isFav = favorites.includes(p.id);
                 const mainImg = p.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
 
@@ -602,7 +742,7 @@ export default function HomeUserCustomer() {
                           loading="lazy"
                           onError={(e) => {
                             e.currentTarget.onerror = null;
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600';
+                            e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400" fill="%23f8fafc"><rect width="300" height="400" fill="%23f1f5f9"/><circle cx="150" cy="170" r="35" fill="%23cbd5e1"/><path d="M105 250c0-25 20-45 45-45s45 20 45 45v15h-90z" fill="%23cbd5e1"/><text x="50%" y="72%" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-weight="bold" font-size="13">Meesho Verified</text></svg>';
                           }}
                         />
                         {p.rating > 0 && (
@@ -626,11 +766,6 @@ export default function HomeUserCustomer() {
                       </div>
 
                       <div className="px-1 min-w-0">
-                        {p.supplierName && (
-                          <span className="text-[10px] font-bold text-[#b90041] uppercase tracking-wider block mb-0.5 truncate">
-                            {p.supplierName}
-                          </span>
-                        )}
                         <h4 
                           className="text-[11.5px] sm:text-xs md:text-sm font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 mb-1 leading-snug min-h-[2.25rem] break-words"
                           title={p.title}

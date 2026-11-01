@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 import {
-  getCart,
-  updateCartItem,
-  removeFromCart,
   toggleWishlist,
   getAddresses,
   getActiveCoupons,
   validateCoupon
 } from '../../services/ecommerceService';
+import { useCart } from '../../hooks/useCart';
 
 export default function ShoppingCart({ onNavigate, onBack }) {
   const navigate = useNavigate();
@@ -18,13 +16,19 @@ export default function ShoppingCart({ onNavigate, onBack }) {
     else navigate(target.startsWith('/') ? target : `/${target}`);
   };
 
-  const [cartData, setCartData] = useState({ items: [], totalItems: 0, subtotal: 0, originalSubtotal: 0, totalDiscount: 0 });
+  const { cart: cartData, updateItem, removeItem, loading: cartLoading, refreshCart } = useCart();
   const [loading, setLoading] = useState(true);
-  const [address, setAddress] = useState({
-    name: 'Customer',
-    phone: '+91 98765 43210',
-    pincode: '560100',
-    details: 'Current Delivery Address',
+  const [address, setAddress] = useState(() => {
+    try {
+      const stored = localStorage.getItem('mshoppy_selected_address');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.pincode && /^[1-9][0-9]{5}$/.test(String(parsed.pincode).trim())) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return null;
   });
 
   const [couponCode, setCouponCode] = useState('');
@@ -33,7 +37,12 @@ export default function ShoppingCart({ onNavigate, onBack }) {
   const [availableCoupons, setAvailableCoupons] = useState([]);
   const [showCouponsModal, setShowCouponsModal] = useState(false);
   const [isChangingAddress, setIsChangingAddress] = useState(false);
-  const [tempAddress, setTempAddress] = useState(address);
+  const [tempAddress, setTempAddress] = useState(() => address || {
+    name: '',
+    phone: '',
+    pincode: '',
+    details: '',
+  });
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
@@ -43,15 +52,13 @@ export default function ShoppingCart({ onNavigate, onBack }) {
     setTimeout(() => setShowToast(false), 2500);
   };
 
-  // Fetch real cart and addresses on mount
+  // Fetch real addresses & coupons on mount
   const loadCartAndAddress = async () => {
     try {
-      const [data, addrs] = await Promise.all([
-        getCart(),
-        getAddresses()
+      const [addrs, activeCoups] = await Promise.all([
+        getAddresses(),
+        getActiveCoupons()
       ]);
-
-      if (data) setCartData(data);
 
       if (addrs && addrs.length > 0) {
         const def = addrs.find(a => a.isDefault) || addrs[0];
@@ -64,14 +71,14 @@ export default function ShoppingCart({ onNavigate, onBack }) {
         setAddress(formatted);
         setTempAddress(formatted);
       } else {
-        const stored = localStorage.getItem('mshoppy_selected_address');
-        if (stored) {
-          try {
-            const p = JSON.parse(stored);
-            setAddress(p);
-            setTempAddress(p);
-          } catch (e) {}
-        }
+        localStorage.removeItem('mshoppy_selected_address');
+        setAddress(null);
+        setTempAddress({
+          name: '',
+          phone: '',
+          pincode: '',
+          details: '',
+        });
       }
 
       // Check saved coupon
@@ -86,13 +93,11 @@ export default function ShoppingCart({ onNavigate, onBack }) {
         } catch (e) {}
       }
 
-      // Fetch active coupons from backend
-      const activeCoups = await getActiveCoupons();
       if (activeCoups) {
         setAvailableCoupons(activeCoups);
       }
     } catch (e) {
-      console.error('Failed to load cart:', e);
+      console.error('Failed to load cart context:', e);
     } finally {
       setLoading(false);
     }
@@ -107,8 +112,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
     if (nextQty === currentQty) return;
 
     try {
-      await updateCartItem(itemId, nextQty);
-      await loadCartAndAddress();
+      await updateItem(itemId, nextQty);
       triggerToast('Cart quantity updated! 🛒');
     } catch (e) {
       triggerToast('Failed to update quantity');
@@ -117,8 +121,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
 
   const handleRemoveItem = async (itemId) => {
     try {
-      await removeFromCart(itemId);
-      await loadCartAndAddress();
+      await removeItem(itemId);
       triggerToast('Item removed from cart');
     } catch (e) {
       triggerToast('Failed to remove item');
@@ -130,8 +133,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
       if (item.productId) {
         await toggleWishlist(item.productId);
       }
-      await removeFromCart(item.id);
-      await loadCartAndAddress();
+      await removeItem(item.id);
       triggerToast(`Moved to Wishlist ❤️`);
     } catch (e) {
       triggerToast('Moved to Wishlist ❤️');
@@ -170,15 +172,37 @@ export default function ShoppingCart({ onNavigate, onBack }) {
 
   const items = cartData.items || [];
   const totalItemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
-  const totalMRP = items.reduce((acc, item) => acc + (item.product?.originalPrice || item.product?.price || 0) * item.quantity, 0);
-  const rawProductTotal = items.reduce((acc, item) => acc + (item.product?.price || 0) * item.quantity, 0);
+
+  // Dynamic Affiliate Margin Support (e.g. ₹849 + ₹150 = ₹999)
+  const affiliateMargin = Number(localStorage.getItem('mshoppy_affiliate_margin') || 0);
+
+  const totalMRP = items.reduce((acc, item) => {
+    const orig = item.product?.originalPrice || item.product?.price || 0;
+    return acc + (orig + (affiliateMargin > 0 ? affiliateMargin : 0)) * item.quantity;
+  }, 0);
+
+  const rawProductTotal = items.reduce((acc, item) => {
+    const baseP = item.product?.price || 0;
+    const effP = baseP + (affiliateMargin > 0 ? affiliateMargin : 0);
+    return acc + effP * item.quantity;
+  }, 0);
   const totalAmount = Math.max(0, rawProductTotal - (items.length > 0 ? couponDiscount : 0));
   const totalDiscount = totalMRP - rawProductTotal + (items.length > 0 ? couponDiscount : 0);
 
   const saveAddress = (e) => {
     e.preventDefault();
-    setAddress(tempAddress);
-    localStorage.setItem('mshoppy_selected_address', JSON.stringify(tempAddress));
+    const cleanPin = tempAddress?.pincode ? String(tempAddress.pincode).trim() : '';
+    if (!cleanPin || !/^[1-9][0-9]{5}$/.test(cleanPin)) {
+      triggerToast('Please enter a valid 6-digit Indian Pincode');
+      return;
+    }
+    const updated = {
+      ...tempAddress,
+      pincode: cleanPin
+    };
+    setAddress(updated);
+    localStorage.setItem('mshoppy_selected_address', JSON.stringify(updated));
+    localStorage.setItem('mshoppy_user_pincode', cleanPin);
     setIsChangingAddress(false);
     triggerToast('Delivery address updated! 📍');
   };
@@ -289,37 +313,63 @@ export default function ShoppingCart({ onNavigate, onBack }) {
             <div className="lg:col-span-7 xl:col-span-8 space-y-5">
               {/* Delivery Address Preview Card */}
               <section className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex gap-3">
-                    <div className="bg-pink-50 text-[#FF3F6C] p-2.5 rounded-2xl h-max flex items-center justify-center">
-                      <span
-                        className="material-symbols-outlined text-xl"
-                        style={{ fontVariationSettings: "'FILL' 1" }}
-                      >
-                        location_on
-                      </span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-extrabold text-sm text-[#191c1e]">
-                          Deliver to: {address.name}
-                        </p>
-                        <span className="bg-slate-100 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-md">
-                          {address.pincode}
+                {address && address.pincode ? (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex gap-3">
+                      <div className="bg-pink-50 text-[#FF3F6C] p-2.5 rounded-2xl h-max flex items-center justify-center">
+                        <span
+                          className="material-symbols-outlined text-xl"
+                          style={{ fontVariationSettings: "'FILL' 1" }}
+                        >
+                          location_on
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2">
-                        {address.details}
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-extrabold text-sm text-[#191c1e]">
+                            Deliver to: {address.name || 'Recipient'}
+                          </p>
+                          <span className="bg-slate-100 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-md">
+                            {address.pincode}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2">
+                          {address.details || `Pincode: ${address.pincode}`}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => {
+                        setTempAddress(address);
+                        setIsChangingAddress(true);
+                      }}
+                      className="text-[#FF3F6C] text-xs font-bold uppercase tracking-wider px-3.5 py-2 bg-pink-50 hover:bg-pink-100 rounded-xl cursor-pointer transition-colors whitespace-nowrap"
+                    >
+                      Change
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setIsChangingAddress(true)}
-                    className="text-[#FF3F6C] text-xs font-bold uppercase tracking-wider px-3.5 py-2 bg-pink-50 hover:bg-pink-100 rounded-xl cursor-pointer transition-colors whitespace-nowrap"
-                  >
-                    Change
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-pink-50 text-[#FF3F6C] p-2.5 rounded-2xl flex items-center justify-center">
+                        <span className="material-symbols-outlined text-xl">add_location_alt</span>
+                      </div>
+                      <div>
+                        <p className="font-extrabold text-sm text-[#191c1e]">Delivery Address Not Set</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Add your pincode &amp; address for accurate delivery time</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setTempAddress({ name: '', phone: '', pincode: '', details: '' });
+                        setIsChangingAddress(true);
+                      }}
+                      className="bg-[#FF3F6C] hover:bg-[#e02659] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-xl cursor-pointer transition-colors shadow-xs whitespace-nowrap"
+                    >
+                      + Add Address
+                    </button>
+                  </div>
+                )}
               </section>
 
               {/* Items List Header */}
@@ -376,7 +426,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
                               </span>
                               {prod.supplierName && (
                                 <span className="text-[11px] text-slate-400">
-                                  Supplier: <strong className="text-slate-600">{prod.supplierName}</strong>
+                                  Seller: <strong className="text-slate-600">{prod.supplierName.toLowerCase().includes('meesho') ? 'Official Store' : prod.supplierName}</strong>
                                 </span>
                               )}
                             </div>
@@ -384,7 +434,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
                             {/* Price */}
                             <div className="flex items-baseline gap-2 mt-2">
                               <span className="font-black text-lg text-slate-900">
-                                ₹{prod.price}
+                                ₹{prod.price + (affiliateMargin > 0 ? affiliateMargin : 0)}
                               </span>
                               {prod.originalPrice && prod.originalPrice > prod.price && (
                                 <span className="text-xs text-slate-400 line-through">
@@ -614,9 +664,11 @@ export default function ShoppingCart({ onNavigate, onBack }) {
                 <label className="text-xs font-bold text-slate-600 block mb-1">Pincode</label>
                 <input
                   type="text"
-                  value={tempAddress.pincode}
-                  onChange={(e) => setTempAddress({ ...tempAddress, pincode: e.target.value })}
-                  className="w-full bg-[#f8f9fb] border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  maxLength={6}
+                  placeholder="Enter 6-digit Pincode"
+                  value={tempAddress.pincode || ''}
+                  onChange={(e) => setTempAddress({ ...tempAddress, pincode: e.target.value.replace(/\D/g, '') })}
+                  className="w-full bg-[#f8f9fb] border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 font-mono font-bold"
                   required
                 />
               </div>
@@ -764,7 +816,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
       )}
 
       {/* Bottom Nav */}
-      <AppBottomNav activeNav="cart" onNavigate={handleNav} />
+      <AppBottomNav activeNav="cart" onNavigate={handleNav} role="customer" homePath="/user-home" />
     </div>
   );
 }

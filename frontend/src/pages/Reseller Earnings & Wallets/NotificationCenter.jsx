@@ -1,245 +1,284 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
+import {
+  getNotifications,
+  subscribeNotifications,
+  markAllAsRead,
+  markAsRead,
+  deleteNotification,
+  formatRelativeTime,
+  getNotificationSection,
+} from '../../services/notificationService';
 
 export default function NotificationCenter() {
   const navigate = useNavigate();
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("All");
+  const [activeTab, setActiveTab] = useState('All');
+  const [notifications, setNotifications] = useState(() => getNotifications());
+  const [toastMessage, setToastMessage] = useState('');
+
+  useEffect(() => {
+    const unsub = subscribeNotifications((updated) => {
+      setNotifications(updated);
+    });
+    return unsub;
+  }, []);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 2500);
+  };
+
+  const handleMarkAllRead = () => {
+    markAllAsRead();
+    showToast('All notifications marked as read! ✓');
+  };
+
+  const handleNotificationClick = (notif) => {
+    if (notif.isUnread) {
+      markAsRead(notif.id);
+    }
+    if (notif.actionPath) {
+      navigate(notif.actionPath);
+    }
+  };
+
+  const handleDelete = (e, id) => {
+    e.stopPropagation();
+    deleteNotification(id);
+    showToast('Notification removed');
+  };
+
+  const filteredNotifications = notifications.filter((n) => {
+    if (activeTab === 'All') return true;
+    return n.category === activeTab;
+  });
+
+  const todayNotifications = filteredNotifications.filter(
+    (n) => getNotificationSection(n.timestamp) === 'Today'
+  );
+  const yesterdayNotifications = filteredNotifications.filter(
+    (n) => getNotificationSection(n.timestamp) === 'Yesterday'
+  );
+  const earlierNotifications = filteredNotifications.filter(
+    (n) => getNotificationSection(n.timestamp) === 'Earlier'
+  );
+
+  const unreadCount = notifications.filter((n) => n.isUnread).length;
+  const ordersCount = notifications.filter((n) => n.category === 'Orders' && n.isUnread).length;
+  const earningsCount = notifications.filter((n) => n.category === 'Earnings' && n.isUnread).length;
+  const offersCount = notifications.filter((n) => n.category === 'Offers' && n.isUnread).length;
+
+  const renderNotificationCard = (notif) => {
+    return (
+      <div
+        key={notif.id}
+        onClick={() => handleNotificationClick(notif)}
+        className={`relative p-4 rounded-2xl transition-all cursor-pointer border ${
+          notif.isUnread
+            ? 'bg-white shadow-[0_8px_25px_rgb(0,0,0,0.04)] border-rose-100 hover:border-rose-200'
+            : 'bg-white/70 shadow-xs border-slate-100 opacity-90 hover:opacity-100 hover:bg-white'
+        }`}
+      >
+        {notif.isUnread && (
+          <div className="absolute top-4 right-4 w-2.5 h-2.5 bg-[#FF3F6C] rounded-full ring-4 ring-rose-50 animate-pulse"></div>
+        )}
+
+        <div className="flex gap-3.5 sm:gap-4 items-start">
+          <div
+            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
+              notif.iconBg || 'bg-rose-50 text-[#b90041]'
+            }`}
+          >
+            <span
+              className="material-symbols-outlined text-2xl"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              {notif.icon || 'notifications'}
+            </span>
+          </div>
+
+          <div className="flex-1 min-w-0 pr-6">
+            <div className="flex justify-between items-start mb-1 gap-2">
+              <h3 className="font-bold text-slate-900 text-sm sm:text-[15px] truncate">
+                {notif.title}
+              </h3>
+              <span className="text-[11px] font-medium text-slate-400 shrink-0">
+                {formatRelativeTime(notif.timestamp)}
+              </span>
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+              {notif.message}
+            </p>
+
+            {notif.actionText && (
+              <div className="mt-2.5 flex items-center gap-1.5 text-xs font-bold text-[#b90041] hover:underline">
+                <span>{notif.actionText}</span>
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => handleDelete(e, notif.id)}
+            className="text-slate-300 hover:text-slate-500 p-1 rounded-full transition-colors shrink-0"
+            title="Delete notification"
+          >
+            <span className="material-symbols-outlined text-base">close</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="bg-surface text-on-surface min-h-screen pb-32 font-sans selection:bg-primary/20">
-      {/* Top Navigation Bar - Full Width */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-sm border-b border-gray-100 dark:border-slate-800">
-        <div className="flex items-center justify-between px-4 sm:px-6 md:px-10 lg:px-16 py-4 w-full">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <button 
-              onClick={() => navigate(-1)} 
-              className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-[#191C1E] dark:text-slate-200 active:scale-95 transition-transform cursor-pointer"
+    <div className="bg-[#f8f9fb] text-slate-900 min-h-screen pb-32 font-['Inter',sans-serif] selection:bg-[#FF3F6C]/20 antialiased">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-[#1c1724] text-white px-5 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 border border-white/10 animate-bounce text-xs font-bold">
+          <span className="material-symbols-outlined text-emerald-400 text-base">check_circle</span>
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Top Header */}
+      <header className="fixed top-0 w-full z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-xs">
+        <div className="flex items-center justify-between px-4 sm:px-6 md:px-10 lg:px-16 py-3.5 w-full max-w-4xl mx-auto">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 rounded-full hover:bg-slate-100 text-slate-700 active:scale-95 transition-transform cursor-pointer"
+              title="Go Back"
             >
               <span className="material-symbols-outlined text-2xl">arrow_back</span>
             </button>
-            <h1 className="font-['Plus_Jakarta_Sans'] font-bold text-xl tracking-tight text-[#FF3F6C]">
-              Notifications
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-['Plus_Jakarta_Sans'] font-black text-xl tracking-tight text-[#FF3F6C]">
+                Notifications
+              </h1>
+              {unreadCount > 0 && (
+                <span className="bg-[#FF3F6C] text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                  {unreadCount} New
+                </span>
+              )}
+            </div>
           </div>
-          <button className="active:scale-95 transition-transform text-[#191C1E] dark:text-slate-200 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-            <span className="material-symbols-outlined text-2xl">more_vert</span>
-          </button>
-        </div>
-      </nav>
 
-      {/* Content Canvas */}
-      <main className="pt-20 pb-28 px-4 sm:px-6 md:px-10 lg:px-16 w-full max-w-5xl mx-auto">
-        {/* Tab Navigation (Asymmetric Soft Editorial Style) */}
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
-          {["All", "Orders", "Offers", "Earnings"].map(tab => (
+          {unreadCount > 0 && (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all cursor-pointer ${
-                activeTab === tab
-                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                  : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
+              onClick={handleMarkAllRead}
+              className="text-xs font-bold text-[#b90041] hover:underline cursor-pointer"
+            >
+              Mark all as read
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="pt-20 pb-28 px-4 sm:px-6 w-full max-w-3xl mx-auto space-y-6">
+        {/* Dynamic Category Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {[
+            { id: 'All', label: 'All', count: unreadCount },
+            { id: 'Orders', label: 'Orders', count: ordersCount },
+            { id: 'Offers', label: 'Offers', count: offersCount },
+            { id: 'Earnings', label: 'Earnings', count: earningsCount },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-5 py-2 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                activeTab === tab.id
+                  ? 'bg-gradient-to-r from-[#FF3F6C] to-[#b90041] text-white shadow-md shadow-[#FF3F6C]/25'
+                  : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50'
               }`}
             >
-              {tab}
+              <span>{tab.label}</span>
+              {tab.count > 0 && (
+                <span
+                  className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${
+                    activeTab === tab.id ? 'bg-white/25 text-white' : 'bg-rose-100 text-[#b90041]'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
-        {/* Section: Today */}
-        {(activeTab === "All" || activeTab === "Offers" || activeTab === "Orders" || activeTab === "Earnings") && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant opacity-60">Today</h2>
-              <button className="text-xs font-bold text-primary cursor-pointer hover:underline">Mark all as read</button>
+        {/* Empty State */}
+        {filteredNotifications.length === 0 ? (
+          <div className="text-center py-16 px-4 bg-white rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+            <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+              <span className="material-symbols-outlined text-3xl">notifications_off</span>
             </div>
-
-            {/* Notification Card: Unread Offer */}
-            {(activeTab === "All" || activeTab === "Offers") && (
-              <div className="relative p-4 rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] group transition-all hover:scale-[1.01] border border-gray-100">
-                <div className="absolute top-4 right-4 w-2 h-2 bg-primary rounded-full"></div>
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      local_fire_department
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-1">
-                      <h3 className="font-bold text-on-surface text-[15px]">Flash Sale: Up to 70% off</h3>
-                      <span className="text-[11px] font-medium text-slate-400">2 mins ago</span>
-                    </div>
-                    <p className="text-sm text-on-surface-variant leading-relaxed">
-                      Grab the hottest trends before they're gone. Sale ends at midnight!
-                    </p>
-                    <div className="mt-3 overflow-hidden rounded-xl">
-                      <img
-                        className="w-full h-32 object-cover transition-transform group-hover:scale-105"
-                        alt="High fashion clothing rack display"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmmXs4jMuCKmJR9bmfO-ktumJnPwdUyq90Ya8OZJ7OrGax4eYSb83US286PqqT8bGbp6adCGDkvA_IvTZTMufhiVFYfSgU56nsi_b72txeFJUFsH1epOewNKrg5MY0bshmgIt5Ed4tcZUonVgSn8AjO6ATshhNprAGO3PEXJnIJQpxqt1tozzCQSrA_-oPoqYZS2kTDyKZtpXDcWdrWpwHDLm5LXJfBT-SifQRpf018-E5uynOF05NxSHMiLLzqRMIE358K-AElC8"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Notification Card: Order Update */}
-            {(activeTab === "All" || activeTab === "Orders") && (
-              <div className="p-4 rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all border border-gray-100">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-secondary">
-                      local_shipping
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-1">
-                      <h3 className="font-bold text-on-surface text-[15px]">Out for Delivery</h3>
-                      <span className="text-[11px] font-medium text-slate-400">1 hour ago</span>
-                    </div>
-                    <p className="text-sm text-on-surface-variant">
-                      Your order <span className="font-semibold text-secondary">#ME67890</span> is arriving today. Get ready!
-                    </p>
-                    <div className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-surface-container-low">
-                      <img
-                        className="w-10 h-10 rounded object-cover"
-                        alt="Minimalist white wristwatch"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuANv_v_A_-Zf138CghsGoQaXLDNzBte54gkcNWPCbyuyvBYendz-JCVMmFpCU74c7cfRkYwCZVvQnySPyNkSKmX0tuOA3NdnA-O2Zsv6puOhRlBAcjxxRQ76j90PsPvZ6-bmBCG-2aXTU7Qnf1oYhNTOV9O6gIN9ElPwHifIFwGXeNS6UjeB7Is-Riawvm0GbiyThgu6BK6Bg3G37rrgH8H8JBrjG5JEnny92QwWqWwIk--rVTQmcyv4R2erNGZwyJJREQHEwYPuzM"
-                      />
-                      <div>
-                        <p className="text-xs font-bold text-on-surface">Premium Quartz Watch</p>
-                        <p className="text-[10px] text-on-surface-variant">Expected by 8:00 PM</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Notification Card: Margin Credit (Earnings) */}
-            {(activeTab === "All" || activeTab === "Earnings") && (
-              <div className="p-4 rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all border border-gray-100">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-tertiary/10 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      payments
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-1">
-                      <h3 className="font-bold text-on-surface text-[15px]">Margin Credited</h3>
-                      <span className="text-[11px] font-medium text-slate-400">3 hours ago</span>
-                    </div>
-                    <p className="text-sm text-on-surface-variant leading-relaxed">
-                      Your margin of <span className="font-bold text-tertiary">₹450</span> for Order #1234 has been credited to your wallet.
-                    </p>
-                    <button 
-                      onClick={() => navigate('/reseller-wallet')}
-                      className="mt-2 text-xs font-bold text-secondary flex items-center gap-1 cursor-pointer hover:underline"
-                    >
-                      Check Balance <span className="material-symbols-outlined text-xs">chevron_right</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            <h3 className="font-bold text-base text-slate-800">No {activeTab} Notifications</h3>
+            <p className="text-xs text-slate-500 max-w-xs mx-auto">
+              {activeTab === 'Orders'
+                ? 'Your order confirmations, dispatches, and delivery alerts will appear here.'
+                : activeTab === 'Earnings'
+                ? 'Your affiliate commission credits, KYC updates, and payout alerts will appear here.'
+                : activeTab === 'Offers'
+                ? 'Exclusive deals, coupons, and seasonal discounts will show up here.'
+                : 'All your customer orders, affiliate earnings, and exclusive promo alerts will appear here.'}
+            </p>
+            <button
+              onClick={() => navigate(activeTab === 'Earnings' ? '/affiliate-program' : '/explorer')}
+              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">
+                {activeTab === 'Earnings' ? 'monetization_on' : 'shopping_bag'}
+              </span>
+              <span>{activeTab === 'Earnings' ? 'Open Affiliate Program' : 'Start Shopping'}</span>
+            </button>
           </div>
-        )}
-
-        {/* Section: Yesterday */}
-        {(activeTab === "All" || activeTab === "Orders" || activeTab === "Offers" || activeTab === "Earnings") && (
-          <div className="mt-10 space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant opacity-60 mb-2">
-              Yesterday
-            </h2>
-
-            {/* Notification Card: Order Delivered */}
-            {(activeTab === "All" || activeTab === "Orders") && (
-              <div className="p-4 rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all opacity-80 border border-gray-100">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-slate-500">check_circle</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-1">
-                      <h3 className="font-bold text-on-surface text-[15px]">Order Delivered</h3>
-                      <span className="text-[11px] font-medium text-slate-400">1 day ago</span>
-                    </div>
-                    <p className="text-sm text-on-surface-variant">
-                      Order #ME67554 was successfully delivered. Don't forget to rate your experience!
-                    </p>
-                  </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Section: Today */}
+            {todayNotifications.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Today
+                  </h2>
                 </div>
-              </div>
+                <div className="space-y-3">{todayNotifications.map(renderNotificationCard)}</div>
+              </section>
             )}
 
-            {/* Notification Card: New Arrivals */}
-            {(activeTab === "All" || activeTab === "Offers") && (
-              <div className="p-4 rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all opacity-80 border border-gray-100">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-primary">apparel</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-1">
-                      <h3 className="font-bold text-on-surface text-[15px]">New Arrivals in Ethnic Wear</h3>
-                      <span className="text-[11px] font-medium text-slate-400">1 day ago</span>
-                    </div>
-                    <p className="text-sm text-on-surface-variant leading-relaxed">
-                      Explore the latest collection of handpicked Saree &amp; Kurtas from top suppliers.
-                    </p>
-                    <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
-                      <img
-                        className="w-20 h-20 rounded-lg object-cover"
-                        alt="Silk saree collection showcase"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuABd1htYsHGNxFucJVs9dAu4YznR8Uvtair6HJV6Q-kFyQMcve_0tAIn_KKZxZbtE95r__YbdXbDWmlWgewal3w7UHP9O-Czhyi3a8Q9qYSi9X0beQS6PeL18bUHol-bjty_jUuOcMXrSwraTEs_lIfb8ac0Y03WC96HqM-JzM-Nik0-3KWJok6CbM_irN7iMZDMJoRHBHfOQtZDUTWj2ZGUOen6gw63HKSyimM8xbDt8lzVhvnWO1UtRZrlAkBL0tg4XstL2bL27Y"
-                      />
-                      <img
-                        className="w-20 h-20 rounded-lg object-cover"
-                        alt="Traditional kurta design"
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuCl4j43ajoO731gr85RwqO_QSzoIE3SR97tHARYhkp7sOKcGp6DL30Qpd0LQNMGcLEfh8StSwtQw6ee41BnibU2_mZGn4OXnLEQKf6ihOvj2Sy1QmOuwwJuIUW2pH4YQg6mRrA5cjjbobGN6VOaEJX1FkHBOs4OxB1naYdNs583pWM7Kw-dTj29m57zawhaPYhXfBRVKteEbtYeRKHeQhIydXtFpLrjYYNwUf-sLtyq98UC_GeU6K4sjjylc5CuAOV08baPChuOBQw"
-                      />
-                      <div className="w-20 h-20 rounded-lg bg-surface-container flex items-center justify-center text-[10px] font-bold text-on-surface-variant text-center px-2">
-                        +15 More
-                      </div>
-                    </div>
-                  </div>
+            {/* Section: Yesterday */}
+            {yesterdayNotifications.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Yesterday
+                  </h2>
                 </div>
-              </div>
+                <div className="space-y-3">{yesterdayNotifications.map(renderNotificationCard)}</div>
+              </section>
             )}
 
-            {/* Notification Card: Payout */}
-            {(activeTab === "All" || activeTab === "Earnings") && (
-              <div className="p-4 rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all opacity-80 border border-gray-100">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-tertiary/10 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-tertiary">account_balance</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-1">
-                      <h3 className="font-bold text-on-surface text-[15px]">New payout processed</h3>
-                      <span className="text-[11px] font-medium text-slate-400">1 day ago</span>
-                    </div>
-                    <p className="text-sm text-on-surface-variant leading-relaxed">
-                      Your weekly payout of <span className="font-bold">₹2,840</span> has been transferred to your linked bank account.
-                    </p>
-                  </div>
+            {/* Section: Earlier */}
+            {earlierNotifications.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                    Earlier
+                  </h2>
                 </div>
-              </div>
+                <div className="space-y-3">{earlierNotifications.map(renderNotificationCard)}</div>
+              </section>
             )}
           </div>
         )}
       </main>
 
-      {/* Universal Responsive Bottom Navigation Bar */}
+      {/* Bottom Nav */}
       <AppBottomNav activeNav="home" />
-
-      {/* Navigation Drawer */}
-      <NavDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
     </div>
   );
 }

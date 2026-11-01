@@ -6,18 +6,23 @@ const getUserId = (req) => {
 
 const ensureProfile = async (userId) => {
   if (!userId) return null;
-  const existing = await prisma.profile.findUnique({ where: { id: userId } });
-  if (!existing) {
-    return await prisma.profile.create({
-      data: {
+  try {
+    return await prisma.profile.upsert({
+      where: { id: userId },
+      update: {},
+      create: {
         id: userId,
         fullName: 'Customer',
         email: `${userId}@customer.meesho`,
         role: 'CUSTOMER'
       }
     });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return await prisma.profile.findUnique({ where: { id: userId } });
+    }
+    throw err;
   }
-  return existing;
 };
 
 export const getWishlist = async (req, res) => {
@@ -72,8 +77,11 @@ export const toggleWishlist = async (req, res) => {
     });
 
     if (existing) {
-      await prisma.wishlistItem.delete({
-        where: { id: existing.id }
+      await prisma.wishlistItem.deleteMany({
+        where: {
+          userId,
+          productId
+        }
       });
       return res.status(200).json({
         success: true,
@@ -81,22 +89,34 @@ export const toggleWishlist = async (req, res) => {
         message: 'Removed from wishlist'
       });
     } else {
-      const created = await prisma.wishlistItem.create({
-        data: {
-          userId,
-          productId
-        },
-        include: {
-          product: true
-        }
-      });
+      try {
+        const created = await prisma.wishlistItem.create({
+          data: {
+            userId,
+            productId
+          },
+          include: {
+            product: true
+          }
+        });
 
-      return res.status(201).json({
-        success: true,
-        action: 'added',
-        message: 'Added to wishlist',
-        data: created
-      });
+        return res.status(201).json({
+          success: true,
+          action: 'added',
+          message: 'Added to wishlist',
+          data: created
+        });
+      } catch (createErr) {
+        // Concurrency handling: If concurrent request already inserted, return idempotent success
+        if (createErr.code === 'P2002') {
+          return res.status(200).json({
+            success: true,
+            action: 'added',
+            message: 'Item already added to wishlist'
+          });
+        }
+        throw createErr;
+      }
     }
   } catch (error) {
     console.error('Error toggling wishlist:', error);

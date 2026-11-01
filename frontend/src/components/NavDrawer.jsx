@@ -1,5 +1,8 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { auth } from '../utils/firebase';
+import { signOut } from 'firebase/auth';
+import { logoutCustomer } from '../services/customerAuthService';
 
 const navSections = [
   {
@@ -208,9 +211,11 @@ export default function NavDrawer({ isOpen, onClose, role = 'reseller', isCustom
             <span>{customerMode ? '100% Genuine Shopping' : '100% Safe Reselling'}</span>
           </div>
           <button 
-            onClick={() => {
+            onClick={async () => {
               onClose();
-              navigate('/login');
+              try { await signOut(auth); } catch (e) {}
+              logoutCustomer();
+              navigate('/user-login');
             }}
             className="text-xs font-semibold text-[#FF3F6C] hover:underline cursor-pointer"
           >

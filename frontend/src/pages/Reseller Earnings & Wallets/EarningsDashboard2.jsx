@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import NavDrawer from "../../components/NavDrawer";
 import AppBottomNav from "../../components/AppBottomNav";
+import { getOrders } from "../../services/ecommerceService";
 
 const EarningsDashboard2 = ({ onNavigate, onBack }) => {
   const navigate = useNavigate();
@@ -10,6 +11,32 @@ const EarningsDashboard2 = ({ onNavigate, onBack }) => {
     else navigate(target.startsWith("/") ? target : `/${target}`);
   };
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const [walletBalance, setWalletBalance] = useState(() => {
+    try {
+      const stored = localStorage.getItem('mshoppy_customer_wallet');
+      return stored ? parseFloat(stored) : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getOrders()
+      .then((data) => {
+        if (data && Array.isArray(data)) {
+          setOrders(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const totalOrdersCount = orders.length;
+  const pendingAmount = orders.filter(o => o.status === 'Pending' || o.status === 'Processing').length * 150;
 
   return (
     <div className="bg-surface text-on-surface min-h-screen pb-32 font-sans selection:bg-primary/20">
@@ -68,10 +95,10 @@ const EarningsDashboard2 = ({ onNavigate, onBack }) => {
           <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
               <span className="font-label text-xs sm:text-sm font-semibold uppercase tracking-widest opacity-80">
-                Total Earnings
+                Total Available Earnings
               </span>
               <h2 className="font-headline text-4xl sm:text-5xl lg:text-6xl font-extrabold mt-2 tracking-tight">
-                ₹42,850
+                ₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h2>
             </div>
             <div className="flex items-center gap-4">
@@ -83,8 +110,8 @@ const EarningsDashboard2 = ({ onNavigate, onBack }) => {
                 Withdraw
               </button>
               <div className="flex items-center gap-1 text-tertiary-fixed font-bold bg-tertiary/20 px-3.5 py-1.5 rounded-full text-sm">
-                <span className="material-symbols-outlined text-sm font-bold">trending_up</span>
-                12%
+                <span className="material-symbols-outlined text-sm font-bold">verified</span>
+                Instant IMPS
               </div>
             </div>
           </div>
@@ -98,7 +125,7 @@ const EarningsDashboard2 = ({ onNavigate, onBack }) => {
             </div>
             <span className="text-slate-500 font-medium text-sm">Pending</span>
             <span className="font-headline text-xl sm:text-2xl font-bold text-on-surface">
-              ₹4,200
+              ₹{pendingAmount.toLocaleString('en-IN')}
             </span>
           </div>
 
@@ -108,7 +135,7 @@ const EarningsDashboard2 = ({ onNavigate, onBack }) => {
             </div>
             <span className="text-slate-500 font-medium text-sm">Total Orders</span>
             <span className="font-headline text-xl sm:text-2xl font-bold text-on-surface">
-              128
+              {totalOrdersCount}
             </span>
           </div>
         </div>
@@ -122,48 +149,18 @@ const EarningsDashboard2 = ({ onNavigate, onBack }) => {
             </span>
           </div>
           <div className="flex items-end justify-between h-44 sm:h-56 gap-3 sm:gap-6 md:gap-10 px-2 sm:px-6">
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div
-                className="w-full bg-primary/20 rounded-t-lg transition-all hover:bg-primary"
-                style={{ height: "40%" }}
-              ></div>
-              <span className="text-[10px] sm:text-xs font-bold text-slate-400">JAN</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div
-                className="w-full bg-primary/20 rounded-t-lg transition-all hover:bg-primary"
-                style={{ height: "65%" }}
-              ></div>
-              <span className="text-[10px] sm:text-xs font-bold text-slate-400">FEB</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div
-                className="w-full bg-primary rounded-t-lg transition-all shadow-[0_0_15px_rgba(185,0,65,0.35)]"
-                style={{ height: "90%" }}
-              ></div>
-              <span className="text-[10px] sm:text-xs font-bold text-primary">MAR</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div
-                className="w-full bg-primary/20 rounded-t-lg transition-all hover:bg-primary"
-                style={{ height: "55%" }}
-              ></div>
-              <span className="text-[10px] sm:text-xs font-bold text-slate-400">APR</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div
-                className="w-full bg-primary/20 rounded-t-lg transition-all hover:bg-primary"
-                style={{ height: "75%" }}
-              ></div>
-              <span className="text-[10px] sm:text-xs font-bold text-slate-400">MAY</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div
-                className="w-full bg-primary/20 rounded-t-lg transition-all hover:bg-primary"
-                style={{ height: "45%" }}
-              ></div>
-              <span className="text-[10px] sm:text-xs font-bold text-slate-400">JUN</span>
-            </div>
+            {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN'].map((m, idx) => {
+              const heights = [20, 35, 45, 60, walletBalance > 0 ? 80 : 25, walletBalance > 0 ? 100 : 30];
+              return (
+                <div key={m} className="flex flex-col items-center gap-2 flex-1">
+                  <div
+                    className={`w-full rounded-t-lg transition-all ${idx === 5 ? 'bg-primary shadow-[0_0_15px_rgba(185,0,65,0.35)]' : 'bg-primary/20 hover:bg-primary'}`}
+                    style={{ height: `${heights[idx]}%` }}
+                  ></div>
+                  <span className={`text-[10px] sm:text-xs font-bold ${idx === 5 ? 'text-primary' : 'text-slate-400'}`}>{m}</span>
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -180,80 +177,46 @@ const EarningsDashboard2 = ({ onNavigate, onBack }) => {
             </button>
           </div>
           <div className="space-y-4">
-            {/* Transaction Item 1 */}
-            <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-surface-container-low rounded-xl flex items-center justify-center overflow-hidden shrink-0">
-                  <img
-                    className="w-full h-full object-cover opacity-90"
-                    alt="Modern minimalist product shot"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBu5fCWm6DJkZiWx37cq0ErcicOdT50QNcBbu3Z6LNZ489k17yessnn0vmnkfJUEy6n3xKStWs8sAxm0tchboz0gTCDMas2HqKj_JsfbzNO_8eUw8dcw-H8ZRnMu95kUxFqXTKZDZI04KG8VZF1jF4vk9D_DM_vWCyj6m_d1NjbbUQWsOMEmZd8jZhdci75dnGXATFA-VUnHYM3ajE69scVpMDyjNZ6VWSiZZVzud13rxNaecQgh4yT9eoJvEAWqw3X4GRRQTVAq_4"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-on-surface text-sm sm:text-base">Order #OR-8821</span>
-                  <span className="text-xs text-slate-400 font-medium">Oct 24, 2023 • Paid</span>
-                </div>
+            {orders.length === 0 ? (
+              <div className="bg-surface-container-lowest p-8 rounded-2xl text-center border border-dashed border-slate-200">
+                <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">receipt_long</span>
+                <p className="text-sm font-bold text-slate-700">No transactions recorded yet</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  When your customers receive delivered items, margin settlements will appear here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/resell-earn')}
+                  className="mt-4 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl shadow-xs hover:opacity-90 active:scale-95"
+                >
+                  Start Reselling
+                </button>
               </div>
-              <div className="text-right">
-                <span className="block font-headline font-bold text-tertiary text-sm sm:text-base">
-                  +₹240.00
-                </span>
-                <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">
-                  Margin Earned
-                </span>
-              </div>
-            </div>
-
-            {/* Transaction Item 2 */}
-            <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-surface-container-low rounded-xl flex items-center justify-center overflow-hidden shrink-0">
-                  <img
-                    className="w-full h-full object-cover opacity-90"
-                    alt="Vibrant red athletic shoe"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCftyXyC5Df__g-RJn4AknauOs3kwPVeCzG6MwUVSZQAHCPEtj5itgV9pJmA2NI0yPU_eb7uO_-QWXJVJ0WX3pLkWdesPs-wTaavlYVj1sEkT66bxFmgCmEC7bm6ZrVGi0gMSuiW2LuSYJM8UGd5_9uiohF1O-cb86T4bX4SEXXXgJ2Bb5lYQYvpaMyiFAExmikK4wrfMkc7bFFFhrhGAmjteKsCd5NSK6t4dWO-RbTVe0Tx8yhVdqSYHPwxv1kY7ou45rttGXEy2w"
-                  />
+            ) : (
+              orders.slice(0, 3).map((ord) => (
+                <div key={ord.id} className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-primary">receipt_long</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-on-surface text-sm sm:text-base">Order #{ord.orderNumber || ord.id.slice(0, 8)}</span>
+                      <span className="text-xs text-slate-400 font-medium">
+                        {new Date(ord.createdAt || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} • {ord.status || 'Settled'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="block font-headline font-bold text-tertiary text-sm sm:text-base">
+                      +₹{ord.marginAmount || 150}.00
+                    </span>
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">
+                      Margin Earned
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-on-surface text-sm sm:text-base">Order #OR-7910</span>
-                  <span className="text-xs text-slate-400 font-medium">Oct 22, 2023 • Pending</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="block font-headline font-bold text-secondary text-sm sm:text-base">
-                  +₹185.50
-                </span>
-                <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">
-                  Projected
-                </span>
-              </div>
-            </div>
-
-            {/* Transaction Item 3 */}
-            <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-surface-container-low rounded-xl flex items-center justify-center overflow-hidden shrink-0">
-                  <img
-                    className="w-full h-full object-cover opacity-90"
-                    alt="Stylish casual footwear"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuVxRQs1a84aICF30bjt51xFm7h2pNDrh81ZB4Dc1Mv0zRnzO2RBgCykxXbsBASpj9RnGIRYpfnLgL8EyYlZT6k7QkpNkFzmbCdyDoytULXcGCrxZ39tEVXnFyYbyLJVHXI401NjUikQxIHA4_S7O4BwSfcQjR2K8oxV5OHuLDz1zHFYg2rjbWOkq3wsR3agvzKR72P7N7_wUH_S8Z9r67kUDd1-XZ9zZPteO0DvJt3b1BjU4RtmI_WpEecor0pKwGwjFCFdPfjwg"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-on-surface text-sm sm:text-base">Order #OR-7855</span>
-                  <span className="text-xs text-slate-400 font-medium">Oct 20, 2023 • Paid</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="block font-headline font-bold text-tertiary text-sm sm:text-base">
-                  +₹520.00
-                </span>
-                <span className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">
-                  Margin Earned
-                </span>
-              </div>
-            </div>
+              ))
+            )}
           </div>
         </section>
       </main>

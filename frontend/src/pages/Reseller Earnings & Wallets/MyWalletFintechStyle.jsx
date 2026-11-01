@@ -8,44 +8,23 @@ export default function MyWalletFintechStyle() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [filter, setFilter] = useState('all');
 
-  const transactions = [
-    {
-      id: 1,
-      title: 'Order Profit - #MS-2291',
-      date: 'May 24, 2024 • 10:45 AM',
-      amount: '+₹150.00',
-      status: 'Settled',
-      type: 'income',
-      color: '#00A389',
-    },
-    {
-      id: 2,
-      title: 'Withdrawal - HDFC Bank',
-      date: 'May 23, 2024 • 03:20 PM',
-      amount: '-₹5,000.00',
-      status: 'Settled',
-      type: 'withdrawal',
-      color: '#ba1a1a',
-    },
-    {
-      id: 3,
-      title: 'Order Profit - #MS-2284',
-      date: 'May 22, 2024 • 09:12 AM',
-      amount: '+₹320.00',
-      status: 'Pending',
-      type: 'income',
-      color: '#00A389',
-    },
-    {
-      id: 4,
-      title: 'Referral Bonus',
-      date: 'May 20, 2024 • 11:00 AM',
-      amount: '+₹500.00',
-      status: 'Settled',
-      type: 'income',
-      color: '#00A389',
+  const [walletBalance, setWalletBalance] = useState(() => {
+    try {
+      const stored = localStorage.getItem('mshoppy_customer_wallet');
+      return stored ? parseFloat(stored) : 0;
+    } catch (e) {
+      return 0;
     }
-  ];
+  });
+
+  const [transactions, setTransactions] = useState(() => {
+    try {
+      const stored = localStorage.getItem('mshoppy_wallet_txns');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   const filteredTransactions = transactions.filter(tx => {
     if (filter === 'income') return tx.type === 'income';
@@ -89,7 +68,9 @@ export default function MyWalletFintechStyle() {
           <div className="relative z-10 flex flex-col items-start gap-1">
             <span className="text-white/70 text-sm font-medium tracking-wide uppercase">Available Balance</span>
             <div className="flex items-baseline gap-1">
-              <span className="text-white text-4xl font-extrabold tracking-tight">₹12,450.50</span>
+              <span className="text-white text-4xl font-extrabold tracking-tight">
+                ₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="mt-8 flex w-full gap-4">
               <button
@@ -165,64 +146,78 @@ export default function MyWalletFintechStyle() {
 
         {/* Transaction History List */}
         <section className="space-y-4">
-          {filteredTransactions.map(tx => (
-            <div
-              key={tx.id}
-              className="bg-surface-container-lowest rounded-3xl p-4 flex items-center justify-between shadow-sm border border-outline-variant/10 transition-all hover:bg-surface-container-low cursor-pointer"
-            >
-              <div className="flex items-center gap-4">
-                <div 
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: `${tx.color}15` }}
-                >
-                  <span 
-                    className="material-symbols-outlined text-xl"
-                    style={{ color: tx.color, fontVariationSettings: "'FILL' 1" }}
+          {filteredTransactions.length === 0 ? (
+            <div className="bg-surface-container-lowest rounded-3xl p-8 text-center border border-dashed border-slate-200">
+              <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">account_balance_wallet</span>
+              <p className="text-sm font-bold text-slate-700">No transactions recorded yet</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Your wallet credits, referral rewards, and withdrawals will appear here in real time.
+              </p>
+            </div>
+          ) : (
+            filteredTransactions.map(tx => (
+              <div
+                key={tx.id}
+                className="bg-surface-container-lowest rounded-3xl p-4 flex items-center justify-between shadow-sm border border-outline-variant/10 transition-all hover:bg-surface-container-low cursor-pointer"
+              >
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: `${tx.color}15` }}
                   >
-                    {tx.type === 'income' ? 'add_circle' : 'do_not_disturb_on'}
+                    <span 
+                      className="material-symbols-outlined text-xl"
+                      style={{ color: tx.color, fontVariationSettings: "'FILL' 1" }}
+                    >
+                      {tx.type === 'income' ? 'add_circle' : 'do_not_disturb_on'}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-on-surface font-bold text-sm">{tx.title}</p>
+                    <p className="text-xs text-outline font-medium mt-0.5">{tx.date}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p 
+                    className="font-extrabold text-sm"
+                    style={{ color: tx.color }}
+                  >
+                    {tx.amount}
+                  </p>
+                  <span 
+                    className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter inline-block mt-1"
+                    style={{ 
+                      backgroundColor: tx.status === 'Settled' ? (tx.type === 'income' ? '#00A38915' : '#ba1a1a15') : '#675df925',
+                      color: tx.status === 'Settled' ? (tx.type === 'income' ? '#00A389' : '#ba1a1a') : '#675df9'
+                    }}
+                  >
+                    {tx.status}
                   </span>
                 </div>
-                <div>
-                  <p className="text-on-surface font-bold text-sm">{tx.title}</p>
-                  <p className="text-xs text-outline font-medium mt-0.5">{tx.date}</p>
-                </div>
               </div>
-              <div className="text-right">
-                <p 
-                  className="font-extrabold text-sm"
-                  style={{ color: tx.color }}
-                >
-                  {tx.amount}
-                </p>
-                <span 
-                  className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter inline-block mt-1"
-                  style={{ 
-                    backgroundColor: tx.status === 'Settled' ? (tx.type === 'income' ? '#00A38915' : '#ba1a1a15') : '#675df925',
-                    color: tx.status === 'Settled' ? (tx.type === 'income' ? '#00A389' : '#ba1a1a') : '#675df9'
-                  }}
-                >
-                  {tx.status}
-                </span>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </section>
 
         {/* Summary Insights (Bento-style Card) */}
         <section className="grid grid-cols-2 gap-4">
           <div className="bg-surface-container-low p-5 rounded-3xl flex flex-col justify-between">
-            <p className="text-[10px] font-bold text-outline uppercase tracking-[0.1em]">Monthly Inflow</p>
+            <p className="text-[10px] font-bold text-outline uppercase tracking-[0.1em]">Available Funds</p>
             <div>
-              <h3 className="text-xl font-extrabold text-on-surface">₹24,800</h3>
-              <p className="text-[10px] text-[#00A389] font-bold mt-1">+12% vs last month</p>
+              <h3 className="text-xl font-extrabold text-on-surface">
+                ₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </h3>
+              <p className="text-[10px] text-emerald-600 font-bold mt-1">Instant Bank IMPS</p>
             </div>
           </div>
           <div className="bg-surface-container-low p-5 rounded-3xl flex flex-col justify-between">
             <p className="text-[10px] font-bold text-outline uppercase tracking-[0.1em]">Total Savings</p>
             <div>
-              <h3 className="text-xl font-extrabold text-on-surface">₹8,450</h3>
+              <h3 className="text-xl font-extrabold text-on-surface">
+                ₹{(walletBalance * 0.15).toFixed(2)}
+              </h3>
               <div className="w-full bg-outline-variant/20 h-1 rounded-full mt-2 overflow-hidden">
-                <div className="bg-primary w-[65%] h-full rounded-full"></div>
+                <div className="bg-primary w-[30%] h-full rounded-full"></div>
               </div>
             </div>
           </div>
