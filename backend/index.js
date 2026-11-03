@@ -15,6 +15,7 @@ import prisma from './src/config/prisma.js';
 
 // Import Routes and Middlewares
 import apiRouter from './src/routes/api.routes.js';
+import seoRoutes from './src/routes/seo.routes.js';
 import { notFoundHandler, errorHandler } from './src/middlewares/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +61,9 @@ app.get('/api', (req, res) => {
     },
   });
 });
+
+// Root SEO routes (sitemap.xml and robots.txt must be at root domain)
+app.use('/', seoRoutes);
 
 // Mount Main API Router (Supports both /api and /api/v1 prefix)
 app.use('/api', apiRouter);
