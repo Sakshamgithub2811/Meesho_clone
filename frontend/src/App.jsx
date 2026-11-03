@@ -53,6 +53,7 @@ import CustomerOrders from './pages/customer & Reseller/CustomerOrders';
 import ReturnRequest from './pages/customer & Reseller/ReturnRequest';
 import AffiliateKYC from './pages/customer & Reseller/AffiliateKYC';
 import AffiliateKycStatus from './pages/customer & Reseller/AffiliateKycStatus';
+import PolicyPage from './pages/customer & Reseller/PolicyPage';
 
 // Delivery & Driver Logistics Pages
 import DriverDashboardMobile from './pages/delivery & driver logistics/driver_dashboard_mobile';
@@ -1197,6 +1198,8 @@ function AppRoutes() {
         <Route path="/gilded-pulse" element={<GildedPulse onNavigate={handleNav} />} />
         <Route path="/social-commerce-luxe" element={<SocialCommerceLuxe onNavigate={handleNav} />} />
         <Route path="/signal-core" element={<SignalCore onNavigate={handleNav} />} />
+        {/* Dynamic Published CMS & Policies Route (Method 2) */}
+        <Route path="/p/:slug" element={<PolicyPage />} />
       </Routes>
     </div>
   );
