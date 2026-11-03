@@ -248,6 +248,27 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
         ...formData,
         panNumber: formData.panNumber.toUpperCase(),
         ifscCode: formData.ifscCode.toUpperCase(),
+        pan: {
+          number: formData.panNumber.toUpperCase(),
+          nameOnDoc: formData.accountHolderName || formData.fullName,
+          status: 'Submitted',
+          image: panPreviewUrl && panPreviewUrl !== 'PDF_DOC' ? panPreviewUrl : null,
+          fileName: formData.panDocName || null,
+        },
+        aadhaar: {
+          number: formData.aadhaarNumber,
+          nameOnDoc: formData.fullName,
+          status: 'Submitted',
+          image: aadhaarPreviewUrl && aadhaarPreviewUrl !== 'PDF_DOC' ? aadhaarPreviewUrl : null,
+          fileName: formData.aadhaarDocName || null,
+        },
+        bank: {
+          bankName: formData.bankName,
+          accountNumber: formData.accountNumber,
+          ifsc: formData.ifscCode.toUpperCase(),
+          holderName: formData.accountHolderName,
+          upiId: formData.upiId || '',
+        },
         applicationId: existingSubmission?.applicationId || `KYC-AFF-${Math.floor(100000 + Math.random() * 900000)}`,
         status: 'PENDING_ADMIN_APPROVAL',
         submittedAt: new Date().toLocaleString('en-IN', {
