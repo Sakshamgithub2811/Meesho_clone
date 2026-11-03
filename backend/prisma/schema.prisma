@@ -95,8 +95,11 @@ model Profile {
   referralsUsed   Referral[]     @relation("Referred")
   deliveryTasks   DeliveryTask[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  isActive        Boolean        @default(true) @map("is_active")
+  isDeleted       Boolean        @default(false) @map("is_deleted")
+  deletedAt       DateTime?      @map("deleted_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@map("profiles")
 }
@@ -123,13 +126,17 @@ model Address {
 // ── 3. Product Categories ──────────────────────────────────────
 
 model Category {
-  id        String    @id @default(uuid())
-  name      String    @unique
-  slug      String    @unique
-  imageUrl  String?   @map("image_url")
-  products  Product[]
-  createdAt DateTime  @default(now()) @map("created_at")
+  id            String     @id @default(uuid())
+  name          String     @unique
+  slug          String     @unique
+  imageUrl      String?    @map("image_url")
+  parentId      String?    @map("parent_id")
+  parent        Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subcategories Category[] @relation("CategoryHierarchy")
+  products      Product[]
+  createdAt     DateTime   @default(now()) @map("created_at")
 
+  @@index([parentId])
   @@map("categories")
 }
 
@@ -161,8 +168,9 @@ model Product {
   reviews       Review[]
   orderItems    OrderItem[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  isDeleted     Boolean        @default(false) @map("is_deleted")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
 
   @@map("products")
 }
@@ -214,8 +222,9 @@ model Order {
   deliveryTask    DeliveryTask?
   returnRequest   ReturnRequest?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  isDeleted       Boolean        @default(false) @map("is_deleted")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@map("orders")
 }
@@ -387,4 +396,21 @@ model Referral {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("referrals")
+}
+
+
+model Banner {
+  id           String   @id @default(uuid())
+  title        String
+  subtitle     String?
+  imageUrl     String   @map("image_url")
+  targetUrl    String   @default("/") @map("target_url")
+  badgeText    String?  @default("MEGA SALE") @map("badge_text")
+  badgeColor   String?  @default("bg-purple-600 text-white") @map("badge_color")
+  displayOrder Int      @default(1) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  clicksCount  Int      @default(0) @map("clicks_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  @@map("banners")
 }

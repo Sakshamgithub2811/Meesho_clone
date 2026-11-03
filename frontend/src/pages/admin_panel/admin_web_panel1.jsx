@@ -11,11 +11,15 @@ import AdminProductsManagement from '../../components/admin/products/AdminProduc
 import AdminSellersManagement from '../../components/admin/sellers/AdminSellersManagement';
 import AdminFinanceManagement from '../../components/admin/finance/AdminFinanceManagement';
 import AdminAnalyticsManagement from '../../components/admin/analytics/AdminAnalyticsManagement';
+import AdminSupportManagement from '../../components/admin/support/AdminSupportManagement';
+import AdminCategoriesManagement from '../../components/admin/categories/AdminCategoriesManagement';
+import AdminCouponsManagement from '../../components/admin/coupons/AdminCouponsManagement';
+import AdminBannersManagement from '../../components/admin/banners/AdminBannersManagement';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
   Package, ShoppingCart, RotateCcw, LineChart,
-  Wallet, Banknote, Store
+  Wallet, Banknote, Store, Headphones, Layers, Ticket, Image
 } from 'lucide-react';
 // Yeh raha aapka MASTER MENU (with Sub-menus)
 const ADMIN_MENU = [
@@ -25,16 +29,21 @@ const ADMIN_MENU = [
     label: 'KYC Verifications',
     icon: ShieldCheck,
     children: [
-      { id: 'dropshipper-kyc', label: 'Dropshipper KYC 📦', icon: Truck, path: '/admin-dropshipper-kyc' },
-      { id: 'affiliate-kyc', label: 'Affiliate KYC 🤝', icon: Users, path: '/admin-affiliate-kyc' },
+      { id: 'supplier-kyc', label: 'Supplier KYC ', icon: Store },
+      { id: 'dropshipper-kyc', label: 'Dropshipper KYC ', icon: Truck, path: '/admin-dropshipper-kyc' },
+      { id: 'affiliate-kyc', label: 'Affiliate KYC ', icon: Users, path: '/admin-affiliate-kyc' },
     ],
   },
-  { id: 'products', label: 'Products 📦', icon: Package },
+  { id: 'products', label: 'Products ', icon: Package },
+  { id: 'categories', label: 'Categories ', icon: Layers },
+  { id: 'coupons', label: 'Coupons 🎟️', icon: Ticket },
+  { id: 'banners', label: 'Banners 🎨', icon: Image },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
-  { id: 'returns', label: 'Returns & Refunds 🔄', icon: RotateCcw },
-  { id: 'sellers', label: 'Sellers 🏬', icon: Store },
-  { id: 'finance', label: 'Finance & Payouts 💳', icon: Banknote },
-  { id: 'analytics', label: 'Analytics 📊', icon: LineChart },
+  { id: 'returns', label: 'Returns & Refunds ', icon: RotateCcw },
+  { id: 'sellers', label: 'Sellers ', icon: Store },
+  { id: 'finance', label: 'Finance & Payouts ', icon: Banknote },
+  { id: 'analytics', label: 'Analytics ', icon: LineChart },
+  { id: 'support', label: 'Support Desk ', icon: Headphones },
   { id: 'users', label: 'Users', icon: Users, path: '/user-dashboard' },
 ];
 
@@ -57,6 +66,7 @@ export default function AdminWebPanel() {
       case 'dashboard':
         return { title: "Dashboard Overview", subtitle: "" };
       case 'kyc':
+      case 'supplier-kyc':
       case 'dropshipper-kyc':
       case 'affiliate-kyc':
         return { title: "KYC Verifications", subtitle: "" };
@@ -64,6 +74,12 @@ export default function AdminWebPanel() {
         return { title: "Manage Users", subtitle: "" };
       case 'products':
         return { title: "Product Catalog & Moderation", subtitle: "Inspect supplier listings, manage inventory, and monitor stock levels" };
+      case 'categories':
+        return { title: "Category Master & Taxonomies", subtitle: "Organize catalog hierarchies, manage category slugs, and link products" };
+      case 'coupons':
+        return { title: "Coupons & Promotional Codes", subtitle: "Configure promotional discounts, validate campaigns, and track customer redemptions" };
+      case 'banners':
+        return { title: "Homepage Banners & Carousels", subtitle: "Curate interactive hero sliders, seasonal promotional banners, and campaign redirects" };
       case 'orders':
         return { title: "Manage Orders", subtitle: "Track, fulfill, and monitor customer orders" };
       case 'returns':
@@ -75,6 +91,8 @@ export default function AdminWebPanel() {
         return { title: "Finance, Escrow & Settlements", subtitle: "Manage partner escrow wallets, process withdrawal payouts, and monitor transaction ledger" };
       case 'analytics':
         return { title: "Business Intelligence & Analytics", subtitle: "Analyze sales trends, order progression, catalog distribution, and top suppliers" };
+      case 'support':
+        return { title: "Customer & Partner Support Desk", subtitle: "Arbitrate disputes, manage support tickets, and resolve buyer or seller inquiries" };
       default:
         // Fallback: Menu se title nikal lo
         const item = ADMIN_MENU.find(m => m.id === activeTab) || ADMIN_MENU.flatMap(m => m.children || []).find(c => c.id === activeTab);
@@ -111,10 +129,11 @@ export default function AdminWebPanel() {
         <AdminDashboardOverview onNavigateTab={(tab) => setActiveTab(tab)} />
       )}
 
-      {(activeTab === 'kyc' || activeTab === 'dropshipper-kyc' || activeTab === 'affiliate-kyc') && (
+      {(activeTab === 'kyc' || activeTab === 'supplier-kyc' || activeTab === 'dropshipper-kyc' || activeTab === 'affiliate-kyc') && (
         <AdminKycManagement
           key={activeTab}
-          initialType={activeTab === 'dropshipper-kyc' ? 'dropshipper' : activeTab === 'affiliate-kyc' ? 'affiliate' : 'all'}
+          initialType={activeTab === 'supplier-kyc'
+            ? 'supplier' : activeTab === 'dropshipper-kyc' ? 'dropshipper' : activeTab === 'affiliate-kyc' ? 'affiliate' : 'all'}
         />
       )}
 
@@ -124,6 +143,18 @@ export default function AdminWebPanel() {
 
       {activeTab === 'products' && (
         <AdminProductsManagement />
+      )}
+
+      {activeTab === 'categories' && (
+        <AdminCategoriesManagement />
+      )}
+
+      {activeTab === 'coupons' && (
+        <AdminCouponsManagement />
+      )}
+
+      {activeTab === 'banners' && (
+        <AdminBannersManagement />
       )}
 
       {activeTab === 'orders' && (
@@ -144,6 +175,10 @@ export default function AdminWebPanel() {
 
       {activeTab === 'analytics' && (
         <AdminAnalyticsManagement />
+      )}
+
+      {activeTab === 'support' && (
+        <AdminSupportManagement />
       )}
 
     </DashboardLayout>

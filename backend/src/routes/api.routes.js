@@ -13,6 +13,10 @@ import adminProductsRoutes from './admin/adminProducts.routes.js';
 import adminSellersRoutes from './admin/adminSellers.routes.js';
 import adminFinanceRoutes from './admin/adminFinance.routes.js';
 import adminAnalyticsRoutes from './admin/adminAnalytics.routes.js';
+import adminSupportRoutes from './admin/adminSupport.routes.js';
+import adminCategoriesRoutes from './admin/adminCategories.routes.js';
+import adminCouponsRoutes from './admin/adminCoupons.routes.js';
+import adminBannersRoutes from './admin/adminBanners.routes.js';
 import authRoutes from './auth.routes.js';
 import affiliateAuthRoutes from './affiliate/affiliateAuth.routes.js';
 import userAuthRoutes from './user/userAuth.routes.js';
@@ -48,6 +52,11 @@ apiRouter.use('/admin-products', adminProductsRoutes);
 apiRouter.use('/admin-sellers', adminSellersRoutes);
 apiRouter.use('/admin-finance', adminFinanceRoutes);
 apiRouter.use('/admin-analytics', adminAnalyticsRoutes);
+apiRouter.use('/admin-support', adminSupportRoutes);
+apiRouter.use('/admin-categories', adminCategoriesRoutes);
+apiRouter.use('/admin-coupons', adminCouponsRoutes);
+apiRouter.use('/admin-banners', adminBannersRoutes);
+apiRouter.use('/banners', adminBannersRoutes);
 
 // Supplier Module endpoints
 apiRouter.use('/supplier/auth', supplierAuthRoutes);
