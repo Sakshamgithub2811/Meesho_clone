@@ -3,18 +3,19 @@ import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
-import {
-  Layers,
-  Plus,
-  RefreshCw,
-  Search,
-  X,
-  AlertCircle,
-} from 'lucide-react';
+import { Layers, Plus } from 'lucide-react';
+import { Button } from '../../ui/button';
 
 import CategoryStatsGrid from './CategoryStatsGrid';
+import FilterBar from '../../common/FilterBar';
 import CategoriesTable from './CategoriesTable';
 import CategoryFormModal from './CategoryFormModal';
+
+const CATEGORY_TABS = [
+  { id: 'all', label: 'All Taxonomies 🏷️' },
+  { id: 'main', label: 'Main Categories 📁' },
+  { id: 'sub', label: 'Subcategories 🌿' },
+];
 
 export default function AdminCategoriesManagement() {
   const currentUser = useSelector((state) => state.user?.currentUser);
@@ -22,13 +23,14 @@ export default function AdminCategoriesManagement() {
   const [categories, setCategories] = useState([]);
   const [stats, setStats] = useState({
     totalCategories: 0,
+    mainCategories: 0,
+    subCategories: 0,
     totalProducts: 0,
-    emptyCategories: 0,
-    activeCategories: 0,
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -61,9 +63,9 @@ export default function AdminCategoriesManagement() {
         toast.error(res.data.message || 'Failed to load categories');
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('Category fetch error:', error);
       toast.error(
-        error.response?.data?.message || 'Error connecting to categories server'
+        error.response?.data?.message || 'Error loading categories'
       );
     } finally {
       setLoading(false);
@@ -75,19 +77,18 @@ export default function AdminCategoriesManagement() {
     fetchCategories();
   }, []);
 
-  // 2. Open Create Modal
+  // Modal triggers
   const handleOpenCreate = () => {
     setEditingCategory(null);
     setModalOpen(true);
   };
 
-  // 3. Open Edit Modal
   const handleOpenEdit = (category) => {
     setEditingCategory(category);
     setModalOpen(true);
   };
 
-  // 4. Submit Create or Update
+  // 2. Create or Update handler
   const handleFormSubmit = async (formData) => {
     try {
       setIsSubmitting(true);
@@ -142,29 +143,21 @@ export default function AdminCategoriesManagement() {
     }
   };
 
-  // 5. Delete Category with Confirmation & Safety Guard
+  // 3. Delete handler
   const handleDeleteCategory = async (category) => {
     const productCount = category._count?.products ?? 0;
     const subcategoryCount = category._count?.subcategories ?? 0;
 
-    if (subcategoryCount > 0) {
+    if (productCount > 0 || subcategoryCount > 0) {
       toast.error(
-        `Cannot delete: "${category.name}" has ${subcategoryCount} subcategories attached. Reassign or delete those subcategories first.`
+        `Cannot delete "${category.name}". It still contains ${productCount} products and ${subcategoryCount} subcategories.`
       );
       return;
     }
 
-    if (productCount > 0) {
-      toast.error(
-        `Cannot delete: "${category.name}" has ${productCount} active products. Reassign or delete those products first.`
-      );
-      return;
-    }
-
-    const typeLabel = category.parentId ? 'subcategory' : 'category';
     if (
       !window.confirm(
-        `Are you sure you want to permanently delete ${typeLabel} "${category.name}"?`
+        `Are you sure you want to permanently delete category "${category.name}"?`
       )
     ) {
       return;
@@ -195,68 +188,73 @@ export default function AdminCategoriesManagement() {
     }
   };
 
+  // Filter categories by Tab & Search
+  const filteredCategories = categories.filter((cat) => {
+    if (activeTab === 'main' && Boolean(cat.parentId)) return false;
+    if (activeTab === 'sub' && !Boolean(cat.parentId)) return false;
+
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      cat.name?.toLowerCase().includes(q) ||
+      cat.slug?.toLowerCase().includes(q) ||
+      cat.parent?.name?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
-      {/* Top Banner / Stats */}
+      {/* 1. Category Stats Grid using StatCard */}
       <CategoryStatsGrid stats={stats} />
 
-      {/* Action Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-        {/* Search */}
-        <div className="relative w-full sm:w-80">
-          <Search
-            size={16}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Search categories, subcategories, slugs..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-500 focus:outline-none transition-all"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X size={14} />
-            </button>
-          )}
+      {/* 2. Top Action Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-pink-50 text-[#b7004d] rounded-xl">
+            <Layers size={22} />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-gray-900">
+              Taxonomy &amp; Hierarchy Master
+            </h2>
+            <p className="text-xs text-gray-500">
+              Organize root departments, map subcategories, and structure product catalogs.
+            </p>
+          </div>
         </div>
 
-        {/* Buttons */}
-        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-          <button
-            onClick={() => fetchCategories(true)}
-            disabled={refreshing}
-            className="px-3.5 py-2 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all flex items-center gap-1.5"
-            title="Refresh list"
-          >
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-            <span>Refresh</span>
-          </button>
-
-          <button
-            onClick={handleOpenCreate}
-            className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 active:scale-95 rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-1.5"
-          >
-            <Plus size={16} />
-            <span>Add Category / Subcategory</span>
-          </button>
-        </div>
+        <Button
+          onClick={handleOpenCreate}
+          className="bg-[#b7004d] hover:bg-[#96003f] text-white rounded-xl text-xs font-bold gap-2 cursor-pointer self-start sm:self-auto"
+        >
+          <Plus size={16} />
+          <span>Add Category / Subcategory</span>
+        </Button>
       </div>
 
-      {/* Main Table */}
+      {/* 3. Reusable FilterBar */}
+      <FilterBar
+        searchPlaceholder="Search categories, subcategories, slugs..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        tabs={CATEGORY_TABS}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        totalCount={filteredCategories.length}
+        countLabel="Categories"
+        onRefresh={() => fetchCategories(true)}
+        refreshing={refreshing}
+      />
+
+      {/* 4. Main Reusable DataTable */}
       <CategoriesTable
-        categories={categories}
+        categories={filteredCategories}
         loading={loading}
         onEdit={handleOpenEdit}
         onDelete={handleDeleteCategory}
-        searchTerm={searchTerm}
       />
 
-      {/* Form Modal */}
+      {/* 5. Form Modal */}
       <CategoryFormModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}

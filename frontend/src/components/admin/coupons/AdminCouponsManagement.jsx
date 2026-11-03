@@ -3,20 +3,16 @@ import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
-import {
-  Ticket,
-  Plus,
-  RefreshCw,
-  Search,
-  X,
-} from 'lucide-react';
+import { Ticket, Plus } from 'lucide-react';
+import { Button } from '../../ui/button';
 
 import CouponStatsGrid from './CouponStatsGrid';
+import FilterBar from '../../common/FilterBar';
 import CouponsTable from './CouponsTable';
 import CouponFormModal from './CouponFormModal';
 
 const STATUS_TABS = [
-  { id: 'ALL', label: 'All Coupons' },
+  { id: 'ALL', label: 'All Coupons 🎟️' },
   { id: 'ACTIVE', label: 'Active ⚡' },
   { id: 'EXPIRED', label: 'Expired ⌛' },
   { id: 'DISABLED', label: 'Disabled 🚫' },
@@ -69,9 +65,9 @@ export default function AdminCouponsManagement() {
         toast.error(res.data.message || 'Failed to load coupons');
       }
     } catch (error) {
-      console.error('Error fetching coupons:', error);
+      console.error('Coupons fetch error:', error);
       toast.error(
-        error.response?.data?.message || 'Error connecting to coupon server'
+        error.response?.data?.message || 'Error occurred while loading coupons'
       );
     } finally {
       setLoading(false);
@@ -83,19 +79,17 @@ export default function AdminCouponsManagement() {
     fetchCoupons();
   }, []);
 
-  // 2. Open Create Modal
   const handleOpenCreate = () => {
     setEditingCoupon(null);
     setModalOpen(true);
   };
 
-  // 3. Open Edit Modal
   const handleOpenEdit = (coupon) => {
     setEditingCoupon(coupon);
     setModalOpen(true);
   };
 
-  // 4. Create or Update Coupon
+  // 2. Submit Create / Update
   const handleFormSubmit = async (formData) => {
     try {
       setIsSubmitting(true);
@@ -141,16 +135,16 @@ export default function AdminCouponsManagement() {
         }
       }
     } catch (error) {
-      console.error('Save coupon error:', error);
+      console.error('Coupon save error:', error);
       toast.error(
-        error.response?.data?.message || 'Failed to save coupon'
+        error.response?.data?.message || 'Error occurred while saving coupon'
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // 5. Toggle Active Status
+  // 3. Toggle Status (Active / Disabled)
   const handleToggleStatus = async (coupon) => {
     try {
       const token = await getAuthToken();
@@ -165,25 +159,20 @@ export default function AdminCouponsManagement() {
       );
 
       if (res.data.success) {
-        toast.success(res.data.message || 'Status updated');
-        // Optimistic update local state
-        setCoupons((prev) =>
-          prev.map((c) =>
-            c.id === coupon.id ? { ...c, isActive: res.data.isActive } : c
-          )
-        );
+        toast.success(res.data.message || 'Coupon status toggled');
+        fetchCoupons(true);
       } else {
-        toast.error(res.data.message || 'Failed to toggle status');
+        toast.error(res.data.message || 'Failed to update status');
       }
     } catch (error) {
-      console.error('Toggle status error:', error);
+      console.error('Toggle coupon status error:', error);
       toast.error(
-        error.response?.data?.message || 'Failed to update coupon status'
+        error.response?.data?.message || 'Error toggling coupon status'
       );
     }
   };
 
-  // 6. Delete Coupon
+  // 4. Delete Coupon
   const handleDeleteCoupon = async (coupon) => {
     if (
       !window.confirm(
@@ -218,91 +207,89 @@ export default function AdminCouponsManagement() {
     }
   };
 
+  const now = new Date();
+
+  // Filter coupons by search term and status tab
+  const filteredCoupons = coupons.filter((coupon) => {
+    const q = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      coupon.code?.toLowerCase().includes(q) ||
+      coupon.title?.toLowerCase().includes(q) ||
+      coupon.description?.toLowerCase().includes(q);
+
+    if (!matchesSearch) return false;
+
+    const isExpired = new Date(coupon.expiresAt) <= now;
+    const isDisabled = coupon.isActive === false;
+
+    if (statusFilter === 'ACTIVE') {
+      return !isExpired && !isDisabled;
+    }
+    if (statusFilter === 'EXPIRED') {
+      return isExpired;
+    }
+    if (statusFilter === 'DISABLED') {
+      return isDisabled;
+    }
+
+    return true;
+  });
+
   return (
     <div className="space-y-6">
-      {/* Top Stats */}
+      {/* 1. Reusable StatCard Grid */}
       <CouponStatsGrid stats={stats} />
 
-      {/* Filter Tabs + Search Toolbar */}
-      <div className="space-y-3">
-        {/* Status Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
-                statusFilter === tab.id
-                  ? 'bg-purple-600 text-white shadow-sm'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Search & Actions Bar */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="relative w-full sm:w-80">
-            <Search
-              size={16}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder="Search code, title or condition..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-500 focus:outline-none transition-all"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X size={14} />
-              </button>
-            )}
+      {/* 2. Top Action Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-pink-50 text-[#b7004d] rounded-xl">
+            <Ticket size={22} />
           </div>
-
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-            <button
-              onClick={() => fetchCoupons(true)}
-              disabled={refreshing}
-              className="px-3.5 py-2 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all flex items-center gap-1.5"
-              title="Refresh list"
-            >
-              <RefreshCw
-                size={14}
-                className={refreshing ? 'animate-spin' : ''}
-              />
-              <span>Refresh</span>
-            </button>
-
-            <button
-              onClick={handleOpenCreate}
-              className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 active:scale-95 rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-1.5"
-            >
-              <Plus size={16} />
-              <span>Create Coupon</span>
-            </button>
+          <div>
+            <h2 className="text-base font-bold text-gray-900">
+              Promotional Discount Codes &amp; Vouchers
+            </h2>
+            <p className="text-xs text-gray-500">
+              Configure checkout discounts, customer cart minimums, validity dates, and campaign redemptions.
+            </p>
           </div>
         </div>
+
+        <Button
+          onClick={handleOpenCreate}
+          className="bg-[#b7004d] hover:bg-[#96003f] text-white rounded-xl text-xs font-bold gap-2 cursor-pointer self-start sm:self-auto"
+        >
+          <Plus size={16} />
+          <span>Create Coupon</span>
+        </Button>
       </div>
 
-      {/* Coupons Table */}
+      {/* 3. Reusable FilterBar */}
+      <FilterBar
+        searchPlaceholder="Search code, title or condition..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        tabs={STATUS_TABS}
+        activeTab={statusFilter}
+        onTabChange={setStatusFilter}
+        totalCount={filteredCoupons.length}
+        countLabel="Coupons"
+        onRefresh={() => fetchCoupons(true)}
+        refreshing={refreshing}
+      />
+
+      {/* 4. Reusable DataTable */}
       <CouponsTable
-        coupons={coupons}
+        coupons={filteredCoupons}
         loading={loading}
         onEdit={handleOpenEdit}
         onDelete={handleDeleteCoupon}
         onToggleStatus={handleToggleStatus}
-        statusFilter={statusFilter}
-        searchTerm={searchTerm}
       />
 
-      {/* Form Modal */}
+      {/* 5. Form Modal */}
       <CouponFormModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
