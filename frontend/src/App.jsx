@@ -28,9 +28,14 @@ import SupplierProductAccess from './pages/Reseller Earnings & Wallets/SupplierP
 // Dropshipper Hub Pages
 import DropshipperLogin from './pages/dropshipper/DropshipperLogin';
 import DropshipperDashboard from './pages/dropshipper/DropshipperDashboard';
+import DropshipperProfileView from './pages/dropshipper/DropshipperProfileView';
 import DropshipperKYCRegister from './pages/dropshipper/DropshipperKYCRegister';
 import DropshipperSettlementTracking from './pages/dropshipper/DropshipperSettlementTracking';
 import DropshipperRotManager from './pages/dropshipper/DropshipperRotManager';
+import DropshipperMarginConfig from './pages/dropshipper/DropshipperMarginConfig';
+import DropshipperSupportDesk from './pages/dropshipper/DropshipperSupportDesk';
+import DropshipperOrdersPush from './pages/dropshipper/DropshipperOrdersPush';
+import DropshipperIntegrations from './pages/dropshipper/DropshipperIntegrations';
 
 // Customer & Reseller Shopping Pages
 import HomeUserCustomer from './pages/customer & Reseller/HomeUserCustomer';
@@ -54,6 +59,7 @@ import CustomerOrders from './pages/customer & Reseller/CustomerOrders';
 import ReturnRequest from './pages/customer & Reseller/ReturnRequest';
 import AffiliateKYC from './pages/customer & Reseller/AffiliateKYC';
 import AffiliateKycStatus from './pages/customer & Reseller/AffiliateKycStatus';
+import PolicyPage from './pages/customer & Reseller/PolicyPage';
 
 // Delivery & Driver Logistics Pages
 import DriverDashboardMobile from './pages/delivery & driver logistics/driver_dashboard_mobile';
@@ -123,15 +129,15 @@ import StructureFlow from './pages/Design_Ecosystem_&_Theme_Variations/structure
 const screenCatalog = [
   // 1. Dropshipper Portal Screens
   { path: '/dropshipper-dashboard', name: 'Dropshipper Dashboard', icon: '📊', group: 'Dropshipper' },
-  { path: '/dropshipper-settlements', name: 'Settlement & Tracking', icon: '📊', group: 'Dropshipper' },
+  { path: '/dropshipper-margin-config', name: 'Margin & Price Rules', icon: '🏷️', group: 'Dropshipper' },
+  { path: '/dropshipper-support', name: 'Disputes & Support Desk', icon: '🎧', group: 'Dropshipper' },
+  { path: '/dropshipper-settlements', name: 'Settlement & Tracking', icon: '📈', group: 'Dropshipper' },
   { path: '/dropshipper-rot-manager', name: 'ROT Liability & Policy Manager', icon: '🛡️', group: 'Dropshipper' },
-  { path: '/share-earn-config', name: 'Share & Margin Config', icon: '🔗', group: 'Dropshipper' },
   { path: '/reseller-returns', name: 'Returns & Margin Ledger', icon: '🔄', group: 'Dropshipper' },
   { path: '/my-wallet', name: 'Fintech Wallet & Passbook', icon: '👛', group: 'Dropshipper' },
-  { path: '/reseller-wallet', name: 'Reseller Earnings Wallet', icon: '💳', group: 'Dropshipper' },
   { path: '/withdraw-earnings', name: 'Withdraw Margin to Bank', icon: '🏦', group: 'Dropshipper' },
   { path: '/payout-settings', name: 'Bank & UPI Settings', icon: '⚙️', group: 'Dropshipper' },
-  { path: '/admin-dropshipper-kyc', name: 'Dropshipper KYC Audit', icon: '📦', group: 'Dropshipper' },
+  { path: '/dropshipper-register', name: '4-Step KYC Verification', icon: '🚀', group: 'Dropshipper' },
 
   // 2. Reseller & Fintech 
   { path: '/reseller-home', name: 'Reseller Home', icon: '🛍️', group: 'Reseller & Shop' },
@@ -587,6 +593,8 @@ function AppRoutes() {
       '/products': '/supplier-products',
       'dropshipper-login': '/dropshipper-login',
       'dropshipper-dashboard': '/dropshipper-dashboard',
+      'dropshipper-profile': '/dropshipper-profile',
+      'view-profile': '/dropshipper-profile',
       dropshipperDashboard: '/dropshipper-dashboard',
       dropshipperLogin: '/dropshipper-login',
       'supplier-products': '/supplier-products',
@@ -610,6 +618,8 @@ function AppRoutes() {
       reseller_returns: '/reseller-returns',
       resellerReturns: '/reseller-returns',
       'dropshipper-settlements': '/dropshipper-settlements',
+      'dropshipper-settlement': '/dropshipper-settlements',
+      'dropshipper-settlement-tracking': '/dropshipper-settlements',
       'dropshipper-tracking': '/dropshipper-settlements',
       'settlement-tracking': '/dropshipper-settlements',
       'dropshipper-rot-manager': '/dropshipper-rot-manager',
@@ -791,10 +801,62 @@ function AppRoutes() {
         <Route path="/my-wallet" element={<MyWalletFintechStyle />} />
         <Route path="/reseller-wallet" element={<ResellerWallet />} />
         <Route path="/reseller-returns" element={<ResellerReturnsLedger onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-settlements" element={<DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-tracking" element={<DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-rot-manager" element={<DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-register" element={<DropshipperKYCRegister onNavigate={handleNav} onBack={handleBack} />} />
+        <Route 
+          path="/dropshipper-settlements" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-settlement" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-settlement-tracking" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-tracking" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-rot-manager" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="ROT Liability & Policy Manager">
+              <DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/rot-manager" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="ROT Liability & Policy Manager">
+              <DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-register" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperKYCRegister onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/withdraw-earnings" element={<WithdrawEarnings />} />
         <Route path="/payout-settings" element={<PayoutSettings />} />
         <Route path="/payout-confirmation" element={<PayoutConfirmation />} />
@@ -811,7 +873,70 @@ function AppRoutes() {
         <Route path="/affiliate/login" element={<AffiliateLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
-        <Route path="/dropshipper-dashboard" element={<DropshipperDashboard />} />
+        <Route 
+          path="/dropshipper-dashboard" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-profile" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperProfileView />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-margin-config" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperMarginConfig />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-support" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperSupportDesk />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-orders-push" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Push Customer Orders to Supplier">
+              <DropshipperOrdersPush />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-orders" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Push Customer Orders to Supplier">
+              <DropshipperOrdersPush />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-push-orders" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Push Customer Orders to Supplier">
+              <DropshipperOrdersPush />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-integrations" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Store Integrations & Webhook Channels">
+              <DropshipperIntegrations />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
 
@@ -1225,6 +1350,8 @@ function AppRoutes() {
         <Route path="/gilded-pulse" element={<GildedPulse onNavigate={handleNav} />} />
         <Route path="/social-commerce-luxe" element={<SocialCommerceLuxe onNavigate={handleNav} />} />
         <Route path="/signal-core" element={<SignalCore onNavigate={handleNav} />} />
+        {/* Dynamic Published CMS & Policies Route (Method 2) */}
+        <Route path="/p/:slug" element={<PolicyPage />} />
       </Routes>
     </div>
   );

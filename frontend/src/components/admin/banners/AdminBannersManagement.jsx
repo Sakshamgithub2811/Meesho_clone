@@ -4,14 +4,16 @@ import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
-import { Plus, RefreshCw, Search, X } from 'lucide-react';
+import { Plus, Image } from 'lucide-react';
+import { Button } from '../../ui/button';
 
 import BannerStatsGrid from './BannerStatsGrid';
+import FilterBar from '../../common/FilterBar';
 import BannersVisualGrid from './BannersVisualGrid';
 import BannerFormModal from './BannerFormModal';
 
 const STATUS_TABS = [
-  { id: 'ALL', label: 'All Banners' },
+  { id: 'ALL', label: 'All Banners 🎨' },
   { id: 'ACTIVE', label: 'Live on Carousel ⚡' },
   { id: 'INACTIVE', label: 'Hidden / Drafts 👁️' },
 ];
@@ -59,7 +61,7 @@ export default function AdminBannersManagement() {
     } catch (error) {
       console.error('Error fetching banners:', error);
       toast.error(
-        error.response?.data?.message || 'Error connecting to banner server'
+        error.response?.data?.message || 'Failed to load banners from server'
       );
     } finally {
       setLoading(false);
@@ -71,17 +73,17 @@ export default function AdminBannersManagement() {
     fetchBanners();
   }, []);
 
-  const handleOpenCreate = () => {
+  const handleOpenCreateModal = () => {
     setEditingBanner(null);
     setModalOpen(true);
   };
 
-  const handleOpenEdit = (banner) => {
+  const handleOpenEditModal = (banner) => {
     setEditingBanner(banner);
     setModalOpen(true);
   };
 
-  const handleFormSubmit = async (formData) => {
+  const handleModalSubmit = async (formData) => {
     try {
       setIsSubmitting(true);
       const token = await getAuthToken();
@@ -92,8 +94,9 @@ export default function AdminBannersManagement() {
           formData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+
         if (res.data.success) {
-          toast.success(res.data.message || 'Banner updated successfully');
+          toast.success('Banner updated successfully!');
           setModalOpen(false);
           fetchBanners(true);
         } else {
@@ -105,8 +108,9 @@ export default function AdminBannersManagement() {
           formData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+
         if (res.data.success) {
-          toast.success(res.data.message || 'Banner created successfully');
+          toast.success('Banner added to carousel!');
           setModalOpen(false);
           fetchBanners(true);
         } else {
@@ -114,28 +118,31 @@ export default function AdminBannersManagement() {
         }
       }
     } catch (error) {
-      console.error('Save banner error:', error);
-      toast.error(error.response?.data?.message || 'Failed to save banner');
+      console.error('Error saving banner:', error);
+      toast.error(
+        error.response?.data?.message || 'Error occurred while saving banner'
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = async (banner) => {
+  const handleToggleStatus = async (bannerOrId) => {
+    const id = typeof bannerOrId === 'object' ? bannerOrId?.id : bannerOrId;
+    if (!id) return;
     try {
       const token = await getAuthToken();
       const res = await axios.patch(
-        `${API_BASE}/admin-banners/${banner.id}/toggle`,
+`${API_BASE}/admin-banners/${id}/toggle`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
       if (res.data.success) {
         toast.success(res.data.message || 'Status updated');
-        setBanners((prev) =>
-          prev.map((b) =>
-            b.id === banner.id ? { ...b, isActive: res.data.isActive } : b
-          )
-        );
+        fetchBanners(true);
+      } else {
+        toast.error(res.data.message || 'Failed to toggle status');
       }
     } catch (error) {
       console.error('Toggle status error:', error);
@@ -165,89 +172,79 @@ export default function AdminBannersManagement() {
     }
   };
 
+  const filteredBanners = banners.filter((b) => {
+    const matchesSearch =
+      b.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.subtitle && b.subtitle.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (b.targetUrl && b.targetUrl.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'ACTIVE' && b.isActive) ||
+      (statusFilter === 'INACTIVE' && !b.isActive);
+
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="space-y-6">
+      {/* 1. Standard Metrics Grid using StatCard */}
       <BannerStatsGrid stats={stats} />
 
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all whitespace-nowrap ${
-                statusFilter === tab.id
-                  ? 'bg-purple-600 text-white shadow-sm'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="relative w-full sm:w-80">
-            <Search
-              size={16}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder="Search headline or redirect link..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-500 focus:outline-none transition-all"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X size={14} />
-              </button>
-            )}
+      {/* 2. Top Action Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-pink-50 text-[#b7004d] rounded-xl">
+            <Image size={22} />
           </div>
-
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-            <button
-              onClick={() => fetchBanners(true)}
-              disabled={refreshing}
-              className="px-3.5 py-2 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all flex items-center gap-1.5"
-            >
-              <RefreshCw
-                size={14}
-                className={refreshing ? 'animate-spin' : ''}
-              />
-              <span>Refresh</span>
-            </button>
-
-            <button
-              onClick={handleOpenCreate}
-              className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 active:scale-95 rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-1.5"
-            >
-              <Plus size={16} />
-              <span>Add Banner</span>
-            </button>
+          <div>
+            <h2 className="text-base font-bold text-gray-900">
+              Carousel &amp; Promotional Sliders
+            </h2>
+            <p className="text-xs text-gray-500">
+              Manage live homepage banners, click track campaigns, and seasonal promotions.
+            </p>
           </div>
         </div>
+
+        <Button
+          onClick={handleOpenCreateModal}
+          className="bg-[#b7004d] hover:bg-[#96003f] text-white rounded-xl text-xs font-bold gap-2 cursor-pointer self-start sm:self-auto"
+        >
+          <Plus size={16} />
+          <span>Add New Banner</span>
+        </Button>
       </div>
 
-      <BannersVisualGrid
-        banners={banners}
-        loading={loading}
-        onEdit={handleOpenEdit}
-        onDelete={handleDeleteBanner}
-        onToggleStatus={handleToggleStatus}
-        statusFilter={statusFilter}
-        searchTerm={searchTerm}
+      {/* 3. Reusable FilterBar */}
+      <FilterBar
+        searchPlaceholder="Search headline, subtitle or redirect link..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        tabs={STATUS_TABS}
+        activeTab={statusFilter}
+        onTabChange={setStatusFilter}
+        totalCount={filteredBanners.length}
+        countLabel="Banners"
+        onRefresh={() => fetchBanners(true)}
+        refreshing={refreshing}
       />
 
+      {/* 4. Visual Card Grid */}
+      <BannersVisualGrid
+        banners={filteredBanners}
+        loading={loading}
+        onEdit={handleOpenEditModal}
+        onDelete={handleDeleteBanner}
+        onToggleStatus={handleToggleStatus}
+      />
+
+      {/* 5. Modal */}
       <BannerFormModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSubmit={handleFormSubmit}
-        initialData={editingBanner}
+        onSubmit={handleModalSubmit}
+        editingBanner={editingBanner}
         isSubmitting={isSubmitting}
       />
     </div>

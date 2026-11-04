@@ -28,29 +28,33 @@ export default function KycReviewModal({
 
   if (!reviewApp) return null;
 
-  const docs = reviewApp.documents || {};
-  const panData = docs.pan || (docs.panNumber ? {
-    number: docs.panNumber,
-    nameOnDoc: docs.accountHolderName || docs.fullName || reviewApp.user?.fullName || '—',
-    status: 'Submitted',
-    image: docs.panPreview || docs.panPreviewUrl || null
-  } : null);
 
-  const aadhaarData = docs.aadhaar || (docs.aadhaarNumber ? {
-    number: docs.aadhaarNumber,
-    nameOnDoc: docs.accountHolderName || docs.fullName || reviewApp.user?.fullName || '—',
-    status: 'Submitted',
-    image: docs.aadhaarPreview || docs.aadhaarPreviewUrl || null
-  } : null);
+  const docs = reviewApp?.documents || {};
 
-  const bankData = docs.bank || (docs.accountNumber ? {
-    bankName: docs.bankName || 'Not Provided',
-    accountNumber: docs.accountNumber,
-    ifsc: docs.ifscCode || docs.ifsc || 'Not Provided',
-    holderName: docs.accountHolderName || docs.fullName || reviewApp.user?.fullName || '—',
-    upiId: docs.upiId,
-    image: docs.chequePreview || docs.chequePreviewUrl || null
-  } : null);
+  // 1. Normalized PAN
+  const panNumber = docs.pan?.number || docs.panNumber;
+  const panName = docs.pan?.nameOnDoc || docs.accountHolderName || docs.fullName || reviewApp?.user?.fullName || '—';
+  const panImage = docs.pan?.image || docs.panDocUrl || docs.panImage;
+  const panFileName = docs.pan?.fileName || docs.panDocName;
+  const panStatus = docs.pan?.status || (panNumber ? 'Submitted' : null);
+
+  // 2. Normalized Aadhaar
+  const aadhaarNumber = docs.aadhaar?.number || docs.aadhaarNumber;
+  const aadhaarName = docs.aadhaar?.nameOnDoc || docs.fullName || reviewApp?.user?.fullName || '—';
+  const aadhaarImage = docs.aadhaar?.image || docs.aadhaarDocUrl || docs.aadhaarImage;
+  const aadhaarFileName = docs.aadhaar?.fileName || docs.aadhaarDocName;
+  const aadhaarStatus = docs.aadhaar?.status || (aadhaarNumber ? 'Submitted' : null);
+
+  // 3. Normalized Bank
+  const bankName = docs.bank?.bankName || docs.bankName;
+  const accountNumber = docs.bank?.accountNumber || docs.accountNumber;
+  const ifsc = docs.bank?.ifsc || docs.ifscCode;
+  const beneficiaryName = docs.bank?.holderName || docs.accountHolderName || docs.fullName || reviewApp?.user?.fullName || '—';
+  const upiId = docs.bank?.upiId || docs.upiId;
+
+  // 4. Normalized Address & Demographics
+  const hasAddressInfo = Boolean(docs.address || docs.city || docs.state || docs.pincode || docs.dob);
+
 
   return (
     <>
@@ -186,56 +190,82 @@ export default function KycReviewModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                   {/* PAN Card */}
-                  {panData && (
+
+                  {panNumber ? (
+
                     <div className="bg-gray-50/70 p-3 rounded-lg border border-gray-100 space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-gray-700">PAN Card</span>
                         <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
-                          {panData.status || 'Submitted'}
+
+                          {panStatus || 'Submitted'}
                         </span>
                       </div>
                       <p className="text-xs font-mono font-bold text-gray-900 tracking-wider">
-                        {panData.number || '—'}
+                        {panNumber}
                       </p>
                       <p className="text-[11px] text-gray-500">
-                        Name on Card: <span className="font-medium text-gray-700">{panData.nameOnDoc || '—'}</span>
+                        Name on Card: <span className="font-medium text-gray-700">{panName}</span>
                       </p>
-                      {panData.image && (
+                      {panImage ? (
                         <button
                           type="button"
-                          onClick={() => setPreviewImage(panData.image)}
+                          onClick={() => setPreviewImage(panImage)}
+
                           className="text-[11px] text-[#b7004d] hover:underline flex items-center gap-1 font-semibold pt-1 cursor-pointer"
                         >
                           <Eye className="w-3 h-3" /> View PAN Photo
                         </button>
+                      ) : panFileName ? (
+                        <p className="text-[10px] text-gray-500 font-mono">File: {panFileName}</p>
+                      ) : (
+                        <span className="inline-block text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-medium">
+                          Number Provided (No Photo Uploaded)
+                        </span>
                       )}
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Aadhaar Card */}
-                  {aadhaarData && (
+
+                  {aadhaarNumber ? (
+
                     <div className="bg-gray-50/70 p-3 rounded-lg border border-gray-100 space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-gray-700">Aadhaar Card</span>
                         <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
-                          {aadhaarData.status || 'Submitted'}
+
+                          {aadhaarStatus || 'Submitted'}
                         </span>
                       </div>
                       <p className="text-xs font-mono font-bold text-gray-900 tracking-wider">
-                        {aadhaarData.number || '—'}
+                        {aadhaarNumber}
                       </p>
                       <p className="text-[11px] text-gray-500">
-                        Name on Card: <span className="font-medium text-gray-700">{aadhaarData.nameOnDoc || '—'}</span>
+                        Name on Card: <span className="font-medium text-gray-700">{aadhaarName}</span>
                       </p>
-                      {aadhaarData.image && (
+                      {aadhaarImage ? (
                         <button
                           type="button"
-                          onClick={() => setPreviewImage(aadhaarData.image)}
+                          onClick={() => setPreviewImage(aadhaarImage)}
+
                           className="text-[11px] text-[#b7004d] hover:underline flex items-center gap-1 font-semibold pt-1 cursor-pointer"
                         >
                           <Eye className="w-3 h-3" /> View Aadhaar Photo
                         </button>
+                      ) : aadhaarFileName ? (
+                        <p className="text-[10px] text-gray-500 font-mono">File: {aadhaarFileName}</p>
+                      ) : (
+                        <span className="inline-block text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-medium">
+                          Number Provided (No Photo Uploaded)
+                        </span>
                       )}
+                    </div>
+                  ) : null}
+
+                  {!panNumber && !aadhaarNumber && (
+                    <div className="col-span-2 text-center py-3 text-xs text-gray-400 italic">
+                      No PAN or Aadhaar document details provided with this application.
                     </div>
                   )}
 
@@ -243,7 +273,9 @@ export default function KycReviewModal({
               </div>
 
               {/* 3. Bank Account & Settlement Details */}
-              {bankData && (
+
+              {(bankName || accountNumber) && (
+
                 <div className="border border-gray-100 rounded-xl p-4 space-y-2 bg-white">
                   <h5 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
                     <Building className="w-3.5 h-3.5 text-emerald-600" />
@@ -252,24 +284,62 @@ export default function KycReviewModal({
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
                       <span className="text-gray-400 block">Bank Name</span>
-                      <span className="font-semibold text-gray-800">{bankData.bankName || '—'}</span>
+
+                      <span className="font-semibold text-gray-800">{bankName || '—'}</span>
                     </div>
                     <div>
                       <span className="text-gray-400 block">Account Number</span>
-                      <span className="font-mono font-semibold text-gray-800">{bankData.accountNumber || '—'}</span>
+                      <span className="font-mono font-semibold text-gray-800">{accountNumber || '—'}</span>
                     </div>
                     <div>
                       <span className="text-gray-400 block">IFSC Code</span>
-                      <span className="font-mono font-semibold text-gray-800">{bankData.ifsc || '—'}</span>
+                      <span className="font-mono font-semibold text-gray-800">{ifsc || '—'}</span>
                     </div>
                     <div>
                       <span className="text-gray-400 block">Beneficiary Name</span>
-                      <span className="font-semibold text-gray-800">{bankData.holderName || '—'}</span>
+                      <span className="font-semibold text-gray-800">{beneficiaryName || '—'}</span>
                     </div>
-                    {bankData.upiId && (
+                    {upiId && (
                       <div className="col-span-2">
                         <span className="text-gray-400 block">UPI ID</span>
-                        <span className="font-mono font-semibold text-indigo-700">{bankData.upiId}</span>
+                        <span className="font-mono font-semibold text-indigo-700">{upiId}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Address & Demographics */}
+              {hasAddressInfo && (
+                <div className="border border-gray-100 rounded-xl p-4 space-y-2 bg-white">
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                    Applicant Address &amp; Demographics
+                  </h5>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {docs.dob && (
+                      <div>
+                        <span className="text-gray-400 block">Date of Birth</span>
+                        <span className="font-medium text-gray-800">{docs.dob}</span>
+                      </div>
+                    )}
+                    {(docs.city || docs.state) && (
+                      <div>
+                        <span className="text-gray-400 block">City &amp; State</span>
+                        <span className="font-semibold text-gray-800">{docs.city ? `${docs.city}, ` : ''}{docs.state || '—'}</span>
+                      </div>
+                    )}
+                    {docs.pincode && (
+                      <div>
+                        <span className="text-gray-400 block">PIN Code</span>
+                        <span className="font-mono font-semibold text-gray-800">{docs.pincode}</span>
+                      </div>
+                    )}
+                    {docs.address && (
+                      <div className="col-span-2">
+                        <span className="text-gray-400 block">Full Residential Address</span>
+                        <span className="text-gray-700">{docs.address}</span>
+
                       </div>
                     )}
                   </div>

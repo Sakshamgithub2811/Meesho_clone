@@ -129,7 +129,7 @@ export default function BannersVisualGrid({
             {/* Bottom Actions Bar */}
             <div className="flex items-center justify-between pt-2 border-t border-gray-100">
               <button
-                onClick={() => onToggleStatus(banner)}
+                onClick={() => onToggleStatus(banner.id)}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold"
               >
                 {banner.isActive !== false ? (

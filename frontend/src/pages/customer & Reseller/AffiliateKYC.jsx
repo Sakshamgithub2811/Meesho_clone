@@ -263,6 +263,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
 
     setIsSubmitting(true);
 
+
     const storedCust = getStoredCustomer();
     const storedAff = getStoredAffiliate();
     const currentUser = storedCust?.user || storedAff?.user;
@@ -323,6 +324,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
         upiId: formData.upiId || '',
         chequeDocName: formData.chequeDocName || '',
         documents: submission
+
       };
 
       const res = await fetch(`${API_V1_BASE}/admin-kyc/submit-affiliate`, {

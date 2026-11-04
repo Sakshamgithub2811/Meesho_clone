@@ -6,6 +6,8 @@ import { fileURLToPath } from 'url';
 
 dotenv.config();
 
+// Auto-reloaded for soft-delete & Prisma client sync
+
 // Initialize services
 import './src/config/firebaseAdmin.js';
 import './src/config/redisClient.js';
@@ -15,6 +17,7 @@ import prisma from './src/config/prisma.js';
 
 // Import Routes and Middlewares
 import apiRouter from './src/routes/api.routes.js';
+import seoRoutes from './src/routes/seo.routes.js';
 import { notFoundHandler, errorHandler } from './src/middlewares/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -38,6 +41,8 @@ app.use(cors({
     return callback(null, true);
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -60,6 +65,9 @@ app.get('/api', (req, res) => {
     },
   });
 });
+
+// Root SEO routes (sitemap.xml and robots.txt must be at root domain)
+app.use('/', seoRoutes);
 
 // Mount Main API Router (Supports both /api and /api/v1 prefix)
 app.use('/api', apiRouter);

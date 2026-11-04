@@ -180,13 +180,30 @@ export const updateKycStatus = async (req, res) => {
       }
     });
 
-    // If APPROVED, update applicant's role in Profile table
+    // If APPROVED, update applicant's role in Profile table and sync verified KYC fields
     if (normalizedStatus === 'APPROVED' && existing.userId) {
       if (existing.type?.toLowerCase() === 'dropshipper') {
+        const docs = typeof existing.documents === 'object' && existing.documents !== null ? existing.documents : {};
+        const bank = docs.bank || {};
+        const panObj = docs.pan || {};
+        const taxObj = docs.tax || {};
+
         await prisma.profile.update({
           where: { id: existing.userId },
-          data: { role: 'DROPSHIPPER' }
-        }).catch(() => {});
+          data: {
+            role: 'DROPSHIPPER',
+            storeName: docs.brandName || docs.businessName || undefined,
+            pan: (panObj.number || docs.panNumber || '').toUpperCase() || undefined,
+            gstin: (taxObj.gstin || docs.gstin || '').toUpperCase() || undefined,
+            bankDetails: {
+              bankName: bank.bankName || docs.bankName || '',
+              accountNumber: bank.accountNumber || docs.accountNumber || '',
+              ifscCode: (bank.ifsc || docs.ifscCode || '').toUpperCase(),
+              upiId: bank.upiId || docs.upiId || '',
+              accountHolder: bank.holderName || docs.accountHolder || ''
+            }
+          }
+        }).catch((err) => console.warn('Dropshipper profile auto-update warning:', err.message));
       } else if (existing.type?.toLowerCase() === 'supplier') {
         const docs = existing.documents || {};
         await prisma.profile.update({

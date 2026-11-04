@@ -39,3 +39,31 @@ export const uploadProductMedia = multer({
     files: 8, // Up to 8 images
   },
 });
+
+// Dedicated Avatar Storage (uploads/avatars/)
+const avatarUploadDir = path.resolve('uploads/avatars');
+if (!fs.existsSync(avatarUploadDir)) {
+  fs.mkdirSync(avatarUploadDir, { recursive: true });
+}
+
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, avatarUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const sanitizedName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, '_');
+    const uniqueSuffix = `avatar-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${uniqueSuffix}${ext}`);
+  },
+});
+
+export const uploadAvatar = multer({
+  storage: avatarStorage,
+  fileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB max for profile avatars
+    files: 1,
+  },
+});
+
