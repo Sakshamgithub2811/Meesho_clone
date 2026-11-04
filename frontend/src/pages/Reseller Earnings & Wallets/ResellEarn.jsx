@@ -22,7 +22,7 @@ export default function ResellAndEarn({ onBack }) {
   const [activeNav, setActiveNav] = useState('orders');
 
   useEffect(() => {
-    getProducts().then((prods) => {
+    getProducts({ all: true }).then((prods) => {
       if (prods && prods.length > 0) {
         const queryParams = new URLSearchParams(location.search);
         const prodId = queryParams.get('id');

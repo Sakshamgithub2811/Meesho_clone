@@ -20,7 +20,7 @@ export default function CuratedSpotlight({ onNavigate = () => {}, onBack }) {
     async function loadCatalog() {
       try {
         setLoading(true);
-        const data = await getProducts();
+        const data = await getProducts({ all: true });
         if (isMounted && data && Array.isArray(data)) {
           setProducts(data);
         }

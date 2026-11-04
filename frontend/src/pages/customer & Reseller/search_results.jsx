@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 import {
@@ -26,6 +26,11 @@ export default function SearchResults({ onNavigate, onBack }) {
   const [dbCategories, setDbCategories] = useState([]);
   const [wishlist, setWishlist] = useState(new Set());
   const [cartCount, setCartCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const sentinelRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -52,13 +57,22 @@ export default function SearchResults({ onNavigate, onBack }) {
     let isMounted = true;
     async function loadData() {
       setLoading(true);
+      setLoadingMore(false);
+      setPage(1);
+      setHasMore(true);
+      pageRef.current = 1;
+      hasMoreRef.current = true;
+
       try {
-        const [cats, prods, cart, wish] = await Promise.all([
+        const [cats, prodsRes, cart, wish] = await Promise.all([
           getCategories(),
           getProducts({
             search: searchQuery,
             category: activeFilter === 'All' ? '' : activeFilter,
-            sort: selectedSort
+            sort: selectedSort,
+            page: 1,
+            limit: 24,
+            withMeta: true
           }),
           getCart(),
           getWishlist()
@@ -66,7 +80,12 @@ export default function SearchResults({ onNavigate, onBack }) {
 
         if (isMounted) {
           if (cats) setDbCategories(cats);
-          if (prods) setProducts(prods);
+          if (prodsRes) {
+            setProducts(prodsRes.products || []);
+            setTotalProducts(prodsRes.total || 0);
+            setHasMore(prodsRes.hasMore);
+            hasMoreRef.current = prodsRes.hasMore;
+          }
           if (cart?.totalItems !== undefined) setCartCount(cart.totalItems);
           if (wish) setWishlist(new Set(wish.map(w => w.productId)));
         }
@@ -80,6 +99,81 @@ export default function SearchResults({ onNavigate, onBack }) {
     loadData();
     return () => { isMounted = false; };
   }, [searchQuery, activeFilter, selectedSort]);
+
+  // Infinite Scroll Handler
+  const loadMoreProducts = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+
+    const nextPage = pageRef.current + 1;
+    try {
+      const res = await getProducts({
+        search: searchQuery,
+        category: activeFilter === 'All' ? '' : activeFilter,
+        sort: selectedSort,
+        page: nextPage,
+        limit: 24,
+        withMeta: true
+      });
+
+      if (res.products && res.products.length > 0) {
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newItems = res.products.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newItems];
+        });
+        setPage(nextPage);
+        pageRef.current = nextPage;
+        setHasMore(res.hasMore);
+        hasMoreRef.current = res.hasMore;
+        setTotalProducts(res.total || 0);
+      } else {
+        setHasMore(false);
+        hasMoreRef.current = false;
+      }
+    } catch (err) {
+      console.error('Error loading more search products:', err);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [searchQuery, activeFilter, selectedSort]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    let observer = null;
+
+    if (sentinel) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) {
+            loadMoreProducts();
+          }
+        },
+        { rootMargin: '450px' }
+      );
+      observer.observe(sentinel);
+    }
+
+    const handleWindowScroll = () => {
+      if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+      const scrollY = window.scrollY || window.pageYOffset;
+      const visibleHeight = window.innerHeight;
+      const totalHeight = document.documentElement.scrollHeight;
+
+      if (totalHeight - (scrollY + visibleHeight) < 600) {
+        loadMoreProducts();
+      }
+    };
+
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('scroll', handleWindowScroll);
+    };
+  }, [loadMoreProducts]);
 
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
@@ -246,6 +340,7 @@ export default function SearchResults({ onNavigate, onBack }) {
             </button>
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {products.map((p) => {
               const isFav = wishlist.has(p.id);
@@ -315,6 +410,17 @@ export default function SearchResults({ onNavigate, onBack }) {
               );
             })}
           </div>
+
+          {/* Sentinel and loader */}
+          <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[80px]">
+            {loadingMore && (
+              <div className="flex items-center gap-3 px-6 py-3 bg-white rounded-full shadow-lg border border-slate-200 text-xs font-extrabold text-[#b90041] animate-pulse">
+                <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
+                <span>Loading more results...</span>
+              </div>
+            )}
+          </div>
+          </>
         )}
       </main>
 

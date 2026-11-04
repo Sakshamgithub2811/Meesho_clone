@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -44,6 +45,7 @@ import {
   Heart,
   Sparkles,
   Wallet,
+  Lock,
   MapPin,
   ShieldCheck,
   Truck,
@@ -123,6 +125,17 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   // Real Authentication & User State (No dummy fallback credentials)
   const reduxUser = useSelector((state) => state.user?.currentUser);
   const [customerUser, setCustomerUser] = useState(() => getStoredCustomer()?.user || reduxUser || null);
+
+  // Affiliate Program Session - strictly verify that stored KYC belongs to the current logged-in customer
+  const [affiliateApp, setAffiliateApp] = useState(() => {
+    const stored = getAffiliateApp();
+    const curId = customerUser?.id || customerUser?.uid;
+    if (stored && curId && stored.userId && stored.userId !== curId) {
+      clearAffiliateApp();
+      return null;
+    }
+    return stored;
+  });
 
   const customerName =
     customerUser?.fullName ||
@@ -229,16 +242,75 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   const [realOrders, setRealOrders] = useState([]);
   const [wishlistItems, setWishlistItems] = useState([]);
   const [savedAddresses, setSavedAddresses] = useState([]);
-  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mshoppy_cached_catalog_prods');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [
+      {
+        id: "a85e2adb-7321-4a9c-8574-4e5d453df5c8",
+        title: "Kids Boys Printed Cotton Dungaree & T-Shirt Set",
+        price: 349,
+        images: ["https://images.meesho.com/images/products/49652451/g6dig_512.jpg"],
+        category: "Kids"
+      },
+      {
+        id: "f3a41127-6513-4b53-b9d0-3c8ee2a4de67",
+        title: "Traditional Embroidered Ladies Jutti",
+        price: 168,
+        images: ["https://images.meesho.com/images/products/71006705/2ic9e_512.jpg"],
+        category: "Footwear"
+      },
+      {
+        id: "70f726c9-1f7b-456d-93dc-c71b5cf4fc63",
+        title: "Flower musicrice",
+        price: 73,
+        images: ["https://images.meesho.com/images/products/59419044/fnkqp_512.jpg"],
+        category: "Women"
+      },
+      {
+        id: "65c95da5-cc91-4ace-b7a8-271cb8792b0c",
+        title: "Premium combinal_price",
+        price: 136,
+        images: ["https://images.meesho.com/images/products/70586121/mxn5l_512.jpg"],
+        category: "Beauty"
+      },
+      {
+        id: "0462cf00-e898-4188-bee0-f4842e331ed5",
+        title: "nail paint",
+        price: 60,
+        images: ["https://images.meesho.com/images/products/70867248/kuynn_512.jpg"],
+        category: "Beauty"
+      },
+      {
+        id: "bd5a3bce-fe63-403f-9a7f-91204344afa9",
+        title: "Oral Tongue Cleanr",
+        price: 119,
+        images: ["https://images.meesho.com/images/products/61022657/ewsm4_512.jpg"],
+        category: "Personal Care"
+      }
+    ];
+  });
 
-  // Real Unified Wallet Balance (Combines Affiliate Margin Credits & Customer Refunds)
+  // Real Unified Wallet Balance (Strictly customer refunds if not approved, or verified affiliate commission if approved)
   const [walletBalance, setWalletBalance] = useState(() => {
     try {
-      const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
-      const affComm = Number(affStats.totalCommission || 0);
+      const storedAff = getAffiliateApp();
+      const isApproved = storedAff && ['Approved', 'APPROVED', 'Active', 'ACTIVE'].includes(storedAff.status);
+      if (isApproved) {
+        const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
+        const affComm = Number(affStats.totalCommission || 0);
+        const saved = localStorage.getItem('mshoppy_customer_wallet');
+        const custBal = saved !== null ? Number(saved) : 0;
+        return Math.max(affComm, custBal);
+      }
+      // If KYC is not approved, affiliate commissions are locked; balance is strictly real customer refunds (default 0)
       const saved = localStorage.getItem('mshoppy_customer_wallet');
-      const custBal = saved !== null ? Number(saved) : 0;
-      return Math.max(affComm, custBal);
+      return saved !== null ? Number(saved) : 0;
     } catch (e) {
       return 0;
     }
@@ -294,17 +366,6 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     isDefault: false
   });
   const [savingAddress, setSavingAddress] = useState(false);
-
-  // Affiliate Program Session - strictly verify that stored KYC belongs to the current logged-in customer
-  const [affiliateApp, setAffiliateApp] = useState(() => {
-    const stored = getAffiliateApp();
-    const curId = customerUser?.id || customerUser?.uid;
-    if (stored && curId && stored.userId && stored.userId !== curId) {
-      clearAffiliateApp();
-      return null;
-    }
-    return stored;
-  });
 
   // Real Linked Bank (Derived from submitted affiliate/KYC data, NOT dummy ICICI Bank)
   const withdrawBank = affiliateApp?.bankName
@@ -364,6 +425,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   // Custom Product Margin State for Verified Affiliate
   const [selectedMarginProductId, setSelectedMarginProductId] = useState('');
   const [customMarginVal, setCustomMarginVal] = useState(150);
+
+  // Partner Hub Catalog Filter, Search & Pagination States
+  const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
+  const [partnerSelectedCat, setPartnerSelectedCat] = useState('All');
+  const [partnerVisibleCount, setPartnerVisibleCount] = useState(12);
 
   // Dynamic Custom Margins Per Product for Resell & Earn Tab
   const [resaleMargins, setResaleMargins] = useState({});
@@ -427,7 +493,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         }
 
         const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-        const res = await fetch(`http://localhost:5000/api/v1/admin-kyc/affiliate-status${queryString}`);
+        const res = await fetch(`${API_V1_BASE}/admin-kyc/affiliate-status${queryString}`);
         if (!res.ok) return;
 
         const data = await res.json();
@@ -481,7 +547,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         getOrders(),
         getWishlist(),
         getAddresses(),
-        getProducts({ limit: 12 }),
+        getProducts({ limit: 48 }),
         getWalletDetails()
       ]);
 
@@ -494,14 +560,27 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       if (addrRes.status === 'fulfilled' && Array.isArray(addrRes.value)) {
         setSavedAddresses(addrRes.value);
       }
-      if (prodsRes.status === 'fulfilled' && Array.isArray(prodsRes.value)) {
+      if (prodsRes.status === 'fulfilled' && Array.isArray(prodsRes.value) && prodsRes.value.length > 0) {
         setCatalogProducts(prodsRes.value);
+        try {
+          localStorage.setItem('mshoppy_cached_catalog_prods', JSON.stringify(prodsRes.value.slice(0, 24)));
+        } catch (e) {}
       }
       if (walletRes.status === 'fulfilled' && walletRes.value) {
         const dbBal = Number(walletRes.value.balance ?? 0);
-        const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
-        const affComm = Number(affStats.totalCommission || 0);
-        const effectiveBal = Math.max(dbBal, affComm);
+        let effectiveBal = dbBal;
+        let affStats = {};
+        try {
+          affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
+        } catch (e) {}
+
+        if (isResellerApproved) {
+          const affComm = Number(affStats.totalCommission || 0);
+          effectiveBal = Math.max(dbBal, affComm);
+        } else {
+          // If KYC is not approved, affiliate margin is not unlocked
+          effectiveBal = dbBal;
+        }
         setWalletBalance(effectiveBal);
         localStorage.setItem('mshoppy_customer_wallet', effectiveBal.toString());
 
@@ -516,7 +595,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
           amount: dt.amount
         }));
 
-        const affOrders = Array.isArray(affStats.recentOrders) ? affStats.recentOrders : [];
+        const affOrders = (isResellerApproved && Array.isArray(affStats.recentOrders)) ? affStats.recentOrders : [];
         const affTxns = affOrders.map((ord) => ({
           title: ord.title || `Affiliate Profit Margin (Order #${(ord.id || '').slice(-6) || 'Ref'})`,
           ref: `TXN-AFF-${(ord.id || '').slice(-6) || Math.floor(100000 + Math.random() * 900000)}`,
@@ -694,6 +773,29 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     navigator.clipboard?.writeText(link);
     toast.success(`Custom product link copied with ₹${margin || customMarginVal || 0} margin!`);
   };
+
+  // Filtered Catalog for Partner Hub
+  const partnerCatalogFiltered = useMemo(() => {
+    if (!catalogProducts || !Array.isArray(catalogProducts)) return [];
+    let list = catalogProducts;
+    if (partnerSelectedCat && partnerSelectedCat !== 'All') {
+      const catLower = partnerSelectedCat.toLowerCase();
+      list = list.filter((p) => {
+        const pCat = typeof p.category === 'object' ? p.category?.name : String(p.category || '');
+        const pCatSlug = typeof p.categorySlug === 'string' ? p.categorySlug : '';
+        return pCat.toLowerCase().includes(catLower) || pCatSlug.toLowerCase().includes(catLower);
+      });
+    }
+    if (partnerSearchQuery && partnerSearchQuery.trim()) {
+      const q = String(partnerSearchQuery).toLowerCase().trim();
+      list = list.filter((p) => {
+        const title = String(p.title || p.name || '').toLowerCase();
+        const brand = String(p.brand || '').toLowerCase();
+        return title.includes(q) || brand.includes(q);
+      });
+    }
+    return list;
+  }, [catalogProducts, partnerSelectedCat, partnerSearchQuery]);
 
   // Submit Affiliate KYC Application
   const handleAffiliateKycSubmit = (e) => {
@@ -877,10 +979,19 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     affiliateApp && (affiliateApp.status === 'Rejected' || affiliateApp.status === 'REJECTED')
   );
 
-  // Automatically redirect away from resale/wallet tabs if not approved
+  // Automatically redirect away from resale/wallet tabs if not approved & purge unapproved stats
   useEffect(() => {
-    if (!isResellerApproved && (activeTab === 'resale' || activeTab === 'wallet')) {
-      setActiveTab('affiliate');
+    if (!isResellerApproved) {
+      if (activeTab === 'resale' || activeTab === 'wallet') {
+        setActiveTab('affiliate');
+      }
+      try {
+        const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
+        if (affStats.totalCommission && affStats.totalCommission > 0) {
+          affStats.totalCommission = 0;
+          localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(affStats));
+        }
+      } catch (_) {}
     }
   }, [isResellerApproved, activeTab]);
   // Dynamic Badges & Titles for Sidebar
@@ -1025,10 +1136,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   // Filtered orders for My Orders tab
   const filteredOrders = useMemo(() => {
     return realOrders.filter((ord) => {
+      const q = String(orderSearchQuery || '').toLowerCase();
       const matchesSearch =
-        !orderSearchQuery ||
-        ord.id?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-        ord.items?.some((it) => it.product?.title?.toLowerCase().includes(orderSearchQuery.toLowerCase()));
+        !q ||
+        String(ord.id || '').toLowerCase().includes(q) ||
+        ord.items?.some((it) => String(it.product?.title || '').toLowerCase().includes(q));
 
       if (!matchesSearch) return false;
       const st = (ord.orderStatus || ord.status || 'ORDERED').toUpperCase();
@@ -1066,7 +1178,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       pageSubtitle={headerInfo.subtitle}
       onLogout={handleLogout}
     >
-      <div className="space-y-6 pb-16">
+      <div className="space-y-4 sm:space-y-6 pb-16 min-w-0 w-full max-w-full overflow-hidden">
 
         {/* =========================================================================
             TAB 1: DASHBOARD OVERVIEW
@@ -1121,7 +1233,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
               </div>
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-pink-50/40 border border-slate-200/80 px-4 py-3 rounded-2xl">
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>
                   <p className="text-xs sm:text-sm font-medium text-slate-700">
                     Customer Account: View your personal orders, delivery tracking, or apply for Reseller Partner status to start earning.
@@ -1327,13 +1439,13 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 </div>
               </div>
 
-              {/* Card 4: Real Wallet Balance */}
-              <div className="bg-gradient-to-br from-[#b7004d] via-[#cf125d] to-[#e62973] text-white p-5 rounded-3xl shadow-lg shadow-pink-600/20 flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                    <Wallet className="w-5 h-5 text-white" />
-                  </div>
-                  {isResellerApproved ? (
+              {/* Card 4: Real Wallet Balance OR KYC Required Status */}
+              {isResellerApproved ? (
+                <div className="bg-gradient-to-br from-[#b7004d] via-[#cf125d] to-[#e62973] text-white p-5 rounded-3xl shadow-lg shadow-pink-600/20 flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                      <Wallet className="w-5 h-5 text-white" />
+                    </div>
                     <button
                       type="button"
                       onClick={() => setShowWithdrawModal(true)}
@@ -1341,21 +1453,61 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                     >
                       Withdraw
                     </button>
-                  ) : (
-                    <span className="text-[10px] font-bold bg-white/20 text-white px-2.5 py-1 rounded-full backdrop-blur-sm">
-                      Refunds &amp; Credits
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-pink-100">Reseller Wallet Balance</p>
+                    <h3 className="text-2xl sm:text-3xl font-black mt-1">
+                      ₹{walletBalance.toLocaleString('en-IN')}
+                    </h3>
+                  </div>
+                </div>
+              ) : isKycUnderReview ? (
+                <div
+                  onClick={() => setActiveTab('affiliate')}
+                  className="bg-amber-50/70 dark:bg-slate-900 border border-amber-200 dark:border-amber-800/40 p-5 rounded-3xl shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200">
+                      Under Review ⏳
                     </span>
-                  )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-amber-800">Partner Wallet</p>
+                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1">
+                      KYC In Progress
+                    </h3>
+                    <p className="text-[11px] text-amber-600 font-medium mt-0.5">
+                      Payouts unlock once verified
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-pink-100">
-                    {isResellerApproved ? 'Reseller Wallet Balance' : 'Customer Wallet Balance'}
-                  </p>
-                  <h3 className="text-2xl sm:text-3xl font-black mt-1">
-                    ₹{walletBalance.toLocaleString('en-IN')}
-                  </h3>
+              ) : (
+                <div
+                  onClick={() => setActiveTab('affiliate')}
+                  className="bg-white dark:bg-slate-900 p-5 rounded-3xl shadow-xs border border-slate-200/80 dark:border-slate-800 hover:border-pink-300 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-pink-50 text-[#b7004d] flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold text-[#b7004d] bg-pink-50 px-2.5 py-1 rounded-full border border-pink-100">
+                      KYC Required 🔒
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Partner Wallet</p>
+                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1">
+                      Wallet Locked
+                    </h3>
+                    <p className="text-[11px] text-[#b7004d] font-bold mt-0.5 group-hover:underline flex items-center gap-1">
+                      Complete KYC to Activate →
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </section>
 
             {/* Real Orders & Performance/KYC Row */}
@@ -1704,7 +1856,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
             {/* If Approved */}
             {affiliateApp?.status === 'Approved' || affiliateApp?.status === 'APPROVED' ? (
               <div className="space-y-6">
-                <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-[#005a2b] p-6 sm:p-8 rounded-3xl text-white shadow-xl border border-emerald-500/30 space-y-4">
+                <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-[#005a2b] p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl text-white shadow-xl border border-emerald-500/30 space-y-4 min-w-0 w-full max-w-full overflow-hidden">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -1734,7 +1886,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       Your Unique Referral Link:
                     </label>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <div className="flex-1 bg-black/40 border border-white/20 rounded-2xl px-4 py-2.5 font-mono text-xs sm:text-sm text-emerald-300 truncate flex items-center">
+                      <div className="flex-1 min-w-0 bg-black/40 border border-white/20 rounded-2xl px-3.5 py-2.5 font-mono text-xs sm:text-sm text-emerald-300 truncate flex items-center overflow-hidden">
                         {`${window.location.origin}/?ref=${affiliateApp.applicationId || 'aff_verified'}`}
                       </div>
                       <button
@@ -1771,7 +1923,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 {/* =========================================================================
                     REAL-TIME PRODUCT CUSTOM MARGIN MANAGER (APNI MARZI KA PROFIT)
                 ========================================================================= */}
-                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
+                <div className="bg-white p-3.5 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs space-y-5 min-w-0 w-full max-w-full overflow-hidden">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
                     <div>
                       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-50 text-[#b7004d] text-xs font-bold mb-1">
@@ -1789,7 +1941,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
 
                   {/* Active Product Margin Customizer Box */}
                   {activeMarginProd && (
-                    <div className="p-5 sm:p-6 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-5">
+                    <div className="p-3 sm:p-5 md:p-6 bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200/70 space-y-4 min-w-0 w-full max-w-full overflow-hidden">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                         <img
                           src={activeMarginProd.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'}
@@ -1803,12 +1955,12 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                           <p className="text-xs text-slate-500">
                             Supplier Base Price: <strong className="text-slate-800">₹{basePrice}</strong>
                           </p>
-                          <div className="flex flex-wrap items-center gap-2 pt-1">
-                            <span className="text-xs font-semibold text-slate-600">Switch Product:</span>
+                          <div className="flex flex-col xs:flex-row xs:items-center gap-1.5 pt-1 w-full max-w-full min-w-0">
+                            <span className="text-xs font-semibold text-slate-600 shrink-0">Switch Product:</span>
                             <select
                               value={activeMarginProd.id}
                               onChange={(e) => setSelectedMarginProductId(e.target.value)}
-                              className="text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#b7004d]"
+                              className="text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#b7004d] w-full sm:w-auto max-w-full truncate"
                             >
                               {catalogProducts.map((p) => (
                                 <option key={p.id} value={p.id}>
@@ -1855,11 +2007,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                             className="w-full accent-emerald-600 cursor-pointer"
                           />
                           <div className="flex justify-between text-[10px] font-bold text-slate-400">
-                            <span>₹0 (Supplier Price)</span>
-                            <span>+₹250</span>
+                            <span>₹0 (Base)</span>
+                            <span className="hidden xs:inline">+₹250</span>
                             <span>+₹500</span>
-                            <span>+₹750</span>
-                            <span>+₹1,000 (Max Margin)</span>
+                            <span className="hidden xs:inline">+₹750</span>
+                            <span>+₹1,000 (Max)</span>
                           </div>
                         </div>
 
@@ -1899,14 +2051,26 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                        <div className="flex flex-col sm:flex-row gap-2 pt-2 w-full">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const refCode = affiliateApp?.applicationId || 'aff_verified';
+                              window.open(`/product?id=${activeMarginProd.id}&ref=${refCode}&margin=${customMarginVal}`, '_blank');
+                            }}
+                            className="py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 shrink-0"
+                            title="Open live product page with your custom margin applied"
+                          >
+                            <ExternalLink className="w-4 h-4 text-emerald-400" />
+                            <span>View Live Product (₹{affiliateSellingPrice})</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleShareCustomMarginWhatsApp()}
                             className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-transform hover:scale-102 active:scale-95"
                           >
                             <Share2 className="w-4 h-4" />
-                            <span>Share on WhatsApp with ₹{customMarginVal} Margin</span>
+                            <span>Share on WhatsApp</span>
                           </button>
                           <button
                             type="button"
@@ -1914,66 +2078,186 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                             className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-colors"
                           >
                             <Copy className="w-4 h-4" />
-                            <span>Copy Custom Margin Link</span>
+                            <span>Copy Link</span>
                           </button>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Catalog Grid with 1-Click Margin Customizer */}
+                  {/* Catalog Explorer with 1-Click Margin Customizer & Full Catalog Access */}
                   {catalogProducts && catalogProducts.length > 0 && (
-                    <div className="space-y-3 pt-2">
-                      <h4 className="font-bold text-sm text-slate-900">
-                        Popular Catalog Products (Pick &amp; Set Margin):
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {catalogProducts.slice(0, 6).map((prod) => (
-                          <div
-                            key={prod.id}
-                            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-3 hover:border-slate-300 transition-colors"
+                    <div className="space-y-4 pt-3 border-t border-slate-200/80">
+                      {/* Section Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <h4 className="font-bold text-sm sm:text-base text-slate-900 flex items-center gap-2">
+                            <span>Catalog Products</span>
+                            <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2.5 py-0.5 rounded-full">
+                              Dynamic Live Catalog
+                            </span>
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Set your custom profit margin on any product and share directly to WhatsApp
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => navigate('/reseller-home')}
+                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shrink-0"
+                          title="Open complete reseller catalog"
+                        >
+                          <span>Explore Full Reseller Catalog</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Search Bar & Category Filter Toolbar */}
+                      <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-3">
+                        <div className="relative">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Search catalog by title, brand or category (e.g. Saree, Kurti, Shoes, Watch)..."
+                            value={partnerSearchQuery}
+                            onChange={(e) => setPartnerSearchQuery(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-10 py-2 text-xs text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-[#b7004d]"
+                          />
+                          {partnerSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setPartnerSearchQuery('')}
+                              className="w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Category Filter Pills */}
+                        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                          {['All', 'Women', 'Men', 'Kids', 'Beauty', 'Footwear', 'Home', 'Gadgets', 'Jewelry'].map((cat) => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setPartnerSelectedCat(cat)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                                partnerSelectedCat === cat
+                                  ? 'bg-slate-900 text-white shadow-xs'
+                                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Filtered Products Grid */}
+                      {partnerCatalogFiltered.length === 0 ? (
+                        <div className="bg-white p-8 rounded-2xl border border-slate-200/80 text-center text-slate-400 space-y-2">
+                          <p className="text-xs font-semibold">No products found matching "{partnerSearchQuery || partnerSelectedCat}".</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPartnerSearchQuery('');
+                              setPartnerSelectedCat('All');
+                            }}
+                            className="text-xs font-bold text-[#b7004d] hover:underline cursor-pointer"
                           >
-                            <div className="flex gap-3">
-                              <img
-                                src={prod.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'}
-                                alt={prod.title}
-                                className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-100"
-                              />
-                              <div className="space-y-0.5">
-                                <h5 className="font-bold text-xs text-slate-900 line-clamp-2">
-                                  {prod.title}
-                                </h5>
-                                <p className="text-[11px] text-slate-500">
-                                  Base: <strong className="text-slate-800">₹{prod.price}</strong>
-                                </p>
-                                <p className="text-[11px] text-emerald-600 font-bold">
-                                  Suggested: ₹{prod.price + 150} (+₹150 Margin)
-                                </p>
+                            Clear search filters
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {partnerCatalogFiltered.slice(0, partnerVisibleCount).map((prod) => (
+                            <div
+                              key={prod.id}
+                              className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-3 hover:border-slate-300 transition-colors"
+                            >
+                              <div className="flex gap-3">
+                                <img
+                                  src={prod.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'}
+                                  alt={prod.title}
+                                  className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-100"
+                                />
+                                <div className="space-y-0.5 min-w-0 flex-1">
+                                  <h5 className="font-bold text-xs text-slate-900 line-clamp-2" title={prod.title}>
+                                    {prod.title}
+                                  </h5>
+                                  <p className="text-[11px] text-slate-500">
+                                    Base: <strong className="text-slate-800">₹{prod.price}</strong>
+                                  </p>
+                                  <p className="text-[11px] text-emerald-600 font-bold">
+                                    Suggested: ₹{prod.price + 150} (+₹150 Margin)
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedMarginProductId(prod.id);
+                                    window.scrollTo({ top: 400, behavior: 'smooth' });
+                                  }}
+                                  className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg cursor-pointer transition-colors text-center"
+                                  title="Load into custom margin slider"
+                                >
+                                  Customize
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const refCode = affiliateApp?.applicationId || 'aff_verified';
+                                    window.open(`/product?id=${prod.id}&ref=${refCode}&margin=150`, '_blank');
+                                  }}
+                                  className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1"
+                                  title="View live product with +₹150 margin"
+                                >
+                                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                                  <span>View (₹{prod.price + 150})</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareCustomMarginWhatsApp(prod, 150)}
+                                  className="py-1.5 px-3 bg-[#25D366] hover:bg-[#20ba59] text-white text-[11px] font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1 shrink-0"
+                                  title="Quick share with ₹150 margin"
+                                >
+                                  <Share2 className="w-3 h-3" />
+                                  <span>Share</span>
+                                </button>
                               </div>
                             </div>
-                            <div className="flex gap-2 pt-2 border-t border-slate-100">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedMarginProductId(prod.id);
-                                  window.scrollTo({ top: 400, behavior: 'smooth' });
-                                }}
-                                className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg cursor-pointer transition-colors text-center"
-                              >
-                                Customize Margin
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleShareCustomMarginWhatsApp(prod, 150)}
-                                className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1"
-                                title="Quick share with ₹150 margin"
-                              >
-                                <Share2 className="w-3 h-3" />
-                                <span>Share</span>
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Professional Dynamic Pagination & Explore Footer */}
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 mt-2 border-t border-slate-100">
+                        <p className="text-xs text-slate-500 font-medium">
+                          Showing <strong className="text-slate-800">{Math.min(partnerVisibleCount, partnerCatalogFiltered.length)}</strong> of <strong className="text-slate-800">{partnerCatalogFiltered.length}</strong> products
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                          {partnerCatalogFiltered.length > partnerVisibleCount && (
+                            <button
+                              type="button"
+                              onClick={() => setPartnerVisibleCount(prev => prev + 12)}
+                              className="py-2 px-4 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+                            >
+                              Load More Products ↓
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => navigate('/reseller-home')}
+                            className="py-2 px-4 bg-[#FF3F6C] hover:bg-[#e0355f] active:scale-95 text-white font-semibold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <span>Browse All Products</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1982,7 +2266,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
             ) : affiliateApp?.status === 'Under Review' || affiliateApp?.status === 'REVIEW' || affiliateApp?.status === 'PENDING' || affiliateApp?.status === 'Pending' ? (
               /* If Under Review */
               <div className="space-y-6">
-                <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-[#78350f] p-6 sm:p-8 rounded-3xl text-white shadow-xl border border-amber-500/30 space-y-5">
+                <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-[#78350f] p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl text-white shadow-xl border border-amber-500/30 space-y-4 min-w-0 w-full max-w-full overflow-hidden">
                   <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30">
                     <Clock className="w-4 h-4 animate-spin text-amber-300" />
                     <span>Application Under Compliance Review • #{affiliateApp.applicationId || affiliateApp.id}</span>
@@ -2050,7 +2334,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
               /* If Not Registered: Clean Pitch + Calculator + Fast Application */
               <div className="space-y-6">
 
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#170a26] via-[#320a2b] to-[#6e0034] p-6 sm:p-10 text-white shadow-2xl border border-pink-500/30">
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#170a26] via-[#320a2b] to-[#6e0034] p-4 sm:p-8 md:p-10 text-white shadow-2xl border border-pink-500/30 min-w-0 w-full max-w-full">
                   <div className="relative z-10 space-y-4 max-w-2xl">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[10px] font-black uppercase text-pink-200 border border-white/20">
                       <Sparkles className="w-3.5 h-3.5 text-pink-300" />
@@ -2167,7 +2451,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 </div>
 
                 {/* Official Multi-Step Affiliate KYC Onboarding Banner */}
-                <div className="bg-gradient-to-br from-white via-pink-50/20 to-slate-50 p-6 sm:p-8 rounded-3xl border border-pink-200/80 shadow-xs space-y-6">
+                <div className="bg-gradient-to-br from-white via-pink-50/20 to-slate-50 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border border-pink-200/80 shadow-xs space-y-5 min-w-0 w-full max-w-full overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
                     <div className="flex items-start sm:items-center gap-3.5">
                       <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#b7004d] to-[#ff4b7d] text-white flex items-center justify-center shadow-md shadow-pink-500/20 shrink-0">
@@ -2420,15 +2704,17 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                             <span>Track Order</span>
                           </button>
 
-                          {/* Invoice Button */}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedInvoiceOrder(order)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer transition-colors"
-                          >
-                            <FileText className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Invoice</span>
-                          </button>
+                          {/* Invoice Button - Only available once order is delivered */}
+                          {isDelivered && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedInvoiceOrder(order)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer transition-colors"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Invoice</span>
+                            </button>
+                          )}
 
                           {/* Real Cancel Button */}
                           {isCancellable && (
@@ -2895,41 +3181,43 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         ========================================================================= */}
         {activeTab === 'profile' && (
           <div className="space-y-6">
-            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6 max-w-3xl">
-              <div className="flex items-center justify-between pb-6 border-b border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#b7004d] to-[#ff6584] text-white flex items-center justify-center font-black text-2xl shadow-md">
+            <div className="bg-white p-4 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6 max-w-3xl overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                  <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-[#b7004d] to-[#ff6584] text-white flex items-center justify-center font-black text-xl sm:text-2xl shadow-md shrink-0">
                     {customerName.charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900">{customerName}</h3>
-                    <p className="text-xs text-slate-500">{customerEmail || 'No email registered'}</p>
-                    <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-pink-50 text-[#b7004d] text-[10px] font-black uppercase border border-pink-100">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 truncate">{customerName}</h3>
+                    <p className="text-xs text-slate-500 truncate">{customerEmail || 'No email registered'}</p>
+                    <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-pink-50 text-[#b7004d] text-[10px] font-black uppercase border border-pink-100 truncate max-w-full">
                       {isResellerApproved ? 'Verified Partner & Reseller' : isKycUnderReview ? 'Partner (KYC Under Review)' : 'Verified Customer'}
                     </span>
                   </div>
                 </div>
 
                 {/* Edit Profile Toggle Button */}
-                {!isEditingProfile ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingProfile(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-pink-50 hover:bg-pink-100 text-[#b7004d] border border-pink-200/80 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-[#b7004d]" />
-                    <span>Edit Profile</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Cancel</span>
-                  </button>
-                )}
+                <div className="self-end sm:self-auto shrink-0">
+                  {!isEditingProfile ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingProfile(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-pink-50 hover:bg-pink-100 text-[#b7004d] border border-pink-200/80 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-[#b7004d]" />
+                      <span>Edit Profile</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Cancel</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               <form onSubmit={handleSaveProfile} className="space-y-4">

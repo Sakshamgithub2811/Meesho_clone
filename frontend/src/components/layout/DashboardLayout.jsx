@@ -104,26 +104,26 @@ export default function DashboardLayout({
       </Sidebar>
 
       {/* 2. RIGHT MAIN CONTENT */}             
-      <div className="flex-1 flex flex-col min-w-0 h-screen max-h-screen overflow-hidden bg-gray-50/50">
+      <div className="flex-1 flex flex-col min-w-0 w-full max-w-full h-screen max-h-screen overflow-hidden bg-gray-50/50">
         
         {/* TOP HEADER */}
-        <header className="h-16 border-b bg-white flex items-center justify-between px-6 sticky top-0 shrink-0 z-30 shadow-xs">
-          <div className="flex items-center gap-4">
-            <SidebarTrigger className="text-[#b7004d]" />
-            <div>
-              <h2 className="text-lg font-bold text-gray-800 leading-tight">
+        <header className="min-h-16 border-b bg-white flex items-center justify-between px-3 sm:px-6 py-2.5 sticky top-0 shrink-0 z-30 shadow-xs gap-2 sm:gap-3 w-full max-w-full min-w-0">
+          <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
+            <SidebarTrigger className="text-[#b7004d] shrink-0" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm sm:text-lg font-bold text-gray-800 leading-tight truncate">
                 {pageTitle || (safeMenuItems.find(m => m.id === activeTab)?.label || 
                      safeMenuItems.flatMap(m => m.children || []).find(c => c.id === activeTab)?.label || 
                      'Dashboard')
                 }
               </h2>
               {pageSubtitle && (
-                <p className="text-xs text-gray-500">{pageSubtitle}</p>
+                <p className="text-[11px] sm:text-xs text-gray-500 truncate line-clamp-1 sm:line-clamp-none">{pageSubtitle}</p>
               )}
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-3 outline-none cursor-pointer p-1 rounded-full hover:bg-gray-100">
                 <div className="text-right hidden sm:block">
@@ -152,7 +152,7 @@ export default function DashboardLayout({
             </DropdownMenu>
           </div>
         </header>
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-2.5 sm:p-4 md:p-6 overflow-y-auto overflow-x-hidden min-w-0 w-full max-w-full">
           {children}
         </main>
       </div>

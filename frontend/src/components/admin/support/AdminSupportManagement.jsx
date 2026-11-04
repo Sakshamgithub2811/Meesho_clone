@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
@@ -64,7 +65,7 @@ export default function AdminSupportManagement() {
       if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
       const res = await axios.get(
-        `http://localhost:5000/api/v1/admin-support?${params.toString()}`,
+        `${API_V1_BASE}/admin-support?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -119,7 +120,7 @@ export default function AdminSupportManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const res = await axios.patch(
-        `http://localhost:5000/api/v1/admin-support/${ticketId}/status`,
+        `${API_V1_BASE}/admin-support/${ticketId}/status`,
         { status: newStatus, adminNotes },
         {
           headers: {

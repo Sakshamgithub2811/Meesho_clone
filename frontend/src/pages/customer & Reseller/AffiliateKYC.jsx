@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
@@ -285,6 +286,8 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
       email: formData.email || currentUser?.email || '',
       panNumber: (formData.panNumber || '').toUpperCase(),
       ifscCode: (formData.ifscCode || '').toUpperCase(),
+      panPreview: panPreviewUrl || null,
+      aadhaarPreview: aadhaarPreviewUrl || null,
       status: 'Under Review',
       kycStatus: 'PENDING',
       submittedAt: new Date().toLocaleString('en-IN', {
@@ -309,8 +312,10 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
         followers: formData.followersCount || formData.followers || '0',
         panNumber: (formData.panNumber || '').toUpperCase(),
         panDocName: formData.panDocName || '',
+        panPreview: panPreviewUrl || null,
         aadhaarNumber: formData.aadhaarNumber || '',
         aadhaarDocName: formData.aadhaarDocName || '',
+        aadhaarPreview: aadhaarPreviewUrl || null,
         bankName: formData.bankName || '',
         accountHolderName: (formData.accountHolderName || formData.fullName || currentUser?.fullName || '').toUpperCase(),
         accountNumber: formData.accountNumber || '',
@@ -320,7 +325,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
         documents: submission
       };
 
-      const res = await fetch('http://localhost:5000/api/v1/admin-kyc/submit-affiliate', {
+      const res = await fetch(`${API_V1_BASE}/admin-kyc/submit-affiliate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

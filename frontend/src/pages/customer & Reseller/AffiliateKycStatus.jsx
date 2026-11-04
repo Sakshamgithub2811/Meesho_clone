@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
@@ -80,7 +81,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
         if (app?.applicationId) queryParams.push(`applicationId=${encodeURIComponent(app.applicationId)}`);
 
         const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-        const res = await fetch(`http://localhost:5000/api/v1/admin-kyc/affiliate-status${queryString}`);
+        const res = await fetch(`${API_V1_BASE}/admin-kyc/affiliate-status${queryString}`);
         if (!res.ok) return;
 
         const data = await res.json();
@@ -351,14 +352,14 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
 
               <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0">
                 <button
-                  onClick={() => handleNav('/affiliate-panel')}
+                  onClick={() => handleNav('/user-dashboard1?tab=affiliate')}
                   className="px-6 py-3 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-lg">dashboard</span>
                   <span>Open Affiliate Hub</span>
                 </button>
                 <button
-                  onClick={() => handleNav('/explorer')}
+                  onClick={() => handleNav('/reseller-home')}
                   className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm border border-white/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-lg">share</span>

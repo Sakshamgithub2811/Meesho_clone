@@ -1137,6 +1137,12 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                   Available Coupons &amp; Offers ({availableCoupons.length})
                 </h4>
 
+                {availableCoupons.length === 0 && (
+                  <div className="py-8 text-center text-xs text-slate-400 font-medium bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                    No active coupons available right now.
+                  </div>
+                )}
+
                 {availableCoupons.map((c) => {
                   const isEligible = basePrice >= c.minOrder;
                   const isAlreadyApplied = appliedCoupon?.code === c.code;

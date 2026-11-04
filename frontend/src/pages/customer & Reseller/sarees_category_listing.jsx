@@ -36,7 +36,7 @@ export default function SareesCategoryListing({ onNavigate, onBack }) {
       setLoading(true);
       try {
         const [prods, cart, wish] = await Promise.all([
-          getProducts({ category: 'women-ethnic' }),
+          getProducts({ category: 'women-ethnic', all: true }),
           getCart(),
           getWishlist()
         ]);

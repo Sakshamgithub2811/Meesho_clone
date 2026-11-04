@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
-import { getProducts } from '../../services/ecommerceService';
+import { getProducts, getProductById } from '../../services/ecommerceService';
+import { getAffiliateApp } from '../../services/affiliateSessionStore';
 
 export default function ShareEarnConfig() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function ShareEarnConfig() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const [activeProduct, setActiveProduct] = useState({
+    id: null,
     title: 'Banarasi Silk Saree with Gold Zari Work',
     price: 500,
     image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
@@ -21,20 +23,40 @@ export default function ShareEarnConfig() {
   const [toastMsg, setToastMsg] = useState('');
 
   useEffect(() => {
-    getProducts().then((prods) => {
-      if (prods && prods.length > 0) {
-        const queryParams = new URLSearchParams(location.search);
-        const prodId = queryParams.get('id');
-        const matched = prodId ? prods.find(p => p.id === prodId) : prods[0];
-        const selected = matched || prods[0];
-        
-        setActiveProduct({
-          title: selected.title || 'Banarasi Silk Saree with Gold Zari Work',
-          price: selected.price || 500,
-          image: selected.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
-        });
+    const queryParams = new URLSearchParams(location.search);
+    const prodId = queryParams.get('id');
+
+    async function loadProduct() {
+      try {
+        if (prodId) {
+          const direct = await getProductById(prodId);
+          if (direct) {
+            setActiveProduct({
+              id: direct.id,
+              title: direct.title || 'Special Collection Item',
+              price: direct.price || 500,
+              image: direct.images?.[0] || direct.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
+            });
+            return;
+          }
+        }
+        const prods = await getProducts({ all: true });
+        if (prods && prods.length > 0) {
+          const matched = prodId ? prods.find(p => String(p.id) === String(prodId)) : prods[0];
+          const selected = matched || prods[0];
+          setActiveProduct({
+            id: selected.id,
+            title: selected.title || 'Special Collection Item',
+            price: selected.price || 500,
+            image: selected.images?.[0] || selected.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load product for share config:', err);
       }
-    }).catch(() => {});
+    }
+
+    loadProduct();
   }, [location.search]);
 
   const numericMargin = Number(profitMargin) || 0;
@@ -56,19 +78,37 @@ export default function ShareEarnConfig() {
     setProfitMargin(margin);
   };
 
+  const getReferralCode = () => {
+    try {
+      const affApp = getAffiliateApp();
+      if (affApp?.referralCode) return affApp.referralCode;
+      const cust = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+      if (cust?.fullName) return (cust.fullName.slice(0, 5).toUpperCase() + 'AFF');
+    } catch (e) {}
+    return 'SHRUTIPAFF';
+  };
+
+  const referralCode = getReferralCode();
+  const orderLink = `${window.location.origin}/product?id=${activeProduct.id || ''}&ref=${referralCode}&margin=${numericMargin}`;
+
   const handleShareToWhatsApp = () => {
     let msg = '';
     if (shareMode === 'images') {
-      msg = `📸 ${activeProduct.title}!\nPure quality fabric with exquisite craftsmanship. Reply to see details or book!`;
+      msg = `📸 *${activeProduct.title}*!\n\n✨ Premium Quality Fabric with Exquisite Craftsmanship.\n👉 Direct Online Booking: ${orderLink}\n\nReply directly with your address to book!`;
     } else if (shareMode === 'desc') {
-      msg = `✨ *${activeProduct.title}*\n\nVerified authentic marketplace quality.\nDirect supplier dispatch with Free Shipping! DM to order.`;
+      msg = `✨ *${activeProduct.title}*\n\nVerified authentic marketplace quality.\nDirect supplier dispatch with Free Shipping!\n\n👉 Order Online: ${orderLink}\n\nOr DM directly with your size & address.`;
     } else {
-      msg = `✨ *${activeProduct.title}*\n\nSpecial Price: ₹${finalPrice} only (Free Shipping!)\n\n✅ 7-Day Easy Replacement Guarantee\n✅ Cash on Delivery Available\n\nReply directly with your address to place order!`;
+      msg = `✨ *${activeProduct.title}*\n\nSpecial Price: ₹${finalPrice} only (Free Shipping!)\n\n✅ 7-Day Easy Replacement Guarantee\n✅ Cash on Delivery Available\n\n👉 Order directly online:\n${orderLink}\n\nOr reply with your address & size to book!`;
     }
 
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
     showToast('Catalog shared to WhatsApp successfully!');
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(orderLink);
+    showToast('Referral link with margin copied to clipboard!');
   };
 
   return (
@@ -249,8 +289,8 @@ export default function ShareEarnConfig() {
           </div>
         </section>
 
-        {/* 6. Action Button: Share to WhatsApp */}
-        <div className="pt-2">
+        {/* 6. Action Button: Share to WhatsApp & Copy Link */}
+        <div className="pt-2 space-y-2.5">
           <button
             type="button"
             onClick={handleShareToWhatsApp}
@@ -261,6 +301,25 @@ export default function ShareEarnConfig() {
             </svg>
             <span className="truncate">Share to WhatsApp with My Margin</span>
           </button>
+
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="flex-1 py-3 px-4 rounded-xl border border-primary/20 bg-white hover:bg-primary/5 text-primary font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+            >
+              <span className="material-symbols-outlined text-base">content_copy</span>
+              <span>Copy Referral Link</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(`/product?id=${activeProduct.id || ''}`)}
+              className="flex-1 py-3 px-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+            >
+              <span className="material-symbols-outlined text-base">visibility</span>
+              <span>View Product Page</span>
+            </button>
+          </div>
         </div>
       </main>
 

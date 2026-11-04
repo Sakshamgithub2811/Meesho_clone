@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
@@ -56,7 +57,7 @@ export default function AdminSellersManagement() {
       if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
       const res = await axios.get(
-        `http://localhost:5000/api/v1/admin-sellers?${params.toString()}`,
+        `${API_V1_BASE}/admin-sellers?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -112,7 +113,7 @@ export default function AdminSellersManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const res = await axios.get(
-        `http://localhost:5000/api/v1/admin-sellers/${seller.id}`,
+        `${API_V1_BASE}/admin-sellers/${seller.id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -135,7 +136,7 @@ export default function AdminSellersManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const res = await axios.patch(
-        `http://localhost:5000/api/v1/admin-sellers/${sellerId}/tier`,
+        `${API_V1_BASE}/admin-sellers/${sellerId}/tier`,
         { tier: newTier },
         {
           headers: {

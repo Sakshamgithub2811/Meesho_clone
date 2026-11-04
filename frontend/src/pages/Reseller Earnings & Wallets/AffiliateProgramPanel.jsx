@@ -203,7 +203,7 @@ export default function AffiliateProgramPanel() {
         </div>
       </header>
 
-      <main className="pt-24 pb-12 px-6 max-w-5xl mx-auto space-y-8">
+      <main className="pt-20 sm:pt-24 pb-16 px-3.5 sm:px-6 max-w-5xl mx-auto space-y-6 sm:space-y-8 min-w-0 w-full max-w-full overflow-hidden">
         {/* Hero: Affiliate Title & Referral Code */}
         <section className="space-y-6">
           <div className="space-y-1">
@@ -217,7 +217,7 @@ export default function AffiliateProgramPanel() {
 
           {/* Referral Card */}
           <div className="p-[1px] rounded-2xl bg-gradient-to-r from-[#f6b630] via-[#d384f2] to-[#ff6c95] group shadow-2xl">
-            <div className="bg-[#1c1724] rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-5">
+            <div className="bg-[#1c1724] rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-5 min-w-0 w-full max-w-full">
               <div className="space-y-1 text-center sm:text-left">
                 <p className="text-gray-400 text-xs font-bold tracking-wider uppercase">
                   Your Unique Referral Partner Code
@@ -242,7 +242,7 @@ export default function AffiliateProgramPanel() {
         {/* Performance Stats Bento Grid */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {/* Commission Card */}
-          <div className="md:col-span-2 bg-[#1c1724]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden group">
+          <div className="md:col-span-2 bg-[#1c1724]/80 backdrop-blur-xl border border-white/10 rounded-2xl sm:rounded-3xl p-5 sm:p-8 relative overflow-hidden group min-w-0 w-full max-w-full">
             <div className="absolute -right-10 -top-10 w-44 h-44 bg-[#b7004d]/20 rounded-full blur-3xl pointer-events-none"></div>
             <div className="relative z-10 flex flex-col h-full justify-between gap-6">
               <div className="flex justify-between items-start">
@@ -262,7 +262,7 @@ export default function AffiliateProgramPanel() {
                 </button>
               </div>
               <div>
-                <p className="text-4xl md:text-6xl font-black text-white tracking-tight">
+                <p className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight break-all sm:break-normal">
                   ₹{(affiliateStats?.totalCommission || 0).toLocaleString('en-IN')}
                 </p>
                 <p className="text-emerald-400 text-xs font-bold mt-2 flex items-center gap-1">

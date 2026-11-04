@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
@@ -61,7 +62,7 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
       if (selectedType !== 'all') params.append('type', selectedType);
       if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-      const res = await axios.get(`http://localhost:5000/api/v1/admin-kyc?${params.toString()}`, {
+      const res = await axios.get(`${API_V1_BASE}/admin-kyc?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -119,7 +120,7 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
       setActionLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
       const res = await axios.put(
-        `http://localhost:5000/api/v1/admin-kyc/${reviewApp.id}/status`,
+        `${API_V1_BASE}/admin-kyc/${reviewApp.id}/status`,
         {
           status: newStatus,
           adminNotes: adminNote.trim()

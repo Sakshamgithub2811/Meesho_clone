@@ -36,7 +36,7 @@ export default function WomenWesternCategory({ onNavigate, onBack }) {
       setLoading(true);
       try {
         const [prods, cart, wish] = await Promise.all([
-          getProducts({ category: 'women-western' }),
+          getProducts({ category: 'women-western', all: true }),
           getCart(),
           getWishlist()
         ]);

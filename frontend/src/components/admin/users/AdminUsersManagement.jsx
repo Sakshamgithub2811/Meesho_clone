@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
@@ -50,7 +51,7 @@ export default function AdminUsersManagement() {
       if (searchTerm.trim()) params.search = searchTerm.trim();
       if (selectedRole !== 'ALL') params.role = selectedRole;
 
-      const response = await axios.get('http://localhost:5000/api/v1/admin-users', {
+      const response = await axios.get(`${API_V1_BASE}/admin-users`, {
         headers: { Authorization: `Bearer ${token}` },
         params
       });
@@ -105,7 +106,7 @@ export default function AdminUsersManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const response = await axios.put(
-        `http://localhost:5000/api/v1/admin-users/${editingUser.id}`,
+        `${API_V1_BASE}/admin-users/${editingUser.id}`,
         formData,
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -144,7 +145,7 @@ export default function AdminUsersManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const response = await axios.put(
-        `http://localhost:5000/api/v1/admin-users/${userId}/role`,
+        `${API_V1_BASE}/admin-users/${userId}/role`,
         { role: newRole },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -179,7 +180,7 @@ export default function AdminUsersManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const response = await axios.put(
-        `http://localhost:5000/api/v1/admin-users/${userId}/status`,
+        `${API_V1_BASE}/admin-users/${userId}/status`,
         { isActive: newStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -217,7 +218,7 @@ export default function AdminUsersManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const response = await axios.delete(
-        `http://localhost:5000/api/v1/admin-users/${userId}`,
+        `${API_V1_BASE}/admin-users/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

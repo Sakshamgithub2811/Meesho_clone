@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
@@ -46,8 +47,8 @@ export default function AdminLogin() {
       const firebaseUser = userCredential.user;
 
       const endpoint = isRegistering
-        ? 'http://localhost:5000/api/v1/admin-auth/register'
-        : 'http://localhost:5000/api/v1/admin-auth/login';
+        ? `${API_V1_BASE}/admin-auth/register`
+        : `${API_V1_BASE}/admin-auth/login`;
 
       const response = await axios.post(endpoint, {
         firebaseUid: firebaseUser.uid,

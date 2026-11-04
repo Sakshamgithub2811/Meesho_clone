@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../utils/firebase';
@@ -43,7 +44,7 @@ export default function UserProfile({
       try {
         setLoading(true);
         const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
-        const res = await axios.get('http://localhost:5000/api/v1/admin-profile/me', {
+        const res = await axios.get(`${API_V1_BASE}/admin-profile/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.data.success && res.data.profile) {
@@ -70,7 +71,7 @@ export default function UserProfile({
       setLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
       const response = await axios.put(
-        'http://localhost:5000/api/v1/admin-profile/update',
+        `${API_V1_BASE}/admin-profile/update`,
         {
           fullName: formData.name,
           phone: formData.phone,
@@ -112,7 +113,7 @@ export default function UserProfile({
       setLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
       const response = await axios.post(
-        'http://localhost:5000/api/v1/admin-profile/change-password',
+        `${API_V1_BASE}/admin-profile/change-password`,
         { newPassword: passData.new },
         { headers: { Authorization: `Bearer ${token}` } }
       );

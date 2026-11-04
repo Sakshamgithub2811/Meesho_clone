@@ -5,6 +5,7 @@ import {
   affiliateLogin, 
   googleAuth,
   getCurrentUser, 
+  getAffiliateStats,
   updateResellerProfile, 
   updateCustomerProfile, 
   updateAffiliateProfile 
@@ -20,10 +21,19 @@ router.post('/user-login', customerLogin); // Alias for user login
 router.post('/affiliate-login', affiliateLogin);
 router.post('/google', googleAuth);
 
-// Protected endpoints (Requires valid Firebase Token)
+// Live Database Stats (Supports token or query/header)
+router.get('/affiliate-stats', (req, res, next) => {
+  // If authorization header present, verify it; otherwise proceed to controller
+  if (req.headers.authorization) {
+    return verifyAuth(req, res, next);
+  }
+  next();
+}, getAffiliateStats);
+
+// Protected endpoints (Requires valid Firebase/JWT Token)
 router.get('/me', verifyAuth, getCurrentUser);
 router.put('/reseller-profile', verifyAuth, authorizeRole('RESELLER', 'ADMIN'), updateResellerProfile);
 router.put('/customer-profile', verifyAuth, authorizeRole('CUSTOMER', 'ADMIN'), updateCustomerProfile);
-router.put('/affiliate-profile', verifyAuth, authorizeRole('AFFILIATE', 'ADMIN'), updateAffiliateProfile);
+router.put('/affiliate-profile', verifyAuth, authorizeRole('AFFILIATE', 'RESELLER', 'ADMIN'), updateAffiliateProfile);
 
 export default router;

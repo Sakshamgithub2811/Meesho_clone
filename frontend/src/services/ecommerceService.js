@@ -41,13 +41,34 @@ export async function getProducts(params = {}) {
     if (params.minPrice) query.set('minPrice', params.minPrice);
     if (params.maxPrice) query.set('maxPrice', params.maxPrice);
     if (params.sort) query.set('sort', params.sort);
-    query.set('limit', params.limit || '1000');
+    if (params.page) query.set('page', params.page);
+    if (params.all) {
+      query.set('all', 'true');
+    } else if (params.limit) {
+      query.set('limit', params.limit);
+    } else {
+      query.set('limit', '24');
+    }
 
     const res = await fetch(`${API_BASE_URL}/products?${query.toString()}`);
-    const data = await res.json();
-    return data?.data || [];
+    const json = await res.json();
+
+    if (params.withMeta) {
+      return {
+        products: json?.data || [],
+        total: json?.total || 0,
+        page: json?.page || Number(params.page || 1),
+        totalPages: json?.totalPages || 1,
+        hasMore: json?.hasMore ?? ((json?.data?.length || 0) === Number(params.limit || 24))
+      };
+    }
+
+    return json?.data || [];
   } catch (error) {
     console.error('Failed to fetch products from database:', error);
+    if (params.withMeta) {
+      return { products: [], total: 0, page: 1, totalPages: 0, hasMore: false };
+    }
     return [];
   }
 }

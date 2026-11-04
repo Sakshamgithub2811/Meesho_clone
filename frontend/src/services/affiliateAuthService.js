@@ -149,6 +149,33 @@ export function subscribeAffiliateAuth(listener) {
 /**
  * Get current affiliate stats with clean 0 defaults
  */
+/**
+ * Fetch live affiliate stats from PostgreSQL database
+ */
+export async function fetchAffiliateStats() {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('mshoppy_token') || localStorage.getItem('firebase_token');
+    const stored = getStoredAffiliate();
+    const userId = stored?.user?.id || '';
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    if (userId) headers['x-user-id'] = userId;
+
+    const query = userId ? '?userId=' + encodeURIComponent(userId) : '';
+    const res = await fetch(API_BASE_URL + '/auth/affiliate-stats' + query, { headers });
+    const data = await res.json();
+    if (data && data.success && data.stats) {
+      localStorage.setItem(STATS_KEY, JSON.stringify(data.stats));
+      notifyListeners();
+      return data.stats;
+    }
+  } catch (err) {
+    console.warn('Could not fetch live affiliate stats from API:', err.message);
+  }
+  return getAffiliateStats();
+}
+
 export function getAffiliateStats() {
   try {
     const statsStr = localStorage.getItem(STATS_KEY);

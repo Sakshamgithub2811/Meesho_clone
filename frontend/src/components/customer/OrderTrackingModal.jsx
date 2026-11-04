@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { auth } from '../../utils/firebase';
@@ -117,7 +118,7 @@ export default function OrderTrackingModal({
       if (!sessionStorage.getItem(storageKey)) {
         autoSentRef.current = true;
         sessionStorage.setItem(storageKey, 'true');
-        fetch('http://localhost:5000/api/v1/orders/send-otp-email', {
+        fetch(`${API_V1_BASE}/orders/send-otp-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

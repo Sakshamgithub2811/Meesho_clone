@@ -7,6 +7,7 @@ import {
   checkCanReview
 } from '../../services/ecommerceService';
 import { useCart } from '../../hooks/useCart';
+import { getAffiliateApp } from '../../services/affiliateSessionStore';
 
 // Category-specific variant configuration & labels
 const CATEGORY_META = {
@@ -188,6 +189,51 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
   const urlMargin = Number(searchParams.get('margin') || searchParams.get('m') || 0);
   const affiliateMargin = urlMargin > 0 ? urlMargin : Number(localStorage.getItem('mshoppy_affiliate_margin') || 0);
   const effectivePrice = (product?.price || 0) + (affiliateMargin > 0 ? affiliateMargin : 0);
+
+  // Reseller WhatsApp Sharing & Custom Margin State (ONLY active when explicitly visiting in reseller mode from Reseller Hub)
+  const isResellerMode = searchParams.get('source') === 'reseller';
+  const [selectedResellerMargin, setSelectedResellerMargin] = useState(100);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareMode, setShareMode] = useState('with-price'); // 'with-price', 'images-only', 'desc'
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const getReferralCode = () => {
+    try {
+      const affApp = getAffiliateApp();
+      if (affApp?.referralCode) return affApp.referralCode;
+      const cust = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+      if (cust?.fullName) return (cust.fullName.slice(0, 5).toUpperCase() + 'AFF');
+    } catch (e) {}
+    return 'SHRUTIPAFF';
+  };
+
+  const referralCode = getReferralCode();
+  const numericResellerMargin = Number(selectedResellerMargin) || 0;
+  const resellerSellingPrice = (product?.price || 0) + numericResellerMargin;
+  const productShareUrl = `${window.location.origin}/product?id=${product?.id || productId || ''}&ref=${referralCode}&margin=${numericResellerMargin}`;
+
+  const handleShareToWhatsApp = (mode = shareMode) => {
+    if (!product) return;
+    let msg = '';
+    if (mode === 'images-only') {
+      msg = `📸 *${product.title}*\n\n✨ Premium Quality Fabric with Exquisite Craftsmanship.\n👉 Order Online: ${productShareUrl}\n\nReply directly with your address to book!`;
+    } else if (mode === 'desc') {
+      msg = `✨ *${product.title}*\n\nVerified authentic marketplace quality.\nDirect supplier dispatch with Free Shipping!\n\n👉 Order Online: ${productShareUrl}\n\nOr DM directly with your size & address.`;
+    } else {
+      msg = `✨ *${product.title}*\n\nSpecial Price: ₹${resellerSellingPrice} only (Free Shipping!)\n\n✅ 7-Day Easy Replacement Guarantee\n✅ Cash on Delivery Available\n\n👉 Order directly online:\n${productShareUrl}\n\nOr reply with your address & size to place order!`;
+    }
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+    triggerToast('Shared to WhatsApp successfully!');
+  };
+
+  const handleCopyProductShareLink = () => {
+    navigator.clipboard.writeText(productShareUrl);
+    setCopiedLink(true);
+    triggerToast('Referral link with margin copied!');
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   // Pincode & Delivery Estimator States - Empty by default, loads from saved address if available
   const [pincode, setPincode] = useState(() => {
@@ -649,6 +695,90 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
             </div>
           </div>
 
+          {/* Reseller Profit Margin & WhatsApp Share Card (Visible ONLY in Reseller Mode, never to normal customers) */}
+          {isResellerMode && (
+          <div className="bg-gradient-to-r from-emerald-50 via-green-50/70 to-emerald-50/50 border-2 border-emerald-300/80 rounded-2xl p-4 sm:p-5 shadow-xs mb-5">
+            <div className="flex items-center justify-between gap-3 mb-2.5">
+              <div className="flex items-center gap-2.5">
+                <span className="w-9 h-9 rounded-xl bg-[#25D366] text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.628 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                </span>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 leading-tight flex items-center gap-1.5">
+                    <span>Resell on WhatsApp &amp; Earn Profit</span>
+                    <span className="text-[10px] font-bold bg-[#25D366] text-white px-2 py-0.2 rounded-full">Reseller Hub</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    Add your profit margin • We ship directly to your buyer • Margin credited on delivery
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Margin Presets & Direct Share CTA */}
+            <div className="bg-white rounded-xl p-3 border border-emerald-200/60 flex flex-col sm:flex-row items-center justify-between gap-3 mt-2">
+              <div className="w-full sm:w-auto">
+                <span className="text-xs font-bold text-slate-600 block mb-1">Set Your Margin:</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[50, 100, 150, 200, 300].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setSelectedResellerMargin(m)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                        selectedResellerMargin === m
+                          ? 'bg-[#25D366] text-white shadow-sm scale-105'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      +₹{m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+                <div className="text-left sm:text-right">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Selling Price</span>
+                  <span className="text-sm font-black text-slate-900">₹{resellerSellingPrice}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleShareToWhatsApp('with-price')}
+                  className="bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white px-3.5 py-2.5 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer whitespace-nowrap"
+                  title="Share to WhatsApp Now"
+                >
+                  <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.628 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                  <span>Share WhatsApp</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 px-1 text-xs">
+              <button
+                type="button"
+                onClick={handleCopyProductShareLink}
+                className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">{copiedLink ? 'check' : 'content_copy'}</span>
+                <span>{copiedLink ? 'Link Copied!' : 'Copy Tracked Referral Link'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(`/share-earn-config?id=${product?.id || productId}`)}
+                className="text-slate-600 hover:text-[#b90041] font-bold flex items-center gap-0.5 cursor-pointer"
+              >
+                <span>Full Reseller Studio</span>
+                <span className="material-symbols-outlined text-sm">chevron_right</span>
+              </button>
+            </div>
+          </div>
+          )}
+
           {/* Delivery & Pincode Checker Card (Meesho Core Feature) */}
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs mb-5 space-y-3">
             <div className="flex items-center justify-between">
@@ -972,26 +1102,42 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
         </section>
       </main>
 
-      {/* Sticky Bottom Actions Bar - Pure Customer E-Commerce */}
-      <div className="fixed bottom-0 left-0 w-full z-40 bg-white/95 backdrop-blur-xl shadow-[0_-8px_30px_rgba(0,0,0,0.08)] px-4 py-3 border-t border-slate-100">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
+      {/* Sticky Bottom Actions Bar - Customer + Reseller WhatsApp Share */}
+      <div className="fixed bottom-0 left-0 w-full z-40 bg-white/95 backdrop-blur-xl shadow-[0_-8px_30px_rgba(0,0,0,0.08)] px-3 sm:px-4 py-3 border-t border-slate-100">
+        <div className="max-w-4xl mx-auto flex items-center gap-2 sm:gap-3">
+          {/* WhatsApp Share & Earn Button (ONLY visible in Reseller Mode, never to normal customers) */}
+          {isResellerMode && (
+          <button
+            type="button"
+            onClick={() => setShowShareModal(true)}
+            className="bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white flex items-center justify-center gap-1.5 sm:gap-2 rounded-2xl py-3.5 px-3.5 sm:px-5 font-black text-xs sm:text-sm shadow-lg shadow-emerald-500/25 transition-all cursor-pointer shrink-0"
+            title="Share on WhatsApp with Margin"
+          >
+            <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.628 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+            </svg>
+            <span className="hidden sm:inline">Share &amp; Earn ₹{selectedResellerMargin}</span>
+            <span className="sm:hidden">Share &amp; Earn</span>
+          </button>
+          )}
+
           <button
             type="button"
             onClick={handleAddToCart}
             disabled={addingToCart}
-            className="flex-1 flex items-center justify-center gap-2 border-2 border-slate-300 hover:border-[#b90041] text-slate-800 hover:text-[#b90041] rounded-2xl py-3.5 font-black text-xs sm:text-sm active:scale-95 transition-all cursor-pointer bg-white"
+            className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 border-2 border-slate-300 hover:border-[#b90041] text-slate-800 hover:text-[#b90041] rounded-2xl py-3.5 font-black text-xs sm:text-sm active:scale-95 transition-all cursor-pointer bg-white"
           >
             <span className="material-symbols-outlined text-lg">shopping_bag</span>
-            <span>{addingToCart ? 'Adding...' : 'Add to Cart'}</span>
+            <span className="truncate">{addingToCart ? 'Adding...' : 'Add to Cart'}</span>
           </button>
 
           <button
             type="button"
             onClick={handleBuyNow}
-            className="flex-1 bg-gradient-to-r from-[#FF3F6C] to-[#DF2457] hover:from-[#e0355f] hover:to-[#c71e4d] text-white flex items-center justify-center gap-2 rounded-2xl py-3.5 font-black text-xs sm:text-sm shadow-xl shadow-pink-500/25 active:scale-95 transition-all cursor-pointer uppercase tracking-wider"
+            className="flex-1 bg-gradient-to-r from-[#FF3F6C] to-[#DF2457] hover:from-[#e0355f] hover:to-[#c71e4d] text-white flex items-center justify-center gap-1.5 sm:gap-2 rounded-2xl py-3.5 font-black text-xs sm:text-sm shadow-xl shadow-pink-500/25 active:scale-95 transition-all cursor-pointer uppercase tracking-wider"
           >
             <span className="material-symbols-outlined text-lg">bolt</span>
-            <span>Buy Now</span>
+            <span className="truncate">Buy Now</span>
           </button>
         </div>
       </div>
@@ -1132,6 +1278,155 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reseller WhatsApp Share & Profit Margin Configuration Modal */}
+      {showShareModal && (
+        <div 
+          onClick={() => setShowShareModal(false)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-full bg-[#25D366]/15 text-[#25D366] flex items-center justify-center">
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.628 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                </span>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900">Share on WhatsApp</h3>
+                  <p className="text-[11px] text-slate-400">Set margin and share to your customers</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowShareModal(false)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Product Summary */}
+            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl">
+              <img 
+                src={images[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400'} 
+                alt={product?.title}
+                className="w-14 h-14 rounded-xl object-contain bg-white shrink-0 border border-slate-100" 
+              />
+              <div className="min-w-0 flex-1">
+                <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{product?.title}</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">Supplier Price: <span className="font-bold text-slate-800">₹{product?.price}</span></p>
+                <span className="inline-block text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.2 rounded-md font-bold mt-1">Free Delivery Included</span>
+              </div>
+            </div>
+
+            {/* Profit Margin Control */}
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-bold text-slate-700">Your Profit Margin</label>
+                <span className="text-xs font-black text-emerald-600">+₹{selectedResellerMargin} Profit</span>
+              </div>
+              <div className="flex gap-2">
+                {[50, 100, 150, 200, 300].map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setSelectedResellerMargin(m)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      selectedResellerMargin === m 
+                        ? 'bg-[#25D366] text-white shadow-md' 
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    +₹{m}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Live Price Preview */}
+            <div className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-emerald-500/20">
+              <div>
+                <span className="text-[11px] uppercase tracking-wider font-bold opacity-90 block">Customer Selling Price</span>
+                <span className="text-2xl font-black">₹{resellerSellingPrice}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] opacity-80 block">Your Direct Earning</span>
+                <span className="text-base font-extrabold bg-white/20 px-2.5 py-0.5 rounded-lg inline-block mt-0.5">₹{selectedResellerMargin}</span>
+              </div>
+            </div>
+
+            {/* Share Mode Selection */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">What to share:</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'with-price', label: 'With Price' },
+                  { id: 'desc', label: 'Description' },
+                  { id: 'images-only', label: 'Only Images' }
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => setShareMode(mode.id)}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      shareMode === mode.id
+                        ? 'bg-[#b90041] text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  handleShareToWhatsApp(shareMode);
+                  setShowShareModal(false);
+                }}
+                className="w-full py-3.5 bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-black text-sm rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+              >
+                <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.628 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
+                <span>Share to WhatsApp Now</span>
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyProductShareLink}
+                  className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-base">{copiedLink ? 'check' : 'content_copy'}</span>
+                  <span>{copiedLink ? 'Copied!' : 'Copy Referral Link'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowShareModal(false);
+                    navigate(`/share-earn-config?id=${product?.id || productId}`);
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50 text-[#b90041] font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-base">tune</span>
+                  <span>Studio Options</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

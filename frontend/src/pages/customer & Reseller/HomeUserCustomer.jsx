@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Logout from '../auth/logout';
+import { useSelector } from 'react-redux';
+import { getStoredCustomer, subscribeCustomerAuth } from '../../services/customerAuthService';
 import NavDrawer from "../../components/NavDrawer";
 import AppBottomNav from "../../components/AppBottomNav";
 import {
@@ -72,6 +73,63 @@ export default function HomeUserCustomer() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(() => getUnreadCount());
 
+  // Real Registered Customer User State
+  const reduxUser = useSelector((state) => state.user?.currentUser);
+  const [currentUser, setCurrentUser] = useState(() => {
+    return getStoredCustomer()?.user || reduxUser || null;
+  });
+
+  useEffect(() => {
+    const unsub = subscribeCustomerAuth((session) => {
+      if (session?.user) {
+        setCurrentUser(session.user);
+      } else {
+        setCurrentUser(null);
+      }
+    });
+    return unsub;
+  }, []);
+
+  const registeredUser = useMemo(() => {
+    if (currentUser?.fullName || currentUser?.name) return currentUser;
+    if (reduxUser?.fullName || reduxUser?.name) return reduxUser;
+    const stored = getStoredCustomer()?.user;
+    if (stored?.fullName || stored?.name) return stored;
+    try {
+      const raw = localStorage.getItem('mshoppy_customer_user') || localStorage.getItem('mshoppy_reseller_user') || localStorage.getItem('mshoppy_affiliate_user') || localStorage.getItem('mshoppy_kyc_app');
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return currentUser || reduxUser || stored || null;
+  }, [currentUser, reduxUser]);
+
+  const registeredName = useMemo(() => {
+    if (!registeredUser) return null;
+    return (
+      registeredUser.fullName ||
+      registeredUser.name ||
+      registeredUser.displayName ||
+      (registeredUser.email ? registeredUser.email.split('@')[0] : null) ||
+      (registeredUser.phone ? `+91 ${registeredUser.phone.slice(-4)}` : null)
+    );
+  }, [registeredUser]);
+  
+  // Real Meesho Infinite Scroll State & Stable Refs
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalProducts, setTotalProducts] = useState(0);
+
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
+  const loadingMoreRef = useRef(false);
+  const loadingRef = useRef(true);
+  const sentinelRef = useRef(null);
+
+  pageRef.current = page;
+  hasMoreRef.current = hasMore;
+  loadingMoreRef.current = loadingMore;
+  loadingRef.current = loading;
+
   useEffect(() => {
     const unsub = subscribeNotifications(() => {
       setUnreadNotifs(getUnreadCount());
@@ -79,66 +137,146 @@ export default function HomeUserCustomer() {
     return unsub;
   }, []);
 
-  // Load Categories & Initial Products from Database
+  // 1. Load Categories, Banners & Wishlist on initial mount
   useEffect(() => {
     let isMounted = true;
-    async function loadData() {
-      setLoading(true);
+    async function loadStaticData() {
       try {
-        const [catsData, prodsData, wishData, bannersData] = await Promise.all([
+        const [catsData, wishData, bannersData] = await Promise.all([
           getCategories(),
-          getProducts(),
           getWishlist(),
           getBanners(),
         ]);
 
         if (isMounted) {
-          if (bannersData && bannersData.length > 0) {
-            setBanners(bannersData);
-          }
-          if (catsData && catsData.length > 0) {
-            setDbCategories(catsData);
-          }
-          if (prodsData) {
-            setProducts(prodsData);
-          }
-          if (wishData) {
-            setFavorites(wishData.map(w => w.productId));
-          }
+          if (bannersData && bannersData.length > 0) setBanners(bannersData);
+          if (catsData && catsData.length > 0) setDbCategories(catsData);
+          if (wishData) setFavorites(wishData.map(w => w.productId));
         }
       } catch (err) {
-        console.error("Error loading initial ecommerce data:", err);
-      } finally {
-        if (isMounted) setLoading(false);
+        console.error("Error loading static ecommerce data:", err);
       }
     }
-    loadData();
+    loadStaticData();
     return () => { isMounted = false; };
   }, []);
 
-  // Fetch when category changes
+  // 2. Fetch Products on Initial Mount & whenever Category or Search Query changes
   useEffect(() => {
     let isMounted = true;
-    async function filterByCategory() {
+    async function fetchInitialProducts() {
       setLoading(true);
+      setLoadingMore(false);
+      setPage(1);
+      setHasMore(true);
+      pageRef.current = 1;
+      hasMoreRef.current = true;
+
       try {
-        const prods = await getProducts({
-          category: selectedCategory === "All" ? "" : selectedCategory,
-          search: searchQuery
+        const targetCategory = selectedCategory === "All" ? "" : selectedCategory;
+        const res = await getProducts({
+          category: targetCategory,
+          search: searchQuery,
+          page: 1,
+          limit: 28,
+          withMeta: true
         });
+
         if (isMounted) {
-          setProducts(prods);
+          setProducts(res.products || []);
+          setTotalProducts(res.total || 0);
+          setHasMore(res.hasMore);
+          hasMoreRef.current = res.hasMore;
         }
       } catch (err) {
-        console.error("Error filtering products:", err);
+        console.error("Error loading initial products:", err);
       } finally {
         if (isMounted) setLoading(false);
       }
     }
+
     setSelectedSubcat("All");
-    filterByCategory();
+    fetchInitialProducts();
     return () => { isMounted = false; };
-  }, [selectedCategory]);
+  }, [selectedCategory, searchQuery]);
+
+  // 3. Load Next Batch (Infinite Scroll)
+  const loadMoreProducts = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+
+    const nextPage = pageRef.current + 1;
+    const targetCategory = selectedCategory === "All" ? "" : selectedCategory;
+
+    try {
+      const res = await getProducts({
+        category: targetCategory,
+        search: searchQuery,
+        page: nextPage,
+        limit: 28,
+        withMeta: true
+      });
+
+      if (res.products && res.products.length > 0) {
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newItems = res.products.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newItems];
+        });
+        setPage(nextPage);
+        pageRef.current = nextPage;
+        setHasMore(res.hasMore);
+        hasMoreRef.current = res.hasMore;
+        setTotalProducts(res.total || 0);
+      } else {
+        setHasMore(false);
+        hasMoreRef.current = false;
+      }
+    } catch (err) {
+      console.error("Error loading more products:", err);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [selectedCategory, searchQuery]);
+
+  // 4. Dual Sentinel (IntersectionObserver + Smooth Window Scroll Listener)
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    let observer = null;
+
+    if (sentinel) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) {
+            loadMoreProducts();
+          }
+        },
+        { rootMargin: '450px' }
+      );
+      observer.observe(sentinel);
+    }
+
+    const handleWindowScroll = () => {
+      if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+      const scrollY = window.scrollY || window.pageYOffset;
+      const visibleHeight = window.innerHeight;
+      const totalHeight = document.documentElement.scrollHeight;
+
+      if (totalHeight - (scrollY + visibleHeight) < 600) {
+        loadMoreProducts();
+      }
+    };
+
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('scroll', handleWindowScroll);
+    };
+  }, [loadMoreProducts]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -390,49 +528,73 @@ export default function HomeUserCustomer() {
           </div>
 
           {/* Action Icons */}
-          <div className="flex items-center gap-1.5 sm:gap-3">
+          <div className="flex items-center gap-0.5 sm:gap-2.5 shrink-0">
             <button 
               onClick={() => navigate('/notifications')} 
-              className="relative text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
+              className="relative text-[#191C1E] dark:text-slate-200 p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
               title="Notifications"
             >
-              <span className="material-symbols-outlined text-2xl">notifications</span>
+              <span className="material-symbols-outlined text-[22px] sm:text-2xl">notifications</span>
               {unreadNotifs > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-[#FF3F6C] text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-4 h-4 bg-[#FF3F6C] text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
                   {unreadNotifs}
                 </span>
               )}
             </button>
             <button 
               onClick={() => navigate('/wishlist')} 
-              className="relative text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
+              className="relative text-[#191C1E] dark:text-slate-200 p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
               title="My Wishlist"
             >
-              <span className="material-symbols-outlined text-2xl">favorite</span>
+              <span className="material-symbols-outlined text-[22px] sm:text-2xl">favorite</span>
               {favorites.length > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-[#FF3F6C] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-4 h-4 bg-[#FF3F6C] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                   {favorites.length}
                 </span>
               )}
             </button>
             <button 
               onClick={() => navigate('/cart')} 
-              className="relative text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
+              className="relative text-[#191C1E] dark:text-slate-200 p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
               title="Shopping Cart"
             >
-              <span className="material-symbols-outlined text-2xl">shopping_bag</span>
+              <span className="material-symbols-outlined text-[22px] sm:text-2xl">shopping_bag</span>
               {cartCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-[#b90041] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-4 h-4 bg-[#b90041] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
             </button>
-            <Logout />
+            {registeredName ? (
+              <button
+                type="button"
+                onClick={() => navigate('/user-dashboard1?tab=profile')}
+                className="flex items-center gap-1.5 sm:gap-2 p-1 sm:pl-1.5 sm:pr-3 py-1 bg-rose-50/90 dark:bg-slate-800/80 hover:bg-rose-100 dark:hover:bg-slate-700/80 border border-rose-200/90 dark:border-rose-900/60 rounded-full transition-all active:scale-95 cursor-pointer shadow-xs group shrink-0"
+                title={`Logged in as ${registeredName} (Click to open profile)`}
+              >
+                <div className="w-7 h-7 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-[#FF3F6C] to-rose-500 text-white flex items-center justify-center font-extrabold text-xs uppercase shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                  {registeredName.trim().charAt(0) || 'U'}
+                </div>
+                <span className="hidden sm:inline text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[120px] md:max-w-[160px] truncate">
+                  {registeredName}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate('/user-login')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-[#FF3F6C] bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer active:scale-95 shrink-0"
+                title="Sign In / Register"
+              >
+                <span className="material-symbols-outlined text-base">person</span>
+                <span className="hidden sm:inline">Sign In</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 pb-32">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pb-24 md:pb-12">
         {/* Mobile Search */}
         <div className="md:hidden pt-2 pb-4">
           <form 
@@ -674,6 +836,7 @@ export default function HomeUserCustomer() {
               ))}
             </div>
           )}
+
         </section>
 
         {/* Real Products Grid from PostgreSQL Database */}
@@ -687,13 +850,11 @@ export default function HomeUserCustomer() {
                 Lowest prices, verified suppliers & top quality products
               </p>
             </div>
-            <span className="text-xs text-slate-400 font-medium">
-              {displayedProducts.length} products
-            </span>
+
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                 <div key={n} className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 animate-pulse">
                   <div className="aspect-[3/4] bg-slate-200 dark:bg-slate-800 rounded-xl mb-3"></div>
@@ -719,7 +880,7 @@ export default function HomeUserCustomer() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
               {displayedProducts.map((p) => {
                 const isFav = favorites.includes(p.id);
                 const mainImg = p.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
@@ -727,7 +888,7 @@ export default function HomeUserCustomer() {
                 return (
                   <div 
                     key={p.id} 
-                    className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                    className="bg-white dark:bg-slate-900 rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 dark:border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
                   >
                     <div 
                       onClick={() => navigate(`/product?id=${p.id}`)} 
@@ -808,6 +969,16 @@ export default function HomeUserCustomer() {
               })}
             </div>
           )}
+
+          {/* Real Meesho Infinite Scroll Sentinel & Loader */}
+          <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[90px]">
+            {loadingMore && (
+              <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-extrabold text-[#b90041] animate-pulse">
+                <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
+                <span>Loading more trending products for you...</span>
+              </div>
+            )}
+          </div>
         </section>
       </main>
 

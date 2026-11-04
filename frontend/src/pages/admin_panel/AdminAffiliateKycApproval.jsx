@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import { useState, useMemo, useEffect } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
 import { getAffiliateApp, saveAffiliateApp, subscribeAffiliateApp } from '../../services/affiliateSessionStore';
@@ -185,7 +186,7 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
     let isMounted = true;
     const fetchRealAffiliates = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/v1/admin-kyc/affiliates');
+        const res = await fetch(`${API_V1_BASE}/admin-kyc/affiliates`);
         if (!res.ok) return;
         const data = await res.json();
         if (data?.applications && isMounted) {
@@ -333,7 +334,7 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
 
     // 2. Persist to Real PostgreSQL Database
     try {
-      await fetch(`http://localhost:5000/api/v1/admin-kyc/${targetDbId}/status`, {
+      await fetch(`${API_V1_BASE}/admin-kyc/${targetDbId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'APPROVED' })
@@ -410,7 +411,7 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
 
     // Persist to Real PostgreSQL Database
     try {
-      await fetch(`http://localhost:5000/api/v1/admin-kyc/${targetDbId}/status`, {
+      await fetch(`${API_V1_BASE}/admin-kyc/${targetDbId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'REJECTED', adminNotes: reason })
@@ -1418,34 +1419,65 @@ export default function AdminAffiliateKycApproval({ onNavigate, onBack, onSwitch
                 </div>
 
                 {activeModalItem.documents[activeDocTab] && (
-                  <div className="bg-[#f8f9fb] p-3.5 rounded-xl border border-slate-100 text-xs space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 font-bold uppercase text-[10px]">
-                        Identifier
-                      </span>
-                      <span className="font-mono font-bold text-slate-800">
-                        {activeModalItem.documents[activeDocTab].number || 'Bank Verified'}
-                      </span>
-                    </div>
-                    {activeModalItem.documents[activeDocTab].nameOnDoc && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-400 font-bold uppercase text-[10px]">
-                          Name on Document
-                        </span>
-                        <span className="font-bold text-slate-800">
-                          {activeModalItem.documents[activeDocTab].nameOnDoc}
-                        </span>
-                      </div>
-                    )}
-                    {activeModalItem.documents[activeDocTab].pennyDrop && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-400 font-bold uppercase text-[10px]">
-                          ₹1 Bank Verification Status
-                        </span>
-                        <span className="font-bold text-emerald-600">
-                          {activeModalItem.documents[activeDocTab].pennyDrop}
-                        </span>
-                      </div>
+                  <div className="bg-[#f8f9fb] p-3.5 rounded-xl border border-slate-100 text-xs space-y-2">
+                    {activeDocTab === 'bank' ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400 font-bold uppercase text-[10px]">Bank Name</span>
+                          <span className="font-bold text-slate-800">{activeModalItem.documents.bank.bankName || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400 font-bold uppercase text-[10px]">Account Number</span>
+                          <span className="font-mono font-bold text-slate-800">{activeModalItem.documents.bank.accountNumber || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400 font-bold uppercase text-[10px]">IFSC Code</span>
+                          <span className="font-mono font-bold text-slate-800">{activeModalItem.documents.bank.ifsc || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400 font-bold uppercase text-[10px]">Beneficiary Name</span>
+                          <span className="font-bold text-slate-800">{activeModalItem.documents.bank.holderName || '—'}</span>
+                        </div>
+                        {activeModalItem.documents.bank.upiId && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-bold uppercase text-[10px]">UPI ID</span>
+                            <span className="font-mono font-bold text-indigo-700">{activeModalItem.documents.bank.upiId}</span>
+                          </div>
+                        )}
+                        {activeModalItem.documents.bank.pennyDrop && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-bold uppercase text-[10px]">Penny Drop Status</span>
+                            <span className="font-bold text-emerald-600">{activeModalItem.documents.bank.pennyDrop}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400 font-bold uppercase text-[10px]">
+                            {activeDocTab === 'pan' ? 'PAN Number' : 'Aadhaar Number'}
+                          </span>
+                          <span className="font-mono font-bold text-slate-800">
+                            {activeModalItem.documents[activeDocTab].number || '—'}
+                          </span>
+                        </div>
+                        {activeModalItem.documents[activeDocTab].nameOnDoc && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400 font-bold uppercase text-[10px]">
+                              Name on Document
+                            </span>
+                            <span className="font-bold text-slate-800">
+                              {activeModalItem.documents[activeDocTab].nameOnDoc}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-slate-400 font-bold uppercase text-[10px]">Verification Status</span>
+                          <span className="font-bold text-emerald-600">
+                            {activeModalItem.documents[activeDocTab].status || 'Submitted'}
+                          </span>
+                        </div>
+                      </>
                     )}
                   </div>
                 )}

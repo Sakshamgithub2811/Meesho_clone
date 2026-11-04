@@ -4,141 +4,7 @@ import NavDrawer from "../../components/NavDrawer";
 import AppBottomNav from "../../components/AppBottomNav";
 import { getUnreadCount, subscribeNotifications } from '../../services/notificationService';
 import { getProducts } from '../../services/ecommerceService';
-
-const initialProducts = [
-  {
-    id: 1,
-    title: "Premium Floral Embroidered Kurti",
-    category: "Women",
-    brand: "Libas",
-    price: 459,
-    originalPrice: 1299,
-    discount: "64% OFF",
-    margin: 65,
-    tag: "NEW",
-    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 2,
-    title: "Men's Vintage Denim Jacket",
-    category: "Men",
-    brand: "Roadster",
-    price: 899,
-    originalPrice: 2499,
-    discount: "64% OFF",
-    margin: 120,
-    tag: "HOT",
-    image: "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 3,
-    title: "Retro Square Sunglasses",
-    category: "Gadgets",
-    brand: "Vincent Chase",
-    price: 249,
-    originalPrice: 999,
-    discount: "75% OFF",
-    margin: 35,
-    tag: "BESTSELLER",
-    image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 4,
-    title: "Air Cushion Sneakers",
-    category: "Men",
-    brand: "Puma",
-    price: 1249,
-    originalPrice: 3499,
-    discount: "64% OFF",
-    margin: 180,
-    tag: "TRENDING",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 5,
-    title: "boAt Rockerz 450 Headphones",
-    category: "Brands",
-    brand: "boAt",
-    price: 1499,
-    originalPrice: 3990,
-    discount: "62% OFF",
-    margin: 220,
-    tag: "VERIFIED BRAND",
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 6,
-    title: "Puma Leather Sneakers",
-    category: "Brands",
-    brand: "Puma",
-    price: 1899,
-    originalPrice: 4499,
-    discount: "58% OFF",
-    margin: 280,
-    tag: "TOP BRAND",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 7,
-    title: "Embroidered Silk Anarkali Kurta Set",
-    category: "Women",
-    brand: "Libas",
-    price: 1249,
-    originalPrice: 2499,
-    discount: "50% OFF",
-    margin: 150,
-    tag: "BESTSELLER",
-    image: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 8,
-    title: "Vintage Rose Floral Cotton Kurta",
-    category: "Women",
-    brand: "Anouk",
-    price: 899,
-    originalPrice: 1799,
-    discount: "50% OFF",
-    margin: 95,
-    tag: "TRENDING",
-    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 9,
-    title: "Men's Classic Khadi Festive Kurta",
-    category: "Men",
-    brand: "FabIndia",
-    price: 999,
-    originalPrice: 1999,
-    discount: "50% OFF",
-    margin: 110,
-    tag: "HOT",
-    image: "https://images.unsplash.com/photo-1609357605129-26f69add5d6e?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 10,
-    title: "Handblock Pure Cotton Kurti & Pant Set",
-    category: "Women",
-    brand: "Sangria",
-    price: 699,
-    originalPrice: 1599,
-    discount: "56% OFF",
-    margin: 85,
-    tag: "NEW",
-    image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600&auto=format&fit=crop&q=80"
-  },
-  {
-    id: 11,
-    title: "Kanjeevaram Banarasi Silk Saree",
-    category: "Women",
-    brand: "SareeMall",
-    price: 1899,
-    originalPrice: 4299,
-    discount: "56% OFF",
-    margin: 260,
-    tag: "TOP RATED",
-    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80"
-  }
-];
+import { getAffiliateApp } from '../../services/affiliateSessionStore';
 
 const categories = [
   { name: "All", icon: "dashboard" },
@@ -164,6 +30,50 @@ export default function HomeUserReseller() {
   const [activeNav, setActiveNav] = useState("home");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(() => getUnreadCount());
+  const [quickShareProduct, setQuickShareProduct] = useState(null);
+  const [quickShareMargin, setQuickShareMargin] = useState(100);
+  const [toastMessage, setToastMessage] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const getReferralCode = () => {
+    try {
+      const affApp = getAffiliateApp();
+      if (affApp?.referralCode) return affApp.referralCode;
+      const cust = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+      if (cust?.fullName) return (cust.fullName.slice(0, 5).toUpperCase() + 'AFF');
+    } catch (e) {}
+    return 'SHRUTIPAFF';
+  };
+
+  const handleQuickShare = (p) => {
+    setQuickShareProduct(p);
+    setQuickShareMargin(Number(p.margin) || 100);
+  };
+
+  const handleWhatsAppSend = (prod, margin) => {
+    const refCode = getReferralCode();
+    const numericMargin = Number(margin) || 0;
+    const finalPrice = prod.price + numericMargin;
+    const orderLink = `${window.location.origin}/product?id=${prod.id}&ref=${refCode}&margin=${numericMargin}`;
+    const msg = `✨ *${prod.title}*\n\nSpecial Price: ₹${finalPrice} only (Free Shipping!)\n\n✅ 7-Day Easy Replacement Guarantee\n✅ Cash on Delivery Available\n\n👉 Order directly online:\n${orderLink}\n\nOr reply with your delivery address & size to book!`;
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+    setToastMessage('Shared to WhatsApp successfully!');
+    setTimeout(() => setToastMessage(''), 2500);
+  };
+
+  const handleCopyQuickLink = (prod, margin) => {
+    const refCode = getReferralCode();
+    const numericMargin = Number(margin) || 0;
+    const orderLink = `${window.location.origin}/product?id=${prod.id}&ref=${refCode}&margin=${numericMargin}`;
+    navigator.clipboard.writeText(orderLink);
+    setCopiedLink(true);
+    setToastMessage('Referral link with margin copied!');
+    setTimeout(() => {
+      setCopiedLink(false);
+      setToastMessage('');
+    }, 2000);
+  };
 
   useEffect(() => {
     const unsub = subscribeNotifications(() => {
@@ -217,29 +127,98 @@ export default function HomeUserReseller() {
     }
   };
 
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(32);
 
+  // Fetch all live database products dynamically (scalable for 1,500 to 50,000+ items)
   useEffect(() => {
-    getProducts().then((data) => {
-      if (Array.isArray(data) && data.length > 0) {
-        const mapped = data.map((item, idx) => ({
-          id: item.id || idx + 1,
-          title: item.title,
-          category: item.category || 'Women',
-          brand: item.brand || 'Libas',
-          price: item.price || 499,
-          originalPrice: item.originalPrice || Math.round((item.price || 499) * 1.8),
-          discount: item.discount || '45% OFF',
-          margin: item.margin || Math.round((item.price || 499) * 0.2),
-          tag: item.tag || (idx % 2 === 0 ? 'BESTSELLER' : 'HOT'),
-          image: (item.images && item.images[0]) || item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
-        }));
-        setProducts(mapped);
-      }
-    }).catch(() => {});
+    let isMounted = true;
+    setLoading(true);
+
+    getProducts({ all: true })
+      .then((data) => {
+        if (!isMounted) return;
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((item, idx) => {
+            const rawCat = (typeof item.category === 'object' ? item.category?.name : item.category) || item.categorySlug || 'Women';
+            const basePrice = Number(item.price) || 499;
+            const originalPrice = Number(item.originalPrice) || Math.round(basePrice * 1.8);
+            const discount = item.discount || (item.discountPercentage ? `${item.discountPercentage}% OFF` : '45% OFF');
+            const defaultMargin = Number(item.margin) || Math.max(50, Math.round(basePrice * 0.2));
+
+            return {
+              id: item.id || idx + 1,
+              title: item.title || item.name || 'MShoppy Product',
+              category: rawCat,
+              brand: item.brand || item.supplierName || 'Official Store',
+              price: basePrice,
+              originalPrice: originalPrice,
+              discount: discount,
+              margin: defaultMargin,
+              tag: item.tag || (idx % 3 === 0 ? 'BESTSELLER' : idx % 3 === 1 ? 'HOT' : 'TRENDING'),
+              image: (Array.isArray(item.images) && item.images[0]) || item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
+            };
+          });
+          setProducts(mapped);
+        } else {
+          setProducts([]);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load live reseller products:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const normalize = (text) => (text || '').toLowerCase().replace(/kurtas?|kurti/g, 'kurt').replace(/sarees?/g, 'saree').trim();
+  // Reset pagination count when category or search changes
+  useEffect(() => {
+    setVisibleCount(32);
+  }, [selectedCategory, searchQuery]);
+
+  const normalize = (text) => {
+    if (!text) return '';
+    const str = typeof text === 'object' ? (text.name || text.title || text.slug || '') : String(text);
+    return str.toLowerCase().replace(/kurtas?|kurti/g, 'kurt').replace(/sarees?/g, 'saree').trim();
+  };
+
+  const matchesCategoryFilter = (pCatRaw, selCat) => {
+    if (!selCat || selCat === 'All') return true;
+    const sel = selCat.toLowerCase().trim();
+    const cat = String(pCatRaw || '').toLowerCase().trim();
+
+    if (sel === 'women') {
+      return cat.includes('women');
+    }
+    if (sel === 'men') {
+      return cat.includes('men') && !cat.includes('women');
+    }
+    if (sel === 'kids') {
+      return cat.includes('kid');
+    }
+    if (sel === 'home') {
+      return cat.includes('home') || cat.includes('kitchen');
+    }
+    if (sel === 'gadgets' || sel === 'electronics') {
+      return cat.includes('gadget') || cat.includes('electronic');
+    }
+    if (sel === 'beauty') {
+      return cat.includes('beauty') || cat.includes('health');
+    }
+    if (sel === 'jewelry' || sel === 'jewellery') {
+      return cat.includes('jewel');
+    }
+    if (sel === 'brands' || sel === 'brand') {
+      return true;
+    }
+    return cat.includes(sel);
+  };
 
   const filteredProducts = products.filter(p => {
     const q = normalize(searchQuery);
@@ -248,10 +227,7 @@ export default function HomeUserReseller() {
     const catNorm = normalize(p.category);
 
     const matchesSearch = !q || titleNorm.includes(q) || brandNorm.includes(q) || catNorm.includes(q);
-    const matchesCat = selectedCategory === "All" || 
-      (selectedCategory.toLowerCase() === "brands" || selectedCategory.toLowerCase() === "brand"
-        ? (p.category.toLowerCase() === "brands" || p.category.toLowerCase() === "brand" || !!p.brand)
-        : p.category.toLowerCase() === selectedCategory.toLowerCase());
+    const matchesCat = matchesCategoryFilter(p.category, selectedCategory);
     return matchesSearch && matchesCat;
   });
 
@@ -373,7 +349,7 @@ export default function HomeUserReseller() {
                           key={item.id}
                           onClick={() => {
                             setShowSuggestions(false);
-                            navigate('/product');
+                            navigate(`/product?id=${item.id}&source=reseller`);
                           }}
                           className="flex items-center gap-3 p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors group"
                         >
@@ -622,11 +598,30 @@ export default function HomeUserReseller() {
               <h3 className="font-headline font-extrabold text-2xl text-on-surface">Curated For You</h3>
               <p className="text-xs text-on-surface-variant mt-0.5">High margin products trending among top resellers</p>
             </div>
-            <span className="text-xs text-on-surface-variant font-medium">{filteredProducts.length} items</span>
+            <span className="text-xs text-on-surface-variant font-medium">
+              {loading ? (
+                <span className="inline-flex items-center gap-1.5 text-slate-500 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-[#FF3F6C] animate-ping inline-block"></span>
+                  Loading live catalog...
+                </span>
+              ) : (
+                <span className="font-bold text-slate-700">{filteredProducts.length} items available</span>
+              )}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {filteredProducts.length === 0 ? (
+            {loading ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="bg-surface-container-lowest rounded-2xl p-3 border border-outline-variant/10 animate-pulse space-y-3">
+                  <div className="aspect-[3/4] bg-slate-200 dark:bg-slate-700 rounded-xl" />
+                  <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded-md w-1/3" />
+                  <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-md w-3/4" />
+                  <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-md w-1/2" />
+                  <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-xl w-full" />
+                </div>
+              ))
+            ) : filteredProducts.length === 0 ? (
               <div className="col-span-full py-12 text-center flex flex-col items-center justify-center bg-surface-container-lowest rounded-2xl border border-outline-variant/10 p-8">
                 <span className="material-symbols-outlined text-5xl text-on-surface-variant/40 mb-2">inventory_2</span>
                 <p className="text-sm font-semibold text-on-surface">No products found in {selectedCategory}</p>
@@ -639,14 +634,14 @@ export default function HomeUserReseller() {
                 </button>
               </div>
             ) : (
-              filteredProducts.map((p) => {
+              filteredProducts.slice(0, visibleCount).map((p) => {
                 const isFav = favorites.includes(p.id);
                 return (
                   <div 
                     key={p.id} 
                     className="bg-surface-container-lowest rounded-2xl p-3 border border-outline-variant/10 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
                   >
-                    <div onClick={() => navigate(`/product?id=${p.id}`)} className="cursor-pointer" title="View Product Details">
+                    <div onClick={() => navigate(`/product?id=${p.id}&source=reseller`)} className="cursor-pointer" title="View Product Details">
                       <div className="aspect-[3/4] rounded-xl overflow-hidden relative mb-3 bg-surface-container-high">
                         <img 
                           src={p.image} 
@@ -691,16 +686,68 @@ export default function HomeUserReseller() {
                       </div>
                     </div>
 
-                    <div 
-                      onClick={() => navigate(`/share-earn-config?id=${p.id}`)}
-                      className="bg-tertiary-container/10 border border-tertiary/10 rounded-xl px-3 py-1.5 flex items-center justify-between cursor-pointer"
-                    >
-                      <span className="text-[10px] font-bold text-tertiary font-label uppercase tracking-wider">Earn ₹{p.margin}</span>
-                      <span className="material-symbols-outlined text-[16px] text-tertiary">share</span>
+                    {/* Reseller WhatsApp Share Action */}
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-1.5">
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleQuickShare(p);
+                        }}
+                        className="w-full py-2 px-2.5 bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-black text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        title="Share on WhatsApp with Margin"
+                      >
+                        <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.628 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                        </svg>
+                        <span className="truncate">Share & Earn ₹{p.margin}</span>
+                      </button>
+
+                      <div className="flex items-center justify-between px-0.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/share-earn-config?id=${p.id}`);
+                          }}
+                          className="text-[10px] font-bold text-slate-500 hover:text-[#b90041] transition-colors cursor-pointer"
+                        >
+                          Custom Margin ➔
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyQuickLink(p, p.margin);
+                          }}
+                          className="text-[10px] font-bold text-[#b90041] hover:underline flex items-center gap-0.5 cursor-pointer"
+                          title="Copy tracked referral link"
+                        >
+                          <span className="material-symbols-outlined text-xs">link</span>
+                          <span>Copy Link</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
               })
+            )}
+
+            {/* Scalable Load More Pagination */}
+            {!loading && filteredProducts.length > visibleCount && (
+              <div className="col-span-full py-8 text-center flex flex-col items-center justify-center gap-3">
+                <p className="text-xs text-slate-500 font-medium">
+                  Showing <strong>{Math.min(visibleCount, filteredProducts.length)}</strong> of <strong>{filteredProducts.length}</strong> products
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((prev) => prev + 32)}
+                  className="px-6 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs rounded-xl shadow-xs hover:shadow transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+                >
+                  <span>Load More Products</span>
+                  <span className="material-symbols-outlined text-sm">expand_more</span>
+                </button>
+              </div>
             )}
           </div>
         </section>
@@ -760,6 +807,138 @@ export default function HomeUserReseller() {
         </section>
       </main>
 
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-20 right-6 z-50 bg-[#008644] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
+          <span className="material-symbols-outlined text-lg">check_circle</span>
+          <span className="text-xs font-bold">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Quick Share to WhatsApp Modal */}
+      {quickShareProduct && (
+        <div 
+          onClick={() => setQuickShareProduct(null)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-full bg-[#25D366]/10 text-[#25D366] flex items-center justify-center">
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.628 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                </span>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">Share to WhatsApp</h3>
+                  <p className="text-[11px] text-slate-400">Add profit margin & send to customer</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setQuickShareProduct(null)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Product Summary */}
+            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl">
+              <img 
+                src={quickShareProduct.image} 
+                alt={quickShareProduct.title}
+                className="w-14 h-14 rounded-xl object-cover shrink-0" 
+              />
+              <div className="min-w-0 flex-1">
+                <h4 className="font-bold text-xs text-slate-800 dark:text-slate-100 line-clamp-1">{quickShareProduct.title}</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">Supplier Base: <span className="font-bold text-slate-700 dark:text-slate-300">₹{quickShareProduct.price}</span></p>
+                <span className="inline-block text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.2 rounded-md font-bold mt-1">Free Delivery Included</span>
+              </div>
+            </div>
+
+            {/* Profit Margin Presets */}
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Your Profit Margin</label>
+                <span className="text-xs font-black text-emerald-600">+₹{quickShareMargin} Profit</span>
+              </div>
+              <div className="flex gap-2">
+                {[50, 100, 150, 200, 300].map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setQuickShareMargin(m)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      quickShareMargin === m 
+                        ? 'bg-[#25D366] text-white shadow-md' 
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    +₹{m}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Price Preview Card */}
+            <div className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-emerald-500/20">
+              <div>
+                <span className="text-[11px] uppercase tracking-wider font-bold opacity-90 block">Customer Selling Price</span>
+                <span className="text-2xl font-black">₹{quickShareProduct.price + (Number(quickShareMargin) || 0)}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] opacity-80 block">Your Direct Earning</span>
+                <span className="text-base font-extrabold bg-white/20 px-2.5 py-0.5 rounded-lg inline-block mt-0.5">₹{quickShareMargin}</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  handleWhatsAppSend(quickShareProduct, quickShareMargin);
+                  setQuickShareProduct(null);
+                }}
+                className="w-full py-3.5 bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-black text-sm rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+              >
+                <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.628 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
+                <span>Share to WhatsApp Now</span>
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyQuickLink(quickShareProduct, quickShareMargin)}
+                  className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-base">{copiedLink ? 'check' : 'content_copy'}</span>
+                  <span>{copiedLink ? 'Copied!' : 'Copy Referral Link'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = quickShareProduct.id;
+                    setQuickShareProduct(null);
+                    navigate(`/share-earn-config?id=${id}`);
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[#b90041] font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-base">tune</span>
+                  <span>Studio Options</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Responsive Universal Bottom Navigation Bar */}
       <AppBottomNav activeNav="home" />

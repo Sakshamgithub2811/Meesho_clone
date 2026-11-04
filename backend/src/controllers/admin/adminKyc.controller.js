@@ -1,3 +1,62 @@
+
+/**
+ * Normalizes KYC application documents so that nested pan, aadhaar, and bank objects
+ * are guaranteed to exist, even if submitted with flat fields.
+ */
+export const normalizeKycApplication = (app) => {
+  if (!app) return app;
+  const docs = app.documents || {};
+  const holderName = (docs.accountHolderName || docs.fullName || app.user?.fullName || '').toUpperCase();
+  const panNum = docs.pan?.number || docs.panNumber || '';
+  const aadhaarNum = docs.aadhaar?.number || docs.aadhaarNumber || '';
+  const bankName = docs.bank?.bankName || docs.bankName || '';
+  const accNum = docs.bank?.accountNumber || docs.accountNumber || '';
+  const ifsc = (docs.bank?.ifsc || docs.ifscCode || '').toUpperCase();
+  const upi = docs.bank?.upiId || docs.upiId || '';
+
+  const panImg = docs.pan?.image || docs.panPreview || docs.panPreviewUrl || null;
+  const aadhaarImg = docs.aadhaar?.image || docs.aadhaarPreview || docs.aadhaarPreviewUrl || null;
+  const chequeImg = docs.bank?.image || docs.chequePreview || docs.chequePreviewUrl || null;
+
+  const normalizedDocs = {
+    ...docs,
+    panNumber: panNum,
+    aadhaarNumber: aadhaarNum,
+    bankName,
+    accountNumber: accNum,
+    ifscCode: ifsc,
+    upiId: upi,
+    pan: docs.pan || (panNum ? {
+      number: panNum.toUpperCase(),
+      nameOnDoc: docs.pan?.nameOnDoc || holderName,
+      status: docs.pan?.status || 'Submitted',
+      image: panImg,
+      docName: docs.pan?.docName || docs.panDocName || ''
+    } : null),
+    aadhaar: docs.aadhaar || (aadhaarNum ? {
+      number: aadhaarNum,
+      nameOnDoc: docs.aadhaar?.nameOnDoc || holderName,
+      status: docs.aadhaar?.status || 'Submitted',
+      image: aadhaarImg,
+      docName: docs.aadhaar?.docName || docs.aadhaarDocName || ''
+    } : null),
+    bank: docs.bank || (accNum ? {
+      bankName: bankName,
+      accountNumber: accNum,
+      ifsc: ifsc,
+      holderName: docs.bank?.holderName || holderName,
+      upiId: upi,
+      image: chequeImg,
+      docName: docs.bank?.docName || docs.chequeDocName || ''
+    } : null)
+  };
+
+  return {
+    ...app,
+    documents: normalizedDocs
+  };
+};
+
 import prisma from '../../config/prisma.js';
 
 /**
@@ -221,14 +280,17 @@ export const submitAffiliateKyc = async (req, res) => {
       followers,
       panNumber,
       panDocName,
+      panPreview,
       aadhaarNumber,
       aadhaarDocName,
+      aadhaarPreview,
       bankName,
       accountHolderName,
       accountNumber,
       ifscCode,
       upiId,
       chequeDocName,
+      chequePreview,
       documents
     } = req.body || {};
 
@@ -309,6 +371,18 @@ export const submitAffiliateKyc = async (req, res) => {
       }
     }
 
+    const holderName = (accountHolderName || fullName || profile.fullName || '').toUpperCase();
+    const finalPan = (panNumber || documents?.panNumber || '').toUpperCase();
+    const finalAadhaar = aadhaarNumber || documents?.aadhaarNumber || '';
+    const finalBankName = bankName || documents?.bankName || '';
+    const finalAccNum = accountNumber || documents?.accountNumber || '';
+    const finalIfsc = (ifscCode || documents?.ifscCode || '').toUpperCase();
+    const finalUpi = upiId || documents?.upiId || '';
+
+    const panImg = panPreview || documents?.panPreview || documents?.panPreviewUrl || documents?.pan?.image || null;
+    const aadhaarImg = aadhaarPreview || documents?.aadhaarPreview || documents?.aadhaarPreviewUrl || documents?.aadhaar?.image || null;
+    const chequeImg = chequePreview || documents?.chequePreview || documents?.chequePreviewUrl || documents?.bank?.image || null;
+
     const docPayload = {
       ...(documents || {}),
       applicationId: applicationId || `KYC-AFF-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -318,16 +392,43 @@ export const submitAffiliateKyc = async (req, res) => {
       handle: handle || '',
       platform: platform || 'Direct / Social',
       followers: followers || '0',
-      panNumber: (panNumber || '').toUpperCase(),
-      panDocName: panDocName || '',
-      aadhaarNumber: aadhaarNumber || '',
-      aadhaarDocName: aadhaarDocName || '',
-      bankName: bankName || '',
-      accountHolderName: (accountHolderName || fullName || profile.fullName || '').toUpperCase(),
-      accountNumber: accountNumber || '',
-      ifscCode: (ifscCode || '').toUpperCase(),
-      upiId: upiId || '',
-      chequeDocName: chequeDocName || '',
+      panNumber: finalPan,
+      panDocName: panDocName || documents?.panDocName || '',
+      panPreview: panImg,
+      aadhaarNumber: finalAadhaar,
+      aadhaarDocName: aadhaarDocName || documents?.aadhaarDocName || '',
+      aadhaarPreview: aadhaarImg,
+      bankName: finalBankName,
+      accountHolderName: holderName,
+      accountNumber: finalAccNum,
+      ifscCode: finalIfsc,
+      upiId: finalUpi,
+      chequeDocName: chequeDocName || documents?.chequeDocName || '',
+      chequePreview: chequeImg,
+      // Structured objects required by Admin KYC Review modals
+      pan: {
+        number: finalPan,
+        nameOnDoc: holderName,
+        status: 'Submitted',
+        image: panImg,
+        docName: panDocName || documents?.panDocName || ''
+      },
+      aadhaar: {
+        number: finalAadhaar,
+        nameOnDoc: holderName,
+        status: 'Submitted',
+        image: aadhaarImg,
+        docName: aadhaarDocName || documents?.aadhaarDocName || ''
+      },
+      bank: {
+        bankName: finalBankName,
+        accountNumber: finalAccNum,
+        ifsc: finalIfsc,
+        holderName: holderName,
+        upiId: finalUpi,
+        image: chequeImg,
+        docName: chequeDocName || documents?.chequeDocName || ''
+      },
       submittedAt: new Date().toLocaleString('en-IN', {
         day: 'numeric',
         month: 'short',

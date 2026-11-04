@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
+    "build": "prisma generate",
     "dev": "nodemon index.js",
     "test:auth": "node test-supplier-auth.js"
   },

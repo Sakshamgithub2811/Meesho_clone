@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
 import { getProducts } from '../../services/ecommerceService';
-import { getAffiliateStats, subscribeAffiliateAuth, getStoredAffiliate } from '../../services/affiliateAuthService';
+import { getAffiliateStats, fetchAffiliateStats, subscribeAffiliateAuth, getStoredAffiliate } from '../../services/affiliateAuthService';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
 import { getStoredCustomer } from '../../services/customerAuthService';
 
@@ -27,6 +27,11 @@ export default function AffiliateProgram() {
   const [affiliateStats, setAffiliateStats] = useState(() => getAffiliateStats());
 
   useEffect(() => {
+    fetchAffiliateStats().then((stats) => {
+      if (stats) setAffiliateStats(stats);
+      if (typeof stats?.walletBalance === 'number') setWalletBalance(stats.walletBalance);
+    }).catch(() => {});
+
     const unsub = subscribeAffiliateAuth(() => {
       setAffiliateStats(getAffiliateStats());
       try {

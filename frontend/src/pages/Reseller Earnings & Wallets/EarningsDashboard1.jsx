@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import NavDrawer from "../../components/NavDrawer";
 import AppBottomNav from "../../components/AppBottomNav";
-import { getOrders } from "../../services/ecommerceService";
+import { getOrders, getWalletDetails } from "../../services/ecommerceService";
+import { fetchAffiliateStats } from "../../services/affiliateAuthService";
 
 const EarningsDashboard1 = ({ onNavigate, onBack }) => {
   const navigate = useNavigate();
@@ -13,31 +14,31 @@ const EarningsDashboard1 = ({ onNavigate, onBack }) => {
   const [chartView, setChartView] = useState("6M");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const [walletBalance, setWalletBalance] = useState(() => {
-    try {
-      const stored = localStorage.getItem('mshoppy_customer_wallet');
-      return stored ? parseFloat(stored) : 0;
-    } catch (e) {
-      return 0;
-    }
-  });
-
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [pendingAmount, setPendingAmount] = useState(0);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getOrders()
-      .then((data) => {
-        if (data && Array.isArray(data)) {
-          setOrders(data);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      getOrders().catch(() => []),
+      getWalletDetails().catch(() => null),
+      fetchAffiliateStats().catch(() => null)
+    ]).then(([ordersData, walletData, statsData]) => {
+      if (ordersData && Array.isArray(ordersData)) {
+        setOrders(ordersData);
+      }
+      if (walletData && typeof walletData.balance === 'number') {
+        setWalletBalance(walletData.balance);
+        setPendingAmount(walletData.pending || 0);
+      } else if (statsData) {
+        if (typeof statsData.walletBalance === 'number') setWalletBalance(statsData.walletBalance);
+        if (typeof statsData.pendingCommission === 'number') setPendingAmount(statsData.pendingCommission);
+      }
+    }).finally(() => setLoading(false));
   }, []);
 
   const totalOrdersCount = orders.length;
-  const pendingAmount = orders.filter(o => o.status === 'Pending' || o.status === 'Processing').length * 150;
 
   return (
     <div className="bg-background text-on-surface min-h-screen pb-32 font-sans selection:bg-primary/20">

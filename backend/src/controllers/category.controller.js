@@ -70,7 +70,6 @@ export const getCategoryBySlug = async (req, res) => {
       where: { slug },
       include: {
         products: {
-          take: 50,
           orderBy: { createdAt: 'desc' }
         },
         _count: {

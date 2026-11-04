@@ -6,10 +6,15 @@ import redisClient from '../config/redisClient.js';
  */
 export const getProducts = async (req, res) => {
   try {
-    const { category, search, minPrice, maxPrice, sort, page = 1, limit = 1000 } = req.query;
+    const { category, search, minPrice, maxPrice, sort, page = 1, limit, all } = req.query;
+
+    const isFetchAll = all === 'true' || limit === 'all' || limit === '0' || limit === 'max';
+    const pageNum = parseInt(page) || 1;
+    const take = isFetchAll ? undefined : (parseInt(limit) || 24);
+    const skip = isFetchAll ? undefined : ((pageNum - 1) * take);
 
     // Fast-path: Check Redis cache if running
-    const cacheKey = `products:${category || 'all'}:${search || ''}:${minPrice || ''}:${maxPrice || ''}:${sort || 'default'}:${page}:${limit}`;
+    const cacheKey = `products:${category || 'all'}:${search || ''}:${minPrice || ''}:${maxPrice || ''}:${sort || 'default'}:${isFetchAll ? 'all' : pageNum}:${isFetchAll ? 'all' : take}`;
     if (redisClient?.isOpen) {
       try {
         const cached = await redisClient.get(cacheKey);
@@ -89,9 +94,6 @@ export const getProducts = async (req, res) => {
     if (sort === 'rating' || sort === 'highest_rating') orderBy = { rating: 'desc' };
     if (sort === 'popular') orderBy = { reviewsCount: 'desc' };
 
-    const take = parseInt(limit);
-    const skip = (parseInt(page) - 1) * take;
-
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -101,16 +103,22 @@ export const getProducts = async (req, res) => {
           }
         },
         orderBy,
-        skip,
-        take
+        ...(take !== undefined ? { skip, take } : {})
       }),
       prisma.product.count({ where })
     ]);
+
+    const totalPages = isFetchAll ? 1 : Math.ceil(total / (take || 1));
+    const hasMore = isFetchAll ? false : (skip + products.length < total);
 
     const responsePayload = {
       success: true,
       count: products.length,
       total,
+      page: isFetchAll ? 1 : pageNum,
+      limit: isFetchAll ? total : take,
+      totalPages,
+      hasMore,
       data: products
     };
 

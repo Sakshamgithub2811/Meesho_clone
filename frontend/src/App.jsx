@@ -1160,9 +1160,9 @@ function AppRoutes() {
         />
 
         {/* Admin Panel Routes (Protected) */}
-        <Route path="/admin-panel1" element={<AdminWebPanel1 />} />
 
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+          <Route path="/admin-panel1" element={<AdminWebPanel1 />} />
           <Route
             path="/admin-panel"
             element={

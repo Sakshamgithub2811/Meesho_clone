@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
@@ -81,7 +82,7 @@ export default function AdminFinanceManagement() {
       if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
       const res = await axios.get(
-        `http://localhost:5000/api/v1/admin-finance?${params.toString()}`,
+        `${API_V1_BASE}/admin-finance?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -138,7 +139,7 @@ export default function AdminFinanceManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const res = await axios.post(
-        `http://localhost:5000/api/v1/admin-finance/wallets/${walletId}/adjust`,
+        `${API_V1_BASE}/admin-finance/wallets/${walletId}/adjust`,
         payload,
         {
           headers: {

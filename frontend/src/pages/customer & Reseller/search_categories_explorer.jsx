@@ -93,6 +93,20 @@ const CATEGORY_GRADIENTS = {
   'default': 'bg-gradient-to-r from-[#831843] via-[#be185d] to-[#db2777]'
 };
 
+// Curated high-resolution aesthetic hero banner images per category
+const CATEGORY_HERO_IMAGES = {
+  'women-ethnic': 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80',
+  'women-western': 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=80',
+  'men': 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=800&auto=format&fit=crop&q=80',
+  'kids': 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=800&auto=format&fit=crop&q=80',
+  'home-kitchen': 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=800&auto=format&fit=crop&q=80',
+  'beauty-health': 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800&auto=format&fit=crop&q=80',
+  'jewellery': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800&auto=format&fit=crop&q=80',
+  'footwear': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80',
+  'electronics': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
+  'default': 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80'
+};
+
 export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -257,8 +271,14 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
   const currentCategory = categories.find(c => c.slug === activeSlug) || categoryData || {
     name: 'Category Explorer',
     slug: activeSlug,
-    imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=700&auto=format&fit=crop&q=80'
+    imageUrl: CATEGORY_HERO_IMAGES[activeSlug] || CATEGORY_HERO_IMAGES['default']
   };
+
+  const bannerImage =
+    CATEGORY_HERO_IMAGES[activeSlug] ||
+    currentCategory?.imageUrl ||
+    (products[0]?.images && products[0].images[0]) ||
+    CATEGORY_HERO_IMAGES['default'];
 
   const dynamicSubcategories = useMemo(() => {
     if (currentCategory?.subcategories && currentCategory.subcategories.length > 0) {
@@ -268,7 +288,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
   }, [currentCategory, activeCategoryMeta]);
 
   return (
-    <div className="bg-[#f8f9fb] font-sans text-[#191c1e] min-h-screen flex flex-col antialiased selection:bg-pink-100 selection:text-pink-700">
+    <div className="bg-[#f8f9fb] font-sans text-[#191c1e] h-screen max-h-screen overflow-hidden flex flex-col antialiased selection:bg-pink-100 selection:text-pink-700">
       {/* Toast Alert */}
       {showToast && (
         <div className="fixed top-20 right-6 z-50 bg-[#008644] text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-bounce">
@@ -278,7 +298,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
       )}
 
       {/* Top Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-xs">
+      <header className="shrink-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-xs">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
           {/* Logo & Back button */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -362,12 +382,12 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
       </header>
 
       {/* Main Split Layout */}
-      <main className="max-w-7xl w-full mx-auto flex flex-1 overflow-hidden h-[calc(100dvh-140px)] sm:h-[calc(100dvh-130px)] px-0 sm:px-4 lg:px-8 py-0 sm:py-3 mb-16 sm:mb-20">
+      <main className="max-w-7xl w-full mx-auto flex-1 min-h-0 flex overflow-hidden px-0 sm:px-4 lg:px-8 py-1 sm:py-3">
         {/* Category Navigation Sidebar */}
-        <aside className="h-full w-24 sm:w-52 md:w-60 lg:w-64 flex flex-col bg-[#F2F4F6] sm:rounded-2xl border-r sm:border border-slate-200/60 overflow-y-auto overflow-x-hidden shrink-0 select-none shadow-sm pb-24 sm:pb-16">
+        <aside className="h-full w-20 sm:w-52 md:w-60 lg:w-64 flex flex-col bg-[#F2F4F6] sm:rounded-2xl border-r sm:border border-slate-200/60 overflow-y-auto overscroll-contain shrink-0 select-none shadow-sm pb-20 md:pb-4 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent">
           <div className="p-3 hidden sm:block border-b border-slate-200/50">
             <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">
-              Live Categories ({categories.length})
+              Categories
             </span>
           </div>
 
@@ -387,14 +407,14 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
                   <button
                     key={cat.id || cat.slug}
                     onClick={() => setActiveSlug(cat.slug)}
-                    className={`py-3 px-2 sm:px-4 flex sm:flex-row flex-col items-center sm:gap-3 gap-1 transition-all cursor-pointer relative text-left rounded-xl mx-1 sm:mx-1.5 w-[calc(100%-8px)] sm:w-[calc(100%-12px)] ${
+                    className={`py-2.5 px-1 sm:px-4 flex sm:flex-row flex-col items-center sm:gap-3 gap-1 transition-all cursor-pointer relative text-left rounded-xl mx-1 sm:mx-1.5 w-[calc(100%-8px)] sm:w-[calc(100%-12px)] ${
                       isActive
                         ? 'bg-white text-[#FF3F6C] font-extrabold shadow-sm'
                         : 'text-slate-600 opacity-80 hover:opacity-100 hover:bg-white/50'
                     }`}
                   >
                     {isActive && (
-                      <span className="absolute left-0 top-1 bottom-1 w-1.5 bg-[#FF3F6C] rounded-r-full sm:hidden" />
+                      <span className="absolute left-0 top-2 bottom-2 w-1.5 bg-[#FF3F6C] rounded-r-full sm:hidden" />
                     )}
                     <span
                       className="material-symbols-outlined text-2xl sm:text-xl shrink-0 pointer-events-none"
@@ -402,15 +422,10 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
                     >
                       {iconName}
                     </span>
-                    <div className="min-w-0 flex-1 truncate text-center sm:text-left">
-                      <span className="text-[10.5px] sm:text-xs leading-tight font-bold block truncate">
+                    <div className="w-full min-w-0 text-center sm:text-left px-0.5">
+                      <span className="text-[10px] sm:text-xs leading-[13px] sm:leading-tight font-bold block break-words line-clamp-2">
                         {cat.name}
                       </span>
-                      {count > 0 && (
-                        <span className="text-[9px] text-slate-400 font-semibold hidden sm:inline-block">
-                          {count} {count === 1 ? 'item' : 'items'}
-                        </span>
-                      )}
                     </div>
                   </button>
                 );
@@ -420,19 +435,16 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
         </aside>
 
         {/* Dynamic Category Content Canvas */}
-        <section className="flex-1 min-w-0 w-full bg-white sm:rounded-2xl sm:border border-slate-200/60 sm:ml-4 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-32 sm:pb-24 shadow-sm">
+        <section className="flex-1 min-h-0 h-full w-full bg-white sm:rounded-2xl sm:border border-slate-200/60 sm:ml-4 overflow-y-auto overscroll-contain p-3 sm:p-6 lg:p-8 pb-24 md:pb-8 shadow-sm [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent">
           {/* Category Header */}
           <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3 sm:pb-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-2xl md:text-3xl font-black text-[#191c1e] truncate">
+                <h2 className="text-base sm:text-2xl md:text-3xl font-black text-[#191c1e] leading-snug">
                   {currentCategory.name}
                 </h2>
-                <span className="bg-pink-50 text-[#FF3F6C] text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-pink-100">
-                  {products.length} Live Items
-                </span>
               </div>
-              <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5 truncate">
+              <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
                 {activeCategoryMeta.subtitle}
               </p>
             </div>
@@ -478,12 +490,21 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
 
             {/* Right Column: Premium Showcase Card with EXACT 2:3 Portrait Aspect (Zero Cropping, Full Head & Body Visible) */}
             <div className="relative shrink-0 flex items-center justify-center p-3 sm:p-5 md:p-6 z-10 self-center">
-              <div className="relative h-32 sm:h-44 md:h-50 aspect-[2/3] rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/40 ring-4 ring-black/10 bg-black/20 group-hover:scale-105 group-hover:-rotate-1 transition-all duration-300">
+              <div 
+                key={`banner-card-${activeSlug}`}
+                className="relative h-32 sm:h-44 md:h-50 aspect-[2/3] rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/40 ring-4 ring-black/10 bg-black/20 group-hover:scale-[1.02] transition-transform duration-300"
+              >
                 <img
-                  src={currentCategory.imageUrl || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=700&auto=format&fit=crop&q=80'}
+                  key={`hero-img-${activeSlug}`}
+                  src={bannerImage}
                   alt={currentCategory.name}
-                  className="w-full h-full object-cover object-top"
-                  loading="lazy"
+                  className="w-full h-full object-cover object-top transition-all duration-300"
+                  onError={(e) => {
+                    const fallback = (products[0]?.images && products[0].images[0]) || CATEGORY_HERO_IMAGES['default'];
+                    if (e.target.src !== fallback) {
+                      e.target.src = fallback;
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -515,9 +536,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
               <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
                 {selectedSubcat === 'All' ? 'Available Products' : `${selectedSubcat} Styles`}
               </h3>
-              <span className="text-xs text-slate-400 font-semibold">
-                Showing {filteredProducts.length} items
-              </span>
+              
             </div>
 
             {loadingProducts ? (
@@ -549,7 +568,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
                     <div
                       key={prod.id}
                       onClick={() => navigate(`/product?id=${prod.id}`)}
-                      className="group bg-white rounded-2xl border border-slate-100 hover:border-pink-200 hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col cursor-pointer relative"
+                      className="group bg-white rounded-2xl border border-slate-100 hover:border-pink-200 hover:shadow-lg transition-[border-color,box-shadow,transform] duration-200 overflow-hidden flex flex-col cursor-pointer relative hover:-translate-y-0.5"
                     >
                       {/* Thumbnail & Wishlist Button */}
                       <div className="aspect-[4/5] bg-slate-100 relative overflow-hidden">

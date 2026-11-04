@@ -195,7 +195,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
     async function loadFlashData() {
       try {
         const [prods, cart, wish, flashConfig] = await Promise.all([
-          getProducts(),
+          getProducts({ all: true }),
           getCart(),
           getWishlist(),
           getFlashSaleConfig()

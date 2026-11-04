@@ -107,7 +107,7 @@ export const createOrder = async (req, res) => {
 
     let finalOrderTotal = authoritativeTotal;
     if (couponCode) {
-      const discount = calculateCouponDiscount(couponCode, authoritativeTotal);
+      const discount = await calculateCouponDiscount(couponCode, authoritativeTotal);
       finalOrderTotal = Math.max(0, authoritativeTotal - discount);
     }
 
@@ -156,6 +156,14 @@ export const createOrder = async (req, res) => {
       await tx.cartItem.deleteMany({
         where: { userId }
       });
+
+      // 4. Increment coupon usage count if applied
+      if (couponCode) {
+        await tx.coupon.updateMany({
+          where: { code: couponCode.trim().toUpperCase() },
+          data: { usedCount: { increment: 1 } }
+        }).catch(() => {});
+      }
 
       return newOrder;
     });

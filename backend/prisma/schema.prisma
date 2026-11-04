@@ -414,3 +414,25 @@ model Banner {
   updatedAt    DateTime @updatedAt @map("updated_at")
   @@map("banners")
 }
+
+// ── 18. Coupons & Promotions ──────────────────────────────────
+
+model Coupon {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  title       String
+  description String?
+  type        String    @default("FLAT") // 'FLAT' | 'PERCENT'
+  value       Float
+  minOrder    Float     @default(0) @map("min_order")
+  maxDiscount Float?    @map("max_discount")
+  expiresAt   DateTime  @map("expires_at")
+  usageLimit  Int?      @map("usage_limit")
+  usedCount   Int       @default(0) @map("used_count")
+  isActive    Boolean   @default(true) @map("is_active")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("coupons")
+}
