@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import os from 'os';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -57,8 +59,13 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Static uploads directory for product images
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Static uploads directory for product images (supports local & Vercel /tmp)
+const localUploads = path.join(__dirname, 'uploads');
+const tmpUploads = path.join(os.tmpdir(), 'uploads');
+if (fs.existsSync(localUploads)) {
+  app.use('/uploads', express.static(localUploads));
+}
+app.use('/uploads', express.static(tmpUploads));
 
 // Root documentation route
 app.get('/api', (req, res) => {

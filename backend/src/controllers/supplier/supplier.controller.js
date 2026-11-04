@@ -4,6 +4,29 @@ import prisma from '../../config/prisma.js';
 import supabase from '../../config/supabaseClient.js';
 import slugify from 'slugify';
 import { dispatchDeliveryOtpEmail } from '../order.controller.js';
+import { getUploadDir } from '../../middlewares/upload.middleware.js';
+
+// Helper to persist uploaded files to Supabase Storage or fallback to local/tmp URL
+const uploadFileToStorage = async (file, baseUrl) => {
+  if (supabase?.storage && file?.path) {
+    try {
+      const fileBuffer = fs.readFileSync(file.path);
+      const ext = path.extname(file.originalname || file.filename || '.jpg');
+      const filename = `product_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
+      const { data, error } = await supabase.storage.from('uploads').upload(filename, fileBuffer, {
+        contentType: file.mimetype || 'image/jpeg',
+        upsert: true
+      });
+      if (!error && data?.path) {
+        const { data: pubData } = supabase.storage.from('uploads').getPublicUrl(data.path);
+        if (pubData?.publicUrl) return pubData.publicUrl;
+      }
+    } catch (sbErr) {
+      // Supabase direct upload note (fallback continues)
+    }
+  }
+  return `${baseUrl}/uploads/${file.filename}`;
+};
 
 // Helper to save base64 data URLs as static files in uploads/
 const saveBase64Image = (base64Str, baseUrl) => {
@@ -19,11 +42,7 @@ const saveBase64Image = (base64Str, baseUrl) => {
     else if (mimeType.includes('webp')) ext = '.webp';
     else if (mimeType.includes('jpeg')) ext = '.jpeg';
 
-    const uploadDir = path.resolve('uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
+    const uploadDir = getUploadDir();
     const filename = `img_${Date.now()}_${Math.round(Math.random() * 1e9)}${ext}`;
     const filePath = path.join(uploadDir, filename);
     fs.writeFileSync(filePath, dataBuffer);
@@ -187,7 +206,10 @@ export const addProduct = async (req, res, next) => {
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      imageUrls.push(...req.files.map((file) => `${baseUrl}/uploads/${file.filename}`));
+      for (const file of req.files) {
+        const storedUrl = await uploadFileToStorage(file, baseUrl);
+        imageUrls.push(storedUrl);
+      }
     }
 
     if (req.body.images) {

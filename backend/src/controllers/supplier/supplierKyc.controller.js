@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import prisma from '../../config/prisma.js';
 import supabase from '../../config/supabaseClient.js';
+import { getUploadDir } from '../../middlewares/upload.middleware.js';
 
 // In-memory fallback store for offline resiliency
 const fallbackKycStore = new Map();
@@ -23,10 +24,7 @@ const saveBase64Image = (base64Str, baseUrl) => {
     else if (mimeType.includes('webp')) ext = '.webp';
     else if (mimeType.includes('jpeg')) ext = '.jpeg';
 
-    const uploadDir = path.resolve('uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    const uploadDir = getUploadDir();
 
     const filename = `kyc_${Date.now()}_${Math.round(Math.random() * 1e9)}${ext}`;
     const filePath = path.join(uploadDir, filename);
