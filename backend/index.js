@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 
 dotenv.config();
 
-// Auto-reloaded for avatar route
+// Auto-reloaded for soft-delete & Prisma client sync
 
 // Initialize services
 import './src/config/firebaseAdmin.js';

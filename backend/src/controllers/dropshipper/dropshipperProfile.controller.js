@@ -53,7 +53,7 @@ export const getDropshipperProfile = async (req, res) => {
  */
 export const updateDropshipperProfile = async (req, res) => {
   try {
-    const { firebaseUid, fullName, phone, avatarUrl, storeName, bankDetails } = req.body;
+    const { firebaseUid, fullName, phone, avatarUrl, storeName, bankDetails, pan, gstin } = req.body;
 
     if (!firebaseUid) {
       return res.status(400).json({ error: "Missing Firebase UID in request body" });
@@ -112,6 +112,14 @@ export const updateDropshipperProfile = async (req, res) => {
       updateData.storeName = storeName.trim();
     }
 
+    if (typeof pan === 'string' && pan.trim()) {
+      updateData.pan = pan.trim().toUpperCase();
+    }
+
+    if (typeof gstin === 'string' && gstin.trim()) {
+      updateData.gstin = gstin.trim().toUpperCase();
+    }
+
     if (bankDetails && typeof bankDetails === 'object') {
       updateData.bankDetails = bankDetails;
     }
@@ -151,6 +159,14 @@ export const updateDropshipperProfile = async (req, res) => {
         }
         if (cleanPhone) {
           docs.phone = cleanPhone;
+        }
+        if (typeof pan === 'string' && pan.trim()) {
+          docs.pan = { ...(docs.pan || {}), number: pan.trim().toUpperCase() };
+          docs.panNumber = pan.trim().toUpperCase();
+        }
+        if (typeof gstin === 'string' && gstin.trim()) {
+          docs.tax = { ...(docs.tax || {}), gstin: gstin.trim().toUpperCase() };
+          docs.gstin = gstin.trim().toUpperCase();
         }
         if (bankDetails && typeof bankDetails === 'object') {
           docs.bank = {
@@ -245,6 +261,111 @@ export const uploadDropshipperAvatar = async (req, res) => {
   } catch (error) {
     console.error("Upload Avatar Error:", error);
     return res.status(500).json({ error: error.message || "Failed to upload avatar" });
+  }
+};
+
+/**
+ * 4. DEACTIVATE DROPSHIPPER ACCOUNT (SOFT DELETE)
+ * Route: POST /api/v1/dropshipper/profile/deactivate
+ * Body: { firebaseUid, reason }
+ */
+export const deactivateDropshipperAccount = async (req, res) => {
+  try {
+    const { firebaseUid, reason, email } = req.body;
+
+    if (!firebaseUid && !email) {
+      return res.status(400).json({ error: "Missing Firebase UID or email in request body" });
+    }
+
+    let profile = null;
+    if (firebaseUid) {
+      profile = await prisma.profile.findUnique({
+        where: { id: firebaseUid }
+      });
+    }
+
+    if (!profile && email) {
+      profile = await prisma.profile.findFirst({
+        where: { email: { equals: email.trim(), mode: 'insensitive' } }
+      });
+    }
+
+    if (!profile) {
+      return res.status(404).json({ error: "Dropshipper profile not found in database" });
+    }
+
+    if (profile.role !== 'DROPSHIPPER' && profile.role !== 'RESELLER') {
+      return res.status(403).json({ error: "Access Denied: Account is not authorized as a Dropshipper" });
+    }
+
+    // Soft delete: Mark account as deleted with timestamp without purging historical orders/wallets
+    const deactivatedProfile = await prisma.profile.update({
+      where: { id: profile.id },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date()
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Dropshipper account deactivated successfully. Historical order and margin ledger preserved.",
+      profile: deactivatedProfile
+    });
+
+  } catch (error) {
+    console.error("Deactivate Dropshipper Account Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to deactivate account" });
+  }
+};
+
+/**
+ * 5. RESTORE DROPSHIPPER ACCOUNT
+ * Route: POST /api/v1/dropshipper/profile/restore
+ * Body: { firebaseUid, email }
+ */
+export const restoreDropshipperAccount = async (req, res) => {
+  try {
+    const { firebaseUid, email } = req.body;
+
+    if (!firebaseUid && !email) {
+      return res.status(400).json({ error: "Missing Firebase UID or email in request body" });
+    }
+
+    let profile = null;
+    if (firebaseUid) {
+      profile = await prisma.profile.findUnique({
+        where: { id: firebaseUid }
+      });
+    }
+
+    if (!profile && email) {
+      profile = await prisma.profile.findFirst({
+        where: { email: { equals: email.trim(), mode: 'insensitive' } }
+      });
+    }
+
+    if (!profile) {
+      return res.status(404).json({ error: "Dropshipper profile not found in database" });
+    }
+
+    const restoredProfile = await prisma.profile.update({
+      where: { id: profile.id },
+      data: {
+        isDeleted: false,
+        deletedAt: null
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Dropshipper account restored successfully.",
+      profile: restoredProfile
+    });
+
+  } catch (error) {
+    console.error("Restore Dropshipper Account Error:", error);
+    return res.status(500).json({ error: error.message || "Failed to restore account" });
   }
 };
 

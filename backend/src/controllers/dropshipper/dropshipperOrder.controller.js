@@ -23,6 +23,7 @@ export const pushDropshipperOrder = async (req, res) => {
       wholesaleCost = 500,
       customerPrice = 999,
       shippingFee = 60,
+      courier = 'Delhivery Express',
       paymentMode = 'COD',
       whiteLabelStoreName = 'Aura Boutique'
     } = req.body;
@@ -34,13 +35,28 @@ export const pushDropshipperOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Customer name, phone, address, and pincode are required' });
     }
 
-    // 1. Verify Profile exists
+    // 1. Verify KYC Approval Status in Database
+    const kycApp = await (prisma.kYCApplication || prisma.kycApplication).findFirst({
+      where: {
+        userId: firebaseUid,
+        type: { equals: 'DROPSHIPPER', mode: 'insensitive' }
+      }
+    });
+
+    if (!kycApp || kycApp.status?.toUpperCase() !== 'APPROVED') {
+      return res.status(403).json({
+        success: false,
+        message: 'Action Forbidden: You must complete 4-Step KYC and have it approved by admin before pushing orders to suppliers.',
+        kycStatus: kycApp ? kycApp.status : 'NOT_SUBMITTED'
+      });
+    }
+
+    // 2. Verify Profile exists
     let profile = await prisma.profile.findUnique({
       where: { id: firebaseUid }
     });
 
     if (!profile) {
-      // Auto-create or fallback if not found
       profile = await prisma.profile.create({
         data: {
           id: firebaseUid,
@@ -51,7 +67,7 @@ export const pushDropshipperOrder = async (req, res) => {
       });
     }
 
-    // 2. Resolve Product ID
+    // 3. Resolve Product ID
     let resolvedProduct = null;
     if (productId) {
       resolvedProduct = await prisma.product.findUnique({ where: { id: productId } });
@@ -81,7 +97,7 @@ export const pushDropshipperOrder = async (req, res) => {
       customerPrice: Number(customerPrice),
       shippingFee: Number(shippingFee),
       dropshipperMargin: calculatedMargin,
-      courier: 'Delhivery Express',
+      courier: courier || 'Delhivery Express',
       awb: randomAwb,
       paymentMode: paymentMode.toUpperCase()
     };
@@ -114,15 +130,23 @@ export const pushDropshipperOrder = async (req, res) => {
       success: true,
       message: 'Dropshipper order pushed to supplier successfully!',
       order: {
-        id: newOrder.id,
-        orderNumber: `DSP-${newOrder.id.slice(0, 8).toUpperCase()}`,
-        date: newOrder.createdAt,
+        id: `DSP-${newOrder.id.slice(0, 8).toUpperCase()}`,
+        dbId: newOrder.id,
+        date: new Date(newOrder.createdAt).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
         customerName,
         customerPhone,
+        address,
         city,
         state,
         pincode,
         productName: shippingAddressPayload.productName,
+        productImg: resolvedProduct?.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=150&auto=format&fit=crop&q=80',
         sku: shippingAddressPayload.productSku,
         qty: Number(quantity),
         wholesaleCost: shippingAddressPayload.wholesaleCost,
@@ -130,7 +154,7 @@ export const pushDropshipperOrder = async (req, res) => {
         shippingFee: Number(shippingFee),
         margin: calculatedMargin,
         paymentMode: paymentMode.toUpperCase(),
-        status: newOrder.orderStatus,
+        status: 'DISPATCHED',
         courier: shippingAddressPayload.courier,
         awb: shippingAddressPayload.awb
       }
@@ -159,6 +183,22 @@ export const pushBulkDropshipperOrders = async (req, res) => {
     }
     if (!orders || orders.length === 0) {
       return res.status(400).json({ success: false, message: 'No orders provided in batch' });
+    }
+
+    // Verify KYC Approval Status in Database
+    const kycApp = await (prisma.kYCApplication || prisma.kycApplication).findFirst({
+      where: {
+        userId: firebaseUid,
+        type: { equals: 'DROPSHIPPER', mode: 'insensitive' }
+      }
+    });
+
+    if (!kycApp || kycApp.status?.toUpperCase() !== 'APPROVED') {
+      return res.status(403).json({
+        success: false,
+        message: 'Action Forbidden: You must complete 4-Step KYC and have it approved by admin before bulk pushing orders.',
+        kycStatus: kycApp ? kycApp.status : 'NOT_SUBMITTED'
+      });
     }
 
     const fallbackProduct = await prisma.product.findFirst();
@@ -216,14 +256,31 @@ export const pushBulkDropshipperOrders = async (req, res) => {
       });
 
       createdOrders.push({
-        id: order.id,
-        orderNumber: `DSP-${order.id.slice(0, 8).toUpperCase()}`,
+        id: `DSP-${order.id.slice(0, 8).toUpperCase()}`,
+        dbId: order.id,
+        date: new Date(order.createdAt).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
         customerName: shippingAddress.fullName,
+        customerPhone: shippingAddress.phone,
+        address: shippingAddress.addressLine,
+        city: shippingAddress.city,
+        state: shippingAddress.state,
+        pincode: shippingAddress.pincode,
         productName: shippingAddress.productName,
+        productImg: fallbackProduct?.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=150&auto=format&fit=crop&q=80',
+        sku: shippingAddress.productSku,
+        qty,
+        wholesaleCost: wholesale * qty,
         customerPrice: selling,
+        shippingFee: shipping,
         margin,
         paymentMode: shippingAddress.paymentMode,
-        status: order.orderStatus,
+        status: 'DISPATCHED',
         courier: shippingAddress.courier,
         awb: shippingAddress.awb
       });
@@ -288,10 +345,12 @@ export const getDropshipperOrders = async (req, res) => {
         }),
         customerName: addr.fullName || 'Customer',
         customerPhone: addr.phone || '-',
+        address: addr.addressLine || 'Delivery Address',
         city: addr.city || 'City',
         state: addr.state || 'State',
         pincode: addr.pincode || '-',
         productName: addr.productName || o.items?.[0]?.product?.title || 'Sourced Item',
+        productImg: o.items?.[0]?.product?.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=150&auto=format&fit=crop&q=80',
         sku: addr.productSku || 'SKU-DS',
         qty: addr.quantity || o.items?.[0]?.quantity || 1,
         wholesaleCost: addr.wholesaleCost || (o.totalAmount * 0.6),
@@ -301,7 +360,12 @@ export const getDropshipperOrders = async (req, res) => {
         paymentMode: addr.paymentMode || o.paymentMethod || 'COD',
         status: o.orderStatus === 'ORDERED' ? 'DISPATCHED' : o.orderStatus,
         courier: addr.courier || 'Delhivery Express',
-        awb: addr.awb || `DEL-${o.id.slice(0, 10)}`
+        awb: addr.awb || `DEL-${o.id.slice(0, 10)}`,
+        isArchived: !!addr.isArchived,
+        cancellationReason: addr.cancellationReason || null,
+        cancelledAt: addr.cancelledAt || null,
+        altPhone: addr.altPhone || null,
+        landmark: addr.landmark || null
       };
     });
 
@@ -320,3 +384,335 @@ export const getDropshipperOrders = async (req, res) => {
     });
   }
 };
+
+/**
+ * 4. Update Dropshipper Order Details (Customer Address, Phone, Selling Price)
+ * PUT /api/v1/dropshipper/orders/:orderId
+ */
+export const updateDropshipperOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const {
+      customerName,
+      customerPhone,
+      altPhone,
+      address,
+      city,
+      state,
+      pincode,
+      landmark,
+      customerPrice,
+      paymentMode
+    } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'orderId param is required' });
+    }
+
+    // Resolve order by DB id or DSP- prefix
+    let dbOrderId = orderId;
+    if (orderId.startsWith('DSP-')) {
+      const hexSnippet = orderId.replace('DSP-', '').toLowerCase();
+      const matched = await prisma.order.findFirst({
+        where: { id: { startsWith: hexSnippet, mode: 'insensitive' } },
+        include: { items: { include: { product: true } } }
+      });
+      if (!matched) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+      dbOrderId = matched.id;
+    }
+
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: dbOrderId },
+      include: { items: { include: { product: true } } }
+    });
+
+    if (!existingOrder) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (existingOrder.orderStatus === 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'Cannot edit an order that has already been cancelled.' });
+    }
+
+    if (existingOrder.orderStatus === 'DELIVERED') {
+      return res.status(400).json({ success: false, message: 'Cannot edit an order that has already been delivered.' });
+    }
+
+    const currentAddr = (typeof existingOrder.shippingAddress === 'object' && existingOrder.shippingAddress !== null)
+      ? existingOrder.shippingAddress
+      : {};
+
+    const updatedPrice = customerPrice !== undefined ? Number(customerPrice) : existingOrder.totalAmount;
+    const wholesaleCost = currentAddr.wholesaleCost || (existingOrder.totalAmount * 0.6);
+    const shippingFee = currentAddr.shippingFee || 60;
+    const newMargin = Math.max(0, updatedPrice - wholesaleCost - shippingFee);
+
+    const updatedAddressPayload = {
+      ...currentAddr,
+      fullName: customerName || currentAddr.fullName,
+      phone: customerPhone || currentAddr.phone,
+      altPhone: altPhone !== undefined ? altPhone : currentAddr.altPhone,
+      addressLine: address || currentAddr.addressLine,
+      city: city || currentAddr.city,
+      state: state || currentAddr.state,
+      pincode: pincode || currentAddr.pincode,
+      landmark: landmark !== undefined ? landmark : currentAddr.landmark,
+      customerPrice: updatedPrice,
+      dropshipperMargin: newMargin,
+      ...(paymentMode && { paymentMode: paymentMode.toUpperCase() })
+    };
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: dbOrderId },
+      data: {
+        totalAmount: updatedPrice,
+        shippingAddress: updatedAddressPayload,
+        ...(paymentMode && {
+          paymentMethod: paymentMode.toUpperCase() === 'COD' ? 'COD' : 'UPI',
+          paymentStatus: paymentMode.toUpperCase() === 'COD' ? 'PENDING' : 'PAID'
+        })
+      },
+      include: { items: { include: { product: true } } }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Order delivery details & pricing updated successfully!',
+      order: {
+        id: `DSP-${updatedOrder.id.slice(0, 8).toUpperCase()}`,
+        dbId: updatedOrder.id,
+        date: new Date(updatedOrder.createdAt).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        customerName: updatedAddressPayload.fullName,
+        customerPhone: updatedAddressPayload.phone,
+        altPhone: updatedAddressPayload.altPhone,
+        address: updatedAddressPayload.addressLine,
+        city: updatedAddressPayload.city,
+        state: updatedAddressPayload.state,
+        pincode: updatedAddressPayload.pincode,
+        landmark: updatedAddressPayload.landmark,
+        productName: updatedAddressPayload.productName || updatedOrder.items?.[0]?.product?.title || 'Sourced Item',
+        productImg: updatedOrder.items?.[0]?.product?.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=150&auto=format&fit=crop&q=80',
+        sku: updatedAddressPayload.productSku || 'SKU-DS',
+        qty: updatedAddressPayload.quantity || updatedOrder.items?.[0]?.quantity || 1,
+        wholesaleCost: updatedAddressPayload.wholesaleCost || (updatedOrder.totalAmount * 0.6),
+        customerPrice: updatedOrder.totalAmount,
+        shippingFee: updatedAddressPayload.shippingFee || 60,
+        margin: updatedAddressPayload.dropshipperMargin || Math.max(0, updatedOrder.totalAmount * 0.3),
+        paymentMode: updatedAddressPayload.paymentMode || updatedOrder.paymentMethod || 'COD',
+        status: updatedOrder.orderStatus === 'ORDERED' ? 'DISPATCHED' : updatedOrder.orderStatus,
+        courier: updatedAddressPayload.courier || 'Delhivery Express',
+        awb: updatedAddressPayload.awb || `DEL-${updatedOrder.id.slice(0, 10)}`
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in updateDropshipperOrder:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update order',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * 5. Cancel Dropshipper Order (Supplier Cancellation & Escrow Release)
+ * PUT /api/v1/dropshipper/orders/:orderId/cancel
+ */
+export const cancelDropshipperOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { cancellationReason = 'Customer requested cancellation via WhatsApp/Store' } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'orderId param is required' });
+    }
+
+    let dbOrderId = orderId;
+    if (orderId.startsWith('DSP-')) {
+      const hexSnippet = orderId.replace('DSP-', '').toLowerCase();
+      const matched = await prisma.order.findFirst({
+        where: { id: { startsWith: hexSnippet, mode: 'insensitive' } }
+      });
+      if (!matched) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+      dbOrderId = matched.id;
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: dbOrderId }
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.orderStatus === 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'Order is already cancelled' });
+    }
+
+    if (order.orderStatus === 'DELIVERED') {
+      return res.status(400).json({ success: false, message: 'Delivered orders cannot be cancelled. Initiate an RTO return instead.' });
+    }
+
+    const currentAddr = (typeof order.shippingAddress === 'object' && order.shippingAddress !== null)
+      ? order.shippingAddress
+      : {};
+
+    const updatedAddressPayload = {
+      ...currentAddr,
+      cancellationReason,
+      cancelledAt: new Date().toISOString()
+    };
+
+    const cancelledOrder = await prisma.order.update({
+      where: { id: dbOrderId },
+      data: {
+        orderStatus: 'CANCELLED',
+        shippingAddress: updatedAddressPayload
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Order #${orderId} has been successfully cancelled. Supplier dispatch halted and Escrow margin released.`,
+      orderId: `DSP-${cancelledOrder.id.slice(0, 8).toUpperCase()}`,
+      status: 'CANCELLED'
+    });
+
+  } catch (error) {
+    console.error('Error in cancelDropshipperOrder:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to cancel order',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * 6. Permanently Delete an Order from Ledger
+ * DELETE /api/v1/dropshipper/orders/:orderId
+ */
+export const deleteDropshipperOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'orderId param is required' });
+    }
+
+    let dbOrderId = orderId;
+    if (orderId.startsWith('DSP-')) {
+      const hexSnippet = orderId.replace('DSP-', '').toLowerCase();
+      const matched = await prisma.order.findFirst({
+        where: { id: { startsWith: hexSnippet, mode: 'insensitive' } }
+      });
+      if (!matched) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+      dbOrderId = matched.id;
+    }
+
+    // Delete associated order items first to satisfy foreign key constraints
+    await prisma.orderItem.deleteMany({
+      where: { orderId: dbOrderId }
+    });
+
+    await prisma.order.delete({
+      where: { id: dbOrderId }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Order #${orderId} has been permanently deleted from database.`
+    });
+
+  } catch (error) {
+    console.error('Error in deleteDropshipperOrder:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete order',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * 7. Archive / Unarchive Dropshipper Order (Industry Standard Soft Archiving)
+ * PUT /api/v1/dropshipper/orders/:orderId/archive
+ */
+export const archiveDropshipperOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { archive = true } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'orderId param is required' });
+    }
+
+    let dbOrderId = orderId;
+    if (orderId.startsWith('DSP-')) {
+      const hexSnippet = orderId.replace('DSP-', '').toLowerCase();
+      const matched = await prisma.order.findFirst({
+        where: { id: { startsWith: hexSnippet, mode: 'insensitive' } }
+      });
+      if (!matched) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+      dbOrderId = matched.id;
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: dbOrderId }
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const currentAddr = (typeof order.shippingAddress === 'object' && order.shippingAddress !== null)
+      ? order.shippingAddress
+      : {};
+
+    const updatedAddressPayload = {
+      ...currentAddr,
+      isArchived: !!archive,
+      archivedAt: archive ? new Date().toISOString() : null
+    };
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: dbOrderId },
+      data: {
+        shippingAddress: updatedAddressPayload
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: archive 
+        ? `Order #${orderId} archived safely. Preserved in database for financial audit.` 
+        : `Order #${orderId} restored to active orders list.`,
+      isArchived: !!archive,
+      orderId: `DSP-${updatedOrder.id.slice(0, 8).toUpperCase()}`
+    });
+
+  } catch (error) {
+    console.error('Error in archiveDropshipperOrder:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to archive/unarchive order',
+      error: error.message
+    });
+  }
+};
+

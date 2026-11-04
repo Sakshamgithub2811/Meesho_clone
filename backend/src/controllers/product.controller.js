@@ -7,7 +7,9 @@ export const getProducts = async (req, res) => {
   try {
     const { category, search, minPrice, maxPrice, sort, page = 1, limit = 50 } = req.query;
 
-    const conditions = [];
+    const conditions = [
+      { isDeleted: false } // Soft delete filter: do not show discontinued/deleted products in live catalog
+    ];
 
     // Category filter - exact slug/name matching (prevents 'men' from loosely matching 'women-ethnic')
     if (category && category !== 'All' && category !== 'all') {
@@ -352,25 +354,71 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
-    // Safely delete associated cart items, wishlist items, reviews, and order items first
-    await prisma.$transaction([
-      prisma.cartItem.deleteMany({ where: { productId: id } }),
-      prisma.wishlistItem.deleteMany({ where: { productId: id } }),
-      prisma.review.deleteMany({ where: { productId: id } }),
-      prisma.orderItem.deleteMany({ where: { productId: id } }),
-      prisma.product.delete({ where: { id } })
-    ]);
+    // Soft delete: remove from active carts and wishlists so new customers cannot buy,
+    // but PRESERVE all historical orderItems and reviews so past customer orders remain intact!
+    const softDeleted = await prisma.$transaction(async (tx) => {
+      await tx.cartItem.deleteMany({ where: { productId: id } });
+      await tx.wishlistItem.deleteMany({ where: { productId: id } });
+      return await tx.product.update({
+        where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date()
+        }
+      });
+    });
 
     return res.status(200).json({
       success: true,
-      message: 'Product deleted successfully',
-      deletedProduct: existing
+      message: 'Product discontinued & soft-deleted successfully. Historical customer orders preserved.',
+      deletedProduct: softDeleted
     });
   } catch (error) {
-    console.error('Error deleting product:', error);
+    console.error('Error soft-deleting product:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to delete product: ' + error.message,
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Controller to restore a soft-deleted product back to active catalog.
+ */
+export const restoreProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.product.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const restoredProduct = await prisma.product.update({
+      where: { id },
+      data: {
+        isDeleted: false,
+        deletedAt: null
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Product restored to active catalog successfully',
+      product: restoredProduct
+    });
+  } catch (error) {
+    console.error('Error restoring product:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to restore product: ' + error.message,
       error: error.message
     });
   }

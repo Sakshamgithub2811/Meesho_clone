@@ -6,6 +6,12 @@ import { auth } from '../../utils/firebase';
 import { logout } from '../../redux/userSlice';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { DROPSHIPPER_MENU } from './dropshipperMenu';
+import {
+  getDropshipperMarginConfigApi,
+  saveDropshipperMarginConfigApi,
+  resetDropshipperMarginConfigApi,
+  getStoreCategoriesApi
+} from '../../services/dropshipperService';
 import { 
   Percent, 
   SlidersHorizontal, 
@@ -24,46 +30,172 @@ import {
   ShoppingBag,
   ExternalLink,
   Copy,
-  Check
+  Check,
+  Loader2,
+  Plus,
+  Trash2,
+  X
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 
+const DEFAULT_CONFIG = {
+  pricingStrategy: 'FIXED', // 'FIXED' | 'PERCENTAGE'
+  fixedMarkup: 200,
+  percentageMarkup: 25,
+  smartRounding: true, // e.g. 749 instead of 750
+  categoryRules: [], // Clean by default: 100% dynamic, no fake pre-filled categories
+  shippingMode: 'FREE_TO_CUSTOMER', // 'FREE_TO_CUSTOMER' (markup covers shipping) | 'SEPARATE'
+  estimatedShippingFee: 60
+};
+
 export default function DropshipperMarginConfig() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { currentUser } = useSelector((state) => state.user);
+  const userUid = currentUser?.uid || currentUser?.id || '';
 
-  // Initial config with localStorage persistence
-  const [config, setConfig] = useState(() => {
-    try {
-      const saved = localStorage.getItem('meesho_dropshipper_margin_config');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return {
-      pricingStrategy: 'FIXED', // 'FIXED' | 'PERCENTAGE'
-      fixedMarkup: 200,
-      percentageMarkup: 25,
-      smartRounding: true, // e.g. 749 instead of 750
-      categoryRules: [
-        { id: 'ethnic', name: 'Sarees & Ethnic Kurtis', wholesaleAvg: 850, markup: 250, marginPercent: 30, active: true },
-        { id: 'western', name: 'Western Tops & Dresses', wholesaleAvg: 550, markup: 180, marginPercent: 32, active: true },
-        { id: 'men', name: 'Men Denim & Casual Wear', wholesaleAvg: 650, markup: 200, marginPercent: 30, active: true },
-        { id: 'accessories', name: 'Jewelry & Handbags', wholesaleAvg: 299, markup: 150, marginPercent: 50, active: true },
-        { id: 'footwear', name: 'Footwear & Sneakers', wholesaleAvg: 799, markup: 250, marginPercent: 31, active: true },
-      ],
-      shippingMode: 'FREE_TO_CUSTOMER', // 'FREE_TO_CUSTOMER' (markup covers shipping) | 'SEPARATE'
-      estimatedShippingFee: 60
-    };
-  });
+  // Config state (loaded from PostgreSQL database via API)
+  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isCustomRule, setIsCustomRule] = useState(false);
+
+  // Real Database Categories & Dynamic Category Rule Form
+  const [dbCategories, setDbCategories] = useState([]);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [selectedCatId, setSelectedCatId] = useState('');
+  const [catMarkupInput, setCatMarkupInput] = useState(250);
 
   // Simulator Interactive States
   const [sampleWholesale, setSampleWholesale] = useState(699);
   const [sampleShipping, setSampleShipping] = useState(60);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+
+  // 1. Fetch Dropshipper Margin Config & Real Categories on Mount
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      setIsLoadingConfig(true);
+      try {
+        // Fetch Real Categories from PostgreSQL
+        try {
+          const catRes = await getStoreCategoriesApi();
+          if (catRes?.success && Array.isArray(catRes.data) && isMounted) {
+            setDbCategories(catRes.data);
+          }
+        } catch (catErr) {
+          console.warn("Could not load categories:", catErr);
+        }
+
+        // Fetch User Margin Config from PostgreSQL
+        if (userUid) {
+          const res = await getDropshipperMarginConfigApi(userUid);
+          if (res?.success && res.config && isMounted) {
+            setConfig({
+              ...res.config,
+              categoryRules: Array.isArray(res.config.categoryRules) ? res.config.categoryRules : []
+            });
+            setIsCustomRule(Boolean(res.isCustom));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load margin rules from database:", err);
+      } finally {
+        if (isMounted) setIsLoadingConfig(false);
+      }
+    };
+
+    loadData();
+    return () => { isMounted = false; };
+  }, [userUid]);
+
+  // Handler: Add a Category Override (Auto-persists to PostgreSQL)
+  const handleAddCategoryRule = async () => {
+    if (!selectedCatId) {
+      toast.error("Please select a product category from the list.");
+      return;
+    }
+    const targetCat = dbCategories.find(c => c.id === selectedCatId);
+    if (!targetCat) return;
+
+    // Check duplicate
+    if (config.categoryRules.some(r => r.id === selectedCatId || r.slug === targetCat.slug)) {
+      toast.error(`${targetCat.name} already has an active override rule.`);
+      return;
+    }
+
+    const newRule = {
+      id: targetCat.id,
+      name: targetCat.name,
+      slug: targetCat.slug,
+      markup: Number(catMarkupInput) || 200,
+      active: true
+    };
+
+    const updatedRules = [...config.categoryRules, newRule];
+
+    setConfig(prev => ({
+      ...prev,
+      categoryRules: updatedRules
+    }));
+
+    setIsAddingCategory(false);
+    setSelectedCatId('');
+    setCatMarkupInput(250);
+
+    // Auto-save immediately to PostgreSQL so refresh never loses it!
+    if (userUid) {
+      try {
+        await saveDropshipperMarginConfigApi({
+          firebaseUid: userUid,
+          pricingStrategy: config.pricingStrategy,
+          fixedMarkup: config.fixedMarkup,
+          percentageMarkup: config.percentageMarkup,
+          smartRounding: config.smartRounding,
+          shippingMode: config.shippingMode,
+          estimatedShippingFee: config.estimatedShippingFee,
+          categoryRules: updatedRules
+        });
+        setIsCustomRule(true);
+        toast.success(`Override rule for ${targetCat.name} saved to Database!`);
+      } catch (e) {
+        console.error("Auto-save category rule error:", e);
+        toast.error("Rule added to view, but failed to auto-save to DB. Please click 'Save Margin Rules'.");
+      }
+    }
+  };
+
+  // Handler: Delete Category Override (Auto-persists deletion to PostgreSQL)
+  const handleDeleteCategoryRule = async (ruleId) => {
+    const updatedRules = config.categoryRules.filter(r => r.id !== ruleId);
+    setConfig(prev => ({
+      ...prev,
+      categoryRules: updatedRules
+    }));
+
+    if (userUid) {
+      try {
+        await saveDropshipperMarginConfigApi({
+          firebaseUid: userUid,
+          pricingStrategy: config.pricingStrategy,
+          fixedMarkup: config.fixedMarkup,
+          percentageMarkup: config.percentageMarkup,
+          smartRounding: config.smartRounding,
+          shippingMode: config.shippingMode,
+          estimatedShippingFee: config.estimatedShippingFee,
+          categoryRules: updatedRules
+        });
+        toast.info("Category override removed and updated in Database.");
+      } catch (e) {
+        console.error("Auto-save delete error:", e);
+      }
+    }
+  };
 
   // Calculate live simulator pricing
   const calculateSellingPrice = () => {
@@ -92,41 +224,56 @@ export default function DropshipperMarginConfig() {
   const netDropshipperMargin = sellingPrice - sampleWholesale - (config.shippingMode === 'FREE_TO_CUSTOMER' ? sampleShipping : 0);
   const marginPercentage = sampleWholesale > 0 ? ((netDropshipperMargin / sampleWholesale) * 100).toFixed(1) : 0;
 
-  // Handle Save
-  const handleSaveConfig = () => {
+  // Handle Save (Persists directly to PostgreSQL Database)
+  const handleSaveConfig = async () => {
+    if (!userUid) {
+      toast.error("User session missing. Please re-login.");
+      return;
+    }
     setIsSaving(true);
     try {
-      localStorage.setItem('meesho_dropshipper_margin_config', JSON.stringify(config));
-      setTimeout(() => {
-        setIsSaving(false);
-        toast.success("Margin & Pricing Rules saved successfully!", {
-          description: "All future product shares and order margins will apply this rule."
+      const res = await saveDropshipperMarginConfigApi({
+        firebaseUid: userUid,
+        pricingStrategy: config.pricingStrategy,
+        fixedMarkup: config.fixedMarkup,
+        percentageMarkup: config.percentageMarkup,
+        smartRounding: config.smartRounding,
+        shippingMode: config.shippingMode,
+        estimatedShippingFee: config.estimatedShippingFee,
+        categoryRules: config.categoryRules
+      });
+
+      if (res?.success) {
+        setIsCustomRule(true);
+        toast.success("Margin & Pricing Rules saved to PostgreSQL Database!", {
+          description: "All future product shares, orders, and channel syncs will apply this rule."
         });
-      }, 500);
+      }
     } catch (e) {
+      console.error("Save Margin Config Error:", e);
+      toast.error(e.response?.data?.error || "Failed to save configuration to database.");
+    } finally {
       setIsSaving(false);
-      toast.error("Failed to save configuration.");
     }
   };
 
-  // Reset to default
-  const handleResetDefaults = () => {
-    setConfig({
-      pricingStrategy: 'FIXED',
-      fixedMarkup: 200,
-      percentageMarkup: 25,
-      smartRounding: true,
-      categoryRules: [
-        { id: 'ethnic', name: 'Sarees & Ethnic Kurtis', wholesaleAvg: 850, markup: 250, marginPercent: 30, active: true },
-        { id: 'western', name: 'Western Tops & Dresses', wholesaleAvg: 550, markup: 180, marginPercent: 32, active: true },
-        { id: 'men', name: 'Men Denim & Casual Wear', wholesaleAvg: 650, markup: 200, marginPercent: 30, active: true },
-        { id: 'accessories', name: 'Jewelry & Handbags', wholesaleAvg: 299, markup: 150, marginPercent: 50, active: true },
-        { id: 'footwear', name: 'Footwear & Sneakers', wholesaleAvg: 799, markup: 250, marginPercent: 31, active: true },
-      ],
-      shippingMode: 'FREE_TO_CUSTOMER',
-      estimatedShippingFee: 60
-    });
-    toast.info("Rules reset to standard B2B defaults.");
+  // Reset to default (Resets in PostgreSQL Database)
+  const handleResetDefaults = async () => {
+    if (!userUid) return;
+    setIsResetting(true);
+    try {
+      const res = await resetDropshipperMarginConfigApi(userUid);
+      if (res?.success) {
+        setConfig(res.config || DEFAULT_CONFIG);
+        setIsCustomRule(false);
+        toast.info("Rules reset to standard B2B defaults in database.");
+      }
+    } catch (e) {
+      console.error("Reset Error:", e);
+      toast.error("Failed to reset rules in database.");
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   // Export Shopify CSV Feed
@@ -211,9 +358,21 @@ export default function DropshipperMarginConfig() {
         <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-[#ffe4ec] via-[#fff0f4] to-[#ffdae3] border border-[#ffb3c6] shadow-xs">
           <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="space-y-2 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-[#b7004d]/10 border border-[#b7004d]/20 text-[#b7004d]">
-                <Percent className="w-3.5 h-3.5" />
-                <span>Automated Profit Engine</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-[#b7004d]/10 border border-[#b7004d]/20 text-[#b7004d]">
+                  <Percent className="w-3.5 h-3.5" />
+                  <span>Automated Profit Engine</span>
+                </div>
+                {isCustomRule ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-emerald-100/90 text-emerald-800 border border-emerald-300">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>PostgreSQL Custom Rule Active</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-white/70 text-gray-600 border border-gray-300">
+                    <span>Platform Default Rules</span>
+                  </span>
+                )}
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-[#4a2135] tracking-tight font-['Plus_Jakarta_Sans',sans-serif]">
                 Global Margin & Price Rule Engine
@@ -247,7 +406,14 @@ export default function DropshipperMarginConfig() {
         </div>
 
         {/* 2-Column Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {isLoadingConfig ? (
+          <div className="py-24 flex flex-col items-center justify-center space-y-3 bg-white rounded-3xl border border-gray-100 shadow-xs">
+            <Loader2 className="w-8 h-8 animate-spin text-[#b7004d]" />
+            <p className="text-sm font-semibold text-gray-700">Loading your margin configuration from database...</p>
+            <span className="text-xs text-gray-400">PostgreSQL Cloud Synced</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* LEFT COLUMN: Pricing Strategy Configuration (8 cols) */}
           <div className="lg:col-span-7 space-y-6">
@@ -415,51 +581,164 @@ export default function DropshipperMarginConfig() {
 
             </div>
 
-            {/* 2. Category-Level Override Rules */}
+            {/* 2. Category-Level Override Rules (100% Dynamic & Connected to PostgreSQL DB) */}
             <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-xs space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
                 <div>
                   <h3 className="text-base font-bold text-gray-900">Niche / Category Markup Rules</h3>
-                  <p className="text-xs text-gray-500">Fine-tune margins for high-margin vs high-volume product categories</p>
+                  <p className="text-xs text-gray-500">
+                    Fine-tune margins for specific product niches. All unlisted categories automatically follow your default markup above.
+                  </p>
                 </div>
-                <span className="text-[11px] font-bold text-[#b7004d] bg-pink-50 px-2.5 py-1 rounded-full">
-                  5 Categories Active
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                    config.categoryRules.length > 0 ? 'text-[#b7004d] bg-pink-50' : 'text-gray-500 bg-gray-100'
+                  }`}>
+                    {config.categoryRules.length} Overrides Active
+                  </span>
+
+                  {!isAddingCategory && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setIsAddingCategory(true)}
+                      className="bg-pink-50 hover:bg-pink-100 text-[#b7004d] rounded-xl text-xs font-bold px-3 py-1.5 h-8 border border-pink-200 cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Override</span>
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {config.categoryRules.map((cat, idx) => (
-                  <div key={cat.id} className="p-3.5 rounded-2xl border border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <h5 className="text-xs font-bold text-gray-800">{cat.name}</h5>
-                      <span className="text-[11px] text-gray-400">Avg Wholesale: ₹{cat.wholesaleAvg}</span>
+              {/* In-line Add Category Override Form */}
+              {isAddingCategory && (
+                <div className="p-4 rounded-2xl bg-pink-50/50 border border-pink-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#b7004d] uppercase tracking-wider">
+                      Add New Category Override
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setIsAddingCategory(false); setSelectedCatId(''); }}
+                      className="text-gray-400 hover:text-gray-600 cursor-pointer p-1"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-7">
+                      <Label className="text-xs font-semibold text-gray-700">Select Product Category (from Database)</Label>
+                      <select
+                        value={selectedCatId}
+                        onChange={(e) => setSelectedCatId(e.target.value)}
+                        className="mt-1.5 w-full h-10 px-3 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-800 focus:outline-none focus:border-[#b7004d]"
+                      >
+                        <option value="">-- Choose a Category --</option>
+                        {dbCategories
+                          .filter(c => !config.categoryRules.some(r => r.id === c.id || r.slug === c.slug))
+                          .map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                      </select>
                     </div>
 
-                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-gray-600">Markup:</span>
-                        <div className="relative w-24">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">₹</span>
-                          <Input
-                            type="number"
-                            value={cat.markup}
-                            onChange={(e) => {
-                              const newRules = [...config.categoryRules];
-                              newRules[idx].markup = Number(e.target.value);
-                              setConfig({ ...config, categoryRules: newRules });
-                            }}
-                            className="h-8 pl-6 pr-2 text-xs font-bold rounded-xl border-gray-200 focus:border-[#b7004d]"
-                          />
-                        </div>
+                    <div className="sm:col-span-5">
+                      <Label className="text-xs font-semibold text-gray-700">Flat Markup Per Item (₹)</Label>
+                      <div className="relative mt-1.5">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">₹</span>
+                        <Input
+                          type="number"
+                          value={catMarkupInput}
+                          onChange={(e) => setCatMarkupInput(Number(e.target.value))}
+                          placeholder="e.g. 250"
+                          className="h-10 pl-7 pr-3 text-xs font-bold rounded-xl border-gray-200"
+                        />
                       </div>
-
-                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                        +{((cat.markup / cat.wholesaleAvg) * 100).toFixed(0)}% Margin
-                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setIsAddingCategory(false); setSelectedCatId(''); }}
+                      className="text-xs text-gray-600 hover:bg-gray-100 rounded-xl"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAddCategoryRule}
+                      className="bg-[#b7004d] hover:bg-[#92003d] text-white text-xs font-bold px-4 rounded-xl cursor-pointer"
+                    >
+                      Add Override Rule
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Category Rules List or Clean Empty State */}
+              {config.categoryRules.length === 0 ? (
+                <div className="py-8 px-4 text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 space-y-3">
+                  <div className="w-10 h-10 rounded-xl bg-pink-50 text-[#b7004d] mx-auto flex items-center justify-center">
+                    <SlidersHorizontal className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-gray-800">No Category Overrides Configured</h4>
+                    <p className="text-[11px] text-gray-500 max-w-md mx-auto leading-relaxed">
+                      All products currently inherit your default markup (
+                      {config.pricingStrategy === 'FIXED' ? `Flat ₹${config.fixedMarkup}` : `+${config.percentageMarkup}%`}
+                      ). Click "+ Add Override" above if you wish to define special margins for specific niches (e.g. Jewellery, Footwear).
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {config.categoryRules.map((cat, idx) => (
+                    <div key={cat.id || idx} className="p-3.5 rounded-2xl border border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <h5 className="text-xs font-bold text-gray-800">{cat.name}</h5>
+                        <span className="text-[11px] text-gray-400">Custom Category Override</span>
+                      </div>
+
+                      <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-600">Markup:</span>
+                          <div className="relative w-28">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">₹</span>
+                            <Input
+                              type="number"
+                              value={cat.markup}
+                              onChange={(e) => {
+                                const newRules = [...config.categoryRules];
+                                newRules[idx].markup = Number(e.target.value);
+                                setConfig({ ...config, categoryRules: newRules });
+                              }}
+                              className="h-8 pl-6 pr-2 text-xs font-bold rounded-xl border-gray-200 focus:border-[#b7004d]"
+                            />
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteCategoryRule(cat.id)}
+                          className="w-8 h-8 rounded-xl text-gray-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Bottom Save Action Bar */}
@@ -468,20 +747,29 @@ export default function DropshipperMarginConfig() {
                 type="button"
                 variant="outline"
                 onClick={handleResetDefaults}
+                disabled={isResetting || isSaving}
                 className="rounded-2xl border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-bold px-5 py-5 cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                {isResetting ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-gray-500" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                )}
                 <span>Reset Defaults</span>
               </Button>
 
               <Button
                 type="button"
                 onClick={handleSaveConfig}
-                disabled={isSaving}
+                disabled={isSaving || isResetting}
                 className="bg-[#b7004d] hover:bg-[#92003d] text-white rounded-2xl px-8 py-5 text-xs font-bold shadow-lg shadow-[#b7004d]/20 transition-all cursor-pointer flex items-center gap-2 active:scale-95"
               >
-                <Save className="w-4 h-4" />
-                <span>{isSaving ? "Saving..." : "Save Margin Rules"}</span>
+                {isSaving ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span>{isSaving ? "Saving to Database..." : "Save Margin Rules"}</span>
               </Button>
             </div>
 
@@ -610,6 +898,7 @@ export default function DropshipperMarginConfig() {
           </div>
 
         </div>
+        )}
 
       </div>
     </DashboardLayout>

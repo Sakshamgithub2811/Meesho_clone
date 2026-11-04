@@ -4,9 +4,10 @@ import { useSelector } from 'react-redux';
 import { isCustomerAuthenticated } from '../services/customerAuthService';
 import { isAffiliateAuthenticated } from '../services/affiliateAuthService';
 import { isResellerAuthenticated } from '../services/resellerAuthService';
-import { isDropshipperAuthenticated } from '../services/dropshipperService';
+import { isDropshipperAuthenticated, getDropshipperKycState } from '../services/dropshipperService';
+import KycGateLockScreen from './common/KycGateLockScreen';
 
-const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
+const ProtectedRoute = ({ children, role = 'customer', allowedRoles, requiresKyc = false, featureName }) => {
   const location = useLocation();
   const { currentUser, isAuthenticated: isReduxAuth } = useSelector((state) => state.user || {});
 
@@ -19,6 +20,15 @@ const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
     if (!isAuthorizedDropshipper) {
       return <Navigate to={`/dropshipper-login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
     }
+
+    // 1.1 KYC Verification Gate (Blocks unverified dropshippers from sensitive trade operations)
+    if (requiresKyc) {
+      const { isKycApproved } = getDropshipperKycState();
+      if (!isKycApproved) {
+        return <KycGateLockScreen featureName={featureName} />;
+      }
+    }
+
     return children ? children : <Outlet />;
   }
 

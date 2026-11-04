@@ -136,10 +136,32 @@ export const loginDropshipper = async (req, res) => {
       return res.status(403).json({ error: 'Access Denied: Your account role is not registered as a Dropshipper' });
     }
 
+    // Step 4b: Soft Delete Guard (Prevent login if account is deactivated)
+    if (profile.isDeleted) {
+      return res.status(403).json({
+        error: 'Your Dropshipper account has been deactivated. Please contact support or admin to restore your account.',
+        isDeactivated: true
+      });
+    }
+
+    // Step 5: Fetch latest KYC application status from database
+    const latestKycApp = await prisma.kYCApplication.findFirst({
+      where: {
+        userId: profile.id,
+        type: { equals: 'dropshipper', mode: 'insensitive' }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const kycStatus = latestKycApp ? latestKycApp.status.toUpperCase() : 'NOT_SUBMITTED';
+
     return res.status(200).json({
       success: true,
       message: 'Dropshipper Login Success',
-      user: profile
+      user: {
+        ...profile,
+        kycStatus
+      }
     });
 
   } catch (error) {

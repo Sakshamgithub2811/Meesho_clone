@@ -73,8 +73,11 @@ export const addToCart = async (req, res) => {
     }
 
     const product = await prisma.product.findUnique({ where: { id: productId } });
-    if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
+    if (!product || product.isDeleted) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'This product has been discontinued or unlisted by the supplier and cannot be purchased.' 
+      });
     }
 
     const existing = await prisma.cartItem.findFirst({

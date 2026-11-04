@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../redux/userSlice';
@@ -6,7 +6,10 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   sendPasswordResetEmail,
-  signOut
+  signOut,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from 'firebase/auth';
 import { auth } from '../../utils/firebase';
 import { 
@@ -28,8 +31,20 @@ export default function DropshipperLogin() {
   const [loading, setLoading] = useState(false);
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginEmail, setLoginEmail] = useState(() => {
+    return localStorage.getItem('remembered_dropshipper_email') || '';
+  });
   const [loginPassword, setLoginPassword] = useState('');
+  // By default, Remember Me is unchecked
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Pre-fill remembered email on mount if previously remembered
+  useEffect(() => {
+    const saved = localStorage.getItem('remembered_dropshipper_email');
+    if (saved) {
+      setLoginEmail(saved);
+    }
+  }, []);
 
   // Register form state
   const [registerName, setRegisterName] = useState('');
@@ -91,6 +106,13 @@ export default function DropshipperLogin() {
         setActiveTab('login');
 
       } else {
+        // Configure Firebase Auth Persistence based on Remember Me
+        try {
+          await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+        } catch (persistErr) {
+          console.warn('Firebase persistence warning:', persistErr);
+        }
+
         // Firebase Client Sign In
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const firebaseUser = userCredential.user;
@@ -111,9 +133,18 @@ export default function DropshipperLogin() {
           return;
         }
 
-        // Save session in Redux & LocalStorage (with 24-hour auto-expiry)
+        // Save session in Redux & Storage with Remember Me duration support
         dispatch(loginSuccess(userData));
-        setDropshipperSession(userData);
+        setDropshipperSession(userData, rememberMe);
+
+        // Manage Remembered Email for faster subsequent logins
+        if (rememberMe) {
+          localStorage.setItem('remembered_dropshipper_email', email);
+          localStorage.setItem('dropshipper_remember_me', 'true');
+        } else {
+          localStorage.removeItem('remembered_dropshipper_email');
+          localStorage.setItem('dropshipper_remember_me', 'false');
+        }
 
         toast.success(`Welcome back, ${userData.fullName || 'Dropshipper'}!`);
         navigate('/dropshipper-dashboard');
@@ -203,6 +234,25 @@ export default function DropshipperLogin() {
           required 
           className="h-12 px-4 text-base rounded-xl focus-visible:ring-[#b7004d]/30"
         />
+      </div>
+
+      {/* Remember Me Checkbox */}
+      <div className="flex items-center justify-between py-1">
+        <label htmlFor="dropshipper-remember-me" className="flex items-center gap-2.5 cursor-pointer select-none group">
+          <input 
+            type="checkbox"
+            id="dropshipper-remember-me"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-[#b7004d] focus:ring-[#b7004d]/30 cursor-pointer accent-[#b7004d]"
+          />
+          <span className="text-xs font-semibold text-gray-700 group-hover:text-gray-900 transition-colors">
+            Remember me
+          </span>
+        </label>
+        <span className="text-[11px] font-medium text-gray-500">
+          {rememberMe ? '30 days persistence' : 'Expires on window close'}
+        </span>
       </div>
 
       <Button 

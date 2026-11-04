@@ -6,7 +6,13 @@ import { auth } from '../../utils/firebase';
 import { logout } from '../../redux/userSlice';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { DROPSHIPPER_MENU } from './dropshipperMenu';
-import { sendWebhookTestPingApi } from '../../services/dropshipperService';
+import { 
+  sendWebhookTestPingApi,
+  getDropshipperIntegrationsApi,
+  saveDropshipperIntegrationApi,
+  getDropshipperWebhookLogsApi,
+  clearDropshipperWebhookLogsApi
+} from '../../services/dropshipperService';
 import { 
   Cable,
   Globe,
@@ -27,111 +33,37 @@ import {
   Server,
   Key,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 
-const INITIAL_LOGS = [
-  {
-    id: 'LOG-88192',
-    channel: 'Shopify Store',
-    event: 'orders/create',
-    status: 200,
-    statusText: 'OK',
-    latency: '118ms',
-    timestamp: '2 mins ago',
-    payload: {
-      order_id: 'SHPF-10928',
-      total_price: '1299.00',
-      currency: 'INR',
-      line_items: [{ sku: 'SKU-BAN-01', name: 'Banarasi Silk Saree', quantity: 1 }],
-      shipping_address: { name: 'Priya Sharma', city: 'Jaipur', zip: '302001' }
-    }
-  },
-  {
-    id: 'LOG-88191',
-    channel: 'WooCommerce',
-    event: 'orders/create',
-    status: 200,
-    statusText: 'OK',
-    latency: '94ms',
-    timestamp: '18 mins ago',
-    payload: {
-      order_id: 'WOO-5049',
-      total_price: '1049.00',
-      currency: 'INR',
-      line_items: [{ sku: 'SKU-ANK-04', name: 'Anarkali Kurti Set', quantity: 1 }],
-      shipping_address: { name: 'Ananya Verma', city: 'Lucknow', zip: '226010' }
-    }
-  },
-  {
-    id: 'LOG-88190',
-    channel: 'Inbound Webhook',
-    event: 'inventory/stock_update',
-    status: 200,
-    statusText: 'OK',
-    latency: '62ms',
-    timestamp: '1 hour ago',
-    payload: {
-      sku: 'SKU-DNM-09',
-      available_units: 450,
-      supplier_hub: 'Surat Central Warehouse',
-      status: 'IN_STOCK'
-    }
-  },
-  {
-    id: 'LOG-88189',
-    channel: 'Shopify Store',
-    event: 'fulfillments/update',
-    status: 200,
-    statusText: 'OK',
-    latency: '142ms',
-    timestamp: '3 hours ago',
-    payload: {
-      order_id: 'SHPF-10915',
-      awb_tracking: 'DEL-8923019283',
-      courier: 'Delhivery Air',
-      tracking_url: 'https://delhivery.com/track/DEL-8923019283'
-    }
-  }
-];
-
 export default function DropshipperIntegrations() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { currentUser } = useSelector((state) => state.user);
+  const userUid = currentUser?.uid || currentUser?.id || '';
 
-  // Shopify Store Configuration
-  const [shopifyConfig, setShopifyConfig] = useState(() => {
-    try {
-      const saved = localStorage.getItem('meesho_dropshipper_shopify_cfg');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return {
-      connected: true,
-      storeDomain: 'glamour-aura.myshopify.com',
-      accessToken: 'shpat_98a3f81029c8e71b29a',
-      autoSyncOrders: true,
-      autoPushTracking: true,
-      inventorySync: true
-    };
+  // Shopify Store Configuration (Synced from PostgreSQL Database - Clean default)
+  const [shopifyConfig, setShopifyConfig] = useState({
+    connected: false,
+    storeDomain: '',
+    accessToken: '',
+    autoSyncOrders: true,
+    autoPushTracking: true,
+    inventorySync: true
   });
 
-  // WooCommerce Configuration
-  const [wooConfig, setWooConfig] = useState(() => {
-    try {
-      const saved = localStorage.getItem('meesho_dropshipper_woo_cfg');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return {
-      connected: false,
-      storeUrl: 'https://myfashionstore.in',
-      consumerKey: '',
-      consumerSecret: ''
-    };
+  // WooCommerce Configuration (Synced from PostgreSQL Database - Clean default)
+  const [wooConfig, setWooConfig] = useState({
+    connected: false,
+    storeUrl: '',
+    consumerKey: '',
+    consumerSecret: ''
   });
 
   // Custom Inbound Webhook
@@ -141,14 +73,13 @@ export default function DropshipperIntegrations() {
   // Outbound Webhook Endpoint (For notifying dropshipper's backend)
   const [outboundWebhook, setOutboundWebhook] = useState('https://webhook.site/demo-endpoint');
 
-  // Logs state
-  const [logs, setLogs] = useState(() => {
-    try {
-      const saved = localStorage.getItem('meesho_dropshipper_webhook_logs');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return INITIAL_LOGS;
-  });
+  // Logs state (Loaded directly from PostgreSQL database)
+  const [logs, setLogs] = useState([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(true);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+  const [isSavingShopify, setIsSavingShopify] = useState(false);
+  const [isSavingWoo, setIsSavingWoo] = useState(false);
+  const [isClearingLogs, setIsClearingLogs] = useState(false);
 
   // UI Interactive States
   const [isSyncingShopify, setIsSyncingShopify] = useState(false);
@@ -156,6 +87,61 @@ export default function DropshipperIntegrations() {
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [inspectedPayload, setInspectedPayload] = useState(null);
   const [isTestingPing, setIsTestingPing] = useState(false);
+
+  // 1. Fetch Store Integrations & Webhook Logs from Database on Mount
+  useEffect(() => {
+    if (!userUid) return;
+
+    const loadDataFromDatabase = async () => {
+      // A. Fetch Saved Store Integrations
+      setIsLoadingConfig(true);
+      try {
+        const res = await getDropshipperIntegrationsApi(userUid);
+        if (res?.success && Array.isArray(res.integrations)) {
+          const shopify = res.integrations.find(i => i.platform === 'SHOPIFY');
+          if (shopify) {
+            setShopifyConfig({
+              connected: shopify.isConnected,
+              storeDomain: shopify.storeDomain || '',
+              accessToken: shopify.accessToken || '',
+              autoSyncOrders: shopify.autoSyncOrders,
+              autoPushTracking: shopify.autoPushTracking,
+              inventorySync: shopify.inventorySync
+            });
+          }
+
+          const woo = res.integrations.find(i => i.platform === 'WOOCOMMERCE');
+          if (woo) {
+            setWooConfig({
+              connected: woo.isConnected,
+              storeUrl: woo.storeDomain || '',
+              consumerKey: woo.accessToken || '',
+              consumerSecret: woo.webhookSecret || ''
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load integrations from DB:", err);
+      } finally {
+        setIsLoadingConfig(false);
+      }
+
+      // B. Fetch Real Webhook Traffic Logs from Database
+      setIsLoadingLogs(true);
+      try {
+        const logRes = await getDropshipperWebhookLogsApi(userUid);
+        if (logRes?.success && Array.isArray(logRes.logs)) {
+          setLogs(logRes.logs);
+        }
+      } catch (err) {
+        console.warn("Could not load webhook logs from DB:", err);
+      } finally {
+        setIsLoadingLogs(false);
+      }
+    };
+
+    loadDataFromDatabase();
+  }, [userUid]);
 
   // Tab change handler for DashboardLayout
   const handleTabChange = (tabId) => {
@@ -187,117 +173,157 @@ export default function DropshipperIntegrations() {
   };
 
   // Test Shopify Connection & Trigger Sync
-  const handleSyncShopify = () => {
+  const handleSyncShopify = async () => {
     setIsSyncingShopify(true);
-    setTimeout(() => {
-      setIsSyncingShopify(false);
-      const newLog = {
-        id: `LOG-${Math.floor(10000 + Math.random() * 90000)}`,
-        channel: 'Shopify Store',
-        event: 'orders/manual_sync',
-        status: 200,
-        statusText: 'OK',
-        latency: '82ms',
-        timestamp: 'Just now',
-        payload: {
-          synced_orders_count: 3,
-          channel: shopifyConfig.storeDomain,
-          status: 'SUCCESS'
-        }
-      };
-      const updated = [newLog, ...logs];
-      setLogs(updated);
-      try {
-        localStorage.setItem('meesho_dropshipper_webhook_logs', JSON.stringify(updated));
-      } catch (e) {}
-
-      toast.success("Shopify Store synchronized successfully!", {
-        description: "3 new customer orders imported to Push Customer Orders Hub."
-      });
-    }, 1200);
-  };
-
-  // Save Shopify Settings
-  const handleSaveShopify = () => {
     try {
-      localStorage.setItem('meesho_dropshipper_shopify_cfg', JSON.stringify(shopifyConfig));
-      toast.success("Shopify settings saved!");
+      if (userUid) {
+        // Trigger live order sync event stored in DB
+        const res = await sendWebhookTestPingApi({
+          firebaseUid: userUid,
+          channel: 'Shopify Store',
+          event: 'orders/manual_sync',
+          payload: {
+            synced_orders_count: 3,
+            channel: shopifyConfig.storeDomain,
+            status: 'SUCCESS'
+          }
+        });
+        if (res?.success && res.log) {
+          setLogs(prev => [res.log, ...prev]);
+        }
+      }
+      toast.success("Shopify Store synchronized successfully!", {
+        description: "Latest sales channel events recorded in PostgreSQL Database."
+      });
     } catch (e) {
-      toast.error("Failed to save settings.");
+      toast.error("Failed to synchronize Shopify store.");
+    } finally {
+      setIsSyncingShopify(false);
     }
   };
 
-  // Test WooCommerce Connection
-  const handleConnectWoo = () => {
+  // Save Shopify Settings (Persists to PostgreSQL database)
+  const handleSaveShopify = async () => {
+    if (!userUid) return;
+    if (!shopifyConfig.storeDomain.trim()) {
+      toast.error("Please enter your Shopify Store Domain (.myshopify.com)!");
+      return;
+    }
+    setIsSavingShopify(true);
+    const willConnect = Boolean(shopifyConfig.storeDomain.trim() && shopifyConfig.accessToken.trim());
+    try {
+      const res = await saveDropshipperIntegrationApi({
+        firebaseUid: userUid,
+        platform: 'SHOPIFY',
+        storeDomain: shopifyConfig.storeDomain.trim(),
+        accessToken: shopifyConfig.accessToken.trim(),
+        isConnected: willConnect,
+        autoSyncOrders: shopifyConfig.autoSyncOrders,
+        autoPushTracking: shopifyConfig.autoPushTracking,
+        inventorySync: shopifyConfig.inventorySync
+      });
+      if (res?.success) {
+        setShopifyConfig(prev => ({ ...prev, connected: willConnect }));
+        toast.success("Shopify configuration saved to PostgreSQL Database!", {
+          description: willConnect ? "Store connected and synchronized" : "Settings updated"
+        });
+      }
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Failed to save Shopify configuration to database.");
+    } finally {
+      setIsSavingShopify(false);
+    }
+  };
+
+  // Connect & Save WooCommerce Settings (Persists to PostgreSQL database)
+  const handleConnectWoo = async () => {
+    if (!userUid) return;
     if (!wooConfig.storeUrl.trim() || !wooConfig.consumerKey.trim()) {
       toast.error("Please enter your WooCommerce Store URL and Consumer Key!");
       return;
     }
-    const updated = { ...wooConfig, connected: true };
-    setWooConfig(updated);
+    setIsSavingWoo(true);
     try {
-      localStorage.setItem('meesho_dropshipper_woo_cfg', JSON.stringify(updated));
-    } catch (e) {}
-    toast.success("WooCommerce connected successfully!", {
-      description: `Active connection established with ${wooConfig.storeUrl}`
-    });
+      const res = await saveDropshipperIntegrationApi({
+        firebaseUid: userUid,
+        platform: 'WOOCOMMERCE',
+        storeDomain: wooConfig.storeUrl.trim(),
+        accessToken: wooConfig.consumerKey.trim(),
+        webhookSecret: wooConfig.consumerSecret.trim(),
+        isConnected: true
+      });
+      if (res?.success) {
+        setWooConfig(prev => ({ ...prev, connected: true }));
+        toast.success("WooCommerce connected & saved to Database!", {
+          description: `Active connection recorded in PostgreSQL for ${wooConfig.storeUrl}`
+        });
+      }
+    } catch (e) {
+      toast.error("Failed to connect WooCommerce to database.");
+    } finally {
+      setIsSavingWoo(false);
+    }
   };
 
-  // Trigger Live Test Ping
+  // Trigger Live Test Ping (Persisted directly in PostgreSQL database)
   const handleTriggerTestPing = async () => {
+    if (!userUid) {
+      toast.error("User session missing. Please re-login.");
+      return;
+    }
     setIsTestingPing(true);
     try {
       const res = await sendWebhookTestPingApi({
+        firebaseUid: userUid,
         channel: 'Shopify Store',
-        storeDomain: shopifyConfig.storeDomain
+        event: 'orders/create',
+        payload: {
+          order_id: `SHPF-${Math.floor(10000 + Math.random() * 90000)}`,
+          total_price: (799 + Math.floor(Math.random() * 1200)).toFixed(2),
+          currency: 'INR',
+          line_items: [{ sku: 'SKU-LIVE-01', name: 'Zari Woven Georgette Saree', quantity: 1 }],
+          shipping_address: { name: 'Live Buyer', city: 'Delhi', zip: '110001' }
+        }
       });
 
-      const newLog = {
-        id: `LOG-${Math.floor(10000 + Math.random() * 90000)}`,
-        channel: res.channel || 'Shopify Store',
-        event: 'orders/test_ping',
-        status: res.status || 200,
-        statusText: res.statusText || 'OK',
-        latency: `${res.latencyMs || 50}ms`,
-        timestamp: 'Just now',
-        payload: {
-          test_event: 'ping_check',
-          store: res.storeDomain || shopifyConfig.storeDomain,
-          verified: true,
-          ms_handshake: 'PROCESSED_200',
-          server_timestamp: res.timestamp
-        }
-      };
-      const updated = [newLog, ...logs];
-      setLogs(updated);
-      try {
-        localStorage.setItem('meesho_dropshipper_webhook_logs', JSON.stringify(updated));
-      } catch (e) {}
-      toast.success("Test Webhook Ping successfully acknowledged by backend (HTTP 200 OK)!");
+      if (res?.success && res.log) {
+        setLogs(prev => [res.log, ...prev]);
+        toast.success("Webhook Ping processed & stored in PostgreSQL Database (HTTP 200 OK)!");
+      }
     } catch (err) {
-      const fallbackLog = {
-        id: `LOG-${Math.floor(10000 + Math.random() * 90000)}`,
-        channel: 'Inbound Webhook',
-        event: 'orders/test_ping',
-        status: 200,
-        statusText: 'OK',
-        latency: '45ms',
-        timestamp: 'Just now',
-        payload: {
-          test_event: 'ping_check',
-          store: shopifyConfig.storeDomain,
-          verified: true,
-          ms_handshake: 'PROCESSED_200'
-        }
-      };
-      const updated = [fallbackLog, ...logs];
-      setLogs(updated);
-      try {
-        localStorage.setItem('meesho_dropshipper_webhook_logs', JSON.stringify(updated));
-      } catch (e) {}
-      toast.success("Test Webhook Ping successfully acknowledged!");
+      console.error("Test ping error:", err);
+      toast.error("Failed to trigger test ping to backend.");
     } finally {
       setIsTestingPing(false);
+    }
+  };
+
+  // Clear All Webhook Logs from Database
+  const handleClearLogs = async () => {
+    if (!userUid) return;
+    setIsClearingLogs(true);
+    try {
+      const res = await clearDropshipperWebhookLogsApi(userUid);
+      if (res?.success) {
+        setLogs([]);
+        toast.success("All webhook logs permanently cleared from Database!");
+      }
+    } catch (err) {
+      toast.error("Failed to clear webhook logs from database.");
+    } finally {
+      setIsClearingLogs(false);
+    }
+  };
+
+  // Format DB timestamp
+  const formatTimestamp = (dateOrStr) => {
+    if (!dateOrStr) return 'Just now';
+    try {
+      const d = new Date(dateOrStr);
+      if (isNaN(d.getTime())) return dateOrStr;
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+    } catch (e) {
+      return dateOrStr;
     }
   };
 
@@ -382,9 +408,20 @@ export default function DropshipperIntegrations() {
                     <h3 className="text-base font-bold text-gray-900 font-['Plus_Jakarta_Sans',sans-serif]">
                       Shopify Store Sync
                     </h3>
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      Connected
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                      shopifyConfig.connected ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {shopifyConfig.connected ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          Connected
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-3 h-3 text-gray-400" />
+                          Not Configured
+                        </>
+                      )}
                     </span>
                   </div>
                   <p className="text-xs text-gray-500">Auto-pull orders & auto-fulfill tracking AWBs</p>
@@ -611,16 +648,37 @@ export default function DropshipperIntegrations() {
               <p className="text-xs text-gray-500">Real-time audit log of external sales channel events</p>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleTriggerTestPing}
-              disabled={isTestingPing}
-              className="text-xs font-semibold rounded-xl text-[#b7004d] hover:bg-pink-50 border-pink-200 cursor-pointer"
-            >
-              <Zap className="w-3.5 h-3.5 mr-1 text-[#b7004d]" />
-              Trigger Sample Event
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearLogs}
+                disabled={isClearingLogs || logs.length === 0}
+                className="text-xs font-semibold rounded-xl text-gray-500 hover:text-rose-600 hover:bg-rose-50 border-gray-200 cursor-pointer"
+              >
+                {isClearingLogs ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin text-rose-500" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                )}
+                Clear Logs
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTriggerTestPing}
+                disabled={isTestingPing}
+                className="text-xs font-semibold rounded-xl text-[#b7004d] hover:bg-pink-50 border-pink-200 cursor-pointer"
+              >
+                {isTestingPing ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin text-[#b7004d]" />
+                ) : (
+                  <Zap className="w-3.5 h-3.5 mr-1 text-[#b7004d]" />
+                )}
+                Trigger Sample Event
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-2xl border border-gray-100">
@@ -637,35 +695,72 @@ export default function DropshipperIntegrations() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-pink-50/20 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{log.id}</td>
-                    <td className="py-3.5 px-4 font-semibold text-gray-800">{log.channel}</td>
-                    <td className="py-3.5 px-4">
-                      <span className="font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md text-[11px]">
-                        {log.event}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        {log.status} {log.statusText}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-gray-500">{log.latency}</td>
-                    <td className="py-3.5 px-4 text-gray-400">{log.timestamp}</td>
-                    <td className="py-3.5 px-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setInspectedPayload(log)}
-                        className="text-[#b7004d] hover:bg-pink-50 text-xs font-semibold h-7 px-2 rounded-lg cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5 mr-1" />
-                        Inspect
-                      </Button>
+                {isLoadingLogs ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-400">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#b7004d]" />
+                        <span>Loading live webhook logs from database...</span>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 px-4 text-center">
+                      <div className="flex flex-col items-center justify-center max-w-sm mx-auto text-center space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400">
+                          <Server className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-800">No Webhook Activity Recorded</p>
+                          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                            Your database is clean. Click below to simulate an inbound ping, or push real orders from Shopify/WooCommerce.
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleTriggerTestPing}
+                          disabled={isTestingPing}
+                          className="mt-2 text-xs font-semibold rounded-xl text-[#b7004d] hover:bg-pink-50 border-pink-200 cursor-pointer"
+                        >
+                          <Zap className="w-3.5 h-3.5 mr-1 text-[#b7004d]" />
+                          Simulate First Inbound Ping
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  logs.map((log) => (
+                    <tr key={log.id} className="hover:bg-pink-50/20 transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{log.id}</td>
+                      <td className="py-3.5 px-4 font-semibold text-gray-800">{log.channel}</td>
+                      <td className="py-3.5 px-4">
+                        <span className="font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md text-[11px]">
+                          {log.event}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                          {log.status} {log.statusText}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-gray-500">{log.latency}</td>
+                      <td className="py-3.5 px-4 text-gray-400">{formatTimestamp(log.createdAt || log.timestamp)}</td>
+                      <td className="py-3.5 px-4 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setInspectedPayload(log)}
+                          className="text-[#b7004d] hover:bg-pink-50 text-xs font-semibold h-7 px-2 rounded-lg cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5 mr-1" />
+                          Inspect
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

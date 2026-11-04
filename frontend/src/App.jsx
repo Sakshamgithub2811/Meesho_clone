@@ -27,6 +27,7 @@ import SupplierProductAccess from './pages/Reseller Earnings & Wallets/SupplierP
 // Dropshipper Hub Pages
 import DropshipperLogin from './pages/dropshipper/DropshipperLogin';
 import DropshipperDashboard from './pages/dropshipper/DropshipperDashboard';
+import DropshipperProfileView from './pages/dropshipper/DropshipperProfileView';
 import DropshipperKYCRegister from './pages/dropshipper/DropshipperKYCRegister';
 import DropshipperSettlementTracking from './pages/dropshipper/DropshipperSettlementTracking';
 import DropshipperRotManager from './pages/dropshipper/DropshipperRotManager';
@@ -569,6 +570,8 @@ function AppRoutes() {
       '/products': '/supplier-products',
       'dropshipper-login': '/dropshipper-login',
       'dropshipper-dashboard': '/dropshipper-dashboard',
+      'dropshipper-profile': '/dropshipper-profile',
+      'view-profile': '/dropshipper-profile',
       dropshipperDashboard: '/dropshipper-dashboard',
       dropshipperLogin: '/dropshipper-login',
       'supplier-products': '/supplier-products',
@@ -592,6 +595,8 @@ function AppRoutes() {
       reseller_returns: '/reseller-returns',
       resellerReturns: '/reseller-returns',
       'dropshipper-settlements': '/dropshipper-settlements',
+      'dropshipper-settlement': '/dropshipper-settlements',
+      'dropshipper-settlement-tracking': '/dropshipper-settlements',
       'dropshipper-tracking': '/dropshipper-settlements',
       'settlement-tracking': '/dropshipper-settlements',
       'dropshipper-rot-manager': '/dropshipper-rot-manager',
@@ -776,7 +781,23 @@ function AppRoutes() {
         <Route 
           path="/dropshipper-settlements" 
           element={
-            <ProtectedRoute role="dropshipper">
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-settlement" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-settlement-tracking" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
               <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
             </ProtectedRoute>
           } 
@@ -784,7 +805,7 @@ function AppRoutes() {
         <Route 
           path="/dropshipper-tracking" 
           element={
-            <ProtectedRoute role="dropshipper">
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
               <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
             </ProtectedRoute>
           } 
@@ -792,7 +813,15 @@ function AppRoutes() {
         <Route 
           path="/dropshipper-rot-manager" 
           element={
-            <ProtectedRoute role="dropshipper">
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="ROT Liability & Policy Manager">
+              <DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/rot-manager" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="ROT Liability & Policy Manager">
               <DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />
             </ProtectedRoute>
           } 
@@ -830,6 +859,14 @@ function AppRoutes() {
           } 
         />
         <Route 
+          path="/dropshipper-profile" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperProfileView />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="/dropshipper-margin-config" 
           element={
             <ProtectedRoute role="dropshipper">
@@ -848,7 +885,23 @@ function AppRoutes() {
         <Route 
           path="/dropshipper-orders-push" 
           element={
-            <ProtectedRoute role="dropshipper">
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Push Customer Orders to Supplier">
+              <DropshipperOrdersPush />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-orders" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Push Customer Orders to Supplier">
+              <DropshipperOrdersPush />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-push-orders" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Push Customer Orders to Supplier">
               <DropshipperOrdersPush />
             </ProtectedRoute>
           } 
@@ -856,7 +909,7 @@ function AppRoutes() {
         <Route 
           path="/dropshipper-integrations" 
           element={
-            <ProtectedRoute role="dropshipper">
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Store Integrations & Webhook Channels">
               <DropshipperIntegrations />
             </ProtectedRoute>
           } 
