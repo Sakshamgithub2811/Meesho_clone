@@ -73,9 +73,19 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
           getActiveCoupons()
         ]);
 
-        if (cartRes?.items) {
-          setCartItems(cartRes.items);
+        let items = (cartRes?.items && cartRes.items.length > 0) ? cartRes.items : [];
+        if (items.length === 0) {
+          try {
+            const buynow = JSON.parse(localStorage.getItem('mshoppy_buynow_item') || 'null');
+            if (buynow) {
+              items = [buynow];
+            } else {
+              const localCart = JSON.parse(localStorage.getItem('mshoppy_local_cart') || '[]');
+              if (localCart.length > 0) items = localCart;
+            }
+          } catch (e) {}
         }
+        setCartItems(items);
 
         if (coupsRes && coupsRes.length > 0) {
           setAvailableCoupons(coupsRes);
@@ -89,20 +99,31 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
           } catch (e) {}
         }
 
+        let resolvedAddr = null;
         const storedAddr = localStorage.getItem('mshoppy_selected_address');
         if (storedAddr) {
           try {
             const parsed = JSON.parse(storedAddr);
-            setAddress(parsed);
+            if (parsed && (parsed.name || parsed.details)) {
+              resolvedAddr = parsed;
+            }
           } catch (e) {}
-        } else if (addrsRes && addrsRes.length > 0) {
+        }
+
+        if (!resolvedAddr && addrsRes && addrsRes.length > 0) {
           const def = addrsRes.find(a => a.isDefault) || addrsRes[0];
-          setAddress({
+          resolvedAddr = {
+            id: def.id,
             name: def.fullName,
             phone: def.phone,
             pincode: def.pincode,
             details: `${def.addressLine}, ${def.city}, ${def.state}`
-          });
+          };
+          localStorage.setItem('mshoppy_selected_address', JSON.stringify(resolvedAddr));
+        }
+
+        if (resolvedAddr) {
+          setAddress(resolvedAddr);
         }
       } catch (e) {
         console.error('Error initializing checkout payment:', e);
@@ -199,6 +220,8 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
     setAppliedCoupon(null);
     setCouponError('');
     localStorage.removeItem('mshoppy_applied_coupon');
+      localStorage.removeItem('mshoppy_buynow_item');
+      localStorage.removeItem('mshoppy_local_cart');
     triggerToast('Coupon removed');
   };
 

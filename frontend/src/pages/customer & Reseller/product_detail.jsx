@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import {
   getProductById,
   getProducts,
+  getWishlist,
   toggleWishlist,
   checkCanReview
 } from '../../services/ecommerceService';
@@ -184,6 +185,7 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
   const [canReviewProduct, setCanReviewProduct] = useState(false);
   const [userOrderId, setUserOrderId] = useState(null);
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
   // Dynamic Custom Affiliate Margin Support
   const urlMargin = Number(searchParams.get('margin') || searchParams.get('m') || 0);
@@ -387,18 +389,26 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
 
   const handleBuyNow = async () => {
     if (!product) return;
+    const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
+    const buynowItem = {
+      id: 'buynow_' + product.id,
+      productId: product.id,
+      quantity: 1,
+      size: sizeToPass,
+      product: product
+    };
     try {
-      const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
+      localStorage.setItem('mshoppy_buynow_item', JSON.stringify(buynowItem));
+    } catch (e) {}
+    try {
       await addItem(product.id, 1, sizeToPass);
-      if (onNavigate) {
-        onNavigate('address');
-      } else {
-        navigate('/address');
-      }
     } catch (err) {
-      console.error('Buy Now failed to add item:', err);
-      if (onNavigate) onNavigate('address');
-      else navigate('/address');
+      console.warn('Buy Now addItem fallback:', err);
+    }
+    if (onNavigate) {
+      onNavigate('address');
+    } else {
+      navigate('/address');
     }
   };
 
@@ -418,11 +428,13 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
 
   const handleWishlistToggle = async () => {
     if (!product) return;
+    const nextState = !isWishlisted;
+    setIsWishlisted(nextState);
     try {
       await toggleWishlist(product.id);
-      triggerToast('Wishlist updated! ❤️');
+      triggerToast(nextState ? 'Saved to Wishlist ❤️' : 'Removed from Wishlist');
     } catch (e) {
-      triggerToast('Saved to Wishlist ❤️');
+      triggerToast(nextState ? 'Saved to Wishlist ❤️' : 'Removed from Wishlist');
     }
   };
 
@@ -522,10 +534,17 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
           </button>
           <button
             onClick={handleWishlistToggle}
-            className="p-2 rounded-full hover:bg-gray-100 text-[#191C1E] active:scale-95 transition-all cursor-pointer"
-            title="Add to Wishlist"
+            className={`p-2 rounded-full hover:bg-gray-100 active:scale-95 transition-all cursor-pointer ${
+              isWishlisted ? 'text-[#FF3F6C]' : 'text-[#191C1E]'
+            }`}
+            title={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
           >
-            <span className="material-symbols-outlined text-2xl">favorite</span>
+            <span
+              className="material-symbols-outlined text-2xl"
+              style={isWishlisted ? { fontVariationSettings: "'FILL' 1" } : {}}
+            >
+              favorite
+            </span>
           </button>
           <button
             onClick={() => navigate('/cart')}

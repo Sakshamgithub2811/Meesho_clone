@@ -6,18 +6,23 @@ const getUserId = (req) => {
 
 const ensureProfile = async (userId) => {
   if (!userId) return null;
-  const existing = await prisma.profile.findUnique({ where: { id: userId } });
-  if (!existing) {
-    return await prisma.profile.create({
-      data: {
+  try {
+    return await prisma.profile.upsert({
+      where: { id: userId },
+      update: {},
+      create: {
         id: userId,
         fullName: 'Customer',
         email: `${userId}@customer.meesho`,
         role: 'CUSTOMER'
       }
     });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return await prisma.profile.findUnique({ where: { id: userId } });
+    }
+    throw err;
   }
-  return existing;
 };
 
 export const getAddresses = async (req, res) => {
@@ -50,7 +55,13 @@ export const createAddress = async (req, res) => {
     const userId = getUserId(req);
     await ensureProfile(userId);
 
-    const { fullName, phone, pincode, addressLine, city, state, isDefault = false } = req.body;
+    const fullName = req.body.fullName || req.body.name;
+    const phone = req.body.phone || req.body.mobileNumber || req.body.phoneNumber;
+    const pincode = req.body.pincode || req.body.postalCode || req.body.pin;
+    const addressLine = req.body.addressLine || req.body.address || req.body.street;
+    const city = req.body.city;
+    const state = req.body.state;
+    const isDefault = Boolean(req.body.isDefault);
 
     if (!fullName || !phone || !pincode || !addressLine || !city || !state) {
       return res.status(400).json({
@@ -69,13 +80,13 @@ export const createAddress = async (req, res) => {
     const newAddress = await prisma.address.create({
       data: {
         userId,
-        fullName,
-        phone,
-        pincode,
-        addressLine,
-        city,
-        state,
-        isDefault: Boolean(isDefault)
+        fullName: String(fullName).trim(),
+        phone: String(phone).trim(),
+        pincode: String(pincode).trim(),
+        addressLine: String(addressLine).trim(),
+        city: String(city).trim(),
+        state: String(state).trim(),
+        isDefault
       }
     });
 

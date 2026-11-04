@@ -54,13 +54,27 @@ export const createOrder = async (req, res) => {
       validPaymentMethod = pmUpper;
     }
 
-    const parsedShippingAddress = typeof shippingAddress === 'string' ? JSON.parse(shippingAddress) : shippingAddress;
+    let parsedShippingAddress = typeof shippingAddress === 'string' ? JSON.parse(shippingAddress) : shippingAddress;
 
-    if (parsedShippingAddress?.name && parsedShippingAddress.name.trim()) {
-      await prisma.profile.update({
-        where: { id: userId },
-        data: { fullName: parsedShippingAddress.name.trim() }
-      }).catch(() => {});
+    if (parsedShippingAddress) {
+      const name = (parsedShippingAddress.name || parsedShippingAddress.fullName || '').trim();
+      const phone = (parsedShippingAddress.phone || parsedShippingAddress.mobileNumber || '').trim();
+      const details = (parsedShippingAddress.details || `${parsedShippingAddress.addressLine || ''}, ${parsedShippingAddress.city || ''}, ${parsedShippingAddress.state || ''}`).replace(/^[\s,]+|[\s,]+$/g, '');
+      const pincode = (parsedShippingAddress.pincode || parsedShippingAddress.pin || '').trim();
+      parsedShippingAddress = {
+        ...parsedShippingAddress,
+        name: name || 'Valued Customer',
+        phone,
+        details,
+        pincode
+      };
+
+      if (name) {
+        await prisma.profile.update({
+          where: { id: userId },
+          data: { fullName: name }
+        }).catch(() => {});
+      }
     }
 
     // Server-side authoritative price verification & stock check

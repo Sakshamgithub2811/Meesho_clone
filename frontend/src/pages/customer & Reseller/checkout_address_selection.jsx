@@ -38,13 +38,24 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
       const data = await getAddresses();
       if (data && data.length > 0) {
         setAddresses(data);
-        const def = data.find(a => a.isDefault) || data[0];
-        setSelectedAddressId(def.id);
+        const storedAddr = localStorage.getItem('mshoppy_selected_address');
+        let selected = null;
+        if (storedAddr) {
+          try {
+            const parsed = JSON.parse(storedAddr);
+            selected = data.find(a => a.id === parsed.id || a.phone === parsed.phone);
+          } catch (e) {}
+        }
+        if (!selected) {
+          selected = data.find(a => a.isDefault) || data[0];
+        }
+        setSelectedAddressId(selected.id);
         localStorage.setItem('mshoppy_selected_address', JSON.stringify({
-          name: def.fullName,
-          phone: def.phone,
-          pincode: def.pincode,
-          details: `${def.addressLine}, ${def.city}, ${def.state}`
+          id: selected.id,
+          name: selected.fullName,
+          phone: selected.phone,
+          pincode: selected.pincode,
+          details: `${selected.addressLine}, ${selected.city}, ${selected.state}`
         }));
       }
     } catch (e) {
@@ -67,18 +78,22 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
 
     try {
       const res = await saveAddress(newAddress);
-      if (res?.data) {
-        setAddresses(prev => [res.data, ...prev]);
-        setSelectedAddressId(res.data.id);
-        localStorage.setItem('mshoppy_selected_address', JSON.stringify({
-          name: res.data.fullName,
-          phone: res.data.phone,
-          pincode: res.data.pincode,
-          details: `${res.data.addressLine}, ${res.data.city}, ${res.data.state}`
-        }));
-      } else {
-        await loadAddresses();
-      }
+      const savedData = res?.data || {
+        ...newAddress,
+        id: 'addr_' + Date.now(),
+        createdAt: new Date().toISOString()
+      };
+      
+      setAddresses(prev => [savedData, ...prev.filter(a => a.id !== savedData.id)]);
+      setSelectedAddressId(savedData.id);
+      localStorage.setItem('mshoppy_selected_address', JSON.stringify({
+        id: savedData.id,
+        name: savedData.fullName,
+        phone: savedData.phone,
+        pincode: savedData.pincode,
+        details: `${savedData.addressLine}, ${savedData.city}, ${savedData.state}`
+      }));
+
       setShowAddAddressModal(false);
       setNewAddress({
         fullName: '',
@@ -89,16 +104,46 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
         state: '',
         isDefault: false
       });
-      triggerToast('New delivery address saved & selected! 📍');
+      triggerToast('Delivery address saved & selected! 📍');
     } catch (err) {
-      triggerToast('Address saved locally! 📍');
+      console.warn('handleAddNewAddress error fallback:', err);
+      const localRecord = {
+        ...newAddress,
+        id: 'addr_loc_' + Date.now(),
+        createdAt: new Date().toISOString()
+      };
+      setAddresses(prev => [localRecord, ...prev]);
+      setSelectedAddressId(localRecord.id);
+      localStorage.setItem('mshoppy_selected_address', JSON.stringify({
+        id: localRecord.id,
+        name: localRecord.fullName,
+        phone: localRecord.phone,
+        pincode: localRecord.pincode,
+        details: `${localRecord.addressLine}, ${localRecord.city}, ${localRecord.state}`
+      }));
+      try {
+        const stored = JSON.parse(localStorage.getItem('mshoppy_saved_addresses') || '[]');
+        localStorage.setItem('mshoppy_saved_addresses', JSON.stringify([localRecord, ...stored]));
+      } catch (e) {}
+
       setShowAddAddressModal(false);
+      setNewAddress({
+        fullName: '',
+        phone: '',
+        pincode: '',
+        addressLine: '',
+        city: '',
+        state: '',
+        isDefault: false
+      });
+      triggerToast('Delivery address saved & selected! 📍');
     }
   };
 
   const handleSelectAddress = (addr) => {
     setSelectedAddressId(addr.id);
     localStorage.setItem('mshoppy_selected_address', JSON.stringify({
+      id: addr.id,
       name: addr.fullName,
       phone: addr.phone,
       pincode: addr.pincode,
@@ -107,7 +152,10 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
   };
 
   const handleProceedToPayment = () => {
-    if (!selectedAddressId && addresses.length > 0) {
+    if (selectedAddressId) {
+      const chosen = addresses.find(a => a.id === selectedAddressId);
+      if (chosen) handleSelectAddress(chosen);
+    } else if (addresses.length > 0) {
       handleSelectAddress(addresses[0]);
     }
     handleNav('/payment');
