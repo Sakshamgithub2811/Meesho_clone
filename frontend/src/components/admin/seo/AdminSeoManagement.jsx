@@ -28,7 +28,7 @@ export default function AdminSeoManagement() {
   const fetchSeoStats = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/seo/stats');
+      const res = await fetch(`${API_BASE}/seo/stats`);
       const data = await res.json();
       if (data.success) {
         setStats(data.data);
@@ -45,7 +45,7 @@ export default function AdminSeoManagement() {
   }, []);
 
   const handleCopySitemap = () => {
-    const url = stats?.sitemapUrl || 'http://localhost:5000/sitemap.xml';
+    const url = stats?.sitemapUrl || `${BACKEND_ROOT}/sitemap.xml`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -180,7 +180,7 @@ export default function AdminSeoManagement() {
               </p>
               <div className="mt-3 flex items-center gap-3">
                 <a
-                  href={stats?.sitemapUrl || 'http://localhost:5000/sitemap.xml'}
+                  href={stats?.sitemapUrl || `${BACKEND_ROOT}/sitemap.xml`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-[#b7004d] hover:underline"
@@ -214,7 +214,7 @@ export default function AdminSeoManagement() {
               </p>
               <div className="mt-3 flex items-center gap-3">
                 <a
-                  href={stats?.robotsUrl || 'http://localhost:5000/robots.txt'}
+                  href={stats?.robotsUrl || `${BACKEND_ROOT}/robots.txt`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:underline"
