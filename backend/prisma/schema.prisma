@@ -131,14 +131,17 @@ model Address {
 // ── 3. Product Categories ──────────────────────────────────────
 
 model Category {
-  id        String    @id @default(uuid())
-  name      String    @unique
-  slug      String    @unique
-  imageUrl  String?   @map("image_url")
-  parentId  String?   @map("parent_id")
-  products  Product[]
-  createdAt DateTime  @default(now()) @map("created_at")
+  id            String     @id @default(uuid())
+  name          String     @unique
+  slug          String     @unique
+  imageUrl      String?    @map("image_url")
+  parentId      String?    @map("parent_id")
+  parent        Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subcategories Category[] @relation("CategoryHierarchy")
+  products      Product[]
+  createdAt     DateTime   @default(now()) @map("created_at")
 
+  @@index([parentId])
   @@map("categories")
 }
 
@@ -414,13 +417,12 @@ model Banner {
   title        String
   subtitle     String?
   imageUrl     String   @map("image_url")
-  targetUrl    String   @map("target_url")
-  badgeText    String?  @map("badge_text")
-  badgeColor   String?  @map("badge_color")
-  displayOrder Int      @map("display_order")
-  isActive     Boolean  @map("is_active")
+  targetUrl    String   @default("/") @map("target_url")
+  badgeText    String?  @default("MEGA SALE") @map("badge_text")
+  badgeColor   String?  @default("bg-purple-600 text-white") @map("badge_color")
+  displayOrder Int      @default(1) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
   clicksCount  Int      @default(0) @map("clicks_count")
-
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -486,3 +488,23 @@ model DropshipperMarginConfig {
   @@map("dropshipper_margin_configs")
 }
 
+// ── 22. CMS Pages & Legal Policies (From Master) ────────────────
+
+enum PageStatus {
+  PUBLISHED
+  DRAFT
+}
+
+model CmsPage {
+  id              String     @id @default(uuid())
+  title           String
+  slug            String     @unique
+  content         String     @db.Text
+  status          PageStatus @default(PUBLISHED)
+  metaTitle       String?    @map("meta_title")
+  metaDescription String?    @map("meta_description")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  @@map("cms_pages")
+}

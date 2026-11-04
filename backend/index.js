@@ -16,7 +16,8 @@ import './src/config/emailTransporter.js';
 import prisma from './src/config/prisma.js';
 
 // Import Routes and Middlewares
-import apiRouter from './src/routes/index.js';
+import apiRouter from './src/routes/api.routes.js';
+import seoRoutes from './src/routes/seo.routes.js';
 import { notFoundHandler, errorHandler } from './src/middlewares/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -25,24 +26,15 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Dynamic CORS to support localhost on any port (5173, 5174, etc.)
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5175',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174',
-  'http://127.0.0.1:5175',
-].filter(Boolean);
-
+// Middleware
 app.use(cors({
-  origin: function (origin, callback) {
+  origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (
-      allowedOrigins.includes(origin) ||
-      /^http:\/\/localhost:\d+$/.test(origin) ||
-      /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://127.0.0.1:') ||
+      origin === process.env.CLIENT_URL ||
+      origin === process.env.FRONTEND_URL
     ) {
       return callback(null, true);
     }
@@ -74,6 +66,9 @@ app.get('/api', (req, res) => {
   });
 });
 
+// Root SEO routes (sitemap.xml and robots.txt must be at root domain)
+app.use('/', seoRoutes);
+
 // Mount Main API Router (Supports both /api and /api/v1 prefix)
 app.use('/api', apiRouter);
 app.use('/api/v1', apiRouter);
@@ -85,8 +80,6 @@ app.use(errorHandler);
 // Start the server
 app.listen(port, () => {
   console.log(`🚀 Backend server is running on http://localhost:${port}`);
-  console.log(`🛡️ Admin auth endpoints available at http://localhost:${port}/api/v1/admin-auth`);
-  console.log(`👤 Admin profile endpoints available at http://localhost:${port}/api/v1/admin-profile`);
 });
 
 export default app;
