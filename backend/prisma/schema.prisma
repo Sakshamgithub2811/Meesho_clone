@@ -531,4 +531,3 @@ model CmsPage {
 
   @@map("cms_pages")
 }
-}
