@@ -491,9 +491,23 @@ export const dispatchDeliveryOtpEmail = async ({
     targetEmail = email || process.env.SMTP_USER;
   }
 
-  console.log(`📨 [OTP Email] Sending ${type} OTP (${finalOtp}) to login email: ${targetEmail}`);
-
   const isPickup = (type || '').toUpperCase().includes('PICKUP') || (type || '').toUpperCase().includes('RETURN');
+
+  // Strict enforcement: DELIVERY OTP is only emailed when the order is OUT_FOR_DELIVERY
+  if (!isPickup && orderDetails) {
+    const currentStatus = (orderDetails.orderStatus || '').toUpperCase();
+    if (currentStatus !== 'OUT_FOR_DELIVERY') {
+      console.log(`ℹ️ [OTP Email] Skipping DELIVERY OTP for Order ${orderId}: status is "${currentStatus}" (OTP only sent upon OUT_FOR_DELIVERY).`);
+      return {
+        success: false,
+        message: `Delivery OTP email is only dispatched when order is OUT_FOR_DELIVERY (current: ${currentStatus}).`,
+        sentTo: null,
+        otp: null
+      };
+    }
+  }
+
+  console.log(`📨 [OTP Email] Sending ${type} OTP (${finalOtp}) to login email: ${targetEmail}`);
   const subject = isPickup
     ? `🚚 Mshoppy Return Pickup Alert: Rider arriving for pickup (OTP: ${finalOtp})`
     : `🚚 Mshoppy Order Delivery Alert: Out for Delivery (OTP: ${finalOtp})`;

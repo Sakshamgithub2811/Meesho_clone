@@ -251,46 +251,62 @@ export default function OrderTrackingModal({
             </div>
           </div>
         ) : !isCancelled && !isDelivered && (
-          <div className="mx-5 mt-4 p-3.5 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/80 rounded-2xl flex items-center justify-between gap-3 shadow-xs shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-black text-xl shrink-0">
-                🔐
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-amber-900">
-                    {isPrepaid ? 'Prepaid Delivery OTP' : 'Doorstep Delivery OTP'}
-                  </span>
-                  <span className="text-[9px] bg-amber-200/70 text-amber-900 font-extrabold px-2 py-0.5 rounded-full">
-                    Required at Delivery
-                  </span>
+          isOutForDelivery ? (
+            <div className="mx-5 mt-4 p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-3 shadow-xs shrink-0 animate-in fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-black text-xl shrink-0">
+                  🔐
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-lg font-black tracking-widest text-slate-900 font-mono">
-                    {deliveryOtp}
-                  </span>
-                  <button
-                    onClick={() => copyToClipboard(String(deliveryOtp), 'Delivery OTP copied to clipboard! 📋')}
-                    className="text-[10px] text-amber-800 font-bold hover:underline cursor-pointer flex items-center gap-0.5 bg-amber-100/60 px-2 py-0.5 rounded-md"
-                  >
-                    <span>Copy</span>
-                  </button>
-                  {customerEmail && (
-                    <span className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-md">
-                      <span>✓</span> Emailed to {customerEmail}
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900">
+                      {isPrepaid ? 'Prepaid Delivery OTP' : 'Doorstep Delivery OTP'}
                     </span>
-                  )}
-                </div>
+                    <span className="text-[9px] bg-emerald-200/70 text-emerald-900 font-extrabold px-2 py-0.5 rounded-full">
+                      Out for Delivery • Share with Driver
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-lg font-black tracking-widest text-slate-900 font-mono">
+                      {deliveryOtp}
+                    </span>
+                    <button
+                      onClick={() => copyToClipboard(String(deliveryOtp), 'Delivery OTP copied to clipboard! 📋')}
+                      className="text-[10px] text-emerald-800 font-bold hover:underline cursor-pointer flex items-center gap-0.5 bg-emerald-100/60 px-2 py-0.5 rounded-md"
+                    >
+                      <span>Copy</span>
+                    </button>
+                    {customerEmail && (
+                      <span className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1 bg-white border border-emerald-200 px-2 py-0.5 rounded-md shadow-2xs">
+                        <span>✓</span> Emailed to {customerEmail}
+                      </span>
+                    )}
+                  </div>
 
-                <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                  🕒 Delivery Window: <strong className="text-slate-700">9:00 AM – 8:00 PM</strong> • Expected by {track?.expectedDeliveryStr}
+                  <p className="text-[10px] text-slate-600 mt-1 leading-snug">
+                    🕒 Delivery Window: <strong className="text-slate-800">9:00 AM – 8:00 PM</strong> • Delivery Today
+                  </p>
+                  <p className="text-[10px] text-emerald-700 font-semibold mt-0.5 flex items-center gap-1">
+                    <span>📲</span> Share this 4-digit OTP with your delivery partner at doorstep
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mx-5 mt-4 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center gap-3 shadow-2xs shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-slate-200/60 text-slate-600 flex items-center justify-center font-bold text-lg shrink-0">
+                🔒
+              </div>
+              <div className="text-xs">
+                <p className="font-bold text-slate-800 text-[11px]">
+                  {isPrepaid ? 'Prepaid Delivery OTP Security' : 'Delivery OTP Verification'}
                 </p>
-                <p className="text-[10px] text-emerald-700 font-semibold mt-0.5 flex items-center gap-1">
-                  <span>📲</span> Sent automatically to your login email upon Out For Delivery
+                <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
+                  Delivery OTP will be generated &amp; sent to your email/SMS <strong className="text-slate-700">only when package is Out For Delivery</strong>.
                 </p>
               </div>
             </div>
-          </div>
+          )
         )}
 
         {/* Detailed Vertical Timeline */}
