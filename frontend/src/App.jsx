@@ -8,18 +8,12 @@ import HomeUserReseller from './pages/Reseller Earnings & Wallets/HomeUserResell
 import ShareEarnConfig from './pages/Reseller Earnings & Wallets/ShareEarnConfig';
 import AffiliateProgram from './pages/Reseller Earnings & Wallets/AffiliateProgram';
 import AffiliateProgramPanel from './pages/Reseller Earnings & Wallets/AffiliateProgramPanel';
-import MyWalletFintechStyle from './pages/Reseller Earnings & Wallets/MyWalletFintechStyle';
-import CommunityHub from './pages/Reseller Earnings & Wallets/CommunityHub';
 import PayoutSettings from './pages/Reseller Earnings & Wallets/PayoutSettings';
-import PayoutConfirmation from './pages/Reseller Earnings & Wallets/PayoutConfirmation';
 import NotificationCenter from './pages/Reseller Earnings & Wallets/NotificationCenter';
-import ConversationScreen from './pages/Reseller Earnings & Wallets/ConversationScreen';
-import MeeshoMessengerChatHub from './pages/Reseller Earnings & Wallets/MeeshoMessengerChatHub';
 import LoginSignup from './pages/Reseller Earnings & Wallets/LoginSignup';
 import ReferEarn from './pages/Reseller Earnings & Wallets/ReferEarn';
 import ResellEarn from './pages/Reseller Earnings & Wallets/ResellEarn';
 import EarningsDashboard1 from './pages/Reseller Earnings & Wallets/EarningsDashboard1';
-import EarningsDashboard2 from './pages/Reseller Earnings & Wallets/EarningsDashboard2';
 import ResellerWallet from './pages/Reseller Earnings & Wallets/ResellerWallet';
 import WithdrawEarnings from './pages/Reseller Earnings & Wallets/WithdrawEarnings';
 import ResellerReturnsLedger from './pages/Reseller Earnings & Wallets/ResellerReturnsLedger';
@@ -39,7 +33,6 @@ import DropshipperIntegrations from './pages/dropshipper/DropshipperIntegrations
 
 // Customer & Reseller Shopping Pages
 import HomeUserCustomer from './pages/customer & Reseller/HomeUserCustomer';
-import HomeScreenFlutterLuxe from './pages/customer & Reseller/home_screen_flutter_luxe';
 import FlashSaleLandingPage from './pages/customer & Reseller/flash_sale_landing_page';
 import CuratedSpotlight from './pages/customer & Reseller/curated_spotlight';
 import SearchCategoriesExplorer from './pages/customer & Reseller/search_categories_explorer';
@@ -783,7 +776,7 @@ function AppRoutes() {
         <Route path="/earnings" element={<EarningsDashboard1 onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/earnings-dashboard" element={<EarningsDashboard1 onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/earnings-dashboard-1" element={<EarningsDashboard1 onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/earnings-dashboard-2" element={<EarningsDashboard2 onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/earnings-dashboard-2" element={<Navigate to="/earnings" replace />} />
         <Route path="/refer-earn" element={<ReferEarn />} />
         <Route path="/affiliate-program" element={<AffiliateProgram />} />
         <Route
@@ -798,7 +791,7 @@ function AppRoutes() {
         <Route path="/become-affiliate" element={<AffiliateKYC onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/affiliate-kyc-status" element={<AffiliateKycStatus onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/affiliate-status" element={<AffiliateKycStatus onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/my-wallet" element={<MyWalletFintechStyle />} />
+        <Route path="/my-wallet" element={<Navigate to="/reseller-wallet" replace />} />
         <Route path="/reseller-wallet" element={<ResellerWallet />} />
         <Route path="/reseller-returns" element={<ResellerReturnsLedger onNavigate={handleNav} onBack={handleBack} />} />
         <Route 
@@ -859,10 +852,10 @@ function AppRoutes() {
         />
         <Route path="/withdraw-earnings" element={<WithdrawEarnings />} />
         <Route path="/payout-settings" element={<PayoutSettings />} />
-        <Route path="/payout-confirmation" element={<PayoutConfirmation />} />
-        <Route path="/community-hub" element={<CommunityHub />} />
-        <Route path="/messenger" element={<MeeshoMessengerChatHub />} />
-        <Route path="/conversation" element={<ConversationScreen />} />
+        <Route path="/payout-confirmation" element={<Navigate to="/reseller-wallet" replace />} />
+        <Route path="/community-hub" element={<Navigate to="/affiliate-program" replace />} />
+        <Route path="/messenger" element={<Navigate to="/support" replace />} />
+        <Route path="/conversation" element={<Navigate to="/support" replace />} />
         <Route path="/notifications" element={<NotificationCenter />} />
         <Route path="/" element={<LoginSignup />} />
         <Route path="/login" element={<LoginSignup />} />
@@ -955,7 +948,7 @@ function AppRoutes() {
         <Route path="/western" element={<WomenWesternCategory onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/spotlight" element={<CuratedSpotlight onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/flash" element={<FlashSaleLandingPage onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/luxe" element={<HomeScreenFlutterLuxe onNavigate={handleNav} />} />
+        <Route path="/luxe" element={<Navigate to="/user-home" replace />} />
         <Route path="/reviews" element={<RatingsReviews onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/write-review" element={<WriteAReview onNavigate={handleNav} onBack={handleBack} />} />
         {/* Customer Dashboard - redirected to new /user-dashboard1 */}

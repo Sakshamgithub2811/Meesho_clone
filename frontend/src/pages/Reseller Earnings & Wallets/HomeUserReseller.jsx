@@ -761,7 +761,7 @@ export default function HomeUserReseller() {
                 <h3 className="text-3xl font-black font-headline text-on-surface mb-2">The Reseller Club</h3>
                 <p className="text-on-surface-variant max-w-xs mb-6 text-sm">Unlock exclusive prices and marketing kits for your business.</p>
                 <button
-                  onClick={() => navigate('/community-hub')}
+                  onClick={() => navigate('/affiliate-program')}
                   className="bg-[#FF3F6C] hover:bg-[#e0355e] text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 group-hover:shadow-xl transition-all cursor-pointer active:scale-95"
                 >
                   Learn More

@@ -732,7 +732,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => handleNav('/messenger')}
+              onClick={() => handleNav('/raise-ticket')}
               className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition-all cursor-pointer"
             >
               Live Chat

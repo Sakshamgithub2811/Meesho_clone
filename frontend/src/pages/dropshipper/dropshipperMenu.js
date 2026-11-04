@@ -124,9 +124,9 @@ export const DROPSHIPPER_MENU = [
     children: [
       { 
         id: 'wallet-passbook', 
-        label: 'Fintech Wallet', 
+        label: 'Reseller & Margin Wallet', 
         icon: Wallet, 
-        path: '/my-wallet',
+        path: '/reseller-wallet',
         requiresKyc: true
       },
       { 

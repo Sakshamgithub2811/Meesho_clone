@@ -18,19 +18,16 @@ const navSections = [
     title: "Business & Earnings",
     items: [
       { name: "My Business Dashboard", path: "/earnings-dashboard-1", icon: "trending_up" },
-      { name: "Analytics & Performance", path: "/earnings-dashboard-2", icon: "query_stats" },
-      { name: "Fintech Wallet", path: "/my-wallet", icon: "account_balance_wallet" },
-      { name: "Reseller Wallet", path: "/reseller-wallet", icon: "payments" },
+      { name: "Reseller Wallet & Payouts", path: "/reseller-wallet", icon: "payments" },
       { name: "Withdraw Earnings", path: "/withdraw-earnings", icon: "savings" },
       { name: "Payout Settings", path: "/payout-settings", icon: "settings_suggest" },
     ]
   },
   {
-    title: "Community & Network",
+    title: "Alerts & Notifications",
     items: [
-      { name: "Community Hub", path: "/community-hub", icon: "groups", badge: "Live" },
-      { name: "Reseller Messenger", path: "/messenger", icon: "chat" },
       { name: "Notification Center", path: "/notifications", icon: "notifications" },
+      { name: "Help & Support", path: "/support-center", icon: "support_agent" },
     ]
   },
   {
