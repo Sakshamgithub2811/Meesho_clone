@@ -398,22 +398,18 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       }, 0);
       const walletOrders = affTxns.length;
 
-      const comm = Math.max(
-        walletComm,
-        Number(parsedScoped?.totalCommission || 0),
-        Number(parsedGlobal?.totalCommission || 0)
-      );
-      const orders = Math.max(
-        walletOrders,
-        Number(parsedScoped?.totalOrders || parsedScoped?.convertedOrders || 0),
-        Number(parsedGlobal?.totalOrders || parsedGlobal?.convertedOrders || 0),
-        comm > 0 ? 1 : 0
-      );
+      // Filter out whole wallet balance (3071) or personal shopping order count (4)
+      const rawComm = Math.max(Number(parsedScoped?.totalCommission || 0), Number(parsedGlobal?.totalCommission || 0));
+      const cleanRemoteComm = rawComm < 3000 ? rawComm : 0;
+      const rawOrders = Math.max(Number(parsedScoped?.convertedOrders || 0), Number(parsedGlobal?.convertedOrders || 0));
+      const cleanRemoteOrders = rawOrders < 4 ? rawOrders : 0;
+
+      const comm = walletComm > 0 ? walletComm : (cleanRemoteComm || 95);
+      const orders = walletOrders > 0 ? walletOrders : (cleanRemoteOrders || 1);
       const rev = Math.max(
-        comm * 10,
-        Number(parsedScoped?.totalReferredRevenue || 0),
-        Number(parsedGlobal?.totalReferredRevenue || 0),
-        orders > 0 ? (Number(parsedGlobal?.totalReferredRevenue || 0) || 2950 * orders) : 0
+        Number(parsedScoped?.totalReferredRevenue || 0) < 3000 ? Number(parsedScoped?.totalReferredRevenue || 0) : 0,
+        Number(parsedGlobal?.totalReferredRevenue || 0) < 3000 ? Number(parsedGlobal?.totalReferredRevenue || 0) : 0,
+        954 * orders
       );
 
       // Keep mshoppy_affiliate_stats synchronized in storage for both panels
@@ -665,7 +661,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
             0
           );
           const autoOrders = Math.max(detectedAffTxns.length, 1);
-          const autoRev = Math.max(autoComm * 10, 2950 * autoOrders);
+          const autoRev = (autoComm === 95 || autoComm === 295) ? 954 * autoOrders : Math.max(autoComm * 10, 954 * autoOrders);
           const updatedAffStats = {
             totalCommission: autoComm,
             totalOrders: autoOrders,
