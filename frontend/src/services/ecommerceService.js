@@ -4,6 +4,18 @@ const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/
 
 export function getCustomerId() {
   try {
+    // 1. Prioritize real authenticated user IDs (non-dummy, non-affiliate_ prefix)
+    for (const key of ['mshoppy_customer_user', 'mshoppy_reseller_user', 'user', 'mshoppy_affiliate_user']) {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const candidate = parsed?.id || parsed?.uid;
+        if (candidate && !String(candidate).startsWith('affiliate_') && !String(candidate).startsWith('guest_')) {
+          return candidate;
+        }
+      }
+    }
+    // 2. Fallback to any user key if only prefixed is available
     for (const key of ['mshoppy_customer_user', 'mshoppy_affiliate_user', 'mshoppy_reseller_user', 'user']) {
       const stored = localStorage.getItem(key);
       if (stored) {
@@ -32,6 +44,19 @@ export function getAuthHeaders() {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+
+  // Include user phone and email if available to guarantee exact wallet and profile matching
+  try {
+    for (const key of ['mshoppy_customer_user', 'mshoppy_affiliate_user', 'mshoppy_reseller_user', 'user']) {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u?.phone && !headers['x-user-phone']) headers['x-user-phone'] = u.phone;
+        if (u?.email && !headers['x-user-email']) headers['x-user-email'] = u.email;
+      }
+    }
+  } catch (e) {}
+
   return headers;
 }
 

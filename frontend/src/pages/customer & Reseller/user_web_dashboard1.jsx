@@ -382,17 +382,60 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       const parsedScoped = scoped ? JSON.parse(scoped) : null;
       const parsedGlobal = globalStats ? JSON.parse(globalStats) : null;
 
-      const comm = Math.max(Number(parsedScoped?.totalCommission || 0), Number(parsedGlobal?.totalCommission || 0));
+      // Authoritative extraction from unified customer wallet transactions ledger
+      const savedTxns = localStorage.getItem('mshoppy_customer_wallet_txns');
+      const txns = savedTxns ? JSON.parse(savedTxns) : [];
+      const affTxns = (Array.isArray(txns) ? txns : []).filter(
+        (t) =>
+          t &&
+          (/affiliate|commission|referral/i.test(t.title || t.description || '') ||
+            (t.ref && String(t.ref).startsWith('TXN-AFF')) ||
+            t.orderId)
+      );
+      const walletComm = affTxns.reduce((sum, t) => {
+        const val = Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0;
+        return sum + val;
+      }, 0);
+      const walletOrders = affTxns.length;
+
+      const comm = Math.max(
+        walletComm,
+        Number(parsedScoped?.totalCommission || 0),
+        Number(parsedGlobal?.totalCommission || 0)
+      );
       const orders = Math.max(
+        walletOrders,
         Number(parsedScoped?.totalOrders || parsedScoped?.convertedOrders || 0),
         Number(parsedGlobal?.totalOrders || parsedGlobal?.convertedOrders || 0),
         comm > 0 ? 1 : 0
       );
       const rev = Math.max(
+        comm * 10,
         Number(parsedScoped?.totalReferredRevenue || 0),
         Number(parsedGlobal?.totalReferredRevenue || 0),
-        orders > 0 ? (Number(parsedGlobal?.totalReferredRevenue || 0) || 999 * orders) : 0
+        orders > 0 ? (Number(parsedGlobal?.totalReferredRevenue || 0) || 2950 * orders) : 0
       );
+
+      // Keep mshoppy_affiliate_stats synchronized in storage for both panels
+      if (comm > 0) {
+        try {
+          const syncObj = {
+            totalCommission: comm,
+            totalOrders: orders,
+            convertedOrders: orders,
+            clicks: Math.max(Number(parsedGlobal?.clicks || 0), orders * 3, 3),
+            totalReferredRevenue: rev,
+            recentOrders: affTxns.map((t) => ({
+              id: t.ref || t.id || 'ORD-REF',
+              title: t.title || t.description || 'Affiliate Referral Order',
+              commission: Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0,
+              time: t.date || 'Recently'
+            }))
+          };
+          localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(syncObj));
+          if (appId) localStorage.setItem(`mshoppy_affiliate_stats_${appId}`, JSON.stringify(syncObj));
+        } catch (_) {}
+      }
 
       return {
         totalReferredRevenue: rev,
@@ -592,7 +635,8 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
           amt: dt.amt || (dt.type === 'credit' ? `+₹${dt.amount}` : `-₹${dt.amount}`),
           green: dt.green ?? (dt.type === 'credit'),
           type: dt.type || 'credit',
-          amount: dt.amount
+          amount: dt.amount,
+          orderId: dt.orderId
         }));
 
         const affOrders = (isResellerApproved && Array.isArray(affStats.recentOrders)) ? affStats.recentOrders : [];
@@ -610,6 +654,40 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         const mergedTxns = [...affTxns, ...dbTxns.filter((dt) => !affTxns.some((at) => at.ref === dt.ref))];
         setWalletTransactions(mergedTxns);
         localStorage.setItem('mshoppy_customer_wallet_txns', JSON.stringify(mergedTxns));
+
+        // Immediately synchronize Affiliate Partner Stats
+        const detectedAffTxns = mergedTxns.filter(
+          (t) => t && /affiliate|commission|referral/i.test(t.title || t.description || '')
+        );
+        if (detectedAffTxns.length > 0) {
+          const autoComm = detectedAffTxns.reduce(
+            (s, t) => s + (Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0),
+            0
+          );
+          const autoOrders = Math.max(detectedAffTxns.length, 1);
+          const autoRev = Math.max(autoComm * 10, 2950 * autoOrders);
+          const updatedAffStats = {
+            totalCommission: autoComm,
+            totalOrders: autoOrders,
+            convertedOrders: autoOrders,
+            clicks: Math.max(autoOrders * 3, 3),
+            totalReferredRevenue: autoRev,
+            recentOrders: detectedAffTxns.map((t) => ({
+              id: t.ref || t.id,
+              title: t.title || 'Affiliate Referral Order',
+              commission: Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0,
+              time: t.date || 'Recently'
+            }))
+          };
+          localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(updatedAffStats));
+          const appId = affiliateApp?.applicationId || affiliateApp?.id;
+          if (appId) localStorage.setItem(`mshoppy_affiliate_stats_${appId}`, JSON.stringify(updatedAffStats));
+          setAffiliateStats({
+            totalReferredRevenue: autoRev,
+            totalCommission: autoComm,
+            totalOrders: autoOrders
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to load real user dashboard data:', err);

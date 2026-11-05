@@ -171,11 +171,37 @@ export default function AffiliateProgramPanel() {
             const updated = {
               ...cur,
               totalCommission: Math.max(comm, Number(cur.totalCommission || 0)),
+              totalOrders: Math.max(orders, Number(cur.totalOrders || 0)),
               convertedOrders: Math.max(orders, Number(cur.convertedOrders || 0)),
+              totalReferredRevenue: Math.max(comm * 10, Number(cur.totalReferredRevenue || 0), 2950),
               clicks: Math.max(Number(cur.clicks || 0), orders * 3, orders > 0 ? 3 : 0),
               recentOrders: recent.length > 0 ? recent : (cur.recentOrders || [])
             };
             localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(updated));
+            const app = getAffiliateApp();
+            if (app?.applicationId) {
+              localStorage.setItem(`mshoppy_affiliate_stats_${app.applicationId}`, JSON.stringify(updated));
+            }
+          } catch (_) {}
+        }
+
+        if (Array.isArray(wallet.transactions) && wallet.transactions.length > 0) {
+          try {
+            const existingRaw = localStorage.getItem('mshoppy_customer_wallet_txns');
+            if (!existingRaw || existingRaw === '[]') {
+              const formatted = wallet.transactions.map((dt) => ({
+                title: dt.description || dt.title || 'Wallet Transaction',
+                ref: dt.id || dt.ref || `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+                date: dt.createdAt ? new Date(dt.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : (dt.date || 'Recently'),
+                status: dt.status || 'COMPLETED',
+                amt: dt.amt || (dt.type === 'credit' ? `+₹${dt.amount}` : `-₹${dt.amount}`),
+                green: dt.green ?? (dt.type === 'credit'),
+                type: dt.type || 'credit',
+                amount: dt.amount,
+                orderId: dt.orderId
+              }));
+              localStorage.setItem('mshoppy_customer_wallet_txns', JSON.stringify(formatted));
+            }
           } catch (_) {}
         }
       })
