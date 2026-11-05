@@ -111,9 +111,17 @@ export async function getCategoryBySlug(slug) {
 
 export async function getBanners() {
   try {
-    const res = await fetch(`${API_BASE_URL}/banners`);
-    const data = await res.json();
-    return data?.data || [];
+    const res = await fetch(`${API_BASE_URL}/banners/active`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.data && data.data.length > 0) return data.data;
+    }
+    const fallbackRes = await fetch(`${API_BASE_URL}/banners`);
+    if (fallbackRes.ok) {
+      const fallbackData = await fallbackRes.json();
+      return fallbackData?.data || [];
+    }
+    return [];
   } catch (error) {
     console.error('Failed to fetch banners:', error);
     return [];

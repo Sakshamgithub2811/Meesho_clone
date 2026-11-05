@@ -944,6 +944,7 @@ function AppRoutes() {
         <Route path="/explorer" element={<SearchCategoriesExplorer onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/categories" element={<SearchCategoriesExplorer onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/search" element={<SearchResults onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/category/:categorySlug" element={<SearchResults onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/sarees" element={<SareesCategoryListing onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/western" element={<WomenWesternCategory onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/spotlight" element={<CuratedSpotlight onNavigate={handleNav} onBack={handleBack} />} />

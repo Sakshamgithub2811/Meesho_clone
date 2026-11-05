@@ -633,39 +633,51 @@ export default function HomeUserCustomer() {
             className="flex transition-transform duration-500 ease-in-out h-48 sm:h-64 md:h-80"
             style={{ transform: `translateX(-${activeSlide * 100}%)` }}
           >
-            {banners.map((banner, idx) => (
-              <div 
-                key={banner.id || idx}
-                onClick={() => {
-                  if (banner.targetCategory) {
-                    setSelectedCategory(banner.targetCategory);
-                  } else if (banner.targetUrl) {
-                    navigate(banner.targetUrl);
-                  }
-                }}
-                className={`w-full shrink-0 relative h-full bg-gradient-to-r ${banner.gradient || 'from-rose-600 via-pink-600 to-red-600'} flex items-center px-6 sm:px-12 md:px-16 text-white cursor-pointer`}
-              >
-                <div className="max-w-md z-10">
-                  {banner.badge && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 shadow-xs">
-                        {banner.badge.includes('⚡') && <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />}
-                        {banner.badge}
-                      </span>
-                      {banner.badgeStatus && (
-                        <span className="bg-yellow-400 text-slate-900 text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs">
-                          {banner.badgeStatus}
+            {banners.map((banner, idx) => {
+              const bgGradients = [
+                'from-rose-600 via-pink-600 to-red-600',
+                'from-indigo-700 via-blue-600 to-cyan-600',
+                'from-purple-700 via-pink-600 to-rose-600',
+                'from-emerald-700 via-teal-600 to-cyan-700'
+              ];
+              const bannerGrad = banner.gradient || bgGradients[idx % bgGradients.length];
+              const badgeLabel = banner.badgeText || banner.badge;
+              const btnLabel = banner.buttonText || 'Shop Now';
+
+              return (
+                <div 
+                  key={banner.id || idx}
+                  onClick={() => {
+                    if (banner.targetCategory) {
+                      setSelectedCategory(banner.targetCategory);
+                    } else if (banner.targetUrl) {
+                      navigate(banner.targetUrl);
+                    }
+                  }}
+                  className={`w-full shrink-0 relative h-full bg-gradient-to-r ${bannerGrad} flex items-center px-6 sm:px-12 md:px-16 text-white cursor-pointer`}
+                >
+                  <div className="max-w-md z-10">
+                    {badgeLabel && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 shadow-xs">
+                          <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
+                          {badgeLabel}
                         </span>
-                      )}
-                    </div>
-                  )}
-                  <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
-                    {banner.title}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-white/90 mb-4 line-clamp-2">
-                    {banner.subtitle}
-                  </p>
-                  {banner.buttonText && (
+                        {banner.badgeStatus && (
+                          <span className="bg-yellow-400 text-slate-900 text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs">
+                            {banner.badgeStatus}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
+                      {banner.title}
+                    </h2>
+                    {banner.subtitle && (
+                      <p className="text-xs sm:text-sm text-white/90 mb-4 line-clamp-2">
+                        {banner.subtitle}
+                      </p>
+                    )}
                     <button 
                       type="button"
                       onClick={(e) => {
@@ -678,20 +690,20 @@ export default function HomeUserCustomer() {
                       }}
                       className={`bg-white ${banner.accentColor || 'text-rose-600'} font-extrabold px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm hover:bg-rose-50 transition-all shadow-md cursor-pointer active:scale-95 flex items-center gap-1.5`}
                     >
-                      <span>{banner.buttonText}</span>
+                      <span>{btnLabel}</span>
                       <span>➔</span>
                     </button>
+                  </div>
+                  {banner.imageUrl && (
+                    <img 
+                      src={banner.imageUrl} 
+                      alt={banner.title} 
+                      className="absolute right-0 top-0 h-full w-1/2 object-cover object-center mask-gradient-left opacity-90 hidden sm:block"
+                    />
                   )}
                 </div>
-                {banner.imageUrl && (
-                  <img 
-                    src={banner.imageUrl} 
-                    alt={banner.title} 
-                    className="absolute right-0 top-0 h-full w-1/2 object-cover object-center mask-gradient-left opacity-90 hidden sm:block"
-                  />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Previous Arrow Button */}

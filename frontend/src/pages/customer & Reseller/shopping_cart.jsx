@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
+import QuickEmailOtpModal from '../../components/auth/QuickEmailOtpModal';
 import {
   toggleWishlist,
   getAddresses,
@@ -33,6 +34,30 @@ export default function ShoppingCart({ onNavigate, onBack }) {
 
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  const isUserAuthenticated = () => {
+    try {
+      const raw = localStorage.getItem('mshoppy_customer_user');
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u?.email && !u.email.endsWith('@customer.meesho') && !u.isOfflineFallback) return true;
+      }
+      const token = localStorage.getItem('mshoppy_customer_token');
+      if (token && raw) return true;
+      return false;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const handleProceedToCheckout = () => {
+    if (!isUserAuthenticated()) {
+      setShowLoginModal(true);
+      return;
+    }
+    handleNav('/address');
+  };
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [availableCoupons, setAvailableCoupons] = useState([]);
   const [showCouponsModal, setShowCouponsModal] = useState(false);
@@ -614,7 +639,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
                 {/* Desktop Checkout CTA */}
                 <button
                   type="button"
-                  onClick={() => handleNav('/address')}
+                  onClick={handleProceedToCheckout}
                   className="w-full py-4 bg-gradient-to-r from-[#FF3F6C] to-[#DF2457] text-white font-black text-base rounded-2xl shadow-xl shadow-pink-500/30 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 uppercase tracking-wider"
                 >
                   <span>Proceed to Checkout</span>
@@ -715,7 +740,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
               <span className="font-black text-xl text-[#191c1e]">₹{totalAmount}</span>
             </div>
             <button
-              onClick={() => handleNav('/address')}
+              onClick={handleProceedToCheckout}
               className="flex-1 bg-gradient-to-r from-[#FF3F6C] to-[#DF2457] text-white h-12 rounded-2xl font-black text-sm shadow-lg shadow-pink-500/30 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 uppercase tracking-wider"
             >
               <span>Place Order</span>
@@ -820,6 +845,17 @@ export default function ShoppingCart({ onNavigate, onBack }) {
           </div>
         </div>
       )}
+
+      {/* Quick Email OTP Login Modal for Cart Checkout */}
+      <QuickEmailOtpModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={() => {
+          handleNav('/address');
+        }}
+        actionTitle="Login to Checkout Your Cart"
+        actionSubtitle="Enter your email to receive an instant 6-digit login OTP"
+      />
 
       {/* Bottom Nav */}
       <AppBottomNav activeNav="cart" onNavigate={handleNav} role="customer" homePath="/user-home" />

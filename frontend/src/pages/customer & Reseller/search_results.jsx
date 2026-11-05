@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 import {
   getProducts,
@@ -12,6 +12,7 @@ import {
 
 export default function SearchResults({ onNavigate, onBack }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { categorySlug } = useParams();
   const navigate = useNavigate();
   const handleNav = (target) => {
     if (onNavigate) onNavigate(target);
@@ -31,6 +32,10 @@ export default function SearchResults({ onNavigate, onBack }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalProducts, setTotalProducts] = useState(0);
   const sentinelRef = useRef(null);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
+  const loadingRef = useRef(true);
+  const loadingMoreRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -43,21 +48,25 @@ export default function SearchResults({ onNavigate, onBack }) {
 
   useEffect(() => {
     const q = searchParams.get('q');
-    const cat = searchParams.get('category');
+    const cat = searchParams.get('category') || categorySlug;
     if (q !== null) {
       setSearchQuery(q);
     }
     if (cat) {
       setActiveFilter(cat);
     }
-  }, [searchParams]);
+  }, [searchParams, categorySlug]);
+
+  const effectiveCategory = activeFilter !== 'All' ? activeFilter : (categorySlug || '');
 
   // Load products from database matching query & filters
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
       setLoading(true);
+      loadingRef.current = true;
       setLoadingMore(false);
+      loadingMoreRef.current = false;
       setPage(1);
       setHasMore(true);
       pageRef.current = 1;
@@ -68,7 +77,7 @@ export default function SearchResults({ onNavigate, onBack }) {
           getCategories(),
           getProducts({
             search: searchQuery,
-            category: activeFilter === 'All' ? '' : activeFilter,
+            category: effectiveCategory,
             sort: selectedSort,
             page: 1,
             limit: 24,
@@ -92,13 +101,16 @@ export default function SearchResults({ onNavigate, onBack }) {
       } catch (e) {
         console.error('Failed to load search results:', e);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
       }
     }
 
     loadData();
     return () => { isMounted = false; };
-  }, [searchQuery, activeFilter, selectedSort]);
+  }, [searchQuery, effectiveCategory, selectedSort]);
 
   // Infinite Scroll Handler
   const loadMoreProducts = useCallback(async () => {
@@ -111,7 +123,7 @@ export default function SearchResults({ onNavigate, onBack }) {
     try {
       const res = await getProducts({
         search: searchQuery,
-        category: activeFilter === 'All' ? '' : activeFilter,
+        category: effectiveCategory,
         sort: selectedSort,
         page: nextPage,
         limit: 24,
@@ -313,7 +325,7 @@ export default function SearchResults({ onNavigate, onBack }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-4 flex justify-between items-center">
           <h2 className="font-extrabold text-sm sm:text-base text-slate-900">
-            {searchQuery ? `Results for "${searchQuery}"` : 'All Products'} ({products.length})
+            {searchQuery ? `Results for "${searchQuery}"` : (effectiveCategory ? effectiveCategory.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All Products')} ({totalProducts || products.length})
           </h2>
         </div>
 
