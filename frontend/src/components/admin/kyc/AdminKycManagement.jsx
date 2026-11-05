@@ -57,6 +57,7 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
       const params = new URLSearchParams();
       if (selectedStatus !== 'ALL') params.append('status', selectedStatus);
       if (selectedType !== 'all') params.append('type', selectedType);
@@ -85,7 +86,9 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
   };
 
   useEffect(() => {
-    fetchApplications();
+    if (auth.currentUser || currentUser?.id) {
+      fetchApplications();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchApplications();
@@ -119,6 +122,7 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
     try {
       setActionLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
       const res = await axios.put(
         `${API_V1_BASE}/admin-kyc/${reviewApp.id}/status`,
         {

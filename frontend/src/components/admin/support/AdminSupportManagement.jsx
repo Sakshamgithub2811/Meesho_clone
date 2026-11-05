@@ -59,6 +59,7 @@ export default function AdminSupportManagement() {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
       const params = new URLSearchParams();
 
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
@@ -96,7 +97,9 @@ export default function AdminSupportManagement() {
   };
 
   useEffect(() => {
-    fetchTickets();
+    if (auth.currentUser || currentUser?.id) {
+      fetchTickets();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchTickets();
@@ -118,6 +121,7 @@ export default function AdminSupportManagement() {
     try {
       setActionLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const res = await axios.patch(
         `${API_V1_BASE}/admin-support/${ticketId}/status`,

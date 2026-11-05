@@ -47,6 +47,7 @@ export default function AdminCmsManagement() {
       else setLoading(true);
 
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.get(`${API_BASE}/admin-cms`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -69,7 +70,15 @@ export default function AdminCmsManagement() {
   };
 
   useEffect(() => {
-    fetchPages();
+    if (auth.currentUser || currentUser?.id) {
+      fetchPages();
+    }
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchPages();
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleOpenCreateModal = () => {
@@ -86,6 +95,7 @@ export default function AdminCmsManagement() {
     try {
       setIsSubmitting(true);
       const token = await getAuthToken();
+      if (!token) return;
 
       if (editingPage) {
         const res = await axios.put(
@@ -129,6 +139,7 @@ export default function AdminCmsManagement() {
   const handleToggleStatus = async (id) => {
     try {
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.patch(
         `${API_BASE}/admin-cms/${id}/status`,
         {},
@@ -162,6 +173,7 @@ export default function AdminCmsManagement() {
 
     try {
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.delete(
         `${API_BASE}/admin-cms/${page.id}`,
         { headers: { Authorization: `Bearer ${token}` } }

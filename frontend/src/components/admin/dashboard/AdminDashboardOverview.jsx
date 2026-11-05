@@ -36,6 +36,10 @@ export default function AdminDashboardOverview({ onNavigateTab }) {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) {
+        // Firebase auth still initializing; wait for onAuthStateChanged
+        return;
+      }
       const res = await axios.get(`${API_V1_BASE}/admin-dashboard/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -60,7 +64,9 @@ export default function AdminDashboardOverview({ onNavigateTab }) {
   };
 
   useEffect(() => {
-    fetchStats();
+    if (auth.currentUser || currentUser?.id) {
+      fetchStats();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchStats();

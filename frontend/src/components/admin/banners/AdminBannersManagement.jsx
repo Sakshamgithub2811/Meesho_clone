@@ -48,6 +48,7 @@ export default function AdminBannersManagement() {
       else setLoading(true);
 
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.get(`${API_BASE}/admin-banners`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -70,7 +71,15 @@ export default function AdminBannersManagement() {
   };
 
   useEffect(() => {
-    fetchBanners();
+    if (auth.currentUser || currentUser?.id) {
+      fetchBanners();
+    }
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchBanners();
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleOpenCreateModal = () => {
@@ -87,6 +96,7 @@ export default function AdminBannersManagement() {
     try {
       setIsSubmitting(true);
       const token = await getAuthToken();
+      if (!token) return;
 
       if (editingBanner) {
         const res = await axios.put(
@@ -132,6 +142,7 @@ export default function AdminBannersManagement() {
     if (!id) return;
     try {
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.patch(
 `${API_BASE}/admin-banners/${id}/toggle`,
         {},
@@ -159,6 +170,7 @@ export default function AdminBannersManagement() {
 
     try {
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.delete(
         `${API_BASE}/admin-banners/${banner.id}`,
         { headers: { Authorization: `Bearer ${token}` } }

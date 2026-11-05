@@ -66,6 +66,7 @@ export default function AdminReturnsManagement() {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
       const params = new URLSearchParams();
 
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
@@ -103,7 +104,9 @@ export default function AdminReturnsManagement() {
   };
 
   useEffect(() => {
-    fetchReturns();
+    if (auth.currentUser || currentUser?.id) {
+      fetchReturns();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchReturns();
@@ -126,6 +129,7 @@ export default function AdminReturnsManagement() {
     try {
       setActionLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const res = await axios.patch(
         `${API_V1_BASE}/admin-returns/${returnId}/status`,
