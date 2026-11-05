@@ -11,7 +11,8 @@ import {
   X,
   Check,
   Ban,
-  Clock
+  Clock,
+  MapPin
 } from 'lucide-react';
 import KycStatusBadge from './KycStatusBadge';
 
