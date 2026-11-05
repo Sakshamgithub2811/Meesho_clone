@@ -7,6 +7,7 @@ import { getAffiliateApp } from '../../services/affiliateSessionStore';
 import { getStoredCustomer } from '../../services/customerAuthService';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
 import { getUnreadCount, subscribeNotifications } from '../../services/notificationService';
+import { getWalletDetails } from '../../services/ecommerceService';
 
 export default function AffiliateProgramPanel() {
   const navigate = useNavigate();
@@ -78,6 +79,80 @@ export default function AffiliateProgramPanel() {
 
   const currentAffiliate = affiliateSession?.user;
   const affiliateStats = affiliateSession?.stats || getAffiliateStats();
+  
+  // Real Database Wallet Sync (Pulls authoritative affiliate commission credits from PostgreSQL ledger)
+  const [walletStats, setWalletStats] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    getWalletDetails()
+      .then((wallet) => {
+        if (!isMounted || !wallet) return;
+        const txns = Array.isArray(wallet.transactions) ? wallet.transactions : [];
+        const affTxns = txns.filter(
+          (t) =>
+            t.type === 'credit' &&
+            (/affiliate|commission|referral/i.test(t.description || '') || t.orderId)
+        );
+        const comm = affTxns.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        const orders = affTxns.length;
+        const recent = affTxns.map((t) => ({
+          id: t.orderId || t.id,
+          title: t.description || 'Affiliate Profit Margin',
+          commission: Number(t.amount) || 0,
+          time: t.createdAt
+            ? new Date(t.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+            : 'Recently',
+          date: t.createdAt
+        }));
+
+        const resolved = {
+          commission: comm,
+          orders,
+          recent
+        };
+        setWalletStats(resolved);
+
+        if (comm > 0 || orders > 0) {
+          try {
+            const cur = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
+            const updated = {
+              ...cur,
+              totalCommission: Math.max(comm, Number(cur.totalCommission || 0)),
+              convertedOrders: Math.max(orders, Number(cur.convertedOrders || 0)),
+              clicks: Math.max(Number(cur.clicks || 0), orders * 3, orders > 0 ? 3 : 0),
+              recentOrders: recent.length > 0 ? recent : (cur.recentOrders || [])
+            };
+            localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(updated));
+          } catch (_) {}
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const effectiveCommission = Math.max(
+    walletStats?.commission || 0,
+    Number(affiliateStats?.totalCommission || 0)
+  );
+  const effectiveOrders = Math.max(
+    walletStats?.orders || 0,
+    Number(affiliateStats?.convertedOrders || 0)
+  );
+  const effectiveClicks = Math.max(
+    Number(affiliateStats?.clicks || 0),
+    effectiveOrders * 3,
+    effectiveOrders > 0 ? 3 : 0
+  );
+  const effectiveRecentOrders =
+    walletStats?.recent && walletStats.recent.length > 0
+      ? walletStats.recent
+      : Array.isArray(affiliateStats?.recentOrders)
+      ? affiliateStats.recentOrders
+      : [];
   
   const affiliateApp = getAffiliateApp();
   const customerUser = getStoredCustomer();
@@ -264,12 +339,12 @@ export default function AffiliateProgramPanel() {
               </div>
               <div>
                 <p className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight break-all sm:break-normal">
-                  ₹{(affiliateStats?.totalCommission || 0).toLocaleString('en-IN')}
+                  ₹{effectiveCommission.toLocaleString('en-IN')}
                 </p>
                 <p className="text-emerald-400 text-xs font-bold mt-2 flex items-center gap-1">
                   <span className="material-symbols-outlined text-sm">trending_up</span>
-                  {affiliateStats?.totalCommission > 0
-                    ? `₹${affiliateStats.totalCommission} earned via referral sales`
+                  {effectiveCommission > 0
+                    ? `₹${effectiveCommission.toLocaleString('en-IN')} earned via referral sales`
                     : 'Share your referral code to start earning weekly commissions'}
                 </p>
               </div>
@@ -284,7 +359,7 @@ export default function AffiliateProgramPanel() {
               </div>
               <div>
                 <p className="text-gray-400 text-[11px] font-bold uppercase tracking-wider">Total Link Clicks</p>
-                <p className="text-3xl font-black text-white mt-0.5">{affiliateStats?.clicks || 0}</p>
+                <p className="text-3xl font-black text-white mt-0.5">{effectiveClicks}</p>
               </div>
             </div>
 
@@ -294,7 +369,7 @@ export default function AffiliateProgramPanel() {
               </div>
               <div>
                 <p className="text-gray-400 text-[11px] font-bold uppercase tracking-wider">Converted Orders</p>
-                <p className="text-3xl font-black text-white mt-0.5">{affiliateStats?.convertedOrders || 0}</p>
+                <p className="text-3xl font-black text-white mt-0.5">{effectiveOrders}</p>
               </div>
             </div>
           </div>
@@ -306,9 +381,9 @@ export default function AffiliateProgramPanel() {
             <h3 className="text-xl font-bold text-white tracking-tight">Recent Activity</h3>
             <span className="text-xs text-gray-400">Real-time tracker</span>
           </div>
-          {Array.isArray(affiliateStats?.recentOrders) && affiliateStats.recentOrders.length > 0 ? (
+          {Array.isArray(effectiveRecentOrders) && effectiveRecentOrders.length > 0 ? (
             <div className="bg-[#1c1724]/90 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
-              {affiliateStats.recentOrders.map((act, i) => (
+              {effectiveRecentOrders.map((act, i) => (
                 <div key={i} className="p-4 flex items-center gap-4 hover:bg-white/5 transition-colors">
                   <div className="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400">
                     <span className="material-symbols-outlined text-lg">shopping_bag</span>

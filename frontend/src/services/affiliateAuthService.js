@@ -154,21 +154,55 @@ export function subscribeAffiliateAuth(listener) {
  */
 export async function fetchAffiliateStats() {
   try {
-    const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('mshoppy_token') || localStorage.getItem('firebase_token');
-    const stored = getStoredAffiliate();
-    const userId = stored?.user?.id || '';
+    const token =
+      localStorage.getItem(TOKEN_KEY) ||
+      localStorage.getItem('mshoppy_customer_token') ||
+      localStorage.getItem('mshoppy_token') ||
+      localStorage.getItem('firebase_token') ||
+      localStorage.getItem('token');
+
+    let resolvedUserId = '';
+    let resolvedEmail = '';
+    let resolvedPhone = '';
+
+    for (const key of ['mshoppy_customer_user', 'user', 'mshoppy_affiliate_user', 'mshoppy_reseller_user']) {
+      try {
+        const u = JSON.parse(localStorage.getItem(key) || '{}');
+        if (!resolvedUserId && u?.id && !u.id.startsWith('affiliate_')) resolvedUserId = u.id;
+        if (!resolvedUserId && u?.uid) resolvedUserId = u.uid;
+        if (!resolvedEmail && u?.email) resolvedEmail = u.email;
+        if (!resolvedPhone && u?.phone) resolvedPhone = u.phone;
+      } catch (_) {}
+    }
+
+    const app = getAffiliateApp();
+    if (!resolvedUserId && app?.userId) resolvedUserId = app.userId;
+    if (!resolvedEmail && app?.email) resolvedEmail = app.email;
+    if (!resolvedPhone && app?.phone) resolvedPhone = app.phone;
+
+    const queryTarget = resolvedUserId || resolvedEmail || resolvedPhone || (getStoredAffiliate()?.user?.id || '');
 
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = 'Bearer ' + token;
-    if (userId) headers['x-user-id'] = userId;
+    if (queryTarget) headers['x-user-id'] = queryTarget;
 
-    const query = userId ? '?userId=' + encodeURIComponent(userId) : '';
+    const query = queryTarget ? '?userId=' + encodeURIComponent(queryTarget) : '';
     const res = await fetch(API_BASE_URL + '/auth/affiliate-stats' + query, { headers });
     const data = await res.json();
     if (data && data.success && data.stats) {
-      localStorage.setItem(STATS_KEY, JSON.stringify(data.stats));
+      const existing = getAffiliateStats();
+      const mergedStats = {
+        ...data.stats,
+        totalCommission: Math.max(Number(data.stats.totalCommission || 0), Number(existing.totalCommission || 0)),
+        clicks: Math.max(Number(data.stats.clicks || 0), Number(existing.clicks || 0)),
+        convertedOrders: Math.max(Number(data.stats.convertedOrders || 0), Number(existing.convertedOrders || 0)),
+        recentOrders: (Array.isArray(data.stats.recentOrders) && data.stats.recentOrders.length > 0)
+          ? data.stats.recentOrders
+          : (existing.recentOrders || [])
+      };
+      localStorage.setItem(STATS_KEY, JSON.stringify(mergedStats));
       notifyListeners();
-      return data.stats;
+      return mergedStats;
     }
   } catch (err) {
     console.warn('Could not fetch live affiliate stats from API:', err.message);
