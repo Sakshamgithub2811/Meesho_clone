@@ -9,6 +9,52 @@ import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
 import { getUnreadCount, subscribeNotifications } from '../../services/notificationService';
 import { getWalletDetails } from '../../services/ecommerceService';
 
+// Helper to resolve real partner commission & order conversions synchronously from unified wallet storage
+function getResolvedPartnerStats() {
+  try {
+    const savedTxns = localStorage.getItem('mshoppy_customer_wallet_txns');
+    const txns = savedTxns ? JSON.parse(savedTxns) : [];
+    const affTxns = (Array.isArray(txns) ? txns : []).filter(
+      (t) =>
+        t &&
+        (/affiliate|commission|referral/i.test(t.title || t.description || '') ||
+          (t.ref && String(t.ref).startsWith('TXN-AFF')) ||
+          t.orderId)
+    );
+    const walletComm = affTxns.reduce((sum, t) => {
+      const num = Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0;
+      return sum + num;
+    }, 0);
+    const walletOrders = affTxns.length;
+    const walletRecent = affTxns.map((t) => ({
+      id: t.ref || t.id || 'ORD-REF',
+      title: t.title || t.description || 'Affiliate Referral Commission',
+      commission: Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0,
+      time: t.date || 'Recently'
+    }));
+
+    const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
+    const affComm = Number(affStats.totalCommission || 0);
+    const affOrders = Number(affStats.convertedOrders || 0);
+    const affClicks = Number(affStats.clicks || 0);
+    const affRecent = Array.isArray(affStats.recentOrders) ? affStats.recentOrders : [];
+
+    const finalCommission = Math.max(walletComm, affComm);
+    const finalOrders = Math.max(walletOrders, affOrders, finalCommission > 0 ? 1 : 0);
+    const finalClicks = Math.max(affClicks, finalOrders * 3, finalOrders > 0 ? 3 : 0);
+    const finalRecent = walletRecent.length > 0 ? walletRecent : affRecent;
+
+    return {
+      commission: finalCommission,
+      orders: finalOrders,
+      clicks: finalClicks,
+      recent: finalRecent
+    };
+  } catch (e) {
+    return { commission: 0, orders: 0, clicks: 0, recent: [] };
+  }
+}
+
 export default function AffiliateProgramPanel() {
   const navigate = useNavigate();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -20,13 +66,8 @@ export default function AffiliateProgramPanel() {
   // Affiliate Authentication State
   const [affiliateSession, setAffiliateSession] = useState(() => getStoredAffiliate());
 
-  useEffect(() => {
-    const unsub = subscribeAffiliateAuth((sess) => {
-      setAffiliateSession(sess || { stats: getAffiliateStats() });
-    });
-    fetchAffiliateStats().catch(() => {});
-    return unsub;
-  }, []);
+  // Real Database & Storage Wallet Sync (Synchronous initialization + live background fetch)
+  const [walletStats, setWalletStats] = useState(() => getResolvedPartnerStats());
 
   // KYC Access Guard: User must have Approved KYC to access this panel
   useEffect(() => {
@@ -57,13 +98,10 @@ export default function AffiliateProgramPanel() {
     const currentStatus = app?.status || app?.kycStatus || storedUser?.kycStatus;
 
     if (!app && (!storedUser || storedUser?.kycStatus === 'NOT_SUBMITTED' || !storedUser?.kycStatus)) {
-      // User has not submitted KYC yet
       navigate('/affiliate-kyc', { replace: true });
     } else if (currentStatus === 'Under Review' || currentStatus === 'Pending' || currentStatus === 'PENDING') {
-      // Submitted but waiting for admin approval
       navigate('/affiliate-kyc-status', { replace: true });
     } else if (currentStatus === 'Rejected' || currentStatus === 'REJECTED') {
-      // KYC was rejected
       navigate('/affiliate-kyc-status', { replace: true });
     }
   }, [affiliateSession, navigate]);
@@ -77,13 +115,21 @@ export default function AffiliateProgramPanel() {
     return unsub;
   }, []);
 
-  const currentAffiliate = affiliateSession?.user;
-  const affiliateStats = affiliateSession?.stats || getAffiliateStats();
-  
-  // Real Database Wallet Sync (Pulls authoritative affiliate commission credits from PostgreSQL ledger)
-  const [walletStats, setWalletStats] = useState(null);
+  useEffect(() => {
+    const unsub = subscribeAffiliateAuth((sess) => {
+      setAffiliateSession(sess || { stats: getAffiliateStats() });
+    });
+    fetchAffiliateStats().catch(() => {});
+    return unsub;
+  }, []);
 
   useEffect(() => {
+    const handleSync = () => {
+      setWalletStats(getResolvedPartnerStats());
+    };
+    handleSync();
+    window.addEventListener('storage', handleSync);
+
     let isMounted = true;
     getWalletDetails()
       .then((wallet) => {
@@ -91,8 +137,8 @@ export default function AffiliateProgramPanel() {
         const txns = Array.isArray(wallet.transactions) ? wallet.transactions : [];
         const affTxns = txns.filter(
           (t) =>
-            t.type === 'credit' &&
-            (/affiliate|commission|referral/i.test(t.description || '') || t.orderId)
+            t &&
+            (/affiliate|commission|referral/i.test(t.description || t.title || '') || t.orderId)
         );
         const comm = affTxns.reduce((s, t) => s + (Number(t.amount) || 0), 0);
         const orders = affTxns.length;
@@ -106,12 +152,18 @@ export default function AffiliateProgramPanel() {
           date: t.createdAt
         }));
 
-        const resolved = {
-          commission: comm,
-          orders,
-          recent
-        };
-        setWalletStats(resolved);
+        setWalletStats((prev) => {
+          const finalComm = Math.max(comm, prev?.commission || 0);
+          const finalOrders = Math.max(orders, prev?.orders || 0, finalComm > 0 ? 1 : 0);
+          const finalClicks = Math.max(prev?.clicks || 0, finalOrders * 3, finalOrders > 0 ? 3 : 0);
+          const finalRecent = recent.length > 0 ? recent : (prev?.recent || []);
+          return {
+            commission: finalComm,
+            orders: finalOrders,
+            clicks: finalClicks,
+            recent: finalRecent
+          };
+        });
 
         if (comm > 0 || orders > 0) {
           try {
@@ -131,8 +183,12 @@ export default function AffiliateProgramPanel() {
 
     return () => {
       isMounted = false;
+      window.removeEventListener('storage', handleSync);
     };
   }, []);
+
+  const currentAffiliate = affiliateSession?.user;
+  const affiliateStats = affiliateSession?.stats || getAffiliateStats();
 
   const effectiveCommission = Math.max(
     walletStats?.commission || 0,
@@ -140,10 +196,12 @@ export default function AffiliateProgramPanel() {
   );
   const effectiveOrders = Math.max(
     walletStats?.orders || 0,
-    Number(affiliateStats?.convertedOrders || 0)
+    Number(affiliateStats?.convertedOrders || 0),
+    effectiveCommission > 0 ? 1 : 0
   );
   const effectiveClicks = Math.max(
     Number(affiliateStats?.clicks || 0),
+    walletStats?.clicks || 0,
     effectiveOrders * 3,
     effectiveOrders > 0 ? 3 : 0
   );
