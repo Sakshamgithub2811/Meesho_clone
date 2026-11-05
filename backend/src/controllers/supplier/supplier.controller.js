@@ -189,7 +189,7 @@ export const addProduct = async (req, res, next) => {
       finalCategorySlug = slugify(categoryName, { lower: true, strict: true });
     }
     if (!finalCategorySlug) {
-      finalCategorySlug = 'general';
+      finalCategorySlug = 'women-ethnic';
     }
 
     // Ensure Category exists or create it
