@@ -485,9 +485,12 @@ export const updateOrderStatus = async (req, res) => {
 
     // Auto-dispatch delivery OTP email as soon as marked OUT_FOR_DELIVERY
     if (upperStatus === 'OUT_FOR_DELIVERY') {
-      dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' })
-        .then((result) => console.log(`🚚 [Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${result.sentTo}`))
-        .catch((err) => console.error(`⚠️ [Order ${id}] OUT_FOR_DELIVERY email dispatch error:`, err.message));
+      try {
+        const otpResult = await dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' });
+        console.log(`🚚 [Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${otpResult.sentTo}`);
+      } catch (err) {
+        console.error(`⚠️ [Order ${id}] OUT_FOR_DELIVERY email dispatch error:`, err.message);
+      }
     }
 
     return res.status(200).json({

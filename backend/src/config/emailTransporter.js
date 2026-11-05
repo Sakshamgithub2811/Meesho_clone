@@ -22,21 +22,26 @@ for (const p of envCandidates) {
 }
 dotenv.config();
 
-const hasSmtpConfig = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+const smtpUser = process.env.SMTP_USER || "pramodlodhi2003born@gmail.com";
+const smtpPass = process.env.SMTP_PASS || "rtgichrdgjzxnkux";
+const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+const smtpPort = Number(process.env.SMTP_PORT) || 587;
+
+const hasSmtpConfig = Boolean(smtpUser && smtpPass);
 
 let realTransporter = null;
 if (hasSmtpConfig) {
   try {
     realTransporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: Number(process.env.SMTP_PORT) === 465,
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+        user: smtpUser,
+        pass: smtpPass
       },
     });
-    console.log("📧 Email Transporter Configured with User:", process.env.SMTP_USER);
+    console.log("📧 Email Transporter Configured with User:", smtpUser);
   } catch (err) {
     console.warn("⚠️ Email Transporter Init Warning:", err.message);
   }
@@ -48,6 +53,9 @@ export const transporter = {
   sendMail: async (options) => {
     if (realTransporter) {
       try {
+        if (!options.from) {
+          options.from = process.env.EMAIL_FROM || `Mshoppy <${smtpUser}>`;
+        }
         return await realTransporter.sendMail(options);
       } catch (err) {
         console.warn("⚠️ SMTP Send Mail Error (skipped):", err.message);
