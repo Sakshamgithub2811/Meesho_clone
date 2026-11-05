@@ -25,20 +25,20 @@ export const verifyAuth = async (req, res, next) => {
     if (authInstance) {
       try {
         decodedToken = await authInstance.verifyIdToken(token);
-        uid = decodedToken.uid;
+        uid = decodedToken.uid || decodedToken.user_id || decodedToken.sub;
         email = decodedToken.email;
       } catch (tokenErr) {
-        // Fallback: Check if token is a standard signed JWT (e.g. from Google Auth or local session)
+        // Fallback: Check if token is a standard signed JWT (Firebase client token or OAuth JWT)
         try {
           const jwtDecoded = jwt.decode(token);
-          if (jwtDecoded && (jwtDecoded.id || jwtDecoded.uid)) {
-            uid = jwtDecoded.id || jwtDecoded.uid;
+          if (jwtDecoded) {
+            uid = jwtDecoded.user_id || jwtDecoded.sub || jwtDecoded.uid || jwtDecoded.id || uid;
             email = jwtDecoded.email || null;
             decodedToken = jwtDecoded;
           }
         } catch (jwtErr) {}
 
-        if (!decodedToken && (token.startsWith('firebase_') || token.length >= 3)) {
+        if (!decodedToken && (token.startsWith('firebase_') || (token.length >= 3 && !token.startsWith('ey')))) {
           uid = token;
         } else if (!decodedToken) {
           return res.status(401).json({ 
@@ -52,8 +52,8 @@ export const verifyAuth = async (req, res, next) => {
       // Admin auth not initialized, check JWT or token format
       try {
         const jwtDecoded = jwt.decode(token);
-        if (jwtDecoded && (jwtDecoded.id || jwtDecoded.uid)) {
-          uid = jwtDecoded.id || jwtDecoded.uid;
+        if (jwtDecoded) {
+          uid = jwtDecoded.user_id || jwtDecoded.sub || jwtDecoded.uid || jwtDecoded.id || uid;
           email = jwtDecoded.email || null;
           decodedToken = jwtDecoded;
         }
