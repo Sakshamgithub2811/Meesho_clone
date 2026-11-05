@@ -11,7 +11,8 @@ import {
   X,
   Check,
   Ban,
-  Clock
+  Clock,
+  MapPin
 } from 'lucide-react';
 import KycStatusBadge from './KycStatusBadge';
 
@@ -73,7 +74,7 @@ export default function KycReviewModal({
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                Application ID: <span className="font-mono text-gray-700">#{reviewApp.id}</span> • Submitted {formatDate(reviewApp.createdAt)}
+                Application ID: <span className="font-mono text-gray-700">#{reviewApp.id}</span> • Submitted {typeof formatDate === 'function' ? formatDate(reviewApp.createdAt) : (reviewApp.createdAt || 'Recently')}
               </p>
             </div>
             <button
