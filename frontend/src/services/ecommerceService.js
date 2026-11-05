@@ -367,12 +367,13 @@ export async function getOrderById(id) {
   }
 }
 
-export async function createOrder({ items, shippingAddress, paymentMethod, totalAmount }) {
+export async function createOrder({ items, shippingAddress, paymentMethod, totalAmount, couponCode, referralCode }) {
   try {
+    const savedRef = referralCode || (typeof window !== 'undefined' ? localStorage.getItem('mshoppy_referral_code') : undefined) || undefined;
     const res = await fetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ items, shippingAddress, paymentMethod, totalAmount }),
+      body: JSON.stringify({ items, shippingAddress, paymentMethod, totalAmount, couponCode, referralCode: savedRef }),
     });
     return await res.json();
   } catch (error) {

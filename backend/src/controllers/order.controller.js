@@ -36,7 +36,8 @@ export const createOrder = async (req, res) => {
       items, // array of { productId, quantity, size }
       shippingAddress,
       paymentMethod = 'COD',
-      couponCode
+      couponCode,
+      referralCode
     } = req.body;
 
     if (!items || !items.length) {
@@ -181,6 +182,84 @@ export const createOrder = async (req, res) => {
 
       return newOrder;
     });
+
+    // 5. Affiliate Referral Attribution & Real Database Commission Credit
+    if (referralCode && typeof referralCode === 'string' && referralCode.trim()) {
+      try {
+        const cleanRef = referralCode.trim().toUpperCase();
+        // 10% commission on final order total (min ?10)
+        const commissionAmount = Math.max(10, Math.round(finalOrderTotal * 0.10));
+
+        // Find the affiliate partner profile
+        const refPrefix = cleanRef.replace(/^AFF-/, '').slice(0, 5).toLowerCase();
+        let affiliateProfile = await prisma.profile.findFirst({
+          where: {
+            OR: [
+              { storeName: cleanRef },
+              { id: cleanRef },
+              ...(refPrefix.length >= 3 ? [{ email: { startsWith: refPrefix } }] : [])
+            ]
+          },
+          include: { wallet: true }
+        });
+
+        // Fallback: If not found, match with active reseller/affiliate
+        if (!affiliateProfile) {
+          affiliateProfile = await prisma.profile.findFirst({
+            where: { role: 'RESELLER' },
+            include: { wallet: true }
+          });
+        }
+
+        if (affiliateProfile && affiliateProfile.id !== userId) {
+          // Record referral in PostgreSQL referrals table
+          await prisma.referral.create({
+            data: {
+              referrerId: affiliateProfile.id,
+              referredId: userId,
+              code: cleanRef,
+              rewardAmount: commissionAmount,
+              isRedeemed: true
+            }
+          }).catch(e => console.warn('Referral creation note:', e.message));
+
+          // Ensure wallet exists for affiliate
+          let wallet = affiliateProfile.wallet;
+          if (!wallet) {
+            wallet = await prisma.wallet.create({
+              data: {
+                userId: affiliateProfile.id,
+                balance: 0,
+                pending: 0
+              }
+            });
+          }
+
+          // Credit the commission into the affiliate's real database wallet
+          await prisma.wallet.update({
+            where: { id: wallet.id },
+            data: {
+              balance: { increment: commissionAmount }
+            }
+          });
+
+          // Create wallet transaction record for passbook & audit trail
+          await prisma.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              amount: commissionAmount,
+              type: 'credit',
+              description: `Affiliate Commission (10%) for Order #${order.id.slice(-6).toUpperCase()}`,
+              orderId: order.id
+            }
+          });
+
+          console.log(`[Affiliate] Credited ?${commissionAmount} commission to ${affiliateProfile.email || affiliateProfile.fullName} for Order ${order.id}`);
+        }
+      } catch (affiliateErr) {
+        console.warn('Affiliate commission credit note:', affiliateErr.message);
+      }
+    }
 
     return res.status(201).json({
       success: true,

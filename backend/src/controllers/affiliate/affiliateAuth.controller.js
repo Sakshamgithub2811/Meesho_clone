@@ -37,6 +37,7 @@ export const registerAffiliate = async (req, res) => {
           email: cleanEmail,
           role: "CUSTOMER", // Stored as customer base profile in Postgres enum
           fullName: fullName || "Affiliate Partner",
+          storeName: partnerCode,
           wallet: {
             create: {
               balance: 0.0,
@@ -54,6 +55,13 @@ export const registerAffiliate = async (req, res) => {
           _count: { select: { orders: true } }
         }
       });
+    }
+
+    if (!profile.storeName) {
+      await prisma.profile.update({
+        where: { id: profile.id },
+        data: { storeName: partnerCode }
+      }).catch(() => {});
     }
 
     const latestKyc = profile.kycApplications?.[0];
@@ -126,6 +134,7 @@ export const loginAffiliate = async (req, res) => {
           email: cleanEmail,
           role: "CUSTOMER",
           fullName: cleanEmail.split('@')[0] || "Affiliate Partner",
+          storeName: `AFF-${cleanEmail.split('@')[0].toUpperCase().slice(0, 5)}${firebaseUid.slice(-3)}`,
           wallet: {
             create: {
               balance: 0.0,
@@ -147,7 +156,13 @@ export const loginAffiliate = async (req, res) => {
 
     const latestKyc = profile.kycApplications?.[0];
     const kycStatus = latestKyc?.status || (profile.role === 'RESELLER' ? 'APPROVED' : 'NOT_SUBMITTED');
-    const partnerCode = `AFF-${cleanEmail.split('@')[0].toUpperCase().slice(0, 5)}${profile.id.slice(-3)}`;
+    const partnerCode = profile.storeName || `AFF-${cleanEmail.split('@')[0].toUpperCase().slice(0, 5)}${profile.id.slice(-3)}`;
+    if (!profile.storeName) {
+      await prisma.profile.update({
+        where: { id: profile.id },
+        data: { storeName: partnerCode }
+      }).catch(() => {});
+    }
 
     const affiliateUser = {
       id: profile.id,

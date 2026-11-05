@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
-import { getStoredAffiliate, logoutAffiliate, subscribeAffiliateAuth, getAffiliateStats } from '../../services/affiliateAuthService';
+import { getStoredAffiliate, logoutAffiliate, subscribeAffiliateAuth, getAffiliateStats, fetchAffiliateStats } from '../../services/affiliateAuthService';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
 import { getStoredCustomer } from '../../services/customerAuthService';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
@@ -23,6 +23,7 @@ export default function AffiliateProgramPanel() {
     const unsub = subscribeAffiliateAuth((sess) => {
       setAffiliateSession(sess || { stats: getAffiliateStats() });
     });
+    fetchAffiliateStats().catch(() => {});
     return unsub;
   }, []);
 

@@ -692,6 +692,21 @@ export const getAffiliateStats = async (req, res) => {
       .filter(t => t.type === 'debit')
       .reduce((sum, t) => sum + t.amount, 0);
 
+    const referrals = await prisma.referral.findMany({
+      where: { referrerId: profile.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    }).catch(() => []);
+
+    const formattedReferrals = (referrals || []).map(r => ({
+      id: r.id,
+      title: `Referral Commission (${r.code})`,
+      orderTotal: Math.round(r.rewardAmount * 10),
+      commission: r.rewardAmount,
+      status: 'CONFIRMED',
+      createdAt: r.createdAt
+    }));
+
     const formattedRecentOrders = (profile.orders || []).map(order => ({
       id: order.id,
       title: order.items?.[0]?.product?.title || `Order #${order.id.slice(-6)}`,
@@ -701,16 +716,19 @@ export const getAffiliateStats = async (req, res) => {
       createdAt: order.createdAt
     }));
 
+    const combinedRecentOrders = [...formattedReferrals, ...formattedRecentOrders];
+    const totalConverted = totalOrders + (referrals?.length || 0);
+
     return res.status(200).json({
       success: true,
       stats: {
         totalCommission: walletBalance,
         pendingCommission: pendingCommission,
         withdrawnAmount: withdrawnAmount,
-        clicks: Math.max(totalOrders * 3, totalOrders),
-        convertedOrders: totalOrders,
-        conversionRate: totalOrders > 0 ? '33.3%' : '0%',
-        recentOrders: formattedRecentOrders,
+        clicks: Math.max(totalConverted * 3, totalConverted),
+        convertedOrders: totalConverted,
+        conversionRate: totalConverted > 0 ? '33.3%' : '0%',
+        recentOrders: combinedRecentOrders,
         kycStatus: kycStatus,
         walletBalance: walletBalance
       }
