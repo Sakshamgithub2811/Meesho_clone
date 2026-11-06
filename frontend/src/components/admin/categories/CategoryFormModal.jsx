@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Image as ImageIcon, Sparkles, Loader2, Check, FolderTree, GitBranch } from 'lucide-react';
+import ImageUploadDropzone from '../../common/ImageUploadDropzone';
 
 export default function CategoryFormModal({
   isOpen,
@@ -293,44 +294,16 @@ export default function CategoryFormModal({
             </p>
           </div>
 
-          {/* Image URL */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-              Thumbnail Image URL (Optional)
-            </label>
-            <input
-              type="url"
-              placeholder="https://images.unsplash.com/photo-..."
-              value={formData.imageUrl}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, imageUrl: e.target.value }))
-              }
-              disabled={isSubmitting}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-100 focus:outline-none transition-all"
-            />
-          </div>
-
-          {/* Image Preview Box */}
-          {formData.imageUrl && (
-            <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-3">
-              <div className="w-14 h-14 rounded-lg bg-white border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
-                <img
-                  src={formData.imageUrl}
-                  alt="Preview"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="text-xs text-gray-600">
-                <span className="font-semibold text-gray-800">Preview</span>
-                <p className="text-[11px] text-gray-400 truncate max-w-xs">
-                  {formData.imageUrl}
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Cloud Image Uploader (Supabase Storage) */}
+          <ImageUploadDropzone
+            label="Category Thumbnail / Icon (Optional)"
+            value={formData.imageUrl}
+            onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url }))}
+            folder="categories"
+            aspectRatio="1/1"
+            recommendedSize="Recommended: 400x400px square, max 10MB (JPEG, PNG, WEBP)"
+            disabled={isSubmitting}
+          />
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
