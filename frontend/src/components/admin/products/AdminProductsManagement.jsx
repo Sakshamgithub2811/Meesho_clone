@@ -4,6 +4,7 @@ import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import ProductsStatsGrid from './ProductsStatsGrid';
 import FilterBar from '../../common/FilterBar';
@@ -193,6 +194,24 @@ export default function AdminProductsManagement() {
     }
   };
 
+  // ── 5. EXPORT PRODUCTS CATALOG TO CSV ───────────────────────────────
+  const handleExportProducts = () => {
+    exportToCsv({
+      data: products,
+      filename: `products_catalog_${stockFilter.toLowerCase()}`,
+      columns: [
+        { key: 'id', label: 'Product ID' },
+        { key: 'title', label: 'Product Title' },
+        { key: 'category.name', label: 'Category' },
+        { key: 'supplier.storeName', label: 'Supplier Store' },
+        { key: 'price', label: 'Customer Price (₹)' },
+        { key: 'supplierPrice', label: 'Wholesale Price (₹)' },
+        { key: 'stock', label: 'Inventory Stock' },
+        { key: 'rating', label: 'Rating' }
+      ]
+    });
+  };
+
   // Category Dropdown options
   const categoryOptions = [
     { value: 'ALL', label: 'All Categories' },
@@ -226,6 +245,8 @@ export default function AdminProductsManagement() {
         countLabel="Products"
         onRefresh={() => fetchProducts(true)}
         refreshing={refreshing}
+        onExport={handleExportProducts}
+        exportLabel="Export Products"
       />
 
       {/* ── 3. PRODUCTS DATA TABLE ─────────────────────────────────── */}

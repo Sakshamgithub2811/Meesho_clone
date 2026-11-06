@@ -4,6 +4,7 @@ import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import OrdersStatsGrid from './OrdersStatsGrid';
 import FilterBar from '../../common/FilterBar';
@@ -176,6 +177,30 @@ export default function AdminOrdersManagement() {
     }
   };
 
+  // ── 5. EXPORT ORDERS TO CSV ───────────────────────────────────────────
+  const handleExportOrders = () => {
+    exportToCsv({
+      data: orders,
+      filename: `orders_report_${statusFilter.toLowerCase()}`,
+      columns: [
+        { key: 'id', label: 'Order ID' },
+        { key: 'createdAt', label: 'Order Date', formatter: (val) => formatDate(val) },
+        { key: 'user.fullName', label: 'Customer Name' },
+        { key: 'user.email', label: 'Customer Email' },
+        { key: 'user.phone', label: 'Customer Phone' },
+        { key: 'totalAmount', label: 'Total Amount (₹)' },
+        { key: 'orderStatus', label: 'Order Status' },
+        { key: 'paymentMethod', label: 'Payment Method' },
+        { key: 'paymentStatus', label: 'Payment Status' },
+        { key: 'shippingAddress.address', label: 'Delivery Address' },
+        { key: 'shippingAddress.city', label: 'City' },
+        { key: 'shippingAddress.state', label: 'State' },
+        { key: 'shippingAddress.pincode', label: 'Pincode' },
+        { key: 'items.length', label: 'Total Item Types' }
+      ]
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* ── 1. KPI STATS CARDS ────────────────────────────────────────── */}
@@ -200,6 +225,8 @@ export default function AdminOrdersManagement() {
         countLabel="Orders Found"
         onRefresh={() => fetchOrders(true)}
         refreshing={refreshing}
+        onExport={handleExportOrders}
+        exportLabel="Export Orders"
       />
 
       {/* ── 3. ORDERS DATA TABLE ──────────────────────────────────────── */}

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import FinanceStatsGrid from './FinanceStatsGrid';
 import FilterBar from '../../common/FilterBar';
@@ -165,6 +166,42 @@ export default function AdminFinanceManagement() {
     }
   };
 
+  // ── 4. EXPORT FINANCE / WALLETS REPORT TO CSV ────────────────────────
+  const handleExportFinance = () => {
+    if (activeView === 'wallets') {
+      exportToCsv({
+        data: wallets,
+        filename: `finance_wallets_${roleFilter.toLowerCase()}`,
+        columns: [
+          { key: 'user.fullName', label: 'Partner Name' },
+          { key: 'user.storeName', label: 'Store Name' },
+          { key: 'user.role', label: 'Role' },
+          { key: 'user.email', label: 'Email' },
+          { key: 'user.phone', label: 'Phone' },
+          { key: 'balance', label: 'Current Escrow Balance (₹)' },
+          { key: 'pendingBalance', label: 'Pending Settlement (₹)' },
+          { key: 'user.bankDetails.accountNumber', label: 'Bank Account Number' },
+          { key: 'user.bankDetails.ifscCode', label: 'IFSC Code' }
+        ]
+      });
+    } else {
+      exportToCsv({
+        data: transactions,
+        filename: `finance_ledger_${typeFilter.toLowerCase()}`,
+        columns: [
+          { key: 'id', label: 'Transaction ID' },
+          { key: 'createdAt', label: 'Date & Time', formatter: (val) => formatDate(val) },
+          { key: 'wallet.user.fullName', label: 'Partner Name' },
+          { key: 'wallet.user.role', label: 'Partner Role' },
+          { key: 'type', label: 'Type (Credit/Debit)', formatter: (val) => String(val || '').toUpperCase() },
+          { key: 'amount', label: 'Amount (₹)' },
+          { key: 'description', label: 'Description / Purpose' },
+          { key: 'orderId', label: 'Linked Order ID' }
+        ]
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ── 1. KPI STATS SUMMARY ────────────────────────────────────── */}
@@ -199,6 +236,8 @@ export default function AdminFinanceManagement() {
         countLabel={activeView === 'wallets' ? 'Wallets' : 'Transactions'}
         onRefresh={() => fetchFinance(true)}
         refreshing={refreshing}
+        onExport={handleExportFinance}
+        exportLabel={activeView === 'wallets' ? 'Export Wallets' : 'Export Ledger'}
       />
 
       {/* ── 3. DATA TABLES ─────────────────────────────────────────── */}

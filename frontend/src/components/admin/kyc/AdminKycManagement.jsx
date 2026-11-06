@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import { Button } from '../../ui/button';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import KycStatsGrid from './KycStatsGrid';
 import FilterBar from '../../common/FilterBar';
@@ -202,6 +203,25 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         onSearchSubmit={handleSearchSubmit}
+        onExport={() => {
+          exportToCsv({
+            data: applications,
+            filename: `kyc_applications_${selectedType}_${selectedStatus.toLowerCase()}`,
+            columns: [
+              { key: 'id', label: 'Application ID' },
+              { key: 'applicantName', label: 'Applicant Name' },
+              { key: 'businessName', label: 'Business / Store Name' },
+              { key: 'type', label: 'Partner Type', formatter: (val) => String(val || '').toUpperCase() },
+              { key: 'email', label: 'Email' },
+              { key: 'phone', label: 'Phone' },
+              { key: 'status', label: 'Verification Status' },
+              { key: 'panNumber', label: 'PAN Number' },
+              { key: 'gstin', label: 'GSTIN' },
+              { key: 'createdAt', label: 'Submitted Date', formatter: (val) => val ? new Date(val).toLocaleDateString('en-IN') : '—' }
+            ]
+          });
+        }}
+        exportLabel="Export KYC"
       />
 
       {/* ── APPLICATIONS TABLE ───────────────────────────────── */}

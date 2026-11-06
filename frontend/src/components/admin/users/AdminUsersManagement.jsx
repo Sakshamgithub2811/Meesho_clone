@@ -4,6 +4,7 @@ import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import FilterBar from '../../common/FilterBar';
 import UserTable from './UserTable';
@@ -238,6 +239,24 @@ export default function AdminUsersManagement() {
     }
   };
 
+  // ── 5. EXPORT USERS TO CSV ──────────────────────────────────────────
+  const handleExportUsers = () => {
+    exportToCsv({
+      data: users,
+      filename: `users_directory_${selectedRole.toLowerCase()}`,
+      columns: [
+        { key: 'id', label: 'User ID' },
+        { key: 'fullName', label: 'Full Name' },
+        { key: 'email', label: 'Email Address' },
+        { key: 'phone', label: 'Phone Number' },
+        { key: 'role', label: 'Role' },
+        { key: 'isActive', label: 'Status', formatter: (val) => (val !== false ? 'ACTIVE' : 'BLOCKED') },
+        { key: '_count.orders', label: 'Total Orders Placed' },
+        { key: 'createdAt', label: 'Joined Date', formatter: (val) => val ? new Date(val).toLocaleDateString('en-IN') : '—' }
+      ]
+    });
+  };
+
   return (
     <div className="space-y-6 mt-4">
       {/* ── COMMON SEARCH & ROLE FILTER BAR ─────────────────── */}
@@ -252,6 +271,8 @@ export default function AdminUsersManagement() {
         searchPlaceholder="Search by name, email, or phone..."
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
+        onExport={handleExportUsers}
+        exportLabel="Export Users"
       />
 
       {/* ── USERS DATA TABLE ─────────────────────────────────── */}

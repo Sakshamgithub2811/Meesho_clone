@@ -46,7 +46,7 @@ export default function AdminCmsManagement() {
       else setLoading(true);
 
       const token = await getAuthToken();
-      const res = await axios.get('http://localhost:5000/api/admin-cms', {
+      const res = await axios.get(`${API_BASE}/admin-cms`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -88,7 +88,7 @@ export default function AdminCmsManagement() {
 
       if (editingPage) {
         const res = await axios.put(
-          `http://localhost:5000/api/admin-cms/${editingPage.id}`,
+          `${API_BASE}/admin-cms/${editingPage.id}`,
           formData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -102,7 +102,7 @@ export default function AdminCmsManagement() {
         }
       } else {
         const res = await axios.post(
-          'http://localhost:5000/api/admin-cms',
+          `${API_BASE}/admin-cms`,
           formData,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -129,7 +129,7 @@ export default function AdminCmsManagement() {
     try {
       const token = await getAuthToken();
       const res = await axios.patch(
-        `http://localhost:5000/api/admin-cms/${id}/status`,
+        `${API_BASE}/admin-cms/${id}/status`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -162,7 +162,7 @@ export default function AdminCmsManagement() {
     try {
       const token = await getAuthToken();
       const res = await axios.delete(
-        `http://localhost:5000/api/admin-cms/${page.id}`,
+        `${API_BASE}/admin-cms/${page.id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
