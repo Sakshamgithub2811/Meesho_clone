@@ -50,6 +50,7 @@ export default function AdminCategoriesManagement() {
       else setLoading(true);
 
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.get(`${API_BASE}/admin-categories`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -75,7 +76,15 @@ export default function AdminCategoriesManagement() {
   };
 
   useEffect(() => {
-    fetchCategories();
+    if (auth.currentUser || currentUser?.id) {
+      fetchCategories();
+    }
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchCategories();
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   // Modal triggers
@@ -94,6 +103,7 @@ export default function AdminCategoriesManagement() {
     try {
       setIsSubmitting(true);
       const token = await getAuthToken();
+      if (!token) return;
 
       if (editingCategory) {
         // UPDATE
@@ -166,6 +176,7 @@ export default function AdminCategoriesManagement() {
 
     try {
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.delete(
         `${API_BASE}/admin-categories/${category.id}`,
         {

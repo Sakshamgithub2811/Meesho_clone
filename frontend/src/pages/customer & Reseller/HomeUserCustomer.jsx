@@ -14,43 +14,58 @@ import {
 import { useCart } from "../../hooks/useCart";
 import { getUnreadCount, subscribeNotifications } from "../../services/notificationService";
 
-const DEFAULT_BANNERS = [
+const REAL_DATABASE_BANNERS = [
   {
-    id: 'banner_flash',
-    badge: '⚡ Lightning Flash Sale',
-    badgeStatus: 'Live Now',
-    title: 'Mega Flash Deals! Up to 75% Off',
-    subtitle: 'Limited-time lightning drops with verified factory pricing & Free Delivery on all orders.',
-    buttonText: 'View Flash Deals',
-    targetUrl: '/flash',
-    imageUrl: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800&auto=format&fit=crop&q=80',
-    gradient: 'from-red-600 via-rose-600 to-pink-600',
-    accentColor: 'text-rose-600',
+    id: "a60f4f58-a862-4256-8067-c7e3b9218109",
+    title: "Mega Blockbuster Festive Sale",
+    subtitle: "Flat 70% Off on Sarees, Kurtis & Ethnic Sets",
+    imageUrl: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=80",
+    targetUrl: "/category/women-ethnic",
+    badgeText: "MEGA SALE",
+    badgeColor: "bg-rose-500 text-white",
+    displayOrder: 1,
+    isActive: true,
+    gradient: "from-rose-700 via-pink-600 to-amber-600",
+    accentColor: "text-rose-600"
   },
   {
-    id: 'banner_festive',
-    badge: 'Special Festive Deals 🛍️',
-    badgeStatus: 'Special Offer',
-    title: 'Grand Festive Sale! Up to 70% Off',
-    subtitle: '100% verified factory direct prices with Free Delivery & Easy 7-day returns.',
-    buttonText: 'Explore Catalog',
-    targetUrl: '/explorer',
-    imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=1000&auto=format&fit=crop&q=80',
-    gradient: 'from-pink-600 via-rose-600 to-red-600',
-    accentColor: 'text-pink-600',
+    id: "cfccdceb-478e-4588-b303-0251a7d961e1",
+    title: "Trending Men Fashion & Streetwear",
+    subtitle: "Casual Shirts, Denim & Oversized Tees from ?199",
+    imageUrl: "https://images.unsplash.com/photo-1516826957135-700dedea698c?auto=format&fit=crop&w=1200&q=80",
+    targetUrl: "/category/men-western",
+    badgeText: "TRENDING",
+    badgeColor: "bg-indigo-500 text-white",
+    displayOrder: 2,
+    isActive: true,
+    gradient: "from-indigo-700 via-blue-600 to-cyan-600",
+    accentColor: "text-indigo-700"
   },
   {
-    id: 'banner_men',
-    badge: 'Lowest Price Guarantee',
-    badgeStatus: 'Best Value',
-    title: 'Trending Menswear & Gadgets',
-    subtitle: 'Casual shirts, sneakers, audio gear & everyday essentials directly at wholesale rates.',
-    buttonText: 'Shop Men',
-    targetCategory: 'Men',
-    targetUrl: '/user-home?category=Men',
-    imageUrl: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1000&auto=format&fit=crop&q=80',
-    gradient: 'from-indigo-700 via-blue-600 to-cyan-600',
-    accentColor: 'text-indigo-700',
+    id: "9b76bb94-5cfe-4cab-9874-5fa5977682db",
+    title: "Smart Electronics & Audio Accessories",
+    subtitle: "TWS Earbuds, Smartwatches & Chargers at Factory Prices",
+    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+    targetUrl: "/category/electronics",
+    badgeText: "BESTSELLER",
+    badgeColor: "bg-amber-500 text-white",
+    displayOrder: 3,
+    isActive: true,
+    gradient: "from-amber-600 via-orange-600 to-yellow-600",
+    accentColor: "text-amber-600"
+  },
+  {
+    id: "5c16330f-9da8-477c-8884-718fe1388975",
+    title: "Home Makeover & Kitchen Essentials",
+    subtitle: "Bedsheets, Curtains & Storage Boxes under ?299",
+    imageUrl: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+    targetUrl: "/category/home-kitchen",
+    badgeText: "HOT DEAL",
+    badgeColor: "bg-emerald-500 text-white",
+    displayOrder: 4,
+    isActive: true,
+    gradient: "from-emerald-700 via-teal-600 to-cyan-700",
+    accentColor: "text-emerald-700"
   }
 ];
 
@@ -60,7 +75,16 @@ export default function HomeUserCustomer() {
   const searchContainerRef = React.useRef(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [isBannerPaused, setIsBannerPaused] = useState(false);
-  const [banners, setBanners] = useState(DEFAULT_BANNERS);
+  const [banners, setBanners] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mshoppy_cached_banners');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return REAL_DATABASE_BANNERS;
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -633,39 +657,51 @@ export default function HomeUserCustomer() {
             className="flex transition-transform duration-500 ease-in-out h-48 sm:h-64 md:h-80"
             style={{ transform: `translateX(-${activeSlide * 100}%)` }}
           >
-            {banners.map((banner, idx) => (
-              <div 
-                key={banner.id || idx}
-                onClick={() => {
-                  if (banner.targetCategory) {
-                    setSelectedCategory(banner.targetCategory);
-                  } else if (banner.targetUrl) {
-                    navigate(banner.targetUrl);
-                  }
-                }}
-                className={`w-full shrink-0 relative h-full bg-gradient-to-r ${banner.gradient || 'from-rose-600 via-pink-600 to-red-600'} flex items-center px-6 sm:px-12 md:px-16 text-white cursor-pointer`}
-              >
-                <div className="max-w-md z-10">
-                  {banner.badge && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 shadow-xs">
-                        {banner.badge.includes('⚡') && <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />}
-                        {banner.badge}
-                      </span>
-                      {banner.badgeStatus && (
-                        <span className="bg-yellow-400 text-slate-900 text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs">
-                          {banner.badgeStatus}
+            {banners.map((banner, idx) => {
+              const bgGradients = [
+                'from-rose-600 via-pink-600 to-red-600',
+                'from-indigo-700 via-blue-600 to-cyan-600',
+                'from-purple-700 via-pink-600 to-rose-600',
+                'from-emerald-700 via-teal-600 to-cyan-700'
+              ];
+              const bannerGrad = banner.gradient || bgGradients[idx % bgGradients.length];
+              const badgeLabel = banner.badgeText || banner.badge;
+              const btnLabel = banner.buttonText || 'Shop Now';
+
+              return (
+                <div 
+                  key={banner.id || idx}
+                  onClick={() => {
+                    if (banner.targetCategory) {
+                      setSelectedCategory(banner.targetCategory);
+                    } else if (banner.targetUrl) {
+                      navigate(banner.targetUrl);
+                    }
+                  }}
+                  className={`w-full shrink-0 relative h-full bg-gradient-to-r ${bannerGrad} flex items-center px-6 sm:px-12 md:px-16 text-white cursor-pointer`}
+                >
+                  <div className="max-w-md z-10">
+                    {badgeLabel && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 shadow-xs">
+                          <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
+                          {badgeLabel}
                         </span>
-                      )}
-                    </div>
-                  )}
-                  <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
-                    {banner.title}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-white/90 mb-4 line-clamp-2">
-                    {banner.subtitle}
-                  </p>
-                  {banner.buttonText && (
+                        {banner.badgeStatus && (
+                          <span className="bg-yellow-400 text-slate-900 text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs">
+                            {banner.badgeStatus}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
+                      {banner.title}
+                    </h2>
+                    {banner.subtitle && (
+                      <p className="text-xs sm:text-sm text-white/90 mb-4 line-clamp-2">
+                        {banner.subtitle}
+                      </p>
+                    )}
                     <button 
                       type="button"
                       onClick={(e) => {
@@ -678,20 +714,20 @@ export default function HomeUserCustomer() {
                       }}
                       className={`bg-white ${banner.accentColor || 'text-rose-600'} font-extrabold px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm hover:bg-rose-50 transition-all shadow-md cursor-pointer active:scale-95 flex items-center gap-1.5`}
                     >
-                      <span>{banner.buttonText}</span>
+                      <span>{btnLabel}</span>
                       <span>➔</span>
                     </button>
+                  </div>
+                  {banner.imageUrl && (
+                    <img 
+                      src={banner.imageUrl} 
+                      alt={banner.title} 
+                      className="absolute right-0 top-0 h-full w-1/2 object-cover object-center mask-gradient-left opacity-90 hidden sm:block"
+                    />
                   )}
                 </div>
-                {banner.imageUrl && (
-                  <img 
-                    src={banner.imageUrl} 
-                    alt={banner.title} 
-                    className="absolute right-0 top-0 h-full w-1/2 object-cover object-center mask-gradient-left opacity-90 hidden sm:block"
-                  />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Previous Arrow Button */}

@@ -4,24 +4,53 @@ const getUserId = (req) => {
   return req.user?.id || req.headers['x-user-id'] || req.query.userId || 'guest_customer';
 };
 
-const ensureWallet = async (userId) => {
+const ensureWallet = async (userId, req = null) => {
   if (!userId) return null;
 
-  // Ensure user profile exists
-  await prisma.profile.upsert({
-    where: { id: userId },
-    update: {},
-    create: {
-      id: userId,
-      fullName: 'Customer',
-      email: `${userId}@customer.meesho`,
-      role: 'CUSTOMER'
-    }
+  // 1. Direct match first
+  let profile = await prisma.profile.findUnique({
+    where: { id: userId }
   });
+
+  // 2. If not found or dummy affiliate/guest prefix, attempt smart matching via clean ID, phone, or email
+  if (!profile || String(userId).startsWith('affiliate_') || String(userId).startsWith('guest_')) {
+    const rawId = String(userId).replace(/^affiliate_/, '').replace(/^firebase_/, '');
+    const cleanPhone = (req?.headers?.['x-user-phone'] || userId || '').toString().replace(/\D/g, '').slice(-10);
+    const candidateEmail = (req?.headers?.['x-user-email'] || (String(userId).includes('@') ? userId : '')).toLowerCase();
+
+    const matched = await prisma.profile.findFirst({
+      where: {
+        OR: [
+          { id: rawId },
+          ...(cleanPhone && cleanPhone.length === 10 ? [{ phone: cleanPhone }] : []),
+          ...(candidateEmail ? [{ email: candidateEmail }] : [])
+        ]
+      }
+    });
+
+    if (matched) {
+      profile = matched;
+      userId = matched.id;
+    }
+  }
+
+  // Ensure user profile exists
+  if (!profile) {
+    profile = await prisma.profile.upsert({
+      where: { id: userId },
+      update: {},
+      create: {
+        id: userId,
+        fullName: 'Customer',
+        email: `${userId}@customer.meesho`,
+        role: 'CUSTOMER'
+      }
+    });
+  }
 
   // Ensure wallet exists
   let wallet = await prisma.wallet.findUnique({
-    where: { userId },
+    where: { userId: profile.id },
     include: {
       transactions: {
         orderBy: { createdAt: 'desc' },
@@ -33,7 +62,7 @@ const ensureWallet = async (userId) => {
   if (!wallet) {
     wallet = await prisma.wallet.create({
       data: {
-        userId,
+        userId: profile.id,
         balance: 0.0,
         pending: 0.0,
       },
@@ -53,7 +82,7 @@ const ensureWallet = async (userId) => {
 export const getMyWallet = async (req, res) => {
   try {
     const userId = getUserId(req);
-    const wallet = await ensureWallet(userId);
+    const wallet = await ensureWallet(userId, req);
 
     const transactions = await prisma.walletTransaction.findMany({
       where: { walletId: wallet.id },
@@ -101,7 +130,7 @@ export const requestWithdrawal = async (req, res) => {
       });
     }
 
-    const wallet = await ensureWallet(userId);
+    const wallet = await ensureWallet(userId, req);
 
     if (wallet.balance < numAmount) {
       return res.status(400).json({

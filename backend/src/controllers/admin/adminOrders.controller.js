@@ -253,9 +253,12 @@ export const updateOrderStatus = async (req, res) => {
     });
 
     if (updateData.orderStatus === 'OUT_FOR_DELIVERY') {
-      dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' })
-        .then((result) => console.log(`🚚 [Admin Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${result.sentTo}`))
-        .catch((err) => console.error(`⚠️ [Admin Order ${id}] OTP email failed:`, err.message));
+      try {
+        const otpResult = await dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' });
+        console.log(`🚚 [Admin Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${otpResult.sentTo}`);
+      } catch (err) {
+        console.error(`⚠️ [Admin Order ${id}] OTP email failed:`, err.message);
+      }
     }
 
     return res.status(200).json({

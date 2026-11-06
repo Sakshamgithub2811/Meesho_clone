@@ -1,4 +1,7 @@
 import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
+import supabase from '../../config/supabaseClient.js';
 const prisma = new PrismaClient();
 
 /**
@@ -233,7 +236,25 @@ export const uploadDropshipperAvatar = async (req, res) => {
     }
 
     // Public URL path relative to static server
-    const avatarPath = `/uploads/avatars/${req.file.filename}`;
+    // Public URL path relative to static server or Supabase Storage
+    let avatarPath = `/uploads/avatars/${req.file.filename}`;
+    if (supabase?.storage && req.file?.path) {
+      try {
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const ext = path.extname(req.file.originalname || req.file.filename || '.jpg');
+        const filename = `avatar_${firebaseUid}_${Date.now()}${ext}`;
+        const { data, error } = await supabase.storage.from('uploads').upload(filename, fileBuffer, {
+          contentType: req.file.mimetype || 'image/jpeg',
+          upsert: true
+        });
+        if (!error && data?.path) {
+          const { data: pubData } = supabase.storage.from('uploads').getPublicUrl(data.path);
+          if (pubData?.publicUrl) avatarPath = pubData.publicUrl;
+        }
+      } catch (sbErr) {
+        // Fallback to local/tmp avatarPath
+      }
+    }
 
     const updatedProfile = await prisma.profile.update({
       where: { id: firebaseUid },

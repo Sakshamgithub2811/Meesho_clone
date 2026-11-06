@@ -47,6 +47,7 @@ export default function AdminUsersManagement() {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const params = {};
       if (searchTerm.trim()) params.search = searchTerm.trim();
@@ -77,7 +78,9 @@ export default function AdminUsersManagement() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    if (auth.currentUser || currentUser?.id) {
+      fetchUsers();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchUsers();
@@ -105,6 +108,7 @@ export default function AdminUsersManagement() {
     try {
       setIsSavingUser(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const response = await axios.put(
         `${API_V1_BASE}/admin-users/${editingUser.id}`,
@@ -144,6 +148,7 @@ export default function AdminUsersManagement() {
     try {
       setActionLoadingId(userId);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const response = await axios.put(
         `${API_V1_BASE}/admin-users/${userId}/role`,
@@ -179,6 +184,7 @@ export default function AdminUsersManagement() {
     try {
       setActionLoadingId(userId);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const response = await axios.put(
         `${API_V1_BASE}/admin-users/${userId}/status`,
@@ -217,6 +223,7 @@ export default function AdminUsersManagement() {
     try {
       setActionLoadingId(userId);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const response = await axios.delete(
         `${API_V1_BASE}/admin-users/${userId}`,

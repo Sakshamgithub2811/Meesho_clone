@@ -1,17 +1,55 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 
-// Ensure uploads directory exists
-const uploadDir = path.resolve('uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Determine safe upload directory (portable across local development and Vercel serverless)
+export const getUploadDir = (subfolder = '') => {
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
-// Storage configuration
+  // In serverless environments (e.g. Vercel), /tmp is the only writable directory
+  if (isServerless) {
+    const tmpDir = path.join(os.tmpdir(), 'uploads', subfolder);
+    try {
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      }
+      return tmpDir;
+    } catch (e) {
+      return os.tmpdir();
+    }
+  }
+
+  // Local development environment
+  const localDir = path.resolve('uploads', subfolder);
+  try {
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+    }
+    return localDir;
+  } catch (err) {
+    // Fallback to os.tmpdir if local directory is read-only
+    const fallbackTmp = path.join(os.tmpdir(), 'uploads', subfolder);
+    try {
+      if (!fs.existsSync(fallbackTmp)) {
+        fs.mkdirSync(fallbackTmp, { recursive: true });
+      }
+      return fallbackTmp;
+    } catch (e) {
+      return os.tmpdir();
+    }
+  }
+};
+
+// Storage configuration with dynamic destination resolution (no top-level mkdirSync)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadDir);
+    try {
+      const dest = getUploadDir();
+      cb(null, dest);
+    } catch (err) {
+      cb(null, os.tmpdir());
+    }
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
@@ -41,14 +79,14 @@ export const uploadProductMedia = multer({
 });
 
 // Dedicated Avatar Storage (uploads/avatars/)
-const avatarUploadDir = path.resolve('uploads/avatars');
-if (!fs.existsSync(avatarUploadDir)) {
-  fs.mkdirSync(avatarUploadDir, { recursive: true });
-}
-
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, avatarUploadDir);
+    try {
+      const dest = getUploadDir('avatars');
+      cb(null, dest);
+    } catch (err) {
+      cb(null, os.tmpdir());
+    }
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
@@ -67,3 +105,8 @@ export const uploadAvatar = multer({
   },
 });
 
+export default {
+  uploadProductMedia,
+  uploadAvatar,
+  getUploadDir
+};

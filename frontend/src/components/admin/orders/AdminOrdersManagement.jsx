@@ -76,6 +76,7 @@ export default function AdminOrdersManagement() {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
       const params = new URLSearchParams();
 
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
@@ -114,7 +115,9 @@ export default function AdminOrdersManagement() {
   };
 
   useEffect(() => {
-    fetchOrders();
+    if (auth.currentUser || currentUser?.id) {
+      fetchOrders();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchOrders();
@@ -137,6 +140,7 @@ export default function AdminOrdersManagement() {
     try {
       setActionLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const res = await axios.patch(
         `${API_V1_BASE}/admin-orders/${orderId}/status`,

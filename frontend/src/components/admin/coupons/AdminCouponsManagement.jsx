@@ -53,6 +53,7 @@ export default function AdminCouponsManagement() {
       else setLoading(true);
 
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.get(`${API_BASE}/admin-coupons`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -78,7 +79,15 @@ export default function AdminCouponsManagement() {
   };
 
   useEffect(() => {
-    fetchCoupons();
+    if (auth.currentUser || currentUser?.id) {
+      fetchCoupons();
+    }
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchCoupons();
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleOpenCreate = () => {
@@ -96,6 +105,7 @@ export default function AdminCouponsManagement() {
     try {
       setIsSubmitting(true);
       const token = await getAuthToken();
+      if (!token) return;
 
       if (editingCoupon) {
         // UPDATE
@@ -150,6 +160,7 @@ export default function AdminCouponsManagement() {
   const handleToggleStatus = async (coupon) => {
     try {
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.patch(
         `${API_BASE}/admin-coupons/${coupon.id}/toggle`,
         {},
@@ -186,6 +197,7 @@ export default function AdminCouponsManagement() {
 
     try {
       const token = await getAuthToken();
+      if (!token) return;
       const res = await axios.delete(
         `${API_BASE}/admin-coupons/${coupon.id}`,
         {

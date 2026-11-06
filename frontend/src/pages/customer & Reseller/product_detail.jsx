@@ -9,6 +9,7 @@ import {
 } from '../../services/ecommerceService';
 import { useCart } from '../../hooks/useCart';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import QuickEmailOtpModal from '../../components/auth/QuickEmailOtpModal';
 
 // Category-specific variant configuration & labels
 const CATEGORY_META = {
@@ -186,6 +187,7 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
   const [userOrderId, setUserOrderId] = useState(null);
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Dynamic Custom Affiliate Margin Support
   const urlMargin = Number(searchParams.get('margin') || searchParams.get('m') || 0);
@@ -387,8 +389,31 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
     }
   };
 
+  const isUserAuthenticated = () => {
+    try {
+      const raw = localStorage.getItem('mshoppy_customer_user');
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u?.email && !u.email.endsWith('@customer.meesho') && !u.isOfflineFallback) return true;
+      }
+      const token = localStorage.getItem('mshoppy_customer_token');
+      if (token && raw) return true;
+      return false;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const handleBuyNow = async () => {
     if (!product) return;
+    if (!isUserAuthenticated()) {
+      setShowLoginModal(true);
+      return;
+    }
+    proceedWithBuyNow();
+  };
+
+  const proceedWithBuyNow = async () => {
     const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
     const buynowItem = {
       id: 'buynow_' + product.id,
@@ -1160,6 +1185,17 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
           </button>
         </div>
       </div>
+
+      {/* Quick Email OTP Login Modal for Guest Buy Now */}
+      <QuickEmailOtpModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={() => {
+          proceedWithBuyNow();
+        }}
+        actionTitle="Login to Buy This Product"
+        actionSubtitle="Enter your email to receive an instant 6-digit login OTP"
+      />
 
       {/* Full-Screen Image Zoom Lightbox Modal */}
       {showImageZoom && (

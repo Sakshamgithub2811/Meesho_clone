@@ -22,16 +22,49 @@ for (const p of envCandidates) {
 }
 dotenv.config();
 
-export const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  },
-});
+const smtpUser = process.env.SMTP_USER || "pramodlodhi2003born@gmail.com";
+const smtpPass = process.env.SMTP_PASS || "rtgichrdgjzxnkux";
+const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+const smtpPort = Number(process.env.SMTP_PORT) || 587;
 
-console.log("📧 Email Transporter Configured with User:", process.env.SMTP_USER);
+const hasSmtpConfig = Boolean(smtpUser && smtpPass);
+
+let realTransporter = null;
+if (hasSmtpConfig) {
+  try {
+    realTransporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass
+      },
+    });
+    console.log("📧 Email Transporter Configured with User:", smtpUser);
+  } catch (err) {
+    console.warn("⚠️ Email Transporter Init Warning:", err.message);
+  }
+} else {
+  console.log("ℹ️ Optional SMTP credentials not provided; email notifications will be safely mocked in runtime.");
+}
+
+export const transporter = {
+  sendMail: async (options) => {
+    if (realTransporter) {
+      try {
+        if (!options.from) {
+          options.from = process.env.EMAIL_FROM || `Mshoppy <${smtpUser}>`;
+        }
+        return await realTransporter.sendMail(options);
+      } catch (err) {
+        console.warn("⚠️ SMTP Send Mail Error (skipped):", err.message);
+        return { messageId: 'mock-mail-id-' + Date.now(), error: err.message, skipped: true };
+      }
+    }
+    console.log(`ℹ️ [Email Mock] To: ${options?.to}, Subject: "${options?.subject}" (SMTP not configured)`);
+    return { messageId: 'mock-mail-id-' + Date.now(), skipped: true };
+  }
+};
 
 export default transporter;

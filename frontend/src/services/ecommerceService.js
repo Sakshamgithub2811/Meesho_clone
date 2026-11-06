@@ -5,6 +5,18 @@ const API_BASE_URL = API_V1_BASE;
 
 export function getCustomerId() {
   try {
+    // 1. Prioritize real authenticated user IDs (non-dummy, non-affiliate_ prefix)
+    for (const key of ['mshoppy_customer_user', 'mshoppy_reseller_user', 'user', 'mshoppy_affiliate_user']) {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const candidate = parsed?.id || parsed?.uid;
+        if (candidate && !String(candidate).startsWith('affiliate_') && !String(candidate).startsWith('guest_')) {
+          return candidate;
+        }
+      }
+    }
+    // 2. Fallback to any user key if only prefixed is available
     for (const key of ['mshoppy_customer_user', 'mshoppy_affiliate_user', 'mshoppy_reseller_user', 'user']) {
       const stored = localStorage.getItem(key);
       if (stored) {
@@ -33,6 +45,19 @@ export function getAuthHeaders() {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+
+  // Include user phone and email if available to guarantee exact wallet and profile matching
+  try {
+    for (const key of ['mshoppy_customer_user', 'mshoppy_affiliate_user', 'mshoppy_reseller_user', 'user']) {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u?.phone && !headers['x-user-phone']) headers['x-user-phone'] = u.phone;
+        if (u?.email && !headers['x-user-email']) headers['x-user-email'] = u.email;
+      }
+    }
+  } catch (e) {}
+
   return headers;
 }
 
@@ -112,9 +137,17 @@ export async function getCategoryBySlug(slug) {
 
 export async function getBanners() {
   try {
-    const res = await fetch(`${API_BASE_URL}/banners`);
-    const data = await res.json();
-    return data?.data || [];
+    const res = await fetch(`${API_BASE_URL}/banners/active`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.data && data.data.length > 0) return data.data;
+    }
+    const fallbackRes = await fetch(`${API_BASE_URL}/banners`);
+    if (fallbackRes.ok) {
+      const fallbackData = await fallbackRes.json();
+      return fallbackData?.data || [];
+    }
+    return [];
   } catch (error) {
     console.error('Failed to fetch banners:', error);
     return [];
@@ -360,12 +393,13 @@ export async function getOrderById(id) {
   }
 }
 
-export async function createOrder({ items, shippingAddress, paymentMethod, totalAmount }) {
+export async function createOrder({ items, shippingAddress, paymentMethod, totalAmount, couponCode, referralCode }) {
   try {
+    const savedRef = referralCode || (typeof window !== 'undefined' ? localStorage.getItem('mshoppy_referral_code') : undefined) || undefined;
     const res = await fetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ items, shippingAddress, paymentMethod, totalAmount }),
+      body: JSON.stringify({ items, shippingAddress, paymentMethod, totalAmount, couponCode, referralCode: savedRef }),
     });
     return await res.json();
   } catch (error) {

@@ -33,7 +33,7 @@ export const getProducts = async (req, res) => {
       const catLower = category.toLowerCase().trim();
       let targetSlugs = [];
 
-      if (catLower === 'men') {
+      if (catLower === 'men' || catLower === 'men-western' || catLower === 'menswear') {
         targetSlugs = ['men'];
       } else if (catLower === 'women' || catLower === 'women ethnic' || catLower === 'women-ethnic' || catLower === 'ethnic wear') {
         targetSlugs = ['women-ethnic'];
