@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Image as ImageIcon, Sparkles, Loader2, Check, FolderTree, GitBranch } from 'lucide-react';
+import ImageUploadDropzone from '../../common/ImageUploadDropzone';
+import { uploadImageToSupabase } from '../../../services/uploadService';
 
 export default function CategoryFormModal({
   isOpen,
@@ -18,6 +20,8 @@ export default function CategoryFormModal({
     parentId: '',
   });
 
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSubcategory, setIsSubcategory] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -40,6 +44,8 @@ export default function CategoryFormModal({
         parentId: '',
       });
     }
+    setSelectedFile(null);
+    setIsUploadingImage(false);
     setErrors({});
   }, [initialData, isOpen]);
 
@@ -105,11 +111,33 @@ export default function CategoryFormModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+
+    let finalImageUrl = formData.imageUrl;
+
+    // 🚀 Deferred Upload: Upload file to Supabase Storage only on Save
+    if (selectedFile) {
+      try {
+        setIsUploadingImage(true);
+        finalImageUrl = await uploadImageToSupabase(selectedFile, 'categories');
+      } catch (err) {
+        console.error('Failed to upload category icon to Supabase:', err);
+        setErrors((p) => ({
+          ...p,
+          imageUrl: err.message || 'Failed to upload image to Supabase cloud.',
+        }));
+        setIsUploadingImage(false);
+        return;
+      } finally {
+        setIsUploadingImage(false);
+      }
+    }
+
     onSubmit({
       ...formData,
+      imageUrl: finalImageUrl,
       parentId: isSubcategory && formData.parentId ? formData.parentId : null,
     });
   };
@@ -293,61 +321,41 @@ export default function CategoryFormModal({
             </p>
           </div>
 
-          {/* Image URL */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-              Thumbnail Image URL (Optional)
-            </label>
-            <input
-              type="url"
-              placeholder="https://images.unsplash.com/photo-..."
-              value={formData.imageUrl}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, imageUrl: e.target.value }))
-              }
-              disabled={isSubmitting}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-100 focus:outline-none transition-all"
-            />
-          </div>
-
-          {/* Image Preview Box */}
-          {formData.imageUrl && (
-            <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-3">
-              <div className="w-14 h-14 rounded-lg bg-white border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
-                <img
-                  src={formData.imageUrl}
-                  alt="Preview"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="text-xs text-gray-600">
-                <span className="font-semibold text-gray-800">Preview</span>
-                <p className="text-[11px] text-gray-400 truncate max-w-xs">
-                  {formData.imageUrl}
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Cloud Image Uploader (Supabase Storage - Upload on Save) */}
+          <ImageUploadDropzone
+            label="Category Thumbnail / Icon (Optional)"
+            value={formData.imageUrl}
+            onChange={(previewOrUrl, file) => {
+              setSelectedFile(file || null);
+              setFormData((prev) => ({ ...prev, imageUrl: previewOrUrl }));
+            }}
+            folder="categories"
+            aspectRatio="1/1"
+            recommendedSize="Recommended: 400x400px square, max 10MB (JPEG, PNG, WEBP)"
+            disabled={isSubmitting || isUploadingImage}
+          />
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingImage}
               className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingImage}
               className="px-5 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 active:scale-95 rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-2"
             >
-              {isSubmitting ? (
+              {isUploadingImage ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Uploading to Supabase...
+                </>
+              ) : isSubmitting ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
                   Saving...

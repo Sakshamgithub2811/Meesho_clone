@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Check, Image as ImageIcon } from 'lucide-react';
+import { X, Loader2, Check, Image as ImageIcon, UploadCloud } from 'lucide-react';
+import ImageUploadDropzone from '../../common/ImageUploadDropzone';
+import { uploadImageToSupabase } from '../../../services/uploadService';
 
 export default function BannerFormModal({
   isOpen,
@@ -20,6 +22,8 @@ export default function BannerFormModal({
     isActive: true,
   });
 
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
@@ -44,6 +48,8 @@ export default function BannerFormModal({
         isActive: true,
       });
     }
+    setSelectedFile(null);
+    setIsUploadingImage(false);
     setErrors({});
   }, [initialData, isOpen]);
 
@@ -52,16 +58,38 @@ export default function BannerFormModal({
   const validate = () => {
     const errs = {};
     if (!formData.title.trim()) errs.title = 'Banner title is required';
-    if (!formData.imageUrl.trim()) errs.imageUrl = 'Image URL is required';
+    if (!formData.imageUrl.trim() && !selectedFile) errs.imageUrl = 'Banner image is required';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+
+    let finalImageUrl = formData.imageUrl;
+
+    // 🚀 Deferred Upload: Upload file to Supabase Storage only on Save
+    if (selectedFile) {
+      try {
+        setIsUploadingImage(true);
+        finalImageUrl = await uploadImageToSupabase(selectedFile, 'banners');
+      } catch (err) {
+        console.error('Failed to upload banner image to Supabase:', err);
+        setErrors((p) => ({
+          ...p,
+          imageUrl: err.message || 'Failed to upload image to Supabase cloud.',
+        }));
+        setIsUploadingImage(false);
+        return;
+      } finally {
+        setIsUploadingImage(false);
+      }
+    }
+
     onSubmit({
       ...formData,
+      imageUrl: finalImageUrl,
       displayOrder: parseInt(formData.displayOrder, 10) || 1,
     });
   };
@@ -133,29 +161,23 @@ export default function BannerFormModal({
             />
           </div>
 
-          {/* Image URL */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-              Banner Image URL (Landscape 16:9) <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="url"
-              placeholder="https://images.unsplash.com/photo-..."
-              value={formData.imageUrl}
-              onChange={(e) =>
-                setFormData((p) => ({ ...p, imageUrl: e.target.value }))
+          {/* Cloud Image Uploader (Supabase Storage - Upload on Save) */}
+          <ImageUploadDropzone
+            label="Banner Visual Asset (Landscape 16:9 / 16:7)"
+            value={formData.imageUrl}
+            onChange={(previewOrUrl, file) => {
+              setSelectedFile(file || null);
+              setFormData((p) => ({ ...p, imageUrl: previewOrUrl }));
+              if (errors.imageUrl) {
+                setErrors((prev) => ({ ...prev, imageUrl: '' }));
               }
-              disabled={isSubmitting}
-              className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none transition-all ${
-                errors.imageUrl
-                  ? 'border-rose-400 focus:ring-2 focus:ring-rose-100'
-                  : 'border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100'
-              }`}
-            />
-            {errors.imageUrl && (
-              <p className="text-xs text-rose-500 mt-1">{errors.imageUrl}</p>
-            )}
-          </div>
+            }}
+            folder="banners"
+            aspectRatio="16/7"
+            recommendedSize="Recommended: 1200x525px landscape, max 10MB (JPEG, PNG, WEBP)"
+            disabled={isSubmitting || isUploadingImage}
+            error={errors.imageUrl}
+          />
 
           {/* Live Visual Preview */}
           {formData.imageUrl && (
@@ -261,17 +283,22 @@ export default function BannerFormModal({
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingImage}
               className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingImage}
               className="px-5 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 active:scale-95 rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-2"
             >
-              {isSubmitting ? (
+              {isUploadingImage ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Uploading to Supabase...
+                </>
+              ) : isSubmitting ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
                   Saving...

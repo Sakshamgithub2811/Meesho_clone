@@ -17,6 +17,7 @@ import {
 import StatCard from '../../common/StatCard';
 import DataTable from '../../common/DataTable';
 import { Card, CardContent } from '../../ui/card';
+import { API_BASE, BACKEND_ROOT } from '../../../config/apiConfig';
 
 export default function AdminSeoManagement() {
   const [stats, setStats] = useState(null);

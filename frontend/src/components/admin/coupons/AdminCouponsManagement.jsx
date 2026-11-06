@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { Ticket, Plus } from 'lucide-react';
 import { Button } from '../../ui/button';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import CouponStatsGrid from './CouponStatsGrid';
 import FilterBar from '../../common/FilterBar';
@@ -291,6 +292,24 @@ export default function AdminCouponsManagement() {
         countLabel="Coupons"
         onRefresh={() => fetchCoupons(true)}
         refreshing={refreshing}
+        onExport={() => {
+          exportToCsv({
+            data: filteredCoupons,
+            filename: `coupons_report_${statusFilter.toLowerCase()}`,
+            columns: [
+              { key: 'code', label: 'Coupon Code' },
+              { key: 'title', label: 'Campaign Title' },
+              { key: 'discountType', label: 'Type' },
+              { key: 'discountValue', label: 'Discount Value' },
+              { key: 'minOrderValue', label: 'Min Order Value (₹)' },
+              { key: 'maxDiscount', label: 'Max Cap (₹)' },
+              { key: 'usageCount', label: 'Total Redemptions' },
+              { key: 'isActive', label: 'Status', formatter: (val) => (val ? 'ACTIVE' : 'DISABLED') },
+              { key: 'endDate', label: 'Expiry Date', formatter: (val) => (val ? new Date(val).toLocaleDateString('en-IN') : 'No Expiry') }
+            ]
+          });
+        }}
+        exportLabel="Export Coupons"
       />
 
       {/* 4. Reusable DataTable */}
