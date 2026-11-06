@@ -1,19 +1,21 @@
-import React, { useState, useRef } from 'react';
-import { UploadCloud, Image as ImageIcon, Link as LinkIcon, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { API_V1_BASE } from '../../config/apiConfig';
+import React, { useState, useRef, useEffect } from 'react';
+import { UploadCloud, Image as ImageIcon, Link as LinkIcon, X, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { uploadImageToSupabase } from '../../services/uploadService';
 
 /**
  * Universal Drag-and-Drop Image Uploader with Supabase Storage Integration
+ * Supports "Deferred Upload on Save" (prevents orphan files) and Manual URL fallback.
  * 
  * @param {Object} props
- * @param {string} props.value - Currently selected/uploaded image URL
- * @param {function} props.onChange - Callback with the new image URL (string)
+ * @param {string} props.value - Currently selected/uploaded image URL (CDN URL or local blob URL)
+ * @param {function} props.onChange - Callback: (urlOrPreview: string, file: File|null) => void
  * @param {string} [props.folder='general'] - Destination Supabase folder (e.g. 'banners', 'categories', 'products', 'kyc')
  * @param {string} [props.label='Image'] - Label displayed above the input
- * @param {string} [props.aspectRatio='16/9'] - Visual aspect ratio (e.g. '16/9', '1/1', '4/3')
+ * @param {string} [props.aspectRatio='16/9'] - Visual aspect ratio (e.g. '16/9', '1/1', '4/3', '16/7')
  * @param {string} [props.recommendedSize='Max size: 10MB (JPEG, PNG, WEBP)'] - Helper guide
  * @param {boolean} [props.disabled=false] - Disable interactions during form submit
  * @param {string} [props.error] - Validation error message to display
+ * @param {boolean} [props.deferUpload=true] - When true, delays cloud upload until form submit (zero orphan files)
  */
 export default function ImageUploadDropzone({
   value = '',
@@ -23,13 +25,24 @@ export default function ImageUploadDropzone({
   aspectRatio = '16/9',
   recommendedSize = 'Max size: 10MB (JPEG, PNG, WEBP)',
   disabled = false,
-  error = ''
+  error = '',
+  deferUpload = true,
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [mode, setMode] = useState('upload'); // 'upload' | 'url'
   const fileInputRef = useRef(null);
+  const lastBlobUrlRef = useRef(null);
+
+  // Clean up any generated blob URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      if (lastBlobUrlRef.current && lastBlobUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(lastBlobUrlRef.current);
+      }
+    };
+  }, []);
 
   // Handle Drag events
   const handleDragOver = (e) => {
@@ -49,19 +62,19 @@ export default function ImageUploadDropzone({
     if (disabled || isUploading) return;
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileUpload(e.dataTransfer.files[0]);
+      processSelectedFile(e.dataTransfer.files[0]);
     }
   };
 
   // Direct file selection
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleFileUpload(e.target.files[0]);
+      processSelectedFile(e.target.files[0]);
     }
   };
 
-  // Core Upload to Supabase API
-  const handleFileUpload = async (file) => {
+  // Process File selection
+  const processSelectedFile = async (file) => {
     // Validate file type
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/svg+xml', 'image/gif'];
     if (!validTypes.includes(file.type)) {
@@ -76,26 +89,31 @@ export default function ImageUploadDropzone({
     }
 
     setUploadError('');
-    setIsUploading(true);
 
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
+    // Revoke previous blob if any
+    if (lastBlobUrlRef.current && lastBlobUrlRef.current.startsWith('blob:')) {
+      URL.revokeObjectURL(lastBlobUrlRef.current);
+      lastBlobUrlRef.current = null;
+    }
 
-      const endpoint = `${API_V1_BASE}/upload?folder=${encodeURIComponent(folder)}`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success || !data.url) {
-        throw new Error(data.message || data.error || 'Failed to upload image to Supabase');
+    // 1. Solution 1 (Default): Deferred Upload on Save
+    // Create instant local memory preview (0 network call, 0 orphan files)
+    if (deferUpload) {
+      const localPreviewUrl = URL.createObjectURL(file);
+      lastBlobUrlRef.current = localPreviewUrl;
+      if (onChange) {
+        onChange(localPreviewUrl, file);
       }
+      return;
+    }
 
-      // Pass public Supabase URL to parent component
-      onChange(data.url);
+    // 2. Immediate Upload mode (if deferUpload explicitly set to false)
+    setIsUploading(true);
+    try {
+      const cdnUrl = await uploadImageToSupabase(file, folder);
+      if (onChange) {
+        onChange(cdnUrl, null);
+      }
     } catch (err) {
       console.error('Image Upload Error:', err);
       setUploadError(err.message || 'Image upload failed. Please try again.');
@@ -109,9 +127,21 @@ export default function ImageUploadDropzone({
 
   const handleRemove = (e) => {
     e.stopPropagation();
-    onChange('');
+    if (lastBlobUrlRef.current && lastBlobUrlRef.current.startsWith('blob:')) {
+      URL.revokeObjectURL(lastBlobUrlRef.current);
+      lastBlobUrlRef.current = null;
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    if (onChange) {
+      onChange('', null);
+    }
     setUploadError('');
   };
+
+  const isLocalBlob = Boolean(value && value.startsWith('blob:'));
+  const isCloudUrl = Boolean(value && (value.includes('supabase') || value.startsWith('http')));
 
   return (
     <div className="space-y-2">
@@ -152,12 +182,12 @@ export default function ImageUploadDropzone({
       {mode === 'upload' && (
         <div>
           {value ? (
-            // Uploaded Preview Card
+            // Uploaded / Selected Preview Card
             <div className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gray-950 group shadow-sm">
               <div style={{ aspectRatio }} className="w-full relative">
                 <img
                   src={value}
-                  alt="Uploaded Preview"
+                  alt="Selected Asset Preview"
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
@@ -172,7 +202,7 @@ export default function ImageUploadDropzone({
                     className="px-3.5 py-1.5 bg-white text-gray-800 rounded-lg text-xs font-bold shadow-md hover:bg-gray-100 transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <UploadCloud className="w-3.5 h-3.5" />
-                    Change
+                    Change Image
                   </button>
                   <button
                     type="button"
@@ -186,10 +216,19 @@ export default function ImageUploadDropzone({
                 </div>
               </div>
 
-              {/* Verified Cloud Badge */}
-              <div className="absolute top-2 left-2 px-2 py-0.5 bg-emerald-500/90 text-white rounded-md text-[10px] font-bold tracking-wide flex items-center gap-1 shadow-sm backdrop-blur-xs">
-                <CheckCircle2 className="w-3 h-3" />
-                Supabase CDN Live
+              {/* Status Badge */}
+              <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                {isLocalBlob ? (
+                  <span className="px-2 py-0.5 bg-purple-600/90 text-white rounded-md text-[10px] font-bold tracking-wide flex items-center gap-1 shadow-sm backdrop-blur-xs">
+                    <Clock className="w-3 h-3" />
+                    Ready to Upload on Save
+                  </span>
+                ) : isCloudUrl ? (
+                  <span className="px-2 py-0.5 bg-emerald-500/90 text-white rounded-md text-[10px] font-bold tracking-wide flex items-center gap-1 shadow-sm backdrop-blur-xs">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Supabase CDN Live
+                  </span>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -246,7 +285,9 @@ export default function ImageUploadDropzone({
               type="url"
               placeholder="https://images.unsplash.com/... or CDN link"
               value={value}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={(e) => {
+                if (onChange) onChange(e.target.value, null);
+              }}
               disabled={disabled || isUploading}
               className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-100 focus:outline-none transition-all pr-8"
             />
@@ -285,4 +326,3 @@ export default function ImageUploadDropzone({
     </div>
   );
 }
-
