@@ -68,15 +68,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
+import { BACKEND_ROOT } from '../../config/apiConfig';
 
 // Helper to resolve avatar URL (relative vs absolute)
 const getAvatarSrc = (url) => {
   if (!url) return null;
   if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:')) return url;
-  const backendBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) 
-    ? import.meta.env.VITE_API_URL.replace(/\/api\/v1\/?$/, '') 
-    : 'http://localhost:5000';
-  return `${backendBase}${url.startsWith('/') ? '' : '/'}${url}`;
+  return `${BACKEND_ROOT}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
 // Import Centralized Master Dropshipper Menu

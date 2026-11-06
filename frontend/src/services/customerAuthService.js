@@ -1,8 +1,9 @@
 // frontend/src/services/customerAuthService.js
 import { clearAffiliateApp } from './affiliateSessionStore';
 import { resetCartCache } from '../hooks/useCart';
+import { API_V1_BASE } from '../config/apiConfig';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = API_V1_BASE;
 const TOKEN_KEY = 'mshoppy_customer_token';
 const USER_KEY = 'mshoppy_customer_user';
 

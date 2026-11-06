@@ -1,6 +1,7 @@
 // frontend/src/services/resellerAuthService.js
+import { API_V1_BASE } from '../config/apiConfig';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = API_V1_BASE;
 const TOKEN_KEY = 'mshoppy_reseller_token';
 const USER_KEY = 'mshoppy_reseller_user';
 const WALLET_KEY = 'mshoppy_reseller_wallet';

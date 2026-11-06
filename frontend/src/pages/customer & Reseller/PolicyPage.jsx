@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, Clock, FileText, ChevronRight } from 'lucide-react';
+import { API_BASE } from '../../config/apiConfig';
 
 export default function PolicyPage() {
   const { slug } = useParams();
@@ -17,7 +18,7 @@ export default function PolicyPage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`http://localhost:5000/api/cms/${slug}`);
+        const res = await fetch(`${API_BASE}/cms/${slug}`);
         const data = await res.json();
 
         if (!res.ok || !data.success) {

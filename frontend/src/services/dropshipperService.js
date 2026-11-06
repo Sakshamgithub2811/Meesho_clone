@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { API_V1_BASE } from '../config/apiConfig';
 
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:5000/api/v1';
+const API_BASE = API_V1_BASE;
 
 /**
  * 0. Master Executive Dashboard Overview Metrics

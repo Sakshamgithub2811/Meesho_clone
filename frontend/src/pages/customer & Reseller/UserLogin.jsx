@@ -10,6 +10,7 @@ import { auth } from '../../utils/firebase';
 import { loginCustomer } from '../../services/customerAuthService';
 import axios from 'axios';
 import AuthLayout from '../../components/layout/AuthLayout';
+import { API_V1_BASE } from '../../config/apiConfig';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,7 +69,7 @@ export default function UserLogin() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  const apiBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api/v1';
+  const apiBase = API_V1_BASE;
 
   // ─── 1. HANDLE REGISTRATION (OPTION A: BRANDED EMAIL VERIFICATION LINK) ───
   const handleRegister = async (e) => {

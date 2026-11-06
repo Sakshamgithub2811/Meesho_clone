@@ -1,6 +1,7 @@
 // frontend/src/services/ecommerceService.js
+import { API_V1_BASE } from '../config/apiConfig';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = API_V1_BASE;
 
 export function getCustomerId() {
   try {
