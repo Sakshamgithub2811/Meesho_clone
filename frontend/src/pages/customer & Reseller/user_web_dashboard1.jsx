@@ -263,32 +263,32 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         category: "Footwear"
       },
       {
-        id: "70f726c9-1f7b-456d-93dc-c71b5cf4fc63",
-        title: "Flower musicrice",
-        price: 73,
-        images: ["https://images.meesho.com/images/products/59419044/fnkqp_512.jpg"],
-        category: "Women"
+        id: "03832b74-30eb-4cf8-9d27-602b5e181fcb",
+        title: "MUKHAKSH Cotton Plain Blush Pink Kurti",
+        price: 519,
+        images: ["https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600"],
+        category: "Women Ethnic"
       },
       {
         id: "65c95da5-cc91-4ace-b7a8-271cb8792b0c",
-        title: "Premium combinal_price",
+        title: "Premium Nail Polish Combo",
         price: 136,
         images: ["https://images.meesho.com/images/products/70586121/mxn5l_512.jpg"],
-        category: "Beauty"
+        category: "Beauty & Health"
       },
       {
         id: "0462cf00-e898-4188-bee0-f4842e331ed5",
-        title: "nail paint",
+        title: "Gel Shine Nail Paint",
         price: 60,
         images: ["https://images.meesho.com/images/products/70867248/kuynn_512.jpg"],
-        category: "Beauty"
+        category: "Beauty & Health"
       },
       {
         id: "bd5a3bce-fe63-403f-9a7f-91204344afa9",
-        title: "Oral Tongue Cleanr",
+        title: "Oral Tongue Cleaner",
         price: 119,
         images: ["https://images.meesho.com/images/products/61022657/ewsm4_512.jpg"],
-        category: "Personal Care"
+        category: "Beauty & Health"
       }
     ];
   });

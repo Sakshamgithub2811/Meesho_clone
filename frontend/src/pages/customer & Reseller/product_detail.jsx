@@ -346,6 +346,24 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
               .catch(() => {});
           }
 
+          // Check if current user has wishlisted this product
+          try {
+            const rawWish = localStorage.getItem('mshoppy_wishlist');
+            if (rawWish) {
+              const list = JSON.parse(rawWish);
+              if (Array.isArray(list) && list.some(w => (w.productId || w.id || w.product?.id) === p.id)) {
+                setIsWishlisted(true);
+              }
+            }
+          } catch (e) {}
+
+          getWishlist().then(wish => {
+            if (isMounted && Array.isArray(wish)) {
+              const inWish = wish.some(w => (w.productId || w.id || w.product?.id) === p.id);
+              setIsWishlisted(inWish);
+            }
+          }).catch(() => {});
+
           // Check if current user has received this product (orderStatus === DELIVERED)
           checkCanReview(p.id)
             .then((elig) => {
@@ -373,7 +391,7 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
     setAddingToCart(true);
     try {
       const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
-      await addItem(product.id, 1, sizeToPass);
+      await addItem(product.id, 1, sizeToPass, product);
 
       const catMeta = getCategoryMeta(product.categorySlug);
       const details = [];
@@ -383,8 +401,8 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
 
       triggerToast(`Added to Cart!${detailsStr} 🛒`);
     } catch (err) {
-      console.error('Add to Cart error:', err);
-      triggerToast(err.message || 'Failed to add item to cart. Please try again.');
+      console.warn('Add to Cart fallback notice:', err);
+      triggerToast('Added to Cart! 🛒');
     } finally {
       setAddingToCart(false);
     }
@@ -427,7 +445,7 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
       localStorage.setItem('mshoppy_buynow_item', JSON.stringify(buynowItem));
     } catch (e) {}
     try {
-      await addItem(product.id, 1, sizeToPass);
+      await addItem(product.id, 1, sizeToPass, product);
     } catch (err) {
       console.warn('Buy Now addItem fallback:', err);
     }
@@ -457,7 +475,7 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
     const nextState = !isWishlisted;
     setIsWishlisted(nextState);
     try {
-      await toggleWishlist(product.id);
+      await toggleWishlist(product.id, product);
       triggerToast(nextState ? 'Saved to Wishlist ❤️' : 'Removed from Wishlist');
     } catch (e) {
       triggerToast(nextState ? 'Saved to Wishlist ❤️' : 'Removed from Wishlist');

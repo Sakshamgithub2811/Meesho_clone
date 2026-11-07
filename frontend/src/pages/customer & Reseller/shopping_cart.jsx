@@ -157,7 +157,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
   const handleMoveToWishlist = async (item) => {
     try {
       if (item.productId) {
-        await toggleWishlist(item.productId);
+        await toggleWishlist(item.productId, item.product);
       }
       await removeItem(item.id);
       triggerToast(`Moved to Wishlist ❤️`);

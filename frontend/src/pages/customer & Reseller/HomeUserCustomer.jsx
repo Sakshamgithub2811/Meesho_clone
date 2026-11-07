@@ -321,15 +321,15 @@ export default function HomeUserCustomer() {
     return () => clearInterval(timer);
   }, [isBannerPaused, banners]);
 
-  const handleToggleFavorite = async (id, e) => {
+  const handleToggleFavorite = async (id, e, productObj = null) => {
     e.stopPropagation();
     try {
       setFavorites(prev =>
         prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
       );
-      await toggleWishlist(id);
+      await toggleWishlist(id, productObj);
     } catch (err) {
-      console.error("Failed to toggle favorite:", err);
+      console.warn("Toggle favorite:", err);
     }
   };
 
@@ -939,7 +939,7 @@ export default function HomeUserCustomer() {
                           loading="lazy"
                           onError={(e) => {
                             e.currentTarget.onerror = null;
-                            e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400" fill="%23f8fafc"><rect width="300" height="400" fill="%23f1f5f9"/><circle cx="150" cy="170" r="35" fill="%23cbd5e1"/><path d="M105 250c0-25 20-45 45-45s45 20 45 45v15h-90z" fill="%23cbd5e1"/><text x="50%" y="72%" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-weight="bold" font-size="13">Meesho Verified</text></svg>';
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
                           }}
                         />
                         {p.rating > 0 && (
@@ -949,7 +949,7 @@ export default function HomeUserCustomer() {
                           </span>
                         )}
                         <button 
-                          onClick={(e) => handleToggleFavorite(p.id, e)}
+                          onClick={(e) => handleToggleFavorite(p.id, e, p)}
                           className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md flex items-center justify-center shadow-sm active:scale-90 transition-transform cursor-pointer hover:bg-white"
                           title="Wishlist"
                         >

@@ -78,7 +78,7 @@ export default function SareesCategoryListing({ onNavigate, onBack }) {
   const handleAddToCart = async (e, saree) => {
     e.stopPropagation();
     try {
-      await addToCart(saree.id, 1, saree.sizes?.[0] || 'Free Size');
+      await addToCart(saree.id, 1, saree.sizes?.[0] || 'Free Size', saree);
       setCartCount((c) => c + 1);
       triggerToast(`Added ${saree.title.slice(0, 20)}... to Cart! 🛍️`);
     } catch (e) {
