@@ -311,9 +311,8 @@ export default function ReturnRequest({ onNavigate, onBack }) {
       setCurrentStep(5); // Show success screen
       handleSendEmailOtp(); // Trigger real email via SMTP
     } catch (e) {
-      console.error('Error submitting return:', e);
-      setCurrentStep(5);
-      handleSendEmailOtp();
+      console.error('Error submitting return to database:', e);
+      showToast(e.message || 'Could not submit return request. Please try again.');
     }
   };
 

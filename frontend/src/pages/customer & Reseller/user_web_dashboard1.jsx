@@ -17,7 +17,8 @@ import {
   saveAddress,
   deleteAddress,
   getProducts,
-  getWalletDetails
+  getWalletDetails,
+  requestWalletWithdrawal
 } from '../../services/ecommerceService';
 import {
   getAffiliateApp,
@@ -296,51 +297,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     ];
   });
 
-  // Real Unified Wallet Balance (Strictly customer refunds if not approved, or verified affiliate commission if approved)
-  const [walletBalance, setWalletBalance] = useState(() => {
-    try {
-      const storedAff = getAffiliateApp();
-      const isApproved = storedAff && ['Approved', 'APPROVED', 'Active', 'ACTIVE'].includes(storedAff.status);
-      if (isApproved) {
-        const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
-        const affComm = Number(affStats.totalCommission || 0);
-        const saved = localStorage.getItem('mshoppy_customer_wallet');
-        const custBal = saved !== null ? Number(saved) : 0;
-        return Math.max(affComm, custBal);
-      }
-      // If KYC is not approved, affiliate commissions are locked; balance is strictly real customer refunds (default 0)
-      const saved = localStorage.getItem('mshoppy_customer_wallet');
-      return saved !== null ? Number(saved) : 0;
-    } catch (e) {
-      return 0;
-    }
-  });
+  // Real Unified Wallet Balance (Loaded authoritatively from PostgreSQL Database)
+  const [walletBalance, setWalletBalance] = useState(0);
 
-  // Real Unified Wallet Transactions Ledger (Includes Affiliate Margin Earnings & Payout Requests)
-  const [walletTransactions, setWalletTransactions] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mshoppy_customer_wallet_txns');
-      const txns = saved ? JSON.parse(saved) : [];
-      const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
-      const affOrders = Array.isArray(affStats.recentOrders) ? affStats.recentOrders : [];
-      
-      const affTxns = affOrders.map((ord) => ({
-        title: ord.title || `Affiliate Profit Margin (Order #${(ord.id || '').slice(-6) || 'Ref'})`,
-        ref: `TXN-AFF-${(ord.id || '').slice(-6) || Math.floor(100000 + Math.random() * 900000)}`,
-        date: ord.time || 'Recently',
-        status: 'COMPLETED',
-        amt: `+₹${Number(ord.commission || 0).toLocaleString('en-IN')}`,
-        green: true,
-        type: 'credit',
-        amount: ord.commission
-      }));
-
-      const merged = [...affTxns, ...txns.filter((t) => !affTxns.some((a) => a.ref === t.ref))];
-      return merged;
-    } catch (e) {
-      return [];
-    }
-  });
+  // Real Unified Wallet Transactions Ledger (Loaded authoritatively from PostgreSQL Database)
+  const [walletTransactions, setWalletTransactions] = useState([]);
 
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -607,21 +568,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       }
       if (walletRes.status === 'fulfilled' && walletRes.value) {
         const dbBal = Number(walletRes.value.balance ?? 0);
-        let effectiveBal = dbBal;
-        let affStats = {};
-        try {
-          affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
-        } catch (e) {}
-
-        if (isResellerApproved) {
-          const affComm = Number(affStats.totalCommission || 0);
-          effectiveBal = Math.max(dbBal, affComm);
-        } else {
-          // If KYC is not approved, affiliate margin is not unlocked
-          effectiveBal = dbBal;
-        }
-        setWalletBalance(effectiveBal);
-        localStorage.setItem('mshoppy_customer_wallet', effectiveBal.toString());
+        setWalletBalance(dbBal);
 
         const dbTxns = (Array.isArray(walletRes.value.transactions) ? walletRes.value.transactions : []).map((dt) => ({
           title: dt.description || dt.title || 'Wallet Transaction',
@@ -635,55 +582,21 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
           orderId: dt.orderId
         }));
 
-        const affOrders = (isResellerApproved && Array.isArray(affStats.recentOrders)) ? affStats.recentOrders : [];
-        const affTxns = affOrders.map((ord) => ({
-          title: ord.title || `Affiliate Profit Margin (Order #${(ord.id || '').slice(-6) || 'Ref'})`,
-          ref: `TXN-AFF-${(ord.id || '').slice(-6) || Math.floor(100000 + Math.random() * 900000)}`,
-          date: ord.time || 'Recently',
-          status: 'COMPLETED',
-          amt: `+₹${Number(ord.commission || 0).toLocaleString('en-IN')}`,
-          green: true,
-          type: 'credit',
-          amount: ord.commission
-        }));
+        setWalletTransactions(dbTxns);
 
-        const mergedTxns = [...affTxns, ...dbTxns.filter((dt) => !affTxns.some((at) => at.ref === dt.ref))];
-        setWalletTransactions(mergedTxns);
-        localStorage.setItem('mshoppy_customer_wallet_txns', JSON.stringify(mergedTxns));
-
-        // Immediately synchronize Affiliate Partner Stats
-        const detectedAffTxns = mergedTxns.filter(
+        const detectedAffTxns = dbTxns.filter(
           (t) => t && /affiliate|commission|referral/i.test(t.title || t.description || '')
         );
-        if (detectedAffTxns.length > 0) {
-          const autoComm = detectedAffTxns.reduce(
-            (s, t) => s + (Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0),
-            0
-          );
-          const autoOrders = Math.max(detectedAffTxns.length, 1);
-          const autoRev = (autoComm === 95 || autoComm === 295) ? 954 * autoOrders : Math.max(autoComm * 10, 954 * autoOrders);
-          const updatedAffStats = {
-            totalCommission: autoComm,
-            totalOrders: autoOrders,
-            convertedOrders: autoOrders,
-            clicks: Math.max(autoOrders * 3, 3),
-            totalReferredRevenue: autoRev,
-            recentOrders: detectedAffTxns.map((t) => ({
-              id: t.ref || t.id,
-              title: t.title || 'Affiliate Referral Order',
-              commission: Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0,
-              time: t.date || 'Recently'
-            }))
-          };
-          localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(updatedAffStats));
-          const appId = affiliateApp?.applicationId || affiliateApp?.id;
-          if (appId) localStorage.setItem(`mshoppy_affiliate_stats_${appId}`, JSON.stringify(updatedAffStats));
-          setAffiliateStats({
-            totalReferredRevenue: autoRev,
-            totalCommission: autoComm,
-            totalOrders: autoOrders
-          });
-        }
+        const autoComm = detectedAffTxns.reduce(
+          (s, t) => s + (t.type === 'credit' ? (Number(t.amount) || 0) : 0),
+          0
+        );
+        const autoOrders = detectedAffTxns.filter(t => t.type === 'credit').length;
+        setAffiliateStats({
+          totalReferredRevenue: autoComm * 10,
+          totalCommission: autoComm,
+          totalOrders: autoOrders
+        });
       }
     } catch (err) {
       console.error('Failed to load real user dashboard data:', err);
@@ -897,12 +810,12 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   };
 
 
-  // Handle Withdraw Form Submission (Real state & transaction ledger logging)
-  const handleWithdrawSubmit = (e) => {
+  // Handle Withdraw Form Submission (Real Database API Call)
+  const handleWithdrawSubmit = async (e) => {
     e.preventDefault();
     const amt = Number(withdrawAmount);
-    if (!amt || amt <= 0) {
-      toast.error('Please enter a valid withdrawal amount');
+    if (!amt || amt < 100) {
+      toast.error('Minimum withdrawal amount is ₹100');
       return;
     }
     if (amt > walletBalance) {
@@ -914,37 +827,45 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       return;
     }
 
-    const newBal = walletBalance - amt;
-    setWalletBalance(newBal);
-    localStorage.setItem('mshoppy_customer_wallet', String(newBal));
-
     try {
-      const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
-      if (affStats.totalCommission) {
-        affStats.totalCommission = Math.max(0, affStats.totalCommission - amt);
-        affStats.withdrawnAmount = (affStats.withdrawnAmount || 0) + amt;
-        localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(affStats));
+      const res = await requestWalletWithdrawal({
+        amount: amt,
+        method: 'bank',
+        destination: withdrawBank
+      });
+
+      if (!res?.success) {
+        toast.error(res?.message || 'Withdrawal failed on server');
+        return;
       }
-    } catch (e) {}
 
-    const newTxn = {
-      title: `Withdrawal to ${withdrawBank}`,
-      ref: 'WTH-' + Date.now().toString().slice(-6),
-      date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-      status: 'PROCESSING',
-      amt: `-₹${amt.toLocaleString('en-IN')}`,
-      green: false
-    };
+      const realTxnId = res?.data?.txnId || ('WTH-' + Date.now().toString().slice(-6));
+      const newBal = typeof res?.data?.remainingBalance === 'number'
+        ? res.data.remainingBalance
+        : Math.max(0, walletBalance - amt);
 
-    const updatedTxns = [newTxn, ...walletTransactions];
-    setWalletTransactions(updatedTxns);
-    localStorage.setItem('mshoppy_customer_wallet_txns', JSON.stringify(updatedTxns));
+      setWalletBalance(newBal);
 
-    setShowWithdrawModal(false);
-    setWithdrawAmount('');
-    toast.success(`Withdrawal of ₹${amt.toLocaleString('en-IN')} initiated!`, {
-      description: `Funds will be settled to ${withdrawBank}.`
-    });
+      const newTxn = {
+        title: `Withdrawal to ${withdrawBank}`,
+        ref: realTxnId,
+        date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+        status: 'PROCESSING',
+        amt: `-₹${amt.toLocaleString('en-IN')}`,
+        green: false
+      };
+
+      setWalletTransactions((prev) => [newTxn, ...prev]);
+
+      setShowWithdrawModal(false);
+      setWithdrawAmount('');
+      toast.success(`Withdrawal of ₹${amt.toLocaleString('en-IN')} initiated!`, {
+        description: `Funds will be settled to ${withdrawBank}. Ref: ${realTxnId}`
+      });
+    } catch (err) {
+      console.error('Withdrawal error:', err);
+      toast.error(err.message || 'Failed to submit withdrawal request');
+    }
   };
 
   // Handle Order Cancellation

@@ -51,10 +51,10 @@ export default function UserWishlist({ onNavigate, onBack }) {
   const handleRemove = async (productId) => {
     try {
       await toggleWishlist(productId);
-      setWishlistItems(prev => prev.filter(w => w.productId !== productId));
+      setWishlistItems(prev => prev.filter(w => w.productId !== productId && w.id !== productId));
       triggerToast('Item removed from Wishlist');
     } catch (e) {
-      triggerToast('Item removed from Wishlist');
+      triggerToast(e.message || 'Failed to remove from wishlist');
     }
   };
 
@@ -62,11 +62,11 @@ export default function UserWishlist({ onNavigate, onBack }) {
     try {
       await addToCart(item.productId, 1, item.product?.sizes?.[0] || 'Free Size');
       await toggleWishlist(item.productId);
-      setWishlistItems(prev => prev.filter(w => w.productId !== item.productId));
+      setWishlistItems(prev => prev.filter(w => w.productId !== item.productId && w.id !== item.productId));
       setCartCount(c => c + 1);
       triggerToast(`Moved "${item.product?.title?.slice(0, 20)}..." to Cart! 🛒`);
     } catch (e) {
-      triggerToast('Moved to Cart! 🛒');
+      triggerToast(e.message || 'Failed to move to cart');
     }
   };
 

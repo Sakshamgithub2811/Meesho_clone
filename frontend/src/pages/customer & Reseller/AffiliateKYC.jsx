@@ -349,32 +349,8 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
     try {
       localStorage.setItem('affiliate_kyc_application', JSON.stringify(submission));
       saveAffiliateApp(submission);
-
-      // Reset affiliate stats for this new KYC application to clean zeros (NO STATIC OR LEFTOVER STATS)
-      const cleanStats = {
-        totalCommission: 0,
-        totalReferredRevenue: 0,
-        totalOrders: 0,
-        clicks: 0,
-        convertedOrders: 0,
-        conversionRate: '0%',
-        recentOrders: [],
-        dailyCommissions: { MON: 0, TUE: 0, WED: 0, THU: 0, FRI: 0, SAT: 0, SUN: 0 }
-      };
-      localStorage.setItem(`mshoppy_affiliate_stats_${submission.applicationId}`, JSON.stringify(cleanStats));
-      localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(cleanStats));
-
-      // Save to admin pending applications registry for admin review
-      const adminQueue = JSON.parse(localStorage.getItem('admin_kyc_applications') || '[]');
-      const existingIdx = adminQueue.findIndex((item) => item.applicationId === submission.applicationId);
-      if (existingIdx >= 0) {
-        adminQueue[existingIdx] = submission;
-      } else {
-        adminQueue.push(submission);
-      }
-      localStorage.setItem('admin_kyc_applications', JSON.stringify(adminQueue));
     } catch (err) {
-      console.error('Storage error', err);
+      console.error('Storage note:', err);
     }
 
     // Real Earnings Notification

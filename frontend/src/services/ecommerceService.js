@@ -276,7 +276,7 @@ export async function clearCart() {
   }
 }
 
-// ── Wishlist API ──────────────────────────────────────────────
+// ── Wishlist API (100% PostgreSQL Database Driven) ────────────
 export async function getWishlist() {
   try {
     const res = await fetch(`${API_BASE_URL}/wishlist`, {
@@ -284,41 +284,16 @@ export async function getWishlist() {
     });
     if (res.ok) {
       const data = await res.json();
-      const items = data?.data || [];
-      try {
-        localStorage.setItem('mshoppy_wishlist', JSON.stringify(items.map(i => i.productId || i.id)));
-      } catch (e) {}
-      return items;
+      return data?.data || [];
     }
+    return [];
   } catch (error) {
-    console.error('Failed to fetch wishlist:', error);
-  }
-
-  // Graceful local cache fallback
-  try {
-    const storedIds = JSON.parse(localStorage.getItem('mshoppy_wishlist') || '[]');
-    return storedIds.map(id => ({ productId: id, id }));
-  } catch (e) {
+    console.error('Failed to fetch wishlist from database:', error);
     return [];
   }
 }
 
 export async function toggleWishlist(productId) {
-  // Optimistically toggle in localStorage
-  let isAdded = false;
-  try {
-    const storedIds = JSON.parse(localStorage.getItem('mshoppy_wishlist') || '[]');
-    const idx = storedIds.indexOf(productId);
-    if (idx >= 0) {
-      storedIds.splice(idx, 1);
-      isAdded = false;
-    } else {
-      storedIds.push(productId);
-      isAdded = true;
-    }
-    localStorage.setItem('mshoppy_wishlist', JSON.stringify(storedIds));
-  } catch (e) {}
-
   try {
     const res = await fetch(`${API_BASE_URL}/wishlist/toggle`, {
       method: 'POST',
@@ -326,10 +301,13 @@ export async function toggleWishlist(productId) {
       body: JSON.stringify({ productId }),
     });
     const data = await res.json();
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.message || 'Failed to update wishlist in database');
+    }
     return data;
   } catch (error) {
-    console.warn('API toggleWishlist fallback:', error);
-    return { success: true, action: isAdded ? 'added' : 'removed', isLocal: true };
+    console.error('API toggleWishlist failed:', error);
+    throw error;
   }
 }
 
