@@ -45,19 +45,6 @@ export function getAuthHeaders() {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-
-  // Include user phone and email if available to guarantee exact wallet and profile matching
-  try {
-    for (const key of ['mshoppy_customer_user', 'mshoppy_affiliate_user', 'mshoppy_reseller_user', 'user']) {
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        const u = JSON.parse(stored);
-        if (u?.phone && !headers['x-user-phone']) headers['x-user-phone'] = u.phone;
-        if (u?.email && !headers['x-user-email']) headers['x-user-email'] = u.email;
-      }
-    }
-  } catch (e) {}
-
   return headers;
 }
 
