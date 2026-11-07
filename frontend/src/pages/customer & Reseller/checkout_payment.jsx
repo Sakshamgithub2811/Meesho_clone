@@ -79,9 +79,6 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
             const buynow = JSON.parse(localStorage.getItem('mshoppy_buynow_item') || 'null');
             if (buynow) {
               items = [buynow];
-            } else {
-              const localCart = JSON.parse(localStorage.getItem('mshoppy_local_cart') || '[]');
-              if (localCart.length > 0) items = localCart;
             }
           } catch (e) {}
         }
@@ -220,8 +217,6 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
     setAppliedCoupon(null);
     setCouponError('');
     localStorage.removeItem('mshoppy_applied_coupon');
-      localStorage.removeItem('mshoppy_buynow_item');
-      localStorage.removeItem('mshoppy_local_cart');
     triggerToast('Coupon removed');
   };
 

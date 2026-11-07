@@ -216,10 +216,6 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
           email: editEmail.trim()
         };
         setAffiliateApp(updatedAff);
-        try {
-          localStorage.setItem('mshoppy_kyc_app', JSON.stringify(updatedAff));
-          localStorage.setItem('affiliate_kyc_application', JSON.stringify(updatedAff));
-        } catch (_) {}
       }
 
       setProfileSuccessMsg('Profile updated successfully! ✨');
@@ -333,88 +329,12 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     ? `${affiliateApp.bankName} (•••• ${affiliateApp.accountNumber ? affiliateApp.accountNumber.slice(-4) : 'XXXX'})`
     : '';
 
-  // Real Dynamic Affiliate Tracking Data (Fully synced with Affiliate Panel & Real Orders)
-  const getResolvedAffiliateStats = () => {
-    try {
-      const appId = affiliateApp?.applicationId || affiliateApp?.id;
-      const scoped = appId ? localStorage.getItem(`mshoppy_affiliate_stats_${appId}`) : null;
-      const globalStats = localStorage.getItem('mshoppy_affiliate_stats');
-
-      const parsedScoped = scoped ? JSON.parse(scoped) : null;
-      const parsedGlobal = globalStats ? JSON.parse(globalStats) : null;
-
-      // Authoritative extraction from unified customer wallet transactions ledger
-      const savedTxns = localStorage.getItem('mshoppy_customer_wallet_txns');
-      const txns = savedTxns ? JSON.parse(savedTxns) : [];
-      const affTxns = (Array.isArray(txns) ? txns : []).filter(
-        (t) =>
-          t &&
-          (/affiliate|commission|referral/i.test(t.title || t.description || '') ||
-            (t.ref && String(t.ref).startsWith('TXN-AFF')) ||
-            t.orderId)
-      );
-      const walletComm = affTxns.reduce((sum, t) => {
-        const val = Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0;
-        return sum + val;
-      }, 0);
-      const walletOrders = affTxns.length;
-
-      // Filter out whole wallet balance (3071) or personal shopping order count (4)
-      const rawComm = Math.max(Number(parsedScoped?.totalCommission || 0), Number(parsedGlobal?.totalCommission || 0));
-      const cleanRemoteComm = rawComm < 3000 ? rawComm : 0;
-      const rawOrders = Math.max(Number(parsedScoped?.convertedOrders || 0), Number(parsedGlobal?.convertedOrders || 0));
-      const cleanRemoteOrders = rawOrders < 4 ? rawOrders : 0;
-
-      const comm = walletComm > 0 ? walletComm : (cleanRemoteComm || 95);
-      const orders = walletOrders > 0 ? walletOrders : (cleanRemoteOrders || 1);
-      const rev = Math.max(
-        Number(parsedScoped?.totalReferredRevenue || 0) < 3000 ? Number(parsedScoped?.totalReferredRevenue || 0) : 0,
-        Number(parsedGlobal?.totalReferredRevenue || 0) < 3000 ? Number(parsedGlobal?.totalReferredRevenue || 0) : 0,
-        954 * orders
-      );
-
-      // Keep mshoppy_affiliate_stats synchronized in storage for both panels
-      if (comm > 0) {
-        try {
-          const syncObj = {
-            totalCommission: comm,
-            totalOrders: orders,
-            convertedOrders: orders,
-            clicks: Math.max(Number(parsedGlobal?.clicks || 0), orders * 3, 3),
-            totalReferredRevenue: rev,
-            recentOrders: affTxns.map((t) => ({
-              id: t.ref || t.id || 'ORD-REF',
-              title: t.title || t.description || 'Affiliate Referral Order',
-              commission: Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0,
-              time: t.date || 'Recently'
-            }))
-          };
-          localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(syncObj));
-          if (appId) localStorage.setItem(`mshoppy_affiliate_stats_${appId}`, JSON.stringify(syncObj));
-        } catch (_) {}
-      }
-
-      return {
-        totalReferredRevenue: rev,
-        totalCommission: comm,
-        totalOrders: orders
-      };
-    } catch (e) {
-      return { totalReferredRevenue: 0, totalCommission: 0, totalOrders: 0 };
-    }
-  };
-
-  const [affiliateStats, setAffiliateStats] = useState(getResolvedAffiliateStats);
-
-  // Re-sync stats dynamically on mount and storage changes
-  useEffect(() => {
-    const syncStats = () => {
-      setAffiliateStats(getResolvedAffiliateStats());
-    };
-    syncStats();
-    window.addEventListener('storage', syncStats);
-    return () => window.removeEventListener('storage', syncStats);
-  }, [affiliateApp?.applicationId, affiliateApp?.id]);
+  // Real Dynamic Affiliate Tracking Data (100% Database Driven)
+  const [affiliateStats, setAffiliateStats] = useState({
+    totalReferredRevenue: 0,
+    totalCommission: 0,
+    totalOrders: 0
+  });
 
   // Affiliate Calculator State (Custom Profit Margin per product, NOT fixed 15%)
   const [calcOrders, setCalcOrders] = useState(15);
@@ -980,13 +900,6 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       if (activeTab === 'resale' || activeTab === 'wallet') {
         setActiveTab('affiliate');
       }
-      try {
-        const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
-        if (affStats.totalCommission && affStats.totalCommission > 0) {
-          affStats.totalCommission = 0;
-          localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(affStats));
-        }
-      } catch (_) {}
     }
   }, [isResellerApproved, activeTab]);
   // Dynamic Badges & Titles for Sidebar

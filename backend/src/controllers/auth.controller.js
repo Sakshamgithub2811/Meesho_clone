@@ -742,12 +742,12 @@ export const getAffiliateStats = async (req, res) => {
     return res.status(200).json({
       success: true,
       stats: {
-        totalCommission: affiliateCommission > 0 ? affiliateCommission : 95,
+        totalCommission: affiliateCommission,
         pendingCommission: pendingCommission,
         withdrawnAmount: withdrawnAmount,
-        clicks: Math.max(affiliateOrdersCount * 3, 3),
-        convertedOrders: affiliateOrdersCount > 0 ? affiliateOrdersCount : 1,
-        totalReferredRevenue: referredRevenue > 0 ? referredRevenue : 954,
+        clicks: affiliateOrdersCount * 3,
+        convertedOrders: affiliateOrdersCount,
+        totalReferredRevenue: referredRevenue,
         conversionRate: affiliateOrdersCount > 0 ? '33.3%' : '0%',
         recentOrders: combinedRecentOrders,
         kycStatus: kycStatus,
@@ -943,6 +943,89 @@ export const updateAffiliateProfile = async (req, res) => {
       message: 'Failed to update affiliate profile',
       error: error.message,
     });
+  }
+};
+
+/**
+ * ==========================================
+ * 8B. PAYOUT & BANK SETTINGS (100% Database Driven)
+ * ==========================================
+ * GET /api/v1/auth/payout-settings
+ * PUT /api/v1/auth/payout-settings
+ */
+export const getPayoutSettings = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.headers['x-user-id'] || req.headers['x-customer-id'] || req.query.userId;
+    if (!userId) {
+      return res.status(200).json({ success: true, bankDetails: null, upiList: [] });
+    }
+    const cleanPhone = cleanPhoneNumber(userId);
+    const profile = await prisma.profile.findFirst({
+      where: {
+        OR: [
+          { id: userId },
+          { id: userId.replace(/^firebase_/, '') },
+          ...(cleanPhone ? [{ phone: cleanPhone }] : []),
+          ...(userId.includes('@') ? [{ email: userId.toLowerCase() }] : [])
+        ]
+      },
+      select: { bankDetails: true }
+    });
+    const bd = profile?.bankDetails && typeof profile.bankDetails === 'object' ? profile.bankDetails : {};
+    return res.status(200).json({
+      success: true,
+      bankDetails: bd.bankDetails || (bd.bankName ? bd : null),
+      upiList: Array.isArray(bd.upiList) ? bd.upiList : (bd.upiId ? [{ id: '1', upiId: bd.upiId, verified: true }] : [])
+    });
+  } catch (error) {
+    console.error('getPayoutSettings error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const updatePayoutSettings = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.headers['x-user-id'] || req.headers['x-customer-id'] || req.body.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'User ID is required' });
+    }
+    const cleanPhone = cleanPhoneNumber(userId);
+    const profile = await prisma.profile.findFirst({
+      where: {
+        OR: [
+          { id: userId },
+          { id: userId.replace(/^firebase_/, '') },
+          ...(cleanPhone ? [{ phone: cleanPhone }] : []),
+          ...(userId.includes('@') ? [{ email: userId.toLowerCase() }] : [])
+        ]
+      }
+    });
+    if (!profile) {
+      return res.status(404).json({ success: false, message: 'Profile not found' });
+    }
+
+    const currentBankDetails = (profile.bankDetails && typeof profile.bankDetails === 'object') ? profile.bankDetails : {};
+    const updatedBankDetails = {
+      ...currentBankDetails,
+      ...(req.body.bankDetails ? { bankDetails: req.body.bankDetails, ...req.body.bankDetails } : {}),
+      ...(req.body.upiList ? { upiList: req.body.upiList } : {}),
+      ...(req.body.upiId ? { upiId: req.body.upiId } : {})
+    };
+
+    await prisma.profile.update({
+      where: { id: profile.id },
+      data: { bankDetails: updatedBankDetails }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Payout settings updated in database',
+      bankDetails: updatedBankDetails.bankDetails || updatedBankDetails,
+      upiList: updatedBankDetails.upiList || []
+    });
+  } catch (error) {
+    console.error('updatePayoutSettings error:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 

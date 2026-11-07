@@ -63,6 +63,13 @@ const ensureWallet = async (userId, req = null) => {
       transactions: {
         orderBy: { createdAt: 'desc' },
         take: 50
+      },
+      user: {
+        select: {
+          bankDetails: true,
+          fullName: true,
+          phone: true
+        }
       }
     }
   });
@@ -75,7 +82,14 @@ const ensureWallet = async (userId, req = null) => {
         pending: 0.0,
       },
       include: {
-        transactions: true
+        transactions: true,
+        user: {
+          select: {
+            bankDetails: true,
+            fullName: true,
+            phone: true
+          }
+        }
       }
     });
   }

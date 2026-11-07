@@ -21,7 +21,10 @@ export default function WithdrawEarnings() {
   const [withdrawals, setWithdrawals] = useState([]);
   const [loadingWallet, setLoadingWallet] = useState(true);
 
-  // Fetch authoritative balance & transaction history from backend PostgreSQL
+  const [linkedBank, setLinkedBank] = useState(null);
+  const [linkedUpi, setLinkedUpi] = useState(null);
+
+  // Fetch authoritative balance & transaction history & bank details from backend PostgreSQL
   useEffect(() => {
     let isMounted = true;
     getWalletDetails()
@@ -48,6 +51,21 @@ export default function WithdrawEarnings() {
               }));
             setWithdrawals(debits);
           }
+          if (wallet.user?.bankDetails) {
+            const bd = wallet.user.bankDetails;
+            const bankObj = bd.bankDetails || (bd.bankName ? bd : null);
+            if (bankObj?.bankName) {
+              setLinkedBank({
+                bankName: bankObj.bankName,
+                accountNumber: bankObj.accountNumber ? (bankObj.accountNumber.startsWith('•') ? bankObj.accountNumber : `•••• ${bankObj.accountNumber.slice(-4)}`) : '•••• XXXX'
+              });
+            }
+            if (Array.isArray(bd.upiList) && bd.upiList.length > 0) {
+              setLinkedUpi(bd.upiList[0].upiId);
+            } else if (bd.upiId) {
+              setLinkedUpi(bd.upiId);
+            }
+          }
         }
       })
       .catch((err) => {
@@ -58,35 +76,6 @@ export default function WithdrawEarnings() {
       });
     return () => { isMounted = false; };
   }, []);
-
-  const [linkedBank] = useState(() => {
-    try {
-      const aff = getAffiliateApp();
-      if (aff?.bankName && aff?.accountNumber) {
-        return {
-          bankName: aff.bankName,
-          accountNumber: `•••• ${aff.accountNumber.slice(-4)}`
-        };
-      }
-      const saved = localStorage.getItem('mshoppy_payout_bank');
-      if (saved) {
-        const p = JSON.parse(saved);
-        return { bankName: p.bankName, accountNumber: p.accountNumber };
-      }
-    } catch (e) {}
-    return null;
-  });
-
-  const [linkedUpi] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mshoppy_payout_upis');
-      if (saved) {
-        const list = JSON.parse(saved);
-        if (list.length > 0) return list[0].upiId;
-      }
-    } catch (e) {}
-    return null;
-  });
 
   const [amount, setAmount] = useState('');
 

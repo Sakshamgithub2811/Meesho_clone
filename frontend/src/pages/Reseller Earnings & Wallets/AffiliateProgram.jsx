@@ -68,21 +68,15 @@ export default function AffiliateProgram() {
   const handleCopyLink = (prod) => {
     const storedAff = getStoredAffiliate();
     const affApp = getAffiliateApp();
-    const dynamicFallbackCode = (() => {
-      const existing = localStorage.getItem('mshoppy_affiliate_dyn_code');
-      if (existing) return existing;
-      const prefix = custUser?.user?.fullName 
-        ? custUser.user.fullName.replace(/[^a-zA-Z]/g, '').slice(0, 5).toUpperCase()
-        : (custUser?.user?.email ? custUser.user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() : 'PARTNER');
-      const gen = `AFF-${prefix}${Math.floor(100 + Math.random() * 900)}`;
-      localStorage.setItem('mshoppy_affiliate_dyn_code', gen);
-      return gen;
-    })();
+    const partnerPrefix = custUser?.user?.fullName 
+      ? custUser.user.fullName.replace(/[^a-zA-Z]/g, '').slice(0, 5).toUpperCase()
+      : (custUser?.user?.email ? custUser.user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() : 'PARTNER');
 
     const activeRefCode = storedAff?.user?.referralCode 
+      || custUser?.user?.storeName
       || affApp?.referralCode 
       || affApp?.applicationId
-      || dynamicFallbackCode;
+      || `AFF-${partnerPrefix}100`;
     const affiliateUrl = `${window.location.origin}/product/${prod.id}?ref=${activeRefCode}`;
     navigator.clipboard.writeText(affiliateUrl);
     setCopiedId(prod.id);

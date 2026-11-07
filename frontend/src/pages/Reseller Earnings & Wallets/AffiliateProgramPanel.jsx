@@ -9,53 +9,14 @@ import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
 import { getUnreadCount, subscribeNotifications } from '../../services/notificationService';
 import { getWalletDetails } from '../../services/ecommerceService';
 
-// Helper to resolve real partner commission & order conversions synchronously from unified wallet storage
+// Helper to initialize clean stats
 function getResolvedPartnerStats() {
-  try {
-    const savedTxns = localStorage.getItem('mshoppy_customer_wallet_txns');
-    const txns = savedTxns ? JSON.parse(savedTxns) : [];
-    const affTxns = (Array.isArray(txns) ? txns : []).filter(
-      (t) =>
-        t &&
-        (/affiliate|commission|referral/i.test(t.title || t.description || '') ||
-          (t.ref && String(t.ref).startsWith('TXN-AFF')) ||
-          t.orderId)
-    );
-    const walletComm = affTxns.reduce((sum, t) => {
-      const num = Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0;
-      return sum + num;
-    }, 0);
-    const walletOrders = affTxns.length;
-    const walletRecent = affTxns.map((t) => ({
-      id: t.ref || t.id || 'ORD-REF',
-      title: t.title || t.description || 'Affiliate Referral Commission',
-      commission: Number(t.amount) || Number(String(t.amt || '').replace(/[^0-9.]/g, '')) || 0,
-      time: t.date || 'Recently'
-    }));
-
-    const affStats = JSON.parse(localStorage.getItem('mshoppy_affiliate_stats') || '{}');
-    const affComm = Number(affStats.totalCommission || 0);
-    const affOrders = Number(affStats.convertedOrders || 0);
-    const affClicks = Number(affStats.clicks || 0);
-    const affRecent = Array.isArray(affStats.recentOrders) ? affStats.recentOrders : [];
-
-    const cleanAffComm = affComm < 3000 ? affComm : 0;
-    const cleanAffOrders = affOrders < 4 ? affOrders : 0;
-
-    const finalCommission = walletComm > 0 ? walletComm : (cleanAffComm || 95);
-    const finalOrders = walletOrders > 0 ? walletOrders : Math.max(cleanAffOrders || 1, finalCommission > 0 ? 1 : 0);
-    const finalClicks = Math.max(affClicks, finalOrders * 3, 3);
-    const finalRecent = walletRecent.length > 0 ? walletRecent : affRecent;
-
-    return {
-      commission: finalCommission,
-      orders: finalOrders,
-      clicks: finalClicks,
-      recent: finalRecent
-    };
-  } catch (e) {
-    return { commission: 95, orders: 1, clicks: 3, recent: [] };
-  }
+  return {
+    commission: 0,
+    orders: 0,
+    clicks: 0,
+    recent: []
+  };
 }
 
 export default function AffiliateProgramPanel() {
@@ -199,18 +160,15 @@ export default function AffiliateProgramPanel() {
   const rawAffOrders = Number(affiliateStats?.convertedOrders || 0);
   const cleanAffOrders = rawAffOrders < 4 ? rawAffOrders : 0;
 
-  const effectiveCommission = walletStats?.commission > 0
+  const effectiveCommission = walletStats?.commission !== undefined
     ? walletStats.commission
-    : (cleanAffComm || 95);
-  const effectiveOrders = walletStats?.orders > 0
+    : (Number(affiliateStats?.totalCommission) || 0);
+  const effectiveOrders = walletStats?.orders !== undefined
     ? walletStats.orders
-    : (cleanAffOrders || 1);
-  const effectiveClicks = Math.max(
-    Number(affiliateStats?.clicks || 0),
-    walletStats?.clicks || 0,
-    effectiveOrders * 3,
-    3
-  );
+    : (Number(affiliateStats?.convertedOrders) || 0);
+  const effectiveClicks = walletStats?.clicks !== undefined
+    ? walletStats.clicks
+    : (Number(affiliateStats?.clicks) || (effectiveOrders * 3));
   const effectiveRecentOrders =
     walletStats?.recent && walletStats.recent.length > 0
       ? walletStats.recent
@@ -228,31 +186,18 @@ export default function AffiliateProgramPanel() {
     currentAffiliate?.fullName ||
     customer?.fullName ||
     customer?.name ||
-    JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}')?.fullName ||
-    JSON.parse(localStorage.getItem('user') || '{}')?.fullName ||
-    JSON.parse(localStorage.getItem('user') || '{}')?.name ||
-    (affiliateApp?.email ? affiliateApp.email.split('@')[0] : '') ||
-    (customer?.email ? customer.email.split('@')[0] : '') ||
     'Partner'
   );
 
   const partnerInitial = partnerName ? partnerName.trim().charAt(0).toUpperCase() : 'P';
 
-  const dynamicFallbackCode = (() => {
-    const existing = localStorage.getItem('mshoppy_affiliate_dyn_code');
-    if (existing) return existing;
-    const prefix = partnerName 
-      ? partnerName.replace(/[^a-zA-Z]/g, '').slice(0, 5).toUpperCase()
-      : (customer?.email ? customer.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() : 'PARTNER');
-    const gen = `AFF-${prefix}${Math.floor(100 + Math.random() * 900)}`;
-    localStorage.setItem('mshoppy_affiliate_dyn_code', gen);
-    return gen;
-  })();
-
-  const computedCode = currentAffiliate?.referralCode 
-    || affiliateApp?.applicationId 
-    || dynamicFallbackCode;
-  const referralCode = computedCode;
+  const referralCode = (
+    currentAffiliate?.referralCode ||
+    customer?.storeName ||
+    affiliateApp?.referralCode ||
+    affiliateApp?.applicationId ||
+    `AFF-${partnerName.replace(/[^a-zA-Z]/g, '').slice(0, 5).toUpperCase() || 'PARTNER'}100`
+  );
 
   // Sync real partner identity to affiliate session so all reseller pages use real name
   useEffect(() => {

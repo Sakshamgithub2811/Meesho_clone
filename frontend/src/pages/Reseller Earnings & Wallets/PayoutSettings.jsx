@@ -1,37 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
 import BankAutocompleteSelect from '../../components/BankAutocompleteSelect';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import { API_V1_BASE } from '../../config/apiConfig';
 
 export default function PayoutSettings() {
   const navigate = useNavigate();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [bankDetails, setBankDetails] = useState(() => {
-    try {
-      const affApp = getAffiliateApp();
-      if (affApp?.bankName && affApp?.accountNumber) {
-        return {
-          bankName: affApp.bankName,
-          accountNumber: `•••• ${affApp.accountNumber.slice(-4)}`,
-          holderName: affApp.accountHolderName || affApp.fullName || 'Verified Partner',
-          ifsc: affApp.ifscCode || 'VERIFIED'
-        };
-      }
-      const saved = localStorage.getItem('mshoppy_payout_bank');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return null;
-  });
+  const [bankDetails, setBankDetails] = useState(null);
+  const [upiList, setUpiList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [upiList, setUpiList] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mshoppy_payout_upis');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [];
-  });
+  // Load authoritative bank & payout settings from backend PostgreSQL
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSettings() {
+      try {
+        const token = localStorage.getItem('mshoppy_customer_token') || localStorage.getItem('token') || '';
+        const custUser = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+        const userId = custUser?.id || custUser?.uid || '';
+
+        const res = await fetch(`${API_V1_BASE}/auth/payout-settings?userId=${encodeURIComponent(userId)}`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            'x-user-id': userId
+          }
+        });
+        const data = await res.json();
+        if (isMounted && data?.success) {
+          if (data.bankDetails) setBankDetails(data.bankDetails);
+          if (Array.isArray(data.upiList)) setUpiList(data.upiList);
+        }
+      } catch (err) {
+        console.warn('Could not fetch payout settings from database:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadSettings();
+    return () => { isMounted = false; };
+  }, []);
 
   const [showAddBankModal, setShowAddBankModal] = useState(false);
   const [showAddUpiModal, setShowAddUpiModal] = useState(false);
@@ -50,7 +60,7 @@ export default function PayoutSettings() {
     setTimeout(() => setToastMsg(""), 2500);
   };
 
-  const handleSaveBank = (e) => {
+  const handleSaveBank = async (e) => {
     e.preventDefault();
     if (!newBank.bankName || !newBank.accountNumber) return;
     const updated = {
@@ -60,28 +70,92 @@ export default function PayoutSettings() {
       ifsc: newBank.ifsc || "VERIFIED"
     };
     setBankDetails(updated);
-    try {
-      localStorage.setItem('mshoppy_payout_bank', JSON.stringify(updated));
-    } catch (err) {}
     setShowAddBankModal(false);
-    showToast("Bank account updated successfully!");
+
+    try {
+      const token = localStorage.getItem('mshoppy_customer_token') || localStorage.getItem('token') || '';
+      const custUser = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+      const userId = custUser?.id || custUser?.uid || '';
+
+      await fetch(`${API_V1_BASE}/auth/payout-settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'x-user-id': userId
+        },
+        body: JSON.stringify({
+          userId,
+          bankDetails: updated
+        })
+      });
+      showToast("Bank account saved to database! ✅");
+    } catch (err) {
+      console.error('Error saving bank details to DB:', err);
+      showToast("Bank account updated!");
+    }
   };
 
-  const handleAddUpi = (e) => {
+  const handleAddUpi = async (e) => {
     e.preventDefault();
     if (!newUpi.includes('@')) {
       alert('Please enter a valid UPI ID (e.g. yourname@upi)');
       return;
     }
-    setUpiList(prev => [...prev, { id: Date.now(), upiId: newUpi, verified: true }]);
+    const updatedList = [...upiList, { id: Date.now(), upiId: newUpi, verified: true }];
+    setUpiList(updatedList);
     setNewUpi("");
     setShowAddUpiModal(false);
-    showToast("UPI ID linked & verified!");
+
+    try {
+      const token = localStorage.getItem('mshoppy_customer_token') || localStorage.getItem('token') || '';
+      const custUser = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+      const userId = custUser?.id || custUser?.uid || '';
+
+      await fetch(`${API_V1_BASE}/auth/payout-settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'x-user-id': userId
+        },
+        body: JSON.stringify({
+          userId,
+          upiList: updatedList
+        })
+      });
+      showToast("UPI ID linked & saved to database! ✅");
+    } catch (err) {
+      console.error('Error saving UPI to DB:', err);
+      showToast("UPI ID linked & verified!");
+    }
   };
 
-  const handleDeleteUpi = (id) => {
-    setUpiList(prev => prev.filter(u => u.id !== id));
+  const handleDeleteUpi = async (id) => {
+    const updatedList = upiList.filter(u => u.id !== id);
+    setUpiList(updatedList);
     showToast("UPI ID removed.");
+
+    try {
+      const token = localStorage.getItem('mshoppy_customer_token') || localStorage.getItem('token') || '';
+      const custUser = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+      const userId = custUser?.id || custUser?.uid || '';
+
+      await fetch(`${API_V1_BASE}/auth/payout-settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'x-user-id': userId
+        },
+        body: JSON.stringify({
+          userId,
+          upiList: updatedList
+        })
+      });
+    } catch (err) {
+      console.error('Error removing UPI in DB:', err);
+    }
   };
 
   return (
