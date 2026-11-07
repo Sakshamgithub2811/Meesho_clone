@@ -192,7 +192,7 @@ export async function deleteProduct(productId) {
 }
 
 
-// ── Cart API ──────────────────────────────────────────────────
+// ── Cart API (100% PostgreSQL Database Driven) ──────────────────
 export async function getCart() {
   try {
     const res = await fetch(`${API_BASE_URL}/cart`, {
@@ -200,31 +200,12 @@ export async function getCart() {
     });
     if (res.ok) {
       const data = await res.json();
-      if (data?.items) {
-        try {
-          localStorage.setItem('mshoppy_local_cart', JSON.stringify(data.items));
-        } catch (e) {}
-      }
       return data;
     }
+    return { items: [], totalItems: 0, subtotal: 0, originalSubtotal: 0, totalDiscount: 0, deliveryFee: 0 };
   } catch (error) {
-    console.error('Failed to fetch cart:', error);
-  }
-
-  // Resilient fallback to local cart cache
-  try {
-    const localItems = JSON.parse(localStorage.getItem('mshoppy_local_cart') || '[]');
-    const totalItems = localItems.reduce((s, i) => s + (i.quantity || 1), 0);
-    const subtotal = localItems.reduce((s, i) => s + ((i.product?.price || 0) * (i.quantity || 1)), 0);
-    return {
-      items: localItems,
-      totalItems,
-      subtotal,
-      deliveryFee: 0,
-      isLocalCache: true
-    };
-  } catch (e) {
-    return { items: [], totalItems: 0, subtotal: 0, deliveryFee: 0 };
+    console.error('Failed to fetch cart from database:', error);
+    return { items: [], totalItems: 0, subtotal: 0, originalSubtotal: 0, totalDiscount: 0, deliveryFee: 0 };
   }
 }
 
@@ -236,35 +217,13 @@ export async function addToCart(productId, quantity = 1, size = 'Free Size') {
       body: JSON.stringify({ productId, quantity, size }),
     });
     const data = await res.json();
-    if (data?.item) {
-      try {
-        const local = JSON.parse(localStorage.getItem('mshoppy_local_cart') || '[]');
-        const idx = local.findIndex(i => i.productId === productId && i.size === size);
-        if (idx >= 0) local[idx] = data.item;
-        else local.unshift(data.item);
-        localStorage.setItem('mshoppy_local_cart', JSON.stringify(local));
-      } catch (e) {}
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.message || 'Failed to add product to cart');
     }
     return data;
   } catch (error) {
-    console.warn('API addToCart offline/fallback, updating local cache:', error);
-    try {
-      const local = JSON.parse(localStorage.getItem('mshoppy_local_cart') || '[]');
-      const idx = local.findIndex(i => i.productId === productId && i.size === size);
-      if (idx >= 0) {
-        local[idx].quantity += quantity;
-      } else {
-        local.unshift({
-          id: 'cart_loc_' + Date.now(),
-          productId,
-          quantity,
-          size,
-          product: { id: productId, price: 0 }
-        });
-      }
-      localStorage.setItem('mshoppy_local_cart', JSON.stringify(local));
-    } catch (e) {}
-    return { success: true, isLocal: true };
+    console.error('API addToCart failed:', error);
+    throw error;
   }
 }
 
@@ -275,7 +234,11 @@ export async function updateCartItem(itemId, quantity, size) {
       headers: getAuthHeaders(),
       body: JSON.stringify({ quantity, size }),
     });
-    return await res.json();
+    const data = await res.json();
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.message || 'Failed to update cart item');
+    }
+    return data;
   } catch (error) {
     console.error('Failed to update cart item:', error);
     throw error;
@@ -288,7 +251,11 @@ export async function removeFromCart(itemId) {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    return await res.json();
+    const data = await res.json();
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.message || 'Failed to remove cart item');
+    }
+    return data;
   } catch (error) {
     console.error('Failed to remove from cart:', error);
     throw error;
@@ -451,38 +418,21 @@ export async function submitReturnRequest(payload) {
 
 
 
-// ── Addresses API ─────────────────────────────────────────────
+// ── Addresses API (100% PostgreSQL Database Driven) ─────────────
 export async function getAddresses() {
-  let serverAddrs = [];
   try {
     const res = await fetch(`${API_BASE_URL}/addresses`, {
       headers: getAuthHeaders(),
     });
     if (res.ok) {
       const data = await res.json();
-      serverAddrs = data?.data || [];
+      return data?.data || [];
     }
+    return [];
   } catch (error) {
-    console.error('Failed to fetch addresses:', error);
+    console.error('Failed to fetch addresses from database:', error);
+    return [];
   }
-
-  let localAddrs = [];
-  try {
-    localAddrs = JSON.parse(localStorage.getItem('mshoppy_saved_addresses') || '[]');
-  } catch (e) {}
-
-  const merged = [...serverAddrs];
-  for (const loc of localAddrs) {
-    if (!merged.some(m => m.id === loc.id || (m.fullName === loc.fullName && m.pincode === loc.pincode))) {
-      merged.push(loc);
-    }
-  }
-
-  try {
-    localStorage.setItem('mshoppy_saved_addresses', JSON.stringify(merged));
-  } catch (e) {}
-
-  return merged;
 }
 
 export async function saveAddress(addressData) {
@@ -492,37 +442,15 @@ export async function saveAddress(addressData) {
       headers: getAuthHeaders(),
       body: JSON.stringify(addressData),
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.data) {
-        try {
-          const stored = JSON.parse(localStorage.getItem('mshoppy_saved_addresses') || '[]');
-          localStorage.setItem('mshoppy_saved_addresses', JSON.stringify([data.data, ...stored.filter(a => a.id !== data.data.id)]));
-        } catch (e) {}
-        return data;
-      }
+    const data = await res.json();
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.message || 'Failed to save address to database');
     }
+    return data;
   } catch (error) {
-    console.warn('saveAddress server error, saving locally:', error);
+    console.error('saveAddress server error:', error);
+    throw error;
   }
-
-  // Resilient fallback local save
-  const localRecord = {
-    ...addressData,
-    id: 'addr_loc_' + Date.now(),
-    createdAt: new Date().toISOString()
-  };
-  try {
-    const stored = JSON.parse(localStorage.getItem('mshoppy_saved_addresses') || '[]');
-    localStorage.setItem('mshoppy_saved_addresses', JSON.stringify([localRecord, ...stored]));
-  } catch (e) {}
-
-  return {
-    success: true,
-    message: 'Address saved locally',
-    data: localRecord,
-    isLocal: true
-  };
 }
 
 export async function deleteAddress(id) {
@@ -531,7 +459,11 @@ export async function deleteAddress(id) {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    return await res.json();
+    const data = await res.json();
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.message || 'Failed to delete address from database');
+    }
+    return data;
   } catch (error) {
     console.error(`Failed to delete address ${id}:`, error);
     throw error;

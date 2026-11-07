@@ -275,39 +275,11 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
       if (res?.success && res.data) {
         setConfirmedOrder({ ...res.data, referralCode });
       } else {
-        // Fallback demo order
-        setConfirmedOrder({
-          id: placedOrderId,
-          totalAmount: finalAmount,
-          paymentMethod: paymentMethodToSave.toUpperCase(),
-          paymentStatus: paymentMethodToSave.toUpperCase() === 'COD' ? 'PENDING' : 'PAID',
-          referralCode
-        });
+        throw new Error(res?.message || 'Failed to place order in database');
       }
     } catch (err) {
       console.error('Failed to place order:', err);
-      localStorage.removeItem('mshoppy_applied_coupon');
-      const referralCode = localStorage.getItem('mshoppy_referral_code');
-      const fallbackId = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
-      if (referralCode) {
-        const affiliateMargin = localStorage.getItem('mshoppy_affiliate_margin');
-        recordAffiliateOrder({
-          referralCode,
-          orderTotal: finalAmount,
-          marginAmount: affiliateMargin ? Number(affiliateMargin) : undefined,
-          orderId: fallbackId
-        });
-        localStorage.removeItem('mshoppy_referral_code');
-        localStorage.removeItem('mshoppy_referral_timestamp');
-        localStorage.removeItem('mshoppy_affiliate_margin');
-      }
-      setConfirmedOrder({
-        id: fallbackId,
-        totalAmount: finalAmount,
-        paymentMethod: paymentMethodToSave.toUpperCase(),
-        paymentStatus: paymentMethodToSave.toUpperCase() === 'COD' ? 'PENDING' : 'PAID',
-        referralCode
-      });
+      triggerToast(err.message || 'Failed to place order. Please check item availability and try again.');
     } finally {
       setPlacingOrder(false);
       setPaymentProcessing(null);

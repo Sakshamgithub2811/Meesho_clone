@@ -5,6 +5,7 @@ import QuickEmailOtpModal from '../../components/auth/QuickEmailOtpModal';
 import {
   toggleWishlist,
   getAddresses,
+  saveAddress as apiSaveAddress,
   getActiveCoupons,
   validateCoupon
 } from '../../services/ecommerceService';
@@ -214,22 +215,39 @@ export default function ShoppingCart({ onNavigate, onBack }) {
   const totalAmount = Math.max(0, rawProductTotal - (items.length > 0 ? couponDiscount : 0));
   const totalDiscount = totalMRP - rawProductTotal + (items.length > 0 ? couponDiscount : 0);
 
-  const saveAddress = (e) => {
+  const saveAddress = async (e) => {
     e.preventDefault();
     const cleanPin = tempAddress?.pincode ? String(tempAddress.pincode).trim() : '';
     if (!cleanPin || !/^[1-9][0-9]{5}$/.test(cleanPin)) {
       triggerToast('Please enter a valid 6-digit Indian Pincode');
       return;
     }
-    const updated = {
-      ...tempAddress,
-      pincode: cleanPin
-    };
-    setAddress(updated);
-    localStorage.setItem('mshoppy_selected_address', JSON.stringify(updated));
-    localStorage.setItem('mshoppy_user_pincode', cleanPin);
-    setIsChangingAddress(false);
-    triggerToast('Delivery address updated! 📍');
+    try {
+      const payload = {
+        fullName: tempAddress?.name || 'Valued Customer',
+        phone: tempAddress?.phone || '9999999999',
+        pincode: cleanPin,
+        addressLine: tempAddress?.details || 'Street Address',
+        city: tempAddress?.city || 'City',
+        state: tempAddress?.state || 'State',
+        isDefault: true
+      };
+      const res = await apiSaveAddress(payload);
+      const saved = res?.data || payload;
+      const updated = {
+        id: saved.id,
+        name: saved.fullName,
+        phone: saved.phone,
+        pincode: saved.pincode,
+        details: `${saved.addressLine}, ${saved.city}, ${saved.state}`
+      };
+      setAddress(updated);
+      setIsChangingAddress(false);
+      triggerToast('Delivery address saved to database! 📍');
+    } catch (err) {
+      console.error('Error saving address:', err);
+      triggerToast(err.message || 'Failed to save address');
+    }
   };
 
   return (

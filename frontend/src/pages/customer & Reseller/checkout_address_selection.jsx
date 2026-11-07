@@ -14,6 +14,7 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
@@ -71,18 +72,20 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
 
   const handleAddNewAddress = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!newAddress.fullName || !newAddress.phone || !newAddress.pincode || !newAddress.addressLine || !newAddress.city || !newAddress.state) {
       triggerToast('Please fill in all address fields');
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const res = await saveAddress(newAddress);
-      const savedData = res?.data || {
-        ...newAddress,
-        id: 'addr_' + Date.now(),
-        createdAt: new Date().toISOString()
-      };
+      const savedData = res?.data;
+      if (!savedData) {
+        throw new Error('Database did not return saved address');
+      }
       
       setAddresses(prev => [savedData, ...prev.filter(a => a.id !== savedData.id)]);
       setSelectedAddressId(savedData.id);
@@ -104,39 +107,12 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
         state: '',
         isDefault: false
       });
-      triggerToast('Delivery address saved & selected! 📍');
+      triggerToast('Delivery address saved to database! 📍');
     } catch (err) {
-      console.warn('handleAddNewAddress error fallback:', err);
-      const localRecord = {
-        ...newAddress,
-        id: 'addr_loc_' + Date.now(),
-        createdAt: new Date().toISOString()
-      };
-      setAddresses(prev => [localRecord, ...prev]);
-      setSelectedAddressId(localRecord.id);
-      localStorage.setItem('mshoppy_selected_address', JSON.stringify({
-        id: localRecord.id,
-        name: localRecord.fullName,
-        phone: localRecord.phone,
-        pincode: localRecord.pincode,
-        details: `${localRecord.addressLine}, ${localRecord.city}, ${localRecord.state}`
-      }));
-      try {
-        const stored = JSON.parse(localStorage.getItem('mshoppy_saved_addresses') || '[]');
-        localStorage.setItem('mshoppy_saved_addresses', JSON.stringify([localRecord, ...stored]));
-      } catch (e) {}
-
-      setShowAddAddressModal(false);
-      setNewAddress({
-        fullName: '',
-        phone: '',
-        pincode: '',
-        addressLine: '',
-        city: '',
-        state: '',
-        isDefault: false
-      });
-      triggerToast('Delivery address saved & selected! 📍');
+      console.error('handleAddNewAddress error:', err);
+      triggerToast(err.message || 'Failed to save address to database. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -417,9 +393,19 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-[#FF3F6C] hover:bg-[#e02659] text-white font-bold text-xs shadow-md shadow-pink-500/25 cursor-pointer"
+                  disabled={isSubmitting}
+                  className={`flex-1 py-3 rounded-xl bg-[#FF3F6C] hover:bg-[#e02659] text-white font-bold text-xs shadow-md shadow-pink-500/25 flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                    isSubmitting ? 'opacity-60 cursor-not-allowed' : 'active:scale-98'
+                  }`}
                 >
-                  Save Address
+                  {isSubmitting ? (
+                    <>
+                      <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                      <span>Saving to Database...</span>
+                    </>
+                  ) : (
+                    'Save Address'
+                  )}
                 </button>
               </div>
             </form>

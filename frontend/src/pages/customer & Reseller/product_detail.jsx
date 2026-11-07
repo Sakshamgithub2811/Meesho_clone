@@ -383,7 +383,8 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
 
       triggerToast(`Added to Cart!${detailsStr} 🛒`);
     } catch (err) {
-      triggerToast('Added to Cart! 🛒');
+      console.error('Add to Cart error:', err);
+      triggerToast(err.message || 'Failed to add item to cart. Please try again.');
     } finally {
       setAddingToCart(false);
     }
