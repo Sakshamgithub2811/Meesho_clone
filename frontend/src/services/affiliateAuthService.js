@@ -281,14 +281,6 @@ export function recordAffiliateOrder({ referralCode, orderTotal, orderId, margin
       stats.recentOrders = stats.recentOrders.slice(0, 20);
     }
 
-    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
-
-    // Also credit customer wallet if customer is using integrated wallet
-    try {
-      const curWallet = Number(localStorage.getItem('mshoppy_customer_wallet') || 0);
-      localStorage.setItem('mshoppy_customer_wallet', (curWallet + earnedMargin).toString());
-    } catch (e) { }
-
     // Real Earnings Notification
     try {
       addNotification({

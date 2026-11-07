@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
-import { getProducts } from '../../services/ecommerceService';
+import { getProducts, getWalletDetails } from '../../services/ecommerceService';
 import { getAffiliateStats, fetchAffiliateStats, subscribeAffiliateAuth, getStoredAffiliate } from '../../services/affiliateAuthService';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
 import { getStoredCustomer } from '../../services/customerAuthService';
@@ -15,45 +15,32 @@ export default function AffiliateProgram() {
   const [copiedToast, setCopiedToast] = useState('');
   const [products, setProducts] = useState([]);
 
-  // Dynamic real wallet and live stats
-  const [walletBalance, setWalletBalance] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mshoppy_customer_wallet');
-      if (saved !== null) return Number(saved);
-    } catch (e) {}
-    return 0;
-  });
-
+  // Dynamic real wallet and live stats from PostgreSQL database
+  const [walletBalance, setWalletBalance] = useState(0);
   const [affiliateStats, setAffiliateStats] = useState(() => getAffiliateStats());
 
   useEffect(() => {
+    let isMounted = true;
     fetchAffiliateStats().then((stats) => {
-      if (stats) setAffiliateStats(stats);
-      if (typeof stats?.walletBalance === 'number') setWalletBalance(stats.walletBalance);
+      if (isMounted && stats) setAffiliateStats(stats);
+      if (isMounted && typeof stats?.walletBalance === 'number') setWalletBalance(stats.walletBalance);
+    }).catch(() => {});
+
+    getWalletDetails().then((wallet) => {
+      if (isMounted && wallet && typeof wallet.balance === 'number') {
+        setWalletBalance(wallet.balance);
+      }
     }).catch(() => {});
 
     const unsub = subscribeAffiliateAuth(() => {
-      setAffiliateStats(getAffiliateStats());
-      try {
-        const saved = localStorage.getItem('mshoppy_customer_wallet');
-        if (saved !== null) setWalletBalance(Number(saved));
-      } catch (e) {}
+      fetchAffiliateStats().then((stats) => {
+        if (isMounted && stats) setAffiliateStats(stats);
+      }).catch(() => {});
     });
 
-    const handleStorage = (e) => {
-      if (e.key === 'mshoppy_affiliate_stats' || e.key === 'mshoppy_customer_wallet') {
-        setAffiliateStats(getAffiliateStats());
-        try {
-          const saved = localStorage.getItem('mshoppy_customer_wallet');
-          if (saved !== null) setWalletBalance(Number(saved));
-        } catch (err) {}
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-
     return () => {
+      isMounted = false;
       unsub();
-      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 
