@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { auth } from '../../utils/firebase';
 import AppBottomNav from '../../components/AppBottomNav';
 import { submitReturnRequest } from '../../services/ecommerceService';
+import { API_V1_BASE } from '../../config/apiConfig';
 
 const RETURN_REASONS = [
   {
@@ -231,7 +232,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
     try {
       setIsSendingEmail(true);
       showToast('Sending OTP to your registered email... ⏳');
-      const apiBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api/v1';
+      const apiBase = API_V1_BASE;
       const res = await fetch(`${apiBase}/orders/send-otp-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

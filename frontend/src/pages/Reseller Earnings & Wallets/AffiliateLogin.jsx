@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import GoogleAuthButton from '@/components/ui/GoogleAuthButton';
+import { API_V1_BASE } from '../../config/apiConfig';
 
 export default function AffiliateLogin() {
   const navigate = useNavigate();
@@ -56,7 +57,7 @@ export default function AffiliateLogin() {
 
       const firebaseUser = userCredential.user;
 
-      const apiBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api/v1';
+      const apiBase = API_V1_BASE;
       const endpoint = isRegistering
         ? `${apiBase}/affiliate-auth/register`
         : `${apiBase}/affiliate-auth/login`;

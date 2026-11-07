@@ -9,6 +9,7 @@ import { loginAffiliate } from '../services/affiliateAuthService';
 import { getAffiliateApp, saveAffiliateApp } from '../services/affiliateSessionStore';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { API_V1_BASE } from '../config/apiConfig';
 
 export const useGoogleAuth = (role = 'USER', customRedirect = null) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +27,7 @@ export const useGoogleAuth = (role = 'USER', customRedirect = null) => {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api/v1';
+      const backendUrl = API_V1_BASE;
 
       // 2. Apne Backend par user ka data bhejna
       const response = await axios.post(`${backendUrl}/auth/google`, {
