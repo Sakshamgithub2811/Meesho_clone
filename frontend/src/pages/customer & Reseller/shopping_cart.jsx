@@ -74,7 +74,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
     city: '',
     state: '',
     addressType: 'Home',
-    isDefault: true,
+    isDefault: false,
   });
   const [pincodeLoading, setPincodeLoading] = useState(false);
   const [pincodeStatus, setPincodeStatus] = useState(null);
@@ -225,57 +225,63 @@ export default function ShoppingCart({ onNavigate, onBack }) {
   const totalDiscount = totalMRP - rawProductTotal + (items.length > 0 ? couponDiscount : 0);
 
   const openAddressModal = (existing = null) => {
-    const base = existing || address;
-    let house = '';
-    let streetVal = '';
-    let landVal = '';
-    let cityVal = base?.city || '';
-    let stateVal = base?.state || '';
+    // If adding a new address or no existing address passed, keep ALL fields completely blank
+    if (!existing || !existing.pincode) {
+      setAddressForm({
+        fullName: '',
+        phone: '',
+        pincode: '',
+        houseNo: '',
+        street: '',
+        landmark: '',
+        city: '',
+        state: '',
+        addressType: 'Home',
+        isDefault: false,
+      });
+      setFormErrors({});
+      setPincodeStatus(null);
+      setIsChangingAddress(true);
+      return;
+    }
 
-    if (base?.houseNo || base?.street) {
-      house = base.houseNo || '';
-      streetVal = base.street || '';
-      landVal = base.landmark || '';
-    } else if (base?.addressLine) {
-      const parts = base.addressLine.split(',').map((s) => s.trim());
+    // Only populate if explicitly editing an already saved delivery address
+    let house = existing.houseNo || '';
+    let streetVal = existing.street || '';
+    let landVal = existing.landmark || '';
+    let cityVal = existing.city || '';
+    let stateVal = existing.state || '';
+
+    if (!house && !streetVal && existing.addressLine) {
+      const parts = existing.addressLine.split(',').map((s) => s.trim());
       house = parts[0] || '';
       streetVal = parts.slice(1).join(', ') || '';
-    } else if (base?.details) {
-      const parts = base.details.split(',').map((s) => s.trim());
+    } else if (!house && !streetVal && existing.details) {
+      const parts = existing.details.split(',').map((s) => s.trim());
       if (parts.length >= 3) {
         house = parts[0] || '';
         streetVal = parts[1] || '';
         if (!cityVal) cityVal = parts[parts.length - 2] || '';
         if (!stateVal) stateVal = parts[parts.length - 1] || '';
       } else {
-        streetVal = base.details;
+        streetVal = existing.details;
       }
     }
 
-    let defaultName = base?.name || base?.fullName || '';
-    let defaultPhone = base?.phone || '';
-    if (!defaultName || !defaultPhone) {
-      try {
-        const storedUser = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
-        if (!defaultName) defaultName = storedUser.fullName || storedUser.name || '';
-        if (!defaultPhone) defaultPhone = storedUser.phone ? storedUser.phone.replace(/\D/g, '').slice(-10) : '';
-      } catch (e) {}
-    }
-
     setAddressForm({
-      fullName: defaultName,
-      phone: defaultPhone ? defaultPhone.replace(/\D/g, '').slice(-10) : '',
-      pincode: base?.pincode || '',
+      fullName: existing.fullName || existing.name || '',
+      phone: existing.phone ? String(existing.phone).replace(/\D/g, '').slice(-10) : '',
+      pincode: existing.pincode || '',
       houseNo: house,
       street: streetVal,
       landmark: landVal,
       city: cityVal,
       state: stateVal,
-      addressType: base?.addressType || 'Home',
-      isDefault: base?.isDefault ?? true,
+      addressType: existing.addressType || 'Home',
+      isDefault: Boolean(existing.isDefault),
     });
     setFormErrors({});
-    setPincodeStatus(base?.pincode ? { success: true, message: 'Valid Pincode' } : null);
+    setPincodeStatus(existing.pincode ? { success: true, message: 'Valid Pincode' } : null);
     setIsChangingAddress(true);
   };
 
