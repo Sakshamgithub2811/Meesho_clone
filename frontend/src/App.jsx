@@ -95,16 +95,7 @@ import AdminLogin from './pages/admin_panel/adminLogin';
 import UserLogin from './pages/customer & Reseller/UserLogin';
 import AffiliateLogin from './pages/Reseller Earnings & Wallets/AffiliateLogin';
 import { LogoutPage, SupplierLogoutPage } from './pages/auth/logout';
-import AdminWebPanel from './pages/admin_panel/admin_web_panel';
-import AdminWebPanel1 from './pages/admin_panel/admin_web_panel1';
-import AdminProductCatalog from './pages/admin_panel/admin_product_catalog';
-import CampaignCreationFlowAdmin from './pages/admin_panel/campaign_creation_flow_admin';
-import PerformanceAnalyticsDashboardAdmin from './pages/admin_panel/performance_analytics_dashboard_admin';
-import AdminReturnRefundHub from './pages/admin_panel/AdminReturnRefundHub';
-import AdminDropshipperKyc from './pages/admin_panel/AdminDropshipperKyc';
-import AdminAffiliateKycApproval from './pages/admin_panel/AdminAffiliateKycApproval';
-import AdminRotRulesConfigurator from './pages/admin_panel/AdminRotRulesConfigurator';
-import AdminSupportDesk from './pages/admin_panel/AdminSupportDesk';
+import AdminWebPanel from './pages/admin_panel/admin_web_panel1';
 
 // Support & Ticketing Pages
 import SupportCenter from './pages/Community_Social_Chat_&_Customer_Support/support_center';
@@ -213,15 +204,8 @@ const screenCatalog = [
 
   // 6. Admin Panel & Support
   { path: '/admin-panel', name: 'Admin Web Panel', icon: '🛡️', group: 'Admin' },
-  { path: '/admin-support', name: 'Admin Support Desk', icon: '🎧', group: 'Admin' },
-  { path: '/admin-affiliate-kyc', name: 'Affiliate KYC & Access', icon: '🤝', group: 'Admin' },
-  { path: '/admin-rot-rules', name: 'ROT Business Rules Configurator', icon: '⚙️', group: 'Admin' },
-  { path: '/admin-returns', name: 'Returns & Refund Hub', icon: '⚖️', group: 'Admin' },
-  { path: '/admin-catalog', name: 'Admin Catalog', icon: '📁', group: 'Admin' },
-  { path: '/campaign-flow', name: 'Campaign Creation', icon: '📢', group: 'Admin' },
-  { path: '/admin-analytics', name: 'Performance Analytics', icon: '📊', group: 'Admin' },
-  { path: '/support-center', name: 'Support Center', icon: '🎧', group: 'Admin' },
-  { path: '/raise-ticket', name: 'Raise A Ticket', icon: '🎫', group: 'Admin' },
+  { path: '/support-center', name: 'Support Center', icon: '🎧', group: 'Support' },
+  { path: '/raise-ticket', name: 'Raise A Ticket', icon: '🎫', group: 'Support' },
 
   // 7. Themes & Design Ecosystem
   { path: '/digital-curator', name: 'Digital Curator', icon: '🎨', group: 'Themes' },
@@ -700,28 +684,31 @@ function AppRoutes() {
 
       // Admin & Community
       adminPanel: '/admin-panel',
-      adminSupport: '/admin-support',
-      'admin-support': '/admin-support',
-      '/admin-support': '/admin-support',
-      support: '/admin-support',
-      '/support': '/admin-support',
-      admin_support: '/admin-support',
-      supportDesk: '/admin-support',
-      adminReturns: '/admin-returns',
-      'admin-returns': '/admin-returns',
-      admin_returns: '/admin-returns',
-      'admin-rot-rules': '/admin-rot-rules',
-      'rot-rules': '/admin-rot-rules',
-      refunds: '/admin-returns',
-      adminCatalog: '/admin-catalog',
-      campaignFlow: '/campaign-flow',
-      adminAnalytics: '/admin-analytics',
-      'admin-analytics': '/admin-analytics',
-      '/admin-analytics': '/admin-analytics',
-      analytics: '/admin-analytics',
-      '/analytics': '/admin-analytics',
-      'admin-dropshipper-kyc': '/admin-dropshipper-kyc',
-      adminDropshipperKyc: '/admin-dropshipper-kyc',
+      'admin-panel': '/admin-panel',
+      adminPanel1: '/admin-panel',
+      'admin-panel1': '/admin-panel',
+      adminSupport: '/admin-panel',
+      'admin-support': '/admin-panel',
+      '/admin-support': '/admin-panel',
+      support: '/admin-panel',
+      '/support': '/admin-panel',
+      admin_support: '/admin-panel',
+      supportDesk: '/admin-panel',
+      adminReturns: '/admin-panel',
+      'admin-returns': '/admin-panel',
+      admin_returns: '/admin-panel',
+      'admin-rot-rules': '/admin-panel',
+      'rot-rules': '/admin-panel',
+      refunds: '/admin-panel',
+      adminCatalog: '/admin-panel',
+      campaignFlow: '/admin-panel',
+      adminAnalytics: '/admin-panel',
+      'admin-analytics': '/admin-panel',
+      '/admin-analytics': '/admin-panel',
+      analytics: '/admin-panel',
+      '/analytics': '/admin-panel',
+      'admin-dropshipper-kyc': '/admin-panel',
+      adminDropshipperKyc: '/admin-panel',
       'dropshipper-register': '/dropshipper-register',
       dropshipperRegister: '/dropshipper-register',
       'dropshipper-kyc': '/dropshipper-register',
@@ -1049,7 +1036,7 @@ function AppRoutes() {
             <SupplierDashboard1
               onNavigate={handleNav}
               onShipNow={() => handleNav('/supplier-orders')}
-              onClaimCredit={() => handleNav('/admin-analytics')}
+              onClaimCredit={() => handleNav('/admin-panel')}
             />
           }
         />
@@ -1281,55 +1268,19 @@ function AppRoutes() {
         {/* Admin Panel Routes (Protected) */}
 
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-          <Route path="/admin-panel1" element={<AdminWebPanel1 />} />
-          <Route
-            path="/admin-panel"
-            element={
-              <AdminWebPanel
-                onNavigate={handleNav}
-                onSwitchView={() => handleNav('/seller-dashboard')}
-                onLogout={() => handleNav('/login')}
-              />
-            }
-          />
-          <Route
-            path="/admin-support"
-            element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/support"
-            element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-rot-rules"
-            element={<AdminRotRulesConfigurator onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-dropshipper-kyc"
-            element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-kyc"
-            element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-affiliate-kyc"
-            element={<AdminAffiliateKycApproval onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-returns"
-            element={<AdminReturnRefundHub onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-catalog"
-            element={<AdminProductCatalog onNavigate={handleNav} onAddNewProduct={() => handleNav('/add-product')} />}
-          />
-          <Route
-            path="/campaign-flow"
-            element={<CampaignCreationFlowAdmin onNavigate={handleNav} onCancel={() => handleNav('/admin-panel')} />}
-          />
-          <Route path="/admin-analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
-          <Route path="/analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
+          <Route path="/admin-panel" element={<AdminWebPanel />} />
+          <Route path="/admin-panel1" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-support" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/support" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-rot-rules" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-dropshipper-kyc" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-kyc" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-affiliate-kyc" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-returns" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-catalog" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/campaign-flow" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-analytics" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/analytics" element={<Navigate to="/admin-panel" replace />} />
         </Route>
         <Route
           path="/support-center"

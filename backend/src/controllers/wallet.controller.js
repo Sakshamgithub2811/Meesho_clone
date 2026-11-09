@@ -141,21 +141,22 @@ export const requestWithdrawal = async (req, res) => {
 
     // Atomic withdrawal transaction
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Deduct balance from wallet
+      // 1. Deduct available balance and hold in pending escrow
       const updatedWallet = await tx.wallet.update({
         where: { id: wallet.id },
         data: {
-          balance: { decrement: numAmount }
+          balance: { decrement: numAmount },
+          pending: { increment: numAmount }
         }
       });
 
-      // 2. Record debit in transaction ledger
+      // 2. Record debit in transaction ledger marked as PENDING payout
       const txn = await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
           amount: numAmount,
           type: 'debit',
-          description: `Payout Withdrawal (${method.toUpperCase()}) to ${destination}`
+          description: `Withdrawal Request: PENDING | Method: ${method.toUpperCase()} | Dest: ${destination}`
         }
       });
 
