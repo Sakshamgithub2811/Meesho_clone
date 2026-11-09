@@ -18,11 +18,12 @@ import AdminBannersManagement from '../../components/admin/banners/AdminBannersM
 import AdminCmsManagement from '../../components/admin/cms/AdminCmsManagement';
 import AdminSeoManagement from '../../components/admin/seo/AdminSeoManagement';
 import AdminReviewsManagement from '../../components/admin/reviews/AdminReviewsManagement';
+import AdminFlashSaleManagement from '../../components/admin/flashSale/AdminFlashSaleManagement';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
   Package, ShoppingCart, RotateCcw, LineChart,
-  Wallet, Banknote, Store, Headphones, Layers, Ticket, Image, FileText, Globe, Star
+  Wallet, Banknote, Store, Headphones, Layers, Ticket, Image, FileText, Globe, Star, Zap
 } from 'lucide-react';
 // Yeh raha aapka MASTER MENU (with Sub-menus)
 const ADMIN_MENU = [
@@ -40,6 +41,7 @@ const ADMIN_MENU = [
   { id: 'products', label: 'Products ', icon: Package },
   { id: 'categories', label: 'Categories ', icon: Layers },
   { id: 'reviews', label: 'Reviews & Ratings ⭐', icon: Star },
+  { id: 'flash-sale', label: 'Flash Sale & Deals ⚡', icon: Zap },
   { id: 'coupons', label: 'Coupons 🎟️', icon: Ticket },
   { id: 'banners', label: 'Banners 🎨', icon: Image },
   { id: 'cms', label: 'CMS Pages 📄', icon: FileText },
@@ -84,6 +86,8 @@ export default function AdminWebPanel() {
         return { title: "Category Master & Taxonomies", subtitle: "Organize catalog hierarchies, manage category slugs, and link products" };
       case 'reviews':
         return { title: "Customer Reviews & Moderation Hub", subtitle: "Inspect buyer feedback, moderate customer unboxing photos, and manage ratings" };
+      case 'flash-sale':
+        return { title: "Flash Sales & Lightning Deals Manager", subtitle: "Configure live countdown timers, campaign banners, and featured deal products" };
       case 'coupons':
         return { title: "Coupons & Promotional Codes", subtitle: "Configure promotional discounts, validate campaigns, and track customer redemptions" };
       case 'banners':
@@ -163,6 +167,10 @@ export default function AdminWebPanel() {
 
       {activeTab === 'reviews' && (
         <AdminReviewsManagement />
+      )}
+
+      {activeTab === 'flash-sale' && (
+        <AdminFlashSaleManagement />
       )}
 
       {activeTab === 'coupons' && (

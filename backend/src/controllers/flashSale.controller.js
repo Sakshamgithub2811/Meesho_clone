@@ -1,14 +1,15 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import prisma from '../config/prisma.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CONFIG_FILE_PATH = path.join(__dirname, '../config/flashSaleConfig.json');
 
 // Default fallback configuration
-const getDefaultConfig = () => {
-  // End of current day (midnight 23:59:59) by default, or 4 hours from now
+export const getDefaultConfig = () => {
+  // End of current day (midnight 23:59:59) by default, or 6 hours from now
   const now = new Date();
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
@@ -18,9 +19,11 @@ const getDefaultConfig = () => {
     subtitle: 'Up to 75% Off Everything',
     bannerBadge: 'Live Lightning Drops',
     dealBadge: '⚡ Limited Stock • Extra 15% Off',
+    resellerBonusNote: 'Earn up to ₹150 extra reseller commission per order during this flash sale!',
     endTime: endOfDay.toISOString(),
     status: 'ACTIVE',
     minDiscount: 40,
+    featuredProductIds: [],
     updatedAt: new Date().toISOString()
   };
 };
@@ -31,7 +34,7 @@ let lastCacheReadTime = 0;
 const CACHE_TTL_MS = 30000; // 30 seconds TTL
 
 // Helper to read config asynchronously / from memory cache
-const readConfig = () => {
+export const readConfig = () => {
   const now = Date.now();
   if (cachedFlashSaleConfig && (now - lastCacheReadTime) < CACHE_TTL_MS) {
     if (new Date(cachedFlashSaleConfig.endTime).getTime() <= now) {
@@ -64,7 +67,7 @@ const readConfig = () => {
 };
 
 // Helper to write config
-const writeConfig = (config) => {
+export const writeConfig = (config) => {
   cachedFlashSaleConfig = config;
   lastCacheReadTime = Date.now();
   fs.promises.writeFile(CONFIG_FILE_PATH, JSON.stringify(config, null, 2)).catch((err) => {
@@ -74,14 +77,36 @@ const writeConfig = (config) => {
 
 /**
  * GET /api/v1/flash-sale/active
- * Returns current active flash sale metadata & timer
+ * Returns current active flash sale metadata, timer, and featured products
  */
 export const getActiveFlashSale = async (req, res) => {
   try {
     const config = readConfig();
+
+    let featuredProducts = [];
+    if (Array.isArray(config.featuredProductIds) && config.featuredProductIds.length > 0) {
+      featuredProducts = await prisma.product.findMany({
+        where: { id: { in: config.featuredProductIds } },
+        select: {
+          id: true,
+          title: true,
+          price: true,
+          images: true,
+          rating: true,
+          reviewsCount: true,
+          categorySlug: true,
+          stock: true,
+          supplierName: true
+        }
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      data: config
+      data: {
+        ...config,
+        featuredProducts
+      }
     });
   } catch (error) {
     console.error('Error in getActiveFlashSale:', error);
@@ -99,18 +124,30 @@ export const getActiveFlashSale = async (req, res) => {
  */
 export const updateFlashSale = async (req, res) => {
   try {
-    const { title, subtitle, bannerBadge, resellerBonusNote, endTime, minDiscount, status } = req.body;
+    const {
+      title,
+      subtitle,
+      bannerBadge,
+      dealBadge,
+      resellerBonusNote,
+      endTime,
+      minDiscount,
+      status,
+      featuredProductIds
+    } = req.body;
     const current = readConfig();
 
     const updated = {
       ...current,
-      ...(title && { title }),
-      ...(subtitle && { subtitle }),
-      ...(bannerBadge && { bannerBadge }),
-      ...(resellerBonusNote && { resellerBonusNote }),
+      ...(title !== undefined && { title }),
+      ...(subtitle !== undefined && { subtitle }),
+      ...(bannerBadge !== undefined && { bannerBadge }),
+      ...(dealBadge !== undefined && { dealBadge }),
+      ...(resellerBonusNote !== undefined && { resellerBonusNote }),
       ...(endTime && { endTime: new Date(endTime).toISOString() }),
       ...(minDiscount !== undefined && { minDiscount: Number(minDiscount) }),
       ...(status && { status }),
+      ...(Array.isArray(featuredProductIds) && { featuredProductIds }),
       updatedAt: new Date().toISOString()
     };
 
