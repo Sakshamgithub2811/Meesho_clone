@@ -45,19 +45,6 @@ export function getAuthHeaders() {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-
-  // Include user phone and email if available to guarantee exact wallet and profile matching
-  try {
-    for (const key of ['mshoppy_customer_user', 'mshoppy_affiliate_user', 'mshoppy_reseller_user', 'user']) {
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        const u = JSON.parse(stored);
-        if (u?.phone && !headers['x-user-phone']) headers['x-user-phone'] = u.phone;
-        if (u?.email && !headers['x-user-email']) headers['x-user-email'] = u.email;
-      }
-    }
-  } catch (e) {}
-
   return headers;
 }
 
@@ -193,7 +180,50 @@ export async function deleteProduct(productId) {
 }
 
 
-// ── Cart API ──────────────────────────────────────────────────
+// ── Cart Local Cache & Fallback Helpers ─────────────────────────
+function getLocalCart() {
+  try {
+    const raw = localStorage.getItem('mshoppy_local_cart');
+    if (raw) {
+      const items = JSON.parse(raw);
+      if (Array.isArray(items)) {
+        const totalItems = items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+        const subtotal = items.reduce(
+          (sum, item) => sum + (Number(item.product?.price || item.price || 0) * (Number(item.quantity) || 1)),
+          0
+        );
+        const originalSubtotal = items.reduce(
+          (sum, item) =>
+            sum +
+            (Number(item.product?.originalPrice || item.originalPrice || item.product?.price || item.price || 0) *
+              (Number(item.quantity) || 1)),
+          0
+        );
+        return {
+          items,
+          totalItems,
+          subtotal,
+          originalSubtotal,
+          totalDiscount: Math.max(0, originalSubtotal - subtotal),
+          deliveryFee: 0,
+        };
+      }
+    }
+  } catch (e) {}
+  return { items: [], totalItems: 0, subtotal: 0, originalSubtotal: 0, totalDiscount: 0, deliveryFee: 0 };
+}
+
+function saveLocalCart(items) {
+  try {
+    const list = Array.isArray(items) ? items : (items?.items || []);
+    localStorage.setItem('mshoppy_local_cart', JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('mshoppy-cart-changed'));
+    }
+  } catch (e) {}
+}
+
+// ── Cart API (Hybrid PostgreSQL with Resilient Local Fallback) ───
 export async function getCart() {
   try {
     const res = await fetch(`${API_BASE_URL}/cart`, {
@@ -201,72 +231,81 @@ export async function getCart() {
     });
     if (res.ok) {
       const data = await res.json();
-      if (data?.items) {
-        try {
-          localStorage.setItem('mshoppy_local_cart', JSON.stringify(data.items));
-        } catch (e) {}
+      if (data && Array.isArray(data.items)) {
+        saveLocalCart(data.items);
+        return data;
       }
-      return data;
     }
   } catch (error) {
-    console.error('Failed to fetch cart:', error);
+    console.warn('API getCart unreachable, using local storage fallback:', error);
   }
-
-  // Resilient fallback to local cart cache
-  try {
-    const localItems = JSON.parse(localStorage.getItem('mshoppy_local_cart') || '[]');
-    const totalItems = localItems.reduce((s, i) => s + (i.quantity || 1), 0);
-    const subtotal = localItems.reduce((s, i) => s + ((i.product?.price || 0) * (i.quantity || 1)), 0);
-    return {
-      items: localItems,
-      totalItems,
-      subtotal,
-      deliveryFee: 0,
-      isLocalCache: true
-    };
-  } catch (e) {
-    return { items: [], totalItems: 0, subtotal: 0, deliveryFee: 0 };
-  }
+  return getLocalCart();
 }
 
-export async function addToCart(productId, quantity = 1, size = 'Free Size') {
+export async function addToCart(productId, quantity = 1, size = 'Free Size', productData = null) {
+  let apiSuccess = false;
+  let apiResult = null;
+
   try {
     const res = await fetch(`${API_BASE_URL}/cart`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ productId, quantity, size }),
     });
-    const data = await res.json();
-    if (data?.item) {
-      try {
-        const local = JSON.parse(localStorage.getItem('mshoppy_local_cart') || '[]');
-        const idx = local.findIndex(i => i.productId === productId && i.size === size);
-        if (idx >= 0) local[idx] = data.item;
-        else local.unshift(data.item);
-        localStorage.setItem('mshoppy_local_cart', JSON.stringify(local));
-      } catch (e) {}
-    }
-    return data;
-  } catch (error) {
-    console.warn('API addToCart offline/fallback, updating local cache:', error);
-    try {
-      const local = JSON.parse(localStorage.getItem('mshoppy_local_cart') || '[]');
-      const idx = local.findIndex(i => i.productId === productId && i.size === size);
-      if (idx >= 0) {
-        local[idx].quantity += quantity;
-      } else {
-        local.unshift({
-          id: 'cart_loc_' + Date.now(),
-          productId,
-          quantity,
-          size,
-          product: { id: productId, price: 0 }
-        });
+    if (res.ok) {
+      apiResult = await res.json();
+      if (apiResult?.success) {
+        apiSuccess = true;
       }
-      localStorage.setItem('mshoppy_local_cart', JSON.stringify(local));
-    } catch (e) {}
-    return { success: true, isLocal: true };
+    }
+  } catch (error) {
+    console.warn('API addToCart network issue, persisting in local cart:', error);
   }
+
+  // Always update local cart state so UI is instantly responsive & offline-safe
+  const local = getLocalCart();
+  const items = [...local.items];
+  const existingIdx = items.findIndex(
+    (i) => (i.productId === productId || i.id === productId || i.product?.id === productId) && (i.size === size || !size)
+  );
+
+  let fullProduct = productData;
+  if (!fullProduct) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('mshoppy_cached_catalog_prods') || '[]');
+      fullProduct = cached.find((p) => p.id === productId) || null;
+    } catch (e) {}
+  }
+
+  if (existingIdx > -1) {
+    items[existingIdx].quantity = (Number(items[existingIdx].quantity) || 1) + Number(quantity);
+    if (fullProduct && !items[existingIdx].product) {
+      items[existingIdx].product = fullProduct;
+    }
+  } else {
+    items.unshift({
+      id: 'cart_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      productId,
+      quantity: Number(quantity) || 1,
+      size: size || 'Free Size',
+      product: fullProduct || { id: productId, title: 'Item in Cart', price: 0 },
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  saveLocalCart(items);
+
+  if (apiSuccess && apiResult) {
+    return apiResult;
+  }
+
+  return {
+    success: true,
+    message: 'Product added to cart',
+    isLocal: true,
+    items,
+    totalItems: items.reduce((s, i) => s + (Number(i.quantity) || 1), 0),
+  };
 }
 
 export async function updateCartItem(itemId, quantity, size) {
@@ -276,11 +315,27 @@ export async function updateCartItem(itemId, quantity, size) {
       headers: getAuthHeaders(),
       body: JSON.stringify({ quantity, size }),
     });
-    return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.success) {
+        const local = getLocalCart();
+        const items = local.items.map((i) =>
+          i.id === itemId || i.productId === itemId ? { ...i, quantity, size: size || i.size } : i
+        );
+        saveLocalCart(items);
+        return data;
+      }
+    }
   } catch (error) {
-    console.error('Failed to update cart item:', error);
-    throw error;
+    console.warn('API updateCartItem fallback to local:', error);
   }
+
+  const local = getLocalCart();
+  const items = local.items.map((i) =>
+    i.id === itemId || i.productId === itemId ? { ...i, quantity, size: size || i.size } : i
+  );
+  saveLocalCart(items);
+  return { success: true, message: 'Cart updated' };
 }
 
 export async function removeFromCart(itemId) {
@@ -289,11 +344,21 @@ export async function removeFromCart(itemId) {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      const local = getLocalCart();
+      const items = local.items.filter((i) => i.id !== itemId && i.productId !== itemId);
+      saveLocalCart(items);
+      return data;
+    }
   } catch (error) {
-    console.error('Failed to remove from cart:', error);
-    throw error;
+    console.warn('API removeFromCart fallback to local:', error);
   }
+
+  const local = getLocalCart();
+  const items = local.items.filter((i) => i.id !== itemId && i.productId !== itemId);
+  saveLocalCart(items);
+  return { success: true, message: 'Item removed from cart' };
 }
 
 export async function clearCart() {
@@ -302,14 +367,38 @@ export async function clearCart() {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    return await res.json();
+    saveLocalCart([]);
+    if (res.ok) return await res.json();
   } catch (error) {
-    console.error('Failed to clear cart:', error);
-    throw error;
+    console.warn('API clearCart fallback to local:', error);
   }
+  saveLocalCart([]);
+  return { success: true, message: 'Cart cleared' };
 }
 
-// ── Wishlist API ──────────────────────────────────────────────
+// ── Wishlist Local Cache & Fallback Helpers ──────────────────────
+function getLocalWishlist() {
+  try {
+    const raw = localStorage.getItem('mshoppy_wishlist');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveLocalWishlist(items) {
+  try {
+    const list = Array.isArray(items) ? items : [];
+    localStorage.setItem('mshoppy_wishlist', JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('mshoppy-wishlist-changed'));
+    }
+  } catch (e) {}
+}
+
+// ── Wishlist API (Hybrid PostgreSQL with Resilient Sync) ─────────
 export async function getWishlist() {
   try {
     const res = await fetch(`${API_BASE_URL}/wishlist`, {
@@ -317,53 +406,76 @@ export async function getWishlist() {
     });
     if (res.ok) {
       const data = await res.json();
-      const items = data?.data || [];
-      try {
-        localStorage.setItem('mshoppy_wishlist', JSON.stringify(items.map(i => i.productId || i.id)));
-      } catch (e) {}
-      return items;
+      if (data && Array.isArray(data.data)) {
+        const local = getLocalWishlist();
+        const mergedMap = new Map();
+        data.data.forEach((item) => mergedMap.set(item.productId || item.id, item));
+        local.forEach((item) => {
+          const key = item.productId || item.id;
+          if (!mergedMap.has(key)) mergedMap.set(key, item);
+        });
+        const merged = Array.from(mergedMap.values());
+        saveLocalWishlist(merged);
+        return merged;
+      }
     }
   } catch (error) {
-    console.error('Failed to fetch wishlist:', error);
+    console.warn('API getWishlist unreachable, using local wishlist:', error);
   }
-
-  // Graceful local cache fallback
-  try {
-    const storedIds = JSON.parse(localStorage.getItem('mshoppy_wishlist') || '[]');
-    return storedIds.map(id => ({ productId: id, id }));
-  } catch (e) {
-    return [];
-  }
+  return getLocalWishlist();
 }
 
-export async function toggleWishlist(productId) {
-  // Optimistically toggle in localStorage
-  let isAdded = false;
-  try {
-    const storedIds = JSON.parse(localStorage.getItem('mshoppy_wishlist') || '[]');
-    const idx = storedIds.indexOf(productId);
-    if (idx >= 0) {
-      storedIds.splice(idx, 1);
-      isAdded = false;
-    } else {
-      storedIds.push(productId);
-      isAdded = true;
-    }
-    localStorage.setItem('mshoppy_wishlist', JSON.stringify(storedIds));
-  } catch (e) {}
+export async function toggleWishlist(productId, productData = null) {
+  // 1. Optimistic update in local cache
+  const local = getLocalWishlist();
+  const existingIdx = local.findIndex(
+    (item) => item.productId === productId || item.id === productId || item.product?.id === productId
+  );
 
+  let action = 'added';
+  if (existingIdx > -1) {
+    local.splice(existingIdx, 1);
+    action = 'removed';
+  } else {
+    let fullProd = productData;
+    if (!fullProd) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('mshoppy_cached_catalog_prods') || '[]');
+        fullProd = cached.find((p) => p.id === productId) || null;
+      } catch (e) {}
+    }
+    local.unshift({
+      id: 'wish_' + productId,
+      productId,
+      product: fullProd || { id: productId, title: 'Saved Item' },
+      createdAt: new Date().toISOString(),
+    });
+    action = 'added';
+  }
+
+  saveLocalWishlist(local);
+
+  // 2. Synchronize to Database
   try {
     const res = await fetch(`${API_BASE_URL}/wishlist/toggle`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ productId }),
     });
-    const data = await res.json();
-    return data;
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
   } catch (error) {
-    console.warn('API toggleWishlist fallback:', error);
-    return { success: true, action: isAdded ? 'added' : 'removed', isLocal: true };
+    console.warn('API toggleWishlist fallback to local:', error);
   }
+
+  return {
+    success: true,
+    action,
+    message: action === 'added' ? 'Added to wishlist' : 'Removed from wishlist',
+    isLocal: true,
+  };
 }
 
 // ── Orders API ────────────────────────────────────────────────
@@ -452,38 +564,21 @@ export async function submitReturnRequest(payload) {
 
 
 
-// ── Addresses API ─────────────────────────────────────────────
+// ── Addresses API (100% PostgreSQL Database Driven) ─────────────
 export async function getAddresses() {
-  let serverAddrs = [];
   try {
     const res = await fetch(`${API_BASE_URL}/addresses`, {
       headers: getAuthHeaders(),
     });
     if (res.ok) {
       const data = await res.json();
-      serverAddrs = data?.data || [];
+      return data?.data || [];
     }
+    return [];
   } catch (error) {
-    console.error('Failed to fetch addresses:', error);
+    console.error('Failed to fetch addresses from database:', error);
+    return [];
   }
-
-  let localAddrs = [];
-  try {
-    localAddrs = JSON.parse(localStorage.getItem('mshoppy_saved_addresses') || '[]');
-  } catch (e) {}
-
-  const merged = [...serverAddrs];
-  for (const loc of localAddrs) {
-    if (!merged.some(m => m.id === loc.id || (m.fullName === loc.fullName && m.pincode === loc.pincode))) {
-      merged.push(loc);
-    }
-  }
-
-  try {
-    localStorage.setItem('mshoppy_saved_addresses', JSON.stringify(merged));
-  } catch (e) {}
-
-  return merged;
 }
 
 export async function saveAddress(addressData) {
@@ -493,37 +588,15 @@ export async function saveAddress(addressData) {
       headers: getAuthHeaders(),
       body: JSON.stringify(addressData),
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.data) {
-        try {
-          const stored = JSON.parse(localStorage.getItem('mshoppy_saved_addresses') || '[]');
-          localStorage.setItem('mshoppy_saved_addresses', JSON.stringify([data.data, ...stored.filter(a => a.id !== data.data.id)]));
-        } catch (e) {}
-        return data;
-      }
+    const data = await res.json();
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.message || 'Failed to save address to database');
     }
+    return data;
   } catch (error) {
-    console.warn('saveAddress server error, saving locally:', error);
+    console.error('saveAddress server error:', error);
+    throw error;
   }
-
-  // Resilient fallback local save
-  const localRecord = {
-    ...addressData,
-    id: 'addr_loc_' + Date.now(),
-    createdAt: new Date().toISOString()
-  };
-  try {
-    const stored = JSON.parse(localStorage.getItem('mshoppy_saved_addresses') || '[]');
-    localStorage.setItem('mshoppy_saved_addresses', JSON.stringify([localRecord, ...stored]));
-  } catch (e) {}
-
-  return {
-    success: true,
-    message: 'Address saved locally',
-    data: localRecord,
-    isLocal: true
-  };
 }
 
 export async function deleteAddress(id) {
@@ -532,7 +605,11 @@ export async function deleteAddress(id) {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    return await res.json();
+    const data = await res.json();
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.message || 'Failed to delete address from database');
+    }
+    return data;
   } catch (error) {
     console.error(`Failed to delete address ${id}:`, error);
     throw error;

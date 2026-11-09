@@ -5,31 +5,29 @@ import supabase from '../../config/supabaseClient.js';
 import slugify from 'slugify';
 import { dispatchDeliveryOtpEmail } from '../order.controller.js';
 import { getUploadDir } from '../../middlewares/upload.middleware.js';
+import { uploadFileToSupabase } from '../../services/supabaseStorage.service.js';
 
 // Helper to persist uploaded files to Supabase Storage or fallback to local/tmp URL
 const uploadFileToStorage = async (file, baseUrl) => {
-  if (supabase?.storage && file?.path) {
+  if (file?.buffer || (file?.path && fs.existsSync(file.path))) {
     try {
-      const fileBuffer = fs.readFileSync(file.path);
-      const ext = path.extname(file.originalname || file.filename || '.jpg');
-      const filename = `product_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
-      const { data, error } = await supabase.storage.from('uploads').upload(filename, fileBuffer, {
-        contentType: file.mimetype || 'image/jpeg',
-        upsert: true
+      const buffer = file.buffer || fs.readFileSync(file.path);
+      const res = await uploadFileToSupabase({
+        buffer,
+        originalname: file.originalname || file.filename || 'product.jpg',
+        mimetype: file.mimetype || 'image/jpeg',
+        folder: 'products'
       });
-      if (!error && data?.path) {
-        const { data: pubData } = supabase.storage.from('uploads').getPublicUrl(data.path);
-        if (pubData?.publicUrl) return pubData.publicUrl;
-      }
+      if (res?.url) return res.url;
     } catch (sbErr) {
-      // Supabase direct upload note (fallback continues)
+      console.warn('Supabase product upload error:', sbErr.message);
     }
   }
   return `${baseUrl}/uploads/${file.filename}`;
 };
 
-// Helper to save base64 data URLs as static files in uploads/
-const saveBase64Image = (base64Str, baseUrl) => {
+// Helper to save base64 data URLs as cloud files in Supabase Storage
+const saveBase64Image = async (base64Str, baseUrl) => {
   try {
     const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
@@ -42,6 +40,18 @@ const saveBase64Image = (base64Str, baseUrl) => {
     else if (mimeType.includes('webp')) ext = '.webp';
     else if (mimeType.includes('jpeg')) ext = '.jpeg';
 
+    try {
+      const res = await uploadFileToSupabase({
+        buffer: dataBuffer,
+        originalname: `product_${Date.now()}${ext}`,
+        mimetype: mimeType,
+        folder: 'products'
+      });
+      if (res?.url) return res.url;
+    } catch (sbErr) {
+      console.warn('Supabase base64 upload error:', sbErr.message);
+    }
+
     const uploadDir = getUploadDir();
     const filename = `img_${Date.now()}_${Math.round(Math.random() * 1e9)}${ext}`;
     const filePath = path.join(uploadDir, filename);
@@ -49,7 +59,7 @@ const saveBase64Image = (base64Str, baseUrl) => {
 
     return `${baseUrl}/uploads/${filename}`;
   } catch (err) {
-    console.warn('Failed to save base64 image to disk:', err.message);
+    console.warn('Failed to save base64 image:', err.message);
     return base64Str;
   }
 };
@@ -235,14 +245,16 @@ export const addProduct = async (req, res, next) => {
       imageUrls.push(req.body.primaryImage.trim());
     }
 
-    // Convert any base64 images into saved static files
+    // Convert any base64 images into saved cloud files
     const hostBaseUrl = `${req.protocol}://${req.get('host')}`;
-    imageUrls = imageUrls.map((u) => {
-      if (typeof u === 'string' && u.startsWith('data:image/')) {
-        return saveBase64Image(u, hostBaseUrl);
-      }
-      return u;
-    });
+    imageUrls = await Promise.all(
+      imageUrls.map(async (u) => {
+        if (typeof u === 'string' && u.startsWith('data:image/')) {
+          return await saveBase64Image(u, hostBaseUrl);
+        }
+        return u;
+      })
+    );
 
     // Clean, trim, and deduplicate
     imageUrls = [...new Set(imageUrls.map((u) => (typeof u === 'string' ? u.trim() : u)).filter(Boolean))];
@@ -354,12 +366,14 @@ export const updateProduct = async (req, res, next) => {
         updateData.images = [updateData.images];
       }
       const hostBaseUrl = `${req.protocol}://${req.get('host')}`;
-      updateData.images = updateData.images.map((u) => {
-        if (typeof u === 'string' && u.startsWith('data:image/')) {
-          return saveBase64Image(u, hostBaseUrl);
-        }
-        return u;
-      }).filter(Boolean);
+      updateData.images = (await Promise.all(
+        updateData.images.map(async (u) => {
+          if (typeof u === 'string' && u.startsWith('data:image/')) {
+            return await saveBase64Image(u, hostBaseUrl);
+          }
+          return u;
+        })
+      )).filter(Boolean);
     }
 
     const updated = await prisma.product.update({

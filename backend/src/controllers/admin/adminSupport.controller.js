@@ -217,3 +217,100 @@ export const updateTicketStatus = async (req, res) => {
     });
   }
 };
+
+/**
+ * 4. CREATE SUPPORT TICKET (For Customer / Reseller)
+ * POST /api/v1/admin-support/create
+ */
+export const createSupportTicket = async (req, res) => {
+  try {
+    const userId =
+      req.user?.id ||
+      req.headers['x-user-id'] ||
+      req.headers['x-customer-id'] ||
+      req.headers['x-affiliate-id'] ||
+      req.body.userId ||
+      'guest_customer';
+
+    const { subject, description, category = 'Other Concerns', priority = 'normal', orderId } = req.body;
+
+    if (!subject || !description) {
+      return res.status(400).json({
+        success: false,
+        message: 'Subject and description are required'
+      });
+    }
+
+    // Ensure profile exists in DB
+    try {
+      await prisma.profile.upsert({
+        where: { id: userId },
+        update: {},
+        create: {
+          id: userId,
+          fullName: 'Customer',
+          email: `${userId}@customer.meesho`,
+          role: 'CUSTOMER'
+        }
+      });
+    } catch (_) {}
+
+    const newTicket = await prisma.supportTicket.create({
+      data: {
+        userId,
+        subject: subject.trim(),
+        description: orderId ? `[Order #${orderId}] ${description.trim()}` : description.trim(),
+        category: category.trim(),
+        priority: priority.toLowerCase(),
+        status: 'OPEN'
+      }
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Support ticket created successfully in database',
+      data: newTicket
+    });
+  } catch (error) {
+    console.error('Error creating support ticket:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create support ticket',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * 5. GET MY SUPPORT TICKETS (For Customer / Reseller)
+ * GET /api/v1/admin-support/my-tickets
+ */
+export const getMySupportTickets = async (req, res) => {
+  try {
+    const userId =
+      req.user?.id ||
+      req.headers['x-user-id'] ||
+      req.headers['x-customer-id'] ||
+      req.headers['x-affiliate-id'] ||
+      req.query.userId ||
+      'guest_customer';
+
+    const tickets = await prisma.supportTicket.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: tickets.length,
+      data: tickets
+    });
+  } catch (error) {
+    console.error('Error fetching user support tickets:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch support tickets',
+      error: error.message
+    });
+  }
+};

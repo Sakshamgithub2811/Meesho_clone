@@ -26,13 +26,8 @@ export default function OrderTrackingModal({
   const isPrepaid = (order?.paymentMethod || '').toUpperCase() !== 'COD';
 
   const returnData = React.useMemo(() => {
-    try {
-      const returnedOrders = JSON.parse(localStorage.getItem('mshoppy_returned_orders') || '{}');
-      return returnedOrders[order.id] || null;
-    } catch (e) {
-      return null;
-    }
-  }, [order.id]);
+    return order?.returnRequest || null;
+  }, [order]);
 
   const primaryItem = order?.items?.[0] || {};
   const product = primaryItem.product || {};

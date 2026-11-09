@@ -97,37 +97,68 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    try {
-      const app = getAffiliateApp();
-      const searchParams = new URLSearchParams(location.search);
-      const isEditRequested = searchParams.get('edit') === 'true';
+    let isMounted = true;
+    async function checkKycFromDb() {
+      try {
+        const searchParams = new URLSearchParams(location.search);
+        const isEditRequested = searchParams.get('edit') === 'true';
 
-      if (app) {
-        setExistingSubmission(app);
-        setFormData((prev) => ({ ...prev, ...app }));
+        const storedCust = getStoredCustomer();
+        const storedAff = getStoredAffiliate();
+        const currentUser = storedCust?.user || storedAff?.user;
+        const curId = currentUser?.id || currentUser?.uid;
+        const curEmail = currentUser?.email;
+        const curPhone = currentUser?.phone;
 
-        if (isEditRequested) {
-          setIsEditing(true);
-        } else {
-          // If already submitted and not explicitly editing, redirect to the new dedicated status page
-          if (onNavigate) {
-            onNavigate('/affiliate-kyc-status');
-          } else {
-            navigate('/affiliate-kyc-status', { replace: true });
+        if (curId || curEmail || curPhone) {
+          const queryParams = [];
+          if (curId) queryParams.push(`userId=${encodeURIComponent(curId)}`);
+          if (curEmail) queryParams.push(`email=${encodeURIComponent(curEmail)}`);
+          if (curPhone) queryParams.push(`phone=${encodeURIComponent(curPhone)}`);
+
+          const res = await fetch(`${API_V1_BASE}/admin-kyc/affiliate-status?${queryParams.join('&')}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (isMounted && data?.application) {
+              const dbApp = data.application;
+              const isDbApproved = dbApp.status === 'APPROVED';
+              const isDbRejected = dbApp.status === 'REJECTED';
+              const updated = {
+                ...(dbApp.documents || {}),
+                id: dbApp.id,
+                dbId: dbApp.id,
+                applicationId: dbApp.documents?.applicationId || dbApp.id,
+                fullName: dbApp.documents?.fullName || dbApp.user?.fullName || '',
+                status: isDbApproved ? 'Approved' : isDbRejected ? 'Rejected' : 'Under Review',
+                kycStatus: isDbApproved ? 'Approved' : isDbRejected ? 'Rejected' : 'Pending',
+                rejectionReason: dbApp.adminNotes || '',
+                userId: dbApp.userId,
+              };
+              setExistingSubmission(updated);
+              setFormData((prev) => ({ ...prev, ...updated }));
+
+              if (isEditRequested) {
+                setIsEditing(true);
+              } else {
+                if (onNavigate) {
+                  onNavigate('/affiliate-kyc-status');
+                } else {
+                  navigate('/affiliate-kyc-status', { replace: true });
+                }
+              }
+              return;
+            }
           }
         }
-      } else {
-        setExistingSubmission(null);
-        setIsEditing(false);
-        try {
-          const storedCust = getStoredCustomer();
-          const storedAff = getStoredAffiliate();
-          const fbUser = auth?.currentUser;
-          const reduxStored = JSON.parse(localStorage.getItem('mshoppy_affiliate_user') || localStorage.getItem('user') || 'null');
 
-          const prefillName = storedAff?.user?.fullName || storedCust?.user?.fullName || reduxStored?.fullName || reduxStored?.name || fbUser?.displayName || '';
-          const prefillEmail = storedAff?.user?.email || storedCust?.user?.email || reduxStored?.email || fbUser?.email || '';
-          const prefillPhone = storedAff?.user?.phone || storedCust?.user?.phone || reduxStored?.phone || fbUser?.phoneNumber || '';
+        // If no DB submission found, initialize fresh form with user profile
+        if (isMounted) {
+          setExistingSubmission(null);
+          setIsEditing(false);
+          const fbUser = auth?.currentUser;
+          const prefillName = currentUser?.fullName || fbUser?.displayName || '';
+          const prefillEmail = currentUser?.email || fbUser?.email || '';
+          const prefillPhone = currentUser?.phone || fbUser?.phoneNumber || '';
 
           setFormData((prev) => ({
             ...prev,
@@ -135,12 +166,14 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
             email: prev.email || prefillEmail,
             phone: prev.phone || prefillPhone,
           }));
-        } catch (err) {}
+        }
+      } catch (e) {
+        console.error('Error loading live KYC application from database:', e);
       }
-    } catch (e) {
-      console.error('Error loading KYC application', e);
     }
-  }, [location.search]);
+    checkKycFromDb();
+    return () => { isMounted = false; };
+  }, [location.search, navigate, onNavigate]);
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
@@ -346,36 +379,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
       return;
     }
 
-    try {
-      localStorage.setItem('affiliate_kyc_application', JSON.stringify(submission));
-      saveAffiliateApp(submission);
 
-      // Reset affiliate stats for this new KYC application to clean zeros (NO STATIC OR LEFTOVER STATS)
-      const cleanStats = {
-        totalCommission: 0,
-        totalReferredRevenue: 0,
-        totalOrders: 0,
-        clicks: 0,
-        convertedOrders: 0,
-        conversionRate: '0%',
-        recentOrders: [],
-        dailyCommissions: { MON: 0, TUE: 0, WED: 0, THU: 0, FRI: 0, SAT: 0, SUN: 0 }
-      };
-      localStorage.setItem(`mshoppy_affiliate_stats_${submission.applicationId}`, JSON.stringify(cleanStats));
-      localStorage.setItem('mshoppy_affiliate_stats', JSON.stringify(cleanStats));
-
-      // Save to admin pending applications registry for admin review
-      const adminQueue = JSON.parse(localStorage.getItem('admin_kyc_applications') || '[]');
-      const existingIdx = adminQueue.findIndex((item) => item.applicationId === submission.applicationId);
-      if (existingIdx >= 0) {
-        adminQueue[existingIdx] = submission;
-      } else {
-        adminQueue.push(submission);
-      }
-      localStorage.setItem('admin_kyc_applications', JSON.stringify(adminQueue));
-    } catch (err) {
-      console.error('Storage error', err);
-    }
 
     // Real Earnings Notification
     try {

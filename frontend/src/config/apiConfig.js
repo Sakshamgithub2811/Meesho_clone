@@ -2,21 +2,25 @@
 // Centralized API configuration for Development and Production deployment
 
 const getRawBackendUrl = () => {
-  // 1. Explicit env variables (Vite)
+  // 1. Browser Runtime Auto-Detection:
+  if (typeof window !== 'undefined' && window.location) {
+    const { hostname, origin } = window.location;
+    // When running on Vercel (e.g. meesho-clone-nu.vercel.app), connect directly to the Vercel backend
+    if (hostname.includes('vercel.app')) {
+      return 'https://meesho-clone-backend-beta.vercel.app/api/v1';
+    }
+    // If running on a production domain or VPS IP (not localhost),
+    // default to the current origin so reverse proxy (e.g. Nginx on VPS) handles /api cleanly.
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return `${origin}/api/v1`;
+    }
+  }
+
+  // 2. Explicit env variables (Vite)
   if (typeof import.meta !== 'undefined' && import.meta.env) {
     if (import.meta.env.VITE_BACKEND_URL) return import.meta.env.VITE_BACKEND_URL;
     if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
     if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
-  }
-
-  // 2. Browser Runtime Auto-Detection:
-  // If running in browser on a production domain or VPS IP (not localhost),
-  // default to the current origin so reverse proxy (e.g. Nginx on VPS) handles /api cleanly.
-  if (typeof window !== 'undefined' && window.location) {
-    const { hostname, origin } = window.location;
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return `${origin}/api/v1`;
-    }
   }
 
   // 3. Localhost fallback

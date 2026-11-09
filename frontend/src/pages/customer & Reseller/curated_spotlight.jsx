@@ -51,7 +51,7 @@ export default function CuratedSpotlight({ onNavigate = () => {}, onBack }) {
   const handleAddToCart = async (e, prod) => {
     e.stopPropagation();
     try {
-      await addToCart(prod.id, 1, 'Free Size');
+      await addToCart(prod.id, 1, 'Free Size', prod);
       triggerToast(`Added "${prod.title.slice(0, 22)}..." to Cart! 🛒`);
     } catch (err) {
       triggerToast('Added to Cart! 🛒');

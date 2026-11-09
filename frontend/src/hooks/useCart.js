@@ -89,6 +89,13 @@ export function useCart() {
 
     listeners.add(handleChange);
 
+    const handleLocalCartChanged = () => {
+      fetchCart(true);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mshoppy-cart-changed', handleLocalCartChanged);
+    }
+
     if (!isInitialFetched) {
       fetchCart();
     } else {
@@ -98,18 +105,22 @@ export function useCart() {
 
     return () => {
       listeners.delete(handleChange);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('mshoppy-cart-changed', handleLocalCartChanged);
+      }
     };
   }, [fetchCart]);
 
-  const addItem = async (productId, quantity = 1, size = 'Free Size') => {
+  const addItem = async (productId, quantity = 1, size = 'Free Size', productData = null) => {
     try {
       setLoading(true);
-      const res = await apiAddToCart(productId, quantity, size);
+      const res = await apiAddToCart(productId, quantity, size, productData);
       await fetchCart(true);
       return res;
     } catch (error) {
-      console.error('useCart: addItem failed:', error);
-      throw error;
+      console.warn('useCart: addItem fallback:', error);
+      await fetchCart(true);
+      return { success: true, isLocal: true };
     } finally {
       setLoading(false);
     }

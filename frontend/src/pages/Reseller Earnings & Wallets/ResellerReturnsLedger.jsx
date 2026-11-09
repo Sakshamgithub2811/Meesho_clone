@@ -1,132 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
-
-const getRecentDate = (daysAgo) => {
-  const d = new Date(Date.now() - daysAgo * 86400000);
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-};
-
-// Reseller Margin Reversal Records (Connected to Panel 1 Customer Returns)
-const INITIAL_REVERSALS = [
-  {
-    id: 'REV-9921',
-    returnId: 'RET-8921',
-    orderId: 'ORD-88210',
-    customerName: 'Priya Sharma',
-    customerCity: 'Jaipur, RJ',
-    productName: 'Banarasi Silk Embroidered Kurti - Pink (M)',
-    productSku: 'BSK-PNK-M',
-    originalOrderPrice: 1299,
-    originalMargin: 300,
-    reversedMargin: 300,
-    formattedReversed: '-₹300.00',
-    returnReason: 'Size too small / Fitting issue',
-    returnDate: getRecentDate(3),
-    reversalDate: getRecentDate(2),
-    status: 'Deducted', // 'Deducted' | 'Pending Reversal' | 'Dispute Under Review'
-    walletDeductionStatus: 'Debited from Current Balance',
-    imageUrl:
-      'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80',
-    sharedOn: 'WhatsApp Catalog',
-    customerNotes: 'Customer ordered M, but shoulders were tight. Picked up by Rider RID-4402.',
-  },
-  {
-    id: 'REV-9920',
-    returnId: 'RET-8890',
-    orderId: 'ORD-88002',
-    customerName: 'Ritu Verma',
-    customerCity: 'Lucknow, UP',
-    productName: 'Designer Cotton Tee - Navy (L)',
-    productSku: 'TEE-NVY-L',
-    originalOrderPrice: 699,
-    originalMargin: 150,
-    reversedMargin: 150,
-    formattedReversed: '-₹150.00',
-    returnReason: 'Fabric color variation from photo',
-    returnDate: getRecentDate(4),
-    reversalDate: getRecentDate(3),
-    status: 'Deducted',
-    walletDeductionStatus: 'Debited from Current Balance',
-    imageUrl:
-      'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80',
-    sharedOn: 'Instagram Story Link',
-    customerNotes: 'Navy shade appeared darker than expected.',
-  },
-  {
-    id: 'REV-9919',
-    returnId: 'RET-8812',
-    orderId: 'ORD-87941',
-    customerName: 'Ananya Rao',
-    customerCity: 'Bengaluru, KA',
-    productName: 'Georgette Printed Saree - Royal Blue',
-    productSku: 'SAR-GEO-BLU',
-    originalOrderPrice: 849,
-    originalMargin: 200,
-    reversedMargin: 200,
-    formattedReversed: '-₹200.00',
-    returnReason: 'Customer changed mind at delivery',
-    returnDate: getRecentDate(5),
-    reversalDate: 'Pending Warehouse Delivery',
-    status: 'Pending Reversal',
-    walletDeductionStatus: 'Will be adjusted upon warehouse intake',
-    imageUrl:
-      'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80',
-    sharedOn: 'Facebook Group Share',
-    customerNotes: 'Courier reverse pickup completed. Parcel in-transit to Surat Hub.',
-  },
-  {
-    id: 'REV-9880',
-    returnId: 'RET-8701',
-    orderId: 'ORD-87720',
-    customerName: 'Neha Gupta',
-    customerCity: 'South Delhi, DL',
-    productName: 'Floral Chiffon Maxi Dress',
-    productSku: 'DRS-CHI-MAX',
-    originalOrderPrice: 1499,
-    originalMargin: 450,
-    reversedMargin: 450,
-    formattedReversed: '-₹450.00',
-    returnReason: 'Defective zipper / Fabric tear',
-    returnDate: getRecentDate(8),
-    reversalDate: getRecentDate(6),
-    status: 'Deducted',
-    walletDeductionStatus: 'Debited from Current Balance',
-    imageUrl:
-      'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&auto=format&fit=crop&q=80',
-    sharedOn: 'Direct WhatsApp Chat',
-    customerNotes: 'Manufacturer defect verified by QC. Full refund issued to buyer.',
-  },
-  {
-    id: 'REV-9842',
-    returnId: 'RET-8619',
-    orderId: 'ORD-87401',
-    customerName: 'Pooja Mishra',
-    customerCity: 'Patna, BR',
-    productName: 'Minimalist Gold Chrono Watch',
-    productSku: 'GLD-WTC-01',
-    originalOrderPrice: 2499,
-    originalMargin: 350,
-    reversedMargin: 350,
-    formattedReversed: '-₹350.00',
-    returnReason: 'Customer claims dial was damaged in transit',
-    returnDate: getRecentDate(11),
-    reversalDate: getRecentDate(9),
-    status: 'Dispute Under Review',
-    walletDeductionStatus: 'Margin withheld pending dispute audit',
-    imageUrl:
-      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80',
-    sharedOn: 'WhatsApp Broadcast List',
-    customerNotes: 'Reseller submitted ticket #TKT-REV-8619 questioning courier packaging condition.',
-  },
-];
+import { API_V1_BASE } from '../../config/apiConfig';
 
 export default function ResellerReturnsLedger({ onNavigate, onBack }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'deducted' | 'pending' | 'disputed'
   const [searchQuery, setSearchQuery] = useState('');
-  const [reversals, setReversals] = useState(INITIAL_REVERSALS);
+  const [reversals, setReversals] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState(null);
+
+  // Live PostgreSQL Orders Return sync
+  useEffect(() => {
+    let isMounted = true;
+    async function loadRealReturns() {
+      try {
+        const token = localStorage.getItem('token') || localStorage.getItem('mshoppy_token') || localStorage.getItem('customer_token');
+        if (!token) {
+          if (isMounted) {
+            setReversals([]);
+            setIsLoading(false);
+          }
+          return;
+        }
+        const res = await fetch(`${API_V1_BASE}/orders`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.orders)) {
+          const returnOrders = data.orders.filter(
+            o => o.orderStatus === 'RETURN_REQUESTED' || o.orderStatus === 'RETURNED' || o.returnRequest
+          );
+          if (isMounted) {
+            if (returnOrders.length > 0) {
+              const mapped = returnOrders.map(o => ({
+                id: `REV-${o.id.slice(0, 6).toUpperCase()}`,
+                returnId: `RET-${(o.returnRequest?.id || o.id).slice(0, 6).toUpperCase()}`,
+                orderId: o.orderNumber || o.id.slice(0, 8),
+                customerName: o.shippingAddress?.fullName || 'Customer',
+                customerCity: o.shippingAddress?.city || 'Local',
+                productName: o.items?.[0]?.product?.title || 'Ordered Product',
+                productSku: o.items?.[0]?.product?.id?.slice(0, 8) || 'SKU-001',
+                originalOrderPrice: o.totalAmount || 0,
+                originalMargin: o.resellerMargin || 0,
+                reversedMargin: o.resellerMargin || 0,
+                formattedReversed: `-₹${(o.resellerMargin || 0).toFixed(2)}`,
+                returnReason: o.returnRequest?.reason || 'Customer Return Request',
+                returnDate: new Date(o.returnRequest?.createdAt || o.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+                reversalDate: new Date(o.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+                status: o.orderStatus === 'RETURNED' ? 'Deducted' : 'Pending Reversal',
+                walletDeductionStatus: o.orderStatus === 'RETURNED' ? 'Debited from Current Balance' : 'Awaiting return verification',
+                imageUrl: o.items?.[0]?.product?.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80',
+                sharedOn: 'Catalog Share',
+                customerNotes: o.returnRequest?.notes || 'Customer initiated return request'
+              }));
+              setReversals(mapped);
+            } else {
+              setReversals([]);
+            }
+          }
+        }
+      } catch (e) {
+        if (isMounted) setReversals([]);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    loadRealReturns();
+    return () => { isMounted = false; };
+  }, []);
 
   // Inquiry / Dispute Modal State
   const [disputeItem, setDisputeItem] = useState(null);
@@ -226,10 +169,10 @@ export default function ResellerReturnsLedger({ onNavigate, onBack }) {
     );
   });
 
-  const totalGrossMargins = 28450;
-  const totalReversed = reversals.reduce((acc, curr) => acc + curr.reversedMargin, 0);
-  const netSettled = totalGrossMargins - totalReversed;
-  const returnRatePercent = ((totalReversed / totalGrossMargins) * 100).toFixed(1);
+  const totalReversed = reversals.reduce((acc, curr) => acc + (curr.reversedMargin || 0), 0);
+  const totalGrossMargins = reversals.reduce((acc, curr) => acc + (curr.originalMargin || 0), 0);
+  const netSettled = Math.max(0, totalGrossMargins - totalReversed);
+  const returnRatePercent = totalGrossMargins > 0 ? ((totalReversed / totalGrossMargins) * 100).toFixed(1) : '0.0';
 
   return (
     <div className="bg-[#f8f9fb] text-[#191c1e] min-h-screen font-sans antialiased pb-28 selection:bg-rose-500/20">
@@ -510,7 +453,22 @@ export default function ResellerReturnsLedger({ onNavigate, onBack }) {
           </div>
 
           <div className="divide-y divide-slate-100">
-            {filteredReversals.map((item) => {
+            {isLoading ? (
+              <div className="p-8 text-center text-xs text-slate-400 font-bold">
+                Loading return adjustments...
+              </div>
+            ) : filteredReversals.length === 0 ? (
+              <div className="p-10 text-center flex flex-col items-center justify-center">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl mb-2.5">
+                  🛡️
+                </div>
+                <h5 className="font-extrabold text-sm text-slate-800">No Margin Deductions Found</h5>
+                <p className="text-xs text-slate-500 max-w-sm mt-1">
+                  Zero return reversals recorded on your account. All your reseller orders are fulfilled smoothly!
+                </p>
+              </div>
+            ) : (
+              filteredReversals.map((item) => {
               const isDeducted = item.status === 'Deducted';
               const isDisputed = item.status === 'Dispute Under Review';
 
@@ -612,7 +570,8 @@ export default function ResellerReturnsLedger({ onNavigate, onBack }) {
                   </div>
                 </div>
               );
-            })}
+            })
+          )}
           </div>
         </section>
       </main>

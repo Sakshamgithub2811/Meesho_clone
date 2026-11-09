@@ -3,12 +3,13 @@ import path from 'path';
 import prisma from '../../config/prisma.js';
 import supabase from '../../config/supabaseClient.js';
 import { getUploadDir } from '../../middlewares/upload.middleware.js';
+import { uploadFileToSupabase } from '../../services/supabaseStorage.service.js';
 
 // In-memory fallback store for offline resiliency
 const fallbackKycStore = new Map();
 
-// Helper to save base64 data URLs as static files in uploads/
-const saveBase64Image = (base64Str, baseUrl) => {
+// Helper to save base64 data URLs as cloud files in Supabase Storage
+const saveBase64Image = async (base64Str, baseUrl) => {
   try {
     if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:image/')) {
       return base64Str;
@@ -24,8 +25,19 @@ const saveBase64Image = (base64Str, baseUrl) => {
     else if (mimeType.includes('webp')) ext = '.webp';
     else if (mimeType.includes('jpeg')) ext = '.jpeg';
 
-    const uploadDir = getUploadDir();
+    try {
+      const res = await uploadFileToSupabase({
+        buffer: dataBuffer,
+        originalname: `kyc_${Date.now()}${ext}`,
+        mimetype: mimeType,
+        folder: 'kyc'
+      });
+      if (res?.url) return res.url;
+    } catch (sbErr) {
+      console.warn('Supabase KYC upload error:', sbErr.message);
+    }
 
+    const uploadDir = getUploadDir();
     const filename = `kyc_${Date.now()}_${Math.round(Math.random() * 1e9)}${ext}`;
     const filePath = path.join(uploadDir, filename);
     fs.writeFileSync(filePath, dataBuffer);
@@ -120,12 +132,14 @@ export const submitSupplierKyc = async (req, res, next) => {
       warehousePhone,
     } = req.body;
 
-    // Process uploaded/base64 document proofs
-    const gstCertificate = saveBase64Image(req.body.gstCertificate, hostBaseUrl);
-    const panImage = saveBase64Image(req.body.panImage, hostBaseUrl);
-    const aadhaarFrontImage = saveBase64Image(req.body.aadhaarFrontImage, hostBaseUrl);
-    const aadhaarBackImage = saveBase64Image(req.body.aadhaarBackImage, hostBaseUrl);
-    const chequeImage = saveBase64Image(req.body.chequeImage, hostBaseUrl);
+    // Process uploaded/base64 document proofs to cloud Supabase Storage
+    const [gstCertificate, panImage, aadhaarFrontImage, aadhaarBackImage, chequeImage] = await Promise.all([
+      saveBase64Image(req.body.gstCertificate, hostBaseUrl),
+      saveBase64Image(req.body.panImage, hostBaseUrl),
+      saveBase64Image(req.body.aadhaarFrontImage, hostBaseUrl),
+      saveBase64Image(req.body.aadhaarBackImage, hostBaseUrl),
+      saveBase64Image(req.body.chequeImage, hostBaseUrl)
+    ]);
 
     if (!businessName && !tradeName) {
       return res.status(400).json({

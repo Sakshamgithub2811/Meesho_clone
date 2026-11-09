@@ -258,7 +258,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     try {
-      await addToCart(product.id, 1, 'Free Size');
+      await addToCart(product.id, 1, 'Free Size', product);
       setCartCount((c) => c + 1);
       triggerToast(`Added "${product.title.slice(0, 25)}..." to Cart! 🛒`);
     } catch (err) {
@@ -269,7 +269,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
   const handleToggleWishlist = async (e, product) => {
     e.stopPropagation();
     try {
-      await toggleWishlist(product.id);
+      await toggleWishlist(product.id, product);
       setWishlistCount((w) => w + 1);
       triggerToast(`Wishlist updated! ❤️`);
     } catch (err) {

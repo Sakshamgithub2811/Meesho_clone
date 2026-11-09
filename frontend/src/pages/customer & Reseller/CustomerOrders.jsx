@@ -121,13 +121,10 @@ export default function CustomerOrders({ onNavigate, onBack }) {
 
     let rawStatus = (o.orderStatus || 'ORDERED').toUpperCase();
 
-    // Check if user requested a return for this order in this session / device
-    try {
-      const returnedOrders = JSON.parse(localStorage.getItem('mshoppy_returned_orders') || '{}');
-      if (returnedOrders[o.id]?.status) {
-        rawStatus = returnedOrders[o.id].status;
-      }
-    } catch (e) {}
+    // Check if user requested a return for this order in PostgreSQL database
+    if (o.returnRequest || rawStatus === 'RETURN_REQUESTED') {
+      rawStatus = 'RETURN_REQUESTED';
+    }
 
     let uiStatus = 'ordered';
     let statusLabel = 'Order Confirmed 📦';
@@ -177,7 +174,8 @@ export default function CustomerOrders({ onNavigate, onBack }) {
       deliveryAddress: addr.details ? `${addr.name || ''}, ${addr.details} - ${addr.pincode || ''}` : 'Home Address',
       sellerName: prod.supplierName || 'Verified Supplier',
       itemsCount: o.items?.length || 1,
-      items: o.items || []
+      items: o.items || [],
+      returnRequest: o.returnRequest || null
     };
   });
 
@@ -398,11 +396,7 @@ export default function CustomerOrders({ onNavigate, onBack }) {
             const isOrdered = !isReturned && order.status === 'ordered';
             const isCancellable = (isOrdered || isShipped) && !isReturned;
 
-            let returnData = null;
-            try {
-              const returnedOrders = JSON.parse(localStorage.getItem('mshoppy_returned_orders') || '{}');
-              returnData = returnedOrders[order.id] || null;
-            } catch (e) {}
+            const returnData = order.returnRequest || null;
 
             return (
               <article

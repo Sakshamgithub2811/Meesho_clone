@@ -78,7 +78,7 @@ export default function WomenWesternCategory({ onNavigate, onBack }) {
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     try {
-      await addToCart(product.id, 1, product.sizes?.[0] || 'Free Size');
+      await addToCart(product.id, 1, product.sizes?.[0] || 'Free Size', product);
       setCartCount((c) => c + 1);
       triggerToast(`Added ${product.title.slice(0, 20)}... to Cart! 🛍️`);
     } catch (e) {

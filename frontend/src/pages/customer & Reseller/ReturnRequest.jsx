@@ -52,10 +52,6 @@ export default function ReturnRequest({ onNavigate, onBack }) {
   // Step state (1: Mode & Reason, 2: Proof & Photos, 3: Refund/Exchange, 4: Pickup Slot, 5: Success)
   const [currentStep, setCurrentStep] = useState(() => {
     if (searchParams.get('step') === '5') return 5;
-    try {
-      const savedReturns = JSON.parse(localStorage.getItem('mshoppy_returned_orders') || '{}');
-      if (savedReturns[orderIdParam]?.status === 'RETURN_REQUESTED') return 5;
-    } catch (e) {}
     return 1;
   });
   const [actionType, setActionType] = useState('return'); // 'return' | 'exchange'
@@ -86,15 +82,8 @@ export default function ReturnRequest({ onNavigate, onBack }) {
     holderName: '',
   });
 
-  // Deterministic and persistent 4-digit Pickup OTP based on Order ID (prevents mismatch with email)
+  // Deterministic 4-digit Pickup OTP based on Order ID
   const pickupOtp = React.useMemo(() => {
-    try {
-      const savedReturns = JSON.parse(localStorage.getItem('mshoppy_returned_orders') || '{}');
-      if (savedReturns[orderIdParam]?.otp) {
-        return Number(savedReturns[orderIdParam].otp);
-      }
-    } catch (e) {}
-
     const seed = (orderIdParam || 'return-sample').split('').reduce((acc, char) => (acc * 41 + char.charCodeAt(0)) % 9000, 1000);
     return Math.abs(seed) + 1000;
   }, [orderIdParam]);
@@ -292,28 +281,11 @@ export default function ReturnRequest({ onNavigate, onBack }) {
         }
       }
 
-      // 2. Persist in localStorage so orders list & dashboard update instantly
-      try {
-        const returnedOrders = JSON.parse(localStorage.getItem('mshoppy_returned_orders') || '{}');
-        returnedOrders[orderIdParam] = {
-          status: 'RETURN_REQUESTED',
-          otp: pickupOtp,
-          slot: selectedSlotLabel,
-          requestedAt: new Date().toISOString(),
-          productName: itemParam,
-          price: priceParam,
-          image: imageParam,
-          size: sizeParam
-        };
-        localStorage.setItem('mshoppy_returned_orders', JSON.stringify(returnedOrders));
-      } catch (e) {}
-
       setCurrentStep(5); // Show success screen
       handleSendEmailOtp(); // Trigger real email via SMTP
     } catch (e) {
-      console.error('Error submitting return:', e);
-      setCurrentStep(5);
-      handleSendEmailOtp();
+      console.error('Error submitting return to database:', e);
+      showToast(e.message || 'Could not submit return request. Please try again.');
     }
   };
 

@@ -51,6 +51,8 @@ app.use(cors({
     'x-customer-id',
     'x-affiliate-id',
     'x-reseller-id',
+    'x-user-phone',
+    'x-user-email',
     'x-requested-with',
     'Accept',
     'Origin'

@@ -13,9 +13,9 @@ export default function ReferEarn({ onBack }) {
   const custUser = getStoredCustomer();
 
   const referralCode = storedAff?.user?.referralCode 
+    || custUser?.user?.storeName
     || affApp?.referralCode 
     || affApp?.applicationId 
-    || localStorage.getItem('mshoppy_affiliate_dyn_code')
     || (custUser?.user?.fullName ? (custUser.user.fullName.replace(/[^a-zA-Z]/g, '').slice(0, 5).toUpperCase() + '100') : 'AFF-REFER100');
 
   const [copied, setCopied] = useState(false);

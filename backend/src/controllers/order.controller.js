@@ -292,7 +292,8 @@ export const getOrders = async (req, res) => {
               }
             }
           }
-        }
+        },
+        returnRequest: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -323,7 +324,8 @@ export const getOrderById = async (req, res) => {
           include: {
             product: true
           }
-        }
+        },
+        returnRequest: true
       }
     });
 

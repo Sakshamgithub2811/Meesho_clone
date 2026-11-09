@@ -3,10 +3,16 @@ import { verifyAuth, authorizeRole } from '../../middlewares/auth.middleware.js'
 import {
   getAllSupportTickets,
   getTicketDetails,
-  updateTicketStatus
+  updateTicketStatus,
+  createSupportTicket,
+  getMySupportTickets
 } from '../../controllers/admin/adminSupport.controller.js';
 
 const router = Router();
+
+// Customer Support Ticket creation & retrieval (Open / User level)
+router.post('/create', createSupportTicket);
+router.get('/my-tickets', getMySupportTickets);
 
 // All Support Desk endpoints require authentication and ADMIN role
 router.get('/', verifyAuth, authorizeRole('ADMIN'), getAllSupportTickets);

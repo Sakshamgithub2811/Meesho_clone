@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
 import { getDropshipperApp } from '../../services/dropshipperSessionStore';
+import { API_V1_BASE } from '../../config/apiConfig';
 
 // Sample verified supplier products dataset for dropshippers
 const SUPPLIER_PRODUCTS = [
@@ -554,6 +555,35 @@ export default function SupplierProductAccess({ onNavigate, onBack }) {
       };
     }
   });
+
+  // Fetch real Store Integration from PostgreSQL database
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLiveIntegration() {
+      try {
+        const sess = JSON.parse(localStorage.getItem('meesho_dropshipper_session') || '{}');
+        const uid = sess?.id || sess?.uid || sess?.email;
+        if (!uid) return;
+        const res = await fetch(`${API_V1_BASE}/dropshipper/integrations/${encodeURIComponent(uid)}`);
+        const data = await res.json();
+        if (isMounted && data?.success && Array.isArray(data.integrations) && data.integrations.length > 0) {
+          const first = data.integrations[0];
+          setConnectedStore((prev) => ({
+            ...prev,
+            storeName: first.storeName || prev.storeName,
+            storeUrl: first.storeUrl || prev.storeUrl,
+            fullStoreUrl: first.storeUrl?.startsWith('http') ? first.storeUrl : `https://${first.storeUrl}`,
+            platform: first.platform || prev.platform,
+            isConnected: true
+          }));
+        }
+      } catch (err) {
+        console.warn('Could not load integrations from DB:', err);
+      }
+    }
+    loadLiveIntegration();
+    return () => { isMounted = false; };
+  }, []);
 
   // Auto-clean any legacy or mock Sharma data on mount
   useEffect(() => {
@@ -2285,20 +2315,26 @@ export default function SupplierProductAccess({ onNavigate, onBack }) {
                 Close
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setStoreSettingsOpen(false);
                   try {
-                    localStorage.setItem('meesho_connected_store', JSON.stringify(connectedStore));
-                    const sess = localStorage.getItem('meesho_dropshipper_session');
-                    if (sess) {
-                      const p = JSON.parse(sess);
-                      p.brandName = connectedStore.storeName;
-                      p.storeUrl = connectedStore.fullStoreUrl;
-                      localStorage.setItem('meesho_dropshipper_session', JSON.stringify(p));
-                      setSession((prev) => ({ ...prev, brandName: connectedStore.storeName, storeUrl: connectedStore.fullStoreUrl }));
-                    }
-                  } catch (e) {}
-                  triggerToast('✅ Store settings saved successfully!');
+                    const sess = JSON.parse(localStorage.getItem('meesho_dropshipper_session') || '{}');
+                    const uid = sess?.id || sess?.uid || sess?.email || 'dropshipper_active';
+                    await fetch(`${API_V1_BASE}/dropshipper/integrations/save`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        firebaseUid: uid,
+                        platform: connectedStore.platform || 'Shopify',
+                        storeUrl: connectedStore.storeUrl,
+                        storeName: connectedStore.storeName,
+                        status: 'ACTIVE'
+                      })
+                    });
+                  } catch (e) {
+                    console.error('Error saving integration to DB:', e);
+                  }
+                  triggerToast('✅ Store settings saved to database!');
                 }}
                 className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
               >

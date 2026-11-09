@@ -50,35 +50,8 @@ export async function loginCustomer({ phone, email, fullName, otp = '123456' }) 
     notifyListeners();
     return data;
   } catch (error) {
-    console.warn('Customer login API fallback mode:', error.message);
-
-    // Resilient offline/mock fallback
-    const cleanPhone = phone ? phone.toString().replace(/\D/g, '').slice(-10) : '';
-    const fallbackUser = {
-      id: cleanPhone ? `customer_${cleanPhone}` : `customer_${Date.now()}`,
-      phone: cleanPhone,
-      email: email || (cleanPhone ? `${cleanPhone}@mshoppy.user` : 'user@meesho.com'),
-      fullName: fullName || (cleanPhone ? `Customer +91 ${cleanPhone.slice(0, 2)}****${cleanPhone.slice(-4)}` : 'Valued Customer'),
-      role: 'CUSTOMER',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      walletBalance: 0,
-      ordersCount: 0,
-      wishlistCount: 0,
-      isOfflineFallback: true,
-    };
-
-    const mockToken = 'mock_cust_token_' + Date.now();
-    localStorage.setItem(TOKEN_KEY, mockToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(fallbackUser));
-
-    notifyListeners();
-
-    return {
-      success: true,
-      user: fallbackUser,
-      token: mockToken,
-      isOfflineFallback: true,
-    };
+    console.error('Customer login API failed:', error);
+    throw error;
   }
 }
 

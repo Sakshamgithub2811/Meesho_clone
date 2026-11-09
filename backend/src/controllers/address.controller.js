@@ -1,7 +1,15 @@
 import prisma from '../config/prisma.js';
 
 const getUserId = (req) => {
-  return req.user?.id || req.headers['x-user-id'] || req.query.userId || 'guest_customer';
+  return (
+    req.user?.id ||
+    req.headers['x-user-id'] ||
+    req.headers['x-customer-id'] ||
+    req.headers['x-affiliate-id'] ||
+    req.headers['x-reseller-id'] ||
+    req.query.userId ||
+    'guest_customer'
+  );
 };
 
 const ensureProfile = async (userId) => {
@@ -70,6 +78,46 @@ export const createAddress = async (req, res) => {
       });
     }
 
+    const cleanPhone = String(phone).trim().replace(/\D/g, '').slice(-10);
+    const cleanPincode = String(pincode).trim();
+    const cleanLine = String(addressLine).trim();
+    const cleanCity = String(city).trim();
+    const cleanState = String(state).trim();
+    const cleanName = String(fullName).trim();
+
+    // Deduplication check: Avoid double address creation under fast clicks or duplicate submissions
+    const existing = await prisma.address.findFirst({
+      where: {
+        userId,
+        phone: { contains: cleanPhone },
+        pincode: cleanPincode,
+        addressLine: { equals: cleanLine, mode: 'insensitive' }
+      }
+    });
+
+    if (existing) {
+      if (isDefault && !existing.isDefault) {
+        await prisma.address.updateMany({
+          where: { userId },
+          data: { isDefault: false }
+        });
+        const updated = await prisma.address.update({
+          where: { id: existing.id },
+          data: { isDefault: true }
+        });
+        return res.status(200).json({
+          success: true,
+          message: 'Address already exists and set as default',
+          data: updated
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        message: 'Address already exists in your account',
+        data: existing
+      });
+    }
+
     if (isDefault) {
       await prisma.address.updateMany({
         where: { userId },
@@ -80,19 +128,19 @@ export const createAddress = async (req, res) => {
     const newAddress = await prisma.address.create({
       data: {
         userId,
-        fullName: String(fullName).trim(),
-        phone: String(phone).trim(),
-        pincode: String(pincode).trim(),
-        addressLine: String(addressLine).trim(),
-        city: String(city).trim(),
-        state: String(state).trim(),
+        fullName: cleanName,
+        phone: cleanPhone.length === 10 ? cleanPhone : String(phone).trim(),
+        pincode: cleanPincode,
+        addressLine: cleanLine,
+        city: cleanCity,
+        state: cleanState,
         isDefault
       }
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Address saved successfully',
+      message: 'Address saved successfully to database',
       data: newAddress
     });
   } catch (error) {

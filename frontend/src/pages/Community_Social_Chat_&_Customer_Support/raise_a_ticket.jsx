@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
-import { getOrders } from '../../services/ecommerceService';
+import { getOrders, getAuthHeaders } from '../../services/ecommerceService';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import { API_V1_BASE } from '../../config/apiConfig';
 
 export function RaiseATicket({ onNavigate, onBack }) {
   const [category, setCategory] = useState('order');
@@ -9,18 +10,37 @@ export function RaiseATicket({ onNavigate, onBack }) {
   const [description, setDescription] = useState('');
   const [orderId, setOrderId] = useState('');
   const [proofs, setProofs] = useState([]);
-  const [tickets, setTickets] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mshoppy_support_tickets');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {}
-    return [];
-  });
+  const [tickets, setTickets] = useState([]);
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Fetch real user tickets directly from PostgreSQL database
+  useEffect(() => {
+    let isMounted = true;
+    fetch(`${API_V1_BASE}/admin-support/my-tickets`, {
+      headers: getAuthHeaders(),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data?.data && Array.isArray(data.data)) {
+          const mapped = data.data.map((t) => ({
+            id: `#TICK-${String(t.id).slice(-6).toUpperCase()}`,
+            dbId: t.id,
+            subject: t.subject,
+            category: t.category,
+            status: t.status === 'OPEN' ? 'In Review' : t.status === 'RESOLVED' ? 'Resolved' : t.status,
+            statusStyle: t.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800',
+            date: new Date(t.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+            description: t.description,
+          }));
+          setTickets(mapped);
+        }
+      })
+      .catch((err) => console.warn('Could not fetch tickets from backend:', err));
+
+    return () => { isMounted = false; };
+  }, []);
 
   // Modals
   const [submittedTicket, setSubmittedTicket] = useState(null);
@@ -57,45 +77,71 @@ export function RaiseATicket({ onNavigate, onBack }) {
     showToast(`${files.length} photo proof attached!`);
   };
 
-  const handleSubmitTicket = (e) => {
+  const handleSubmitTicket = async (e) => {
     e.preventDefault();
     if (!subject.trim() || !description.trim()) {
       showToast('Please fill in both subject and description.');
       return;
     }
 
-    const ticketNumber = `#TICK-${Math.floor(10000 + Math.random() * 90000)}`;
-    const newTicket = {
-      id: ticketNumber,
-      subject: subject.trim(),
-      category:
-        category === 'order'
-          ? 'Order & Delivery'
-          : category === 'payment'
-          ? 'Payment & Refunds'
-          : category === 'reseller'
-          ? 'Reseller Earnings'
-          : category === 'account'
-          ? 'Account & Security'
-          : 'Other Concerns',
-      status: 'In Review',
-      statusStyle: 'bg-amber-100 text-amber-800',
-      date: 'Today',
-      description: description.trim(),
-      orderId: orderId.trim(),
-    };
+    if (isSubmittingTicket) return;
+    setIsSubmittingTicket(true);
 
-    const updatedTickets = [newTicket, ...tickets];
-    setTickets(updatedTickets);
+    const formattedCat =
+      category === 'order'
+        ? 'Order & Delivery'
+        : category === 'payment'
+        ? 'Payment & Refunds'
+        : category === 'reseller'
+        ? 'Reseller Earnings'
+        : category === 'account'
+        ? 'Account & Security'
+        : 'Other Concerns';
+
     try {
-      localStorage.setItem('mshoppy_support_tickets', JSON.stringify(updatedTickets));
-    } catch (e) {}
-    setSubmittedTicket(newTicket);
-    setSubject('');
-    setDescription('');
-    setOrderId('');
-    setProofs([]);
-    showToast(`Ticket ${ticketNumber} raised successfully!`);
+      const res = await fetch(`${API_V1_BASE}/admin-support/create`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          subject: subject.trim(),
+          description: description.trim(),
+          category: formattedCat,
+          orderId: orderId.trim() || undefined
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || 'Failed to submit ticket');
+      }
+
+      const serverTicket = data.data;
+      const ticketNumber = `#TICK-${String(serverTicket.id).slice(-6).toUpperCase()}`;
+      const newTicket = {
+        id: ticketNumber,
+        dbId: serverTicket.id,
+        subject: serverTicket.subject,
+        category: serverTicket.category,
+        status: 'In Review',
+        statusStyle: 'bg-amber-100 text-amber-800',
+        date: 'Today',
+        description: serverTicket.description,
+        orderId: orderId.trim(),
+      };
+
+      setTickets((prev) => [newTicket, ...prev]);
+      setSubmittedTicket(newTicket);
+      setSubject('');
+      setDescription('');
+      setOrderId('');
+      setProofs([]);
+      showToast(`Ticket ${ticketNumber} raised successfully in database! 🎫`);
+    } catch (err) {
+      console.error('Error submitting support ticket:', err);
+      showToast(err.message || 'Could not raise ticket. Please try again.');
+    } finally {
+      setIsSubmittingTicket(false);
+    }
   };
 
   const handleSendAiMessage = (e) => {

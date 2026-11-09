@@ -1,7 +1,15 @@
 import prisma from '../config/prisma.js';
 
 const getUserId = (req) => {
-  return req.user?.id || req.headers['x-user-id'] || req.query.userId || 'guest_customer';
+  return (
+    req.user?.id ||
+    req.headers['x-user-id'] ||
+    req.headers['x-customer-id'] ||
+    req.headers['x-affiliate-id'] ||
+    req.headers['x-reseller-id'] ||
+    req.query.userId ||
+    'guest_customer'
+  );
 };
 
 const ensureProfile = async (userId) => {

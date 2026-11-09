@@ -6,42 +6,8 @@ import { getAffiliateApp } from '../../services/affiliateSessionStore';
 import { addNotification } from '../../services/notificationService';
 import { getWalletDetails, requestWalletWithdrawal } from '../../services/ecommerceService';
 
-// Initial realistic withdrawal records if none exist in localStorage
-const INITIAL_WITHDRAWALS = [
-  {
-    id: "WTH-984210",
-    amount: 3200.00,
-    method: "bank",
-    accountLabel: "HDFC Bank (•••• 4321)",
-    date: "Today, 10:15 AM",
-    status: "PROCESSING", // "PROCESSING" | "COMPLETED" | "PENDING"
-    statusLabel: "Processing (24 - 48 Hrs)",
-    estimatedArrival: "24 to 48 Hours",
-    progress: 50
-  },
-  {
-    id: "WTH-972104",
-    amount: 4500.00,
-    method: "bank",
-    accountLabel: "HDFC Bank (•••• 4321)",
-    date: "24 Oct 2026, 11:15 AM",
-    status: "COMPLETED",
-    statusLabel: "Credited to Bank",
-    estimatedArrival: "Completed",
-    progress: 100
-  },
-  {
-    id: "WTH-960182",
-    amount: 1850.00,
-    method: "upi",
-    accountLabel: "partner@upi",
-    date: "18 Oct 2026, 02:40 PM",
-    status: "COMPLETED",
-    statusLabel: "Credited via UPI",
-    estimatedArrival: "Completed",
-    progress: 100
-  }
-];
+// Initial clean slate - live records loaded directly from PostgreSQL database
+const INITIAL_WITHDRAWALS = [];
 
 export default function WithdrawEarnings() {
   const navigate = useNavigate();
@@ -50,77 +16,72 @@ export default function WithdrawEarnings() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
 
-  // Dynamic States from PostgreSQL Wallet
-  const [withdrawableBalance, setWithdrawableBalance] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mshoppy_customer_wallet');
-      if (saved !== null && Number(saved) > 0) return Number(saved);
-    } catch (e) {}
-    return 1000;
-  });
+  // Dynamic States from PostgreSQL Database
+  const [withdrawableBalance, setWithdrawableBalance] = useState(0);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [loadingWallet, setLoadingWallet] = useState(true);
 
-  // Fetch authoritative balance from backend PostgreSQL
+  const [linkedBank, setLinkedBank] = useState(null);
+  const [linkedUpi, setLinkedUpi] = useState(null);
+
+  // Fetch authoritative balance & transaction history & bank details from backend PostgreSQL
   useEffect(() => {
     let isMounted = true;
-    getWalletDetails().then((wallet) => {
-      if (isMounted && wallet && typeof wallet.balance === 'number') {
-        setWithdrawableBalance(wallet.balance);
-        localStorage.setItem('mshoppy_customer_wallet', wallet.balance.toString());
-      }
-    }).catch(() => {});
+    getWalletDetails()
+      .then((wallet) => {
+        if (isMounted && wallet) {
+          if (typeof wallet.balance === 'number') {
+            setWithdrawableBalance(wallet.balance);
+          }
+          if (Array.isArray(wallet.transactions)) {
+            const debits = wallet.transactions
+              .filter((t) => t.type === 'debit' || /withdraw|payout/i.test(t.description || ''))
+              .map((t) => ({
+                id: t.id || `WTH-${String(t.id || '').slice(-6)}`,
+                amount: t.amount,
+                method: /upi/i.test(t.description || '') ? 'upi' : 'bank',
+                accountLabel: t.description || 'Bank Payout',
+                date: t.createdAt
+                  ? new Date(t.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                  : 'Recent',
+                status: t.status || 'COMPLETED',
+                statusLabel: t.status === 'PENDING' ? 'Processing (24 - 48 Hrs)' : 'Credited to Account',
+                estimatedArrival: t.status === 'PENDING' ? '24 to 48 Hours' : 'Completed',
+                progress: t.status === 'PENDING' ? 50 : 100
+              }));
+            setWithdrawals(debits);
+          }
+          if (wallet.user?.bankDetails) {
+            const bd = wallet.user.bankDetails;
+            const bankObj = bd.bankDetails || (bd.bankName ? bd : null);
+            if (bankObj?.bankName) {
+              setLinkedBank({
+                bankName: bankObj.bankName,
+                accountNumber: bankObj.accountNumber ? (bankObj.accountNumber.startsWith('•') ? bankObj.accountNumber : `•••• ${bankObj.accountNumber.slice(-4)}`) : '•••• XXXX'
+              });
+            }
+            if (Array.isArray(bd.upiList) && bd.upiList.length > 0) {
+              setLinkedUpi(bd.upiList[0].upiId);
+            } else if (bd.upiId) {
+              setLinkedUpi(bd.upiId);
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load wallet from database:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingWallet(false);
+      });
     return () => { isMounted = false; };
   }, []);
 
-  const [linkedBank] = useState(() => {
-    try {
-      const aff = getAffiliateApp();
-      if (aff?.bankName && aff?.accountNumber) {
-        return {
-          bankName: aff.bankName,
-          accountNumber: `•••• ${aff.accountNumber.slice(-4)}`
-        };
-      }
-      const saved = localStorage.getItem('mshoppy_payout_bank');
-      if (saved) {
-        const p = JSON.parse(saved);
-        return { bankName: p.bankName, accountNumber: p.accountNumber };
-      }
-    } catch (e) {}
-    return null;
-  });
-
-  const [linkedUpi] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mshoppy_payout_upis');
-      if (saved) {
-        const list = JSON.parse(saved);
-        if (list.length > 0) return list[0].upiId;
-      }
-    } catch (e) {}
-    return null;
-  });
-
-  const [amount, setAmount] = useState(() => (withdrawableBalance > 0 ? withdrawableBalance.toString() : ''));
+  const [amount, setAmount] = useState('');
 
   const [payoutMethod, setPayoutMethod] = useState('bank');
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState('');
-
-  // Withdrawals List (with localStorage persistence)
-  const [withdrawals, setWithdrawals] = useState(() => {
-    try {
-      const saved = localStorage.getItem('meesho_dropshipper_withdrawals');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return INITIAL_WITHDRAWALS;
-  });
-
-  // Sync withdrawals to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('meesho_dropshipper_withdrawals', JSON.stringify(withdrawals));
-    } catch (e) {}
-  }, [withdrawals]);
 
   // Find active withdrawal (currently in PROCESSING state)
   const activeWithdrawal = withdrawals.find((w) => w.status === 'PROCESSING');
@@ -198,7 +159,6 @@ export default function WithdrawEarnings() {
         : Math.max(0, withdrawableBalance - numAmount);
 
       setWithdrawableBalance(newBal);
-      localStorage.setItem('mshoppy_customer_wallet', newBal.toString());
 
       const payoutData = {
         amount: numAmount,
@@ -210,14 +170,21 @@ export default function WithdrawEarnings() {
 
       sessionStorage.setItem('mshoppy_last_payout', JSON.stringify(payoutData));
 
-      // Append to real Withdrawal History
-      const history = JSON.parse(localStorage.getItem('mshoppy_withdrawal_history') || '[]');
-      history.unshift({
-        ...payoutData,
-        date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-        status: 'PROCESSING'
-      });
-      localStorage.setItem('mshoppy_withdrawal_history', JSON.stringify(history));
+      // Append to local state list for instant feedback
+      setWithdrawals((prev) => [
+        {
+          id: realTxnId,
+          amount: numAmount,
+          method: payoutMethod,
+          accountLabel: chosenBankName,
+          date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          status: 'PROCESSING',
+          statusLabel: 'Processing (24 - 48 Hrs)',
+          estimatedArrival: '24 to 48 Hours',
+          progress: 50
+        },
+        ...prev
+      ]);
 
       // Dispatch Real Live Notification
       addNotification({

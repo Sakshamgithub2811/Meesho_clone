@@ -191,19 +191,15 @@ export async function fetchAffiliateStats() {
     const res = await fetch(API_BASE_URL + '/auth/affiliate-stats' + query, { headers });
     const data = await res.json();
     if (data && data.success && data.stats) {
-      const existing = getAffiliateStats();
-      const mergedStats = {
+      const dbStats = {
         ...data.stats,
-        totalCommission: Math.max(Number(data.stats.totalCommission || 0), Number(existing.totalCommission || 0)),
-        clicks: Math.max(Number(data.stats.clicks || 0), Number(existing.clicks || 0)),
-        convertedOrders: Math.max(Number(data.stats.convertedOrders || 0), Number(existing.convertedOrders || 0)),
-        recentOrders: (Array.isArray(data.stats.recentOrders) && data.stats.recentOrders.length > 0)
-          ? data.stats.recentOrders
-          : (existing.recentOrders || [])
+        totalCommission: Number(data.stats.totalCommission || 0),
+        clicks: Number(data.stats.clicks || 0),
+        convertedOrders: Number(data.stats.convertedOrders || 0),
+        recentOrders: Array.isArray(data.stats.recentOrders) ? data.stats.recentOrders : []
       };
-      localStorage.setItem(STATS_KEY, JSON.stringify(mergedStats));
       notifyListeners();
-      return mergedStats;
+      return dbStats;
     }
   } catch (err) {
     console.warn('Could not fetch live affiliate stats from API:', err.message);
@@ -284,14 +280,6 @@ export function recordAffiliateOrder({ referralCode, orderTotal, orderId, margin
     if (stats.recentOrders.length > 20) {
       stats.recentOrders = stats.recentOrders.slice(0, 20);
     }
-
-    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
-
-    // Also credit customer wallet if customer is using integrated wallet
-    try {
-      const curWallet = Number(localStorage.getItem('mshoppy_customer_wallet') || 0);
-      localStorage.setItem('mshoppy_customer_wallet', (curWallet + earnedMargin).toString());
-    } catch (e) { }
 
     // Real Earnings Notification
     try {

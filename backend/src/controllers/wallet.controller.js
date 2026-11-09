@@ -1,7 +1,15 @@
 import prisma from '../config/prisma.js';
 
 const getUserId = (req) => {
-  return req.user?.id || req.headers['x-user-id'] || req.query.userId || 'guest_customer';
+  return (
+    req.user?.id ||
+    req.headers['x-user-id'] ||
+    req.headers['x-customer-id'] ||
+    req.headers['x-affiliate-id'] ||
+    req.headers['x-reseller-id'] ||
+    req.query.userId ||
+    'guest_customer'
+  );
 };
 
 const ensureWallet = async (userId, req = null) => {
@@ -55,6 +63,13 @@ const ensureWallet = async (userId, req = null) => {
       transactions: {
         orderBy: { createdAt: 'desc' },
         take: 50
+      },
+      user: {
+        select: {
+          bankDetails: true,
+          fullName: true,
+          phone: true
+        }
       }
     }
   });
@@ -67,7 +82,14 @@ const ensureWallet = async (userId, req = null) => {
         pending: 0.0,
       },
       include: {
-        transactions: true
+        transactions: true,
+        user: {
+          select: {
+            bankDetails: true,
+            fullName: true,
+            phone: true
+          }
+        }
       }
     });
   }
