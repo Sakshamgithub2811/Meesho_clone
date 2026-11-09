@@ -18,6 +18,7 @@ import adminCategoriesRoutes from './admin/adminCategories.routes.js';
 import adminCouponsRoutes from './admin/adminCoupons.routes.js';
 import adminBannersRoutes from './admin/adminBanners.routes.js';
 import adminCmsRoutes from './admin/adminCms.routes.js';
+import adminReviewsRoutes from './admin/adminReviews.routes.js';
 import authRoutes from './auth.routes.js';
 import affiliateAuthRoutes from './affiliate/affiliateAuth.routes.js';
 import userAuthRoutes from './user/userAuth.routes.js';
@@ -60,6 +61,7 @@ apiRouter.use('/admin-coupons', adminCouponsRoutes);
 apiRouter.use('/admin-banners', adminBannersRoutes);
 apiRouter.use('/banners', adminBannersRoutes);
 apiRouter.use('/admin-cms', adminCmsRoutes);
+apiRouter.use('/admin-reviews', adminReviewsRoutes);
 
 // Supplier Module endpoints
 apiRouter.use('/supplier/auth', supplierAuthRoutes);

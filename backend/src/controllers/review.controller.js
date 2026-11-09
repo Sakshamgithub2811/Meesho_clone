@@ -196,7 +196,7 @@ export const getProductReviews = async (req, res) => {
     }
 
     const reviews = await prisma.review.findMany({
-      where: { productId },
+      where: { productId, isHidden: false },
       include: {
         user: {
           select: {

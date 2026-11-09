@@ -260,17 +260,20 @@ model OrderItem {
 // ── 9. Reviews ─────────────────────────────────────────────────
 
 model Review {
-  id        String  @id @default(uuid())
-  userId    String  @map("user_id")
-  user      Profile @relation(fields: [userId], references: [id])
-  productId String  @map("product_id")
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  rating    Int
-  title     String?
-  comment   String?
-  images    String[]
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  user       Profile  @relation(fields: [userId], references: [id])
+  productId  String   @map("product_id")
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating     Int
+  title      String?
+  comment    String?
+  images     String[]
+  isHidden   Boolean  @default(false) @map("is_hidden")
+  adminReply String?  @map("admin_reply")
+  status     String   @default("APPROVED")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@unique([userId, productId])
   @@map("reviews")

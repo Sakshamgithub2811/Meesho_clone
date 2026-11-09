@@ -420,3 +420,4 @@ export default function OrderPrintSlipModal({ order, onClose }) {
     </div>
   );
 }
+

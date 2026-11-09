@@ -545,70 +545,93 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
       )}
 
       {/* Top Header Bar */}
-      <header className="sticky top-0 z-40 flex items-center justify-between px-4 md:px-8 py-3.5 w-full bg-white/95 backdrop-blur-md shadow-xs border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => (onBack ? onBack() : navigate('/user-home'))}
-            className="p-1.5 rounded-full hover:bg-gray-100 active:scale-95 transition-all text-[#191C1E] cursor-pointer"
-            title="Go Back"
-          >
-            <span className="material-symbols-outlined text-2xl">arrow_back</span>
-          </button>
-          <div 
-            onClick={() => navigate('/user-home')}
-            className="flex items-center gap-2 cursor-pointer select-none"
-          >
-            <img 
-              src="/mshoppy-logo.png" 
-              alt="MShoppy" 
-              className="w-7 h-7 object-contain rounded-lg" 
-            />
-            <span className="font-extrabold text-lg md:text-xl tracking-tight text-[#FF3F6C]">
-              MShoppy
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            onClick={() => navigate('/search')}
-            className="p-2 rounded-full hover:bg-gray-100 text-[#191C1E] active:scale-95 transition-all cursor-pointer"
-            title="Search Products"
-          >
-            <span className="material-symbols-outlined text-2xl">search</span>
-          </button>
-          <button
-            onClick={handleWishlistToggle}
-            className={`p-2 rounded-full hover:bg-gray-100 active:scale-95 transition-all cursor-pointer ${
-              isWishlisted ? 'text-[#FF3F6C]' : 'text-[#191C1E]'
-            }`}
-            title={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
-          >
-            <span
-              className="material-symbols-outlined text-2xl"
-              style={isWishlisted ? { fontVariationSettings: "'FILL' 1" } : {}}
+      <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md shadow-xs border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => (onBack ? onBack() : navigate('/user-home'))}
+              className="p-1.5 rounded-full hover:bg-gray-100 active:scale-95 transition-all text-[#191C1E] cursor-pointer"
+              title="Go Back"
             >
-              favorite
-            </span>
-          </button>
-          <button
-            onClick={() => navigate('/cart')}
-            className="p-2 rounded-full hover:bg-gray-100 text-[#191C1E] active:scale-95 transition-all cursor-pointer relative"
-            title="Shopping Cart"
-          >
-            <span className="material-symbols-outlined text-2xl">shopping_cart</span>
-            {cartCount > 0 && (
-              <span className="absolute top-1 right-1 bg-[#b90041] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                {cartCount}
+              <span className="material-symbols-outlined text-2xl">arrow_back</span>
+            </button>
+            <div 
+              onClick={() => navigate('/user-home')}
+              className="flex items-center gap-2 cursor-pointer select-none"
+            >
+              <img 
+                src="/mshoppy-logo.png" 
+                alt="MShoppy" 
+                className="w-7 h-7 object-contain rounded-lg" 
+              />
+              <span className="font-extrabold text-lg md:text-xl tracking-tight text-[#FF3F6C]">
+                MShoppy
               </span>
-            )}
-          </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => navigate('/search')}
+              className="p-2 rounded-full hover:bg-gray-100 text-[#191C1E] active:scale-95 transition-all cursor-pointer"
+              title="Search Products"
+            >
+              <span className="material-symbols-outlined text-2xl">search</span>
+            </button>
+            <button
+              onClick={handleWishlistToggle}
+              className={`p-2 rounded-full hover:bg-gray-100 active:scale-95 transition-all cursor-pointer ${
+                isWishlisted ? 'text-[#FF3F6C]' : 'text-[#191C1E]'
+              }`}
+              title={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+            >
+              <span
+                className="material-symbols-outlined text-2xl"
+                style={isWishlisted ? { fontVariationSettings: "'FILL' 1" } : {}}
+              >
+                favorite
+              </span>
+            </button>
+            <button
+              onClick={() => navigate('/cart')}
+              className="p-2 rounded-full hover:bg-gray-100 text-[#191C1E] active:scale-95 transition-all cursor-pointer relative"
+              title="Shopping Cart"
+            >
+              <span className="material-symbols-outlined text-2xl">shopping_cart</span>
+              {cartCount > 0 && (
+                <span className="absolute top-1 right-1 bg-[#b90041] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="pb-36 max-w-4xl mx-auto px-4 pt-4 md:pt-6">
-        {/* Full Uncropped Image Presentation */}
-        <section className="relative bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
+      <main className="pb-28 lg:pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 md:pt-6">
+        {/* Desktop Breadcrumbs */}
+        <nav className="hidden sm:flex items-center gap-2 text-xs text-slate-500 mb-4 font-medium" aria-label="Breadcrumb">
+          <button type="button" onClick={() => navigate('/user-home')} className="hover:text-[#FF3F6C] cursor-pointer">
+            Home
+          </button>
+          <span>/</span>
+          <button 
+            type="button" 
+            onClick={() => navigate(`/search?category=${encodeURIComponent(product?.category?.name || product?.categorySlug || '')}`)} 
+            className="hover:text-[#FF3F6C] cursor-pointer"
+          >
+            {product?.category?.name || 'Category'}
+          </button>
+          <span>/</span>
+          <span className="text-slate-800 font-semibold truncate max-w-xs">{product?.title}</span>
+        </nav>
+
+        {/* 2-Column Responsive Layout for Desktop & Mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
+          {/* LEFT COLUMN: Gallery & Photos (lg:col-span-6 xl:col-span-7 lg:sticky lg:top-24) */}
+          <div className="lg:col-span-6 xl:col-span-7 lg:sticky lg:top-24 space-y-4">
+            {/* Full Uncropped Image Presentation */}
+            <section className="relative bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
           {/* Main Photo Container - Full view with object-contain to avoid any cropping */}
           <div className="relative w-full aspect-[4/5] max-h-[560px] bg-white flex items-center justify-center p-2 sm:p-4 select-none">
             <img
@@ -683,11 +706,13 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
               ))}
             </div>
           )}
-        </section>
+            </section>
+          </div>
 
-        {/* Product Hero Info */}
-        <section className="pt-5 pb-4">
-          <div className="flex justify-between items-start mb-2 gap-2">
+          {/* RIGHT COLUMN: Buy Box & Product Options (lg:col-span-6 xl:col-span-5 space-y-4 sm:space-y-5) */}
+          <div className="lg:col-span-6 xl:col-span-5 space-y-4 sm:space-y-5">
+            <section className="space-y-4">
+              <div className="flex justify-between items-start mb-2 gap-2">
             <span className="text-[#006a34] font-bold text-xs tracking-wider uppercase bg-green-50 px-3 py-1 rounded-full border border-green-200">
               {product.category?.name || 'Verified Collection'}
             </span>
@@ -756,6 +781,40 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
                 Easy 7 Days Return / Exchange
               </span>
             </div>
+          </div>
+
+          {/* Desktop Buy & Cart Action Buttons (Prominent in Buy Box on large screens) */}
+          <div className="hidden lg:flex items-center gap-3 pt-1">
+            {isResellerMode && (
+              <button
+                type="button"
+                onClick={() => setShowShareModal(true)}
+                className="bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 font-black text-xs shadow-lg shadow-emerald-500/25 transition-all cursor-pointer shrink-0"
+                title="Share on WhatsApp with Margin"
+              >
+                <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.628 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
+                <span>Share &amp; Earn ₹{selectedResellerMargin}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={addingToCart}
+              className="flex-1 flex items-center justify-center gap-2 border-2 border-slate-300 hover:border-[#b90041] text-slate-800 hover:text-[#b90041] rounded-2xl py-3.5 px-4 font-black text-xs sm:text-sm active:scale-95 transition-all cursor-pointer bg-white shadow-xs"
+            >
+              <span className="material-symbols-outlined text-lg">shopping_bag</span>
+              <span className="truncate">{addingToCart ? 'Adding...' : 'Add to Cart'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              className="flex-1 bg-gradient-to-r from-[#FF3F6C] to-[#DF2457] hover:from-[#e0355f] hover:to-[#c71e4d] text-white flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 font-black text-xs sm:text-sm shadow-xl shadow-pink-500/25 active:scale-95 transition-all cursor-pointer uppercase tracking-wider"
+            >
+              <span className="material-symbols-outlined text-lg">bolt</span>
+              <span className="truncate">Buy Now</span>
+            </button>
           </div>
 
           {/* Reseller Profit Margin & WhatsApp Share Card (Visible ONLY in Reseller Mode, never to normal customers) */}
@@ -1018,7 +1077,7 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
           </div>
 
           {/* Trust Badges */}
-          <div className="grid grid-cols-3 gap-3 bg-white rounded-3xl p-4 md:p-5 shadow-xs border border-slate-100 mb-6">
+          <div className="grid grid-cols-3 gap-3 bg-white rounded-3xl p-4 md:p-5 shadow-xs border border-slate-100 mb-2">
             <div className="flex flex-col items-center gap-1.5 text-center">
               <div className="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center text-[#006a34]">
                 <span className="material-symbols-outlined text-xl">replay</span>
@@ -1044,130 +1103,135 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
               </span>
             </div>
           </div>
+        </section>
+      </div>
+    </div>
 
-          {/* Customer Ratings & Reviews Card */}
-          <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-xs mb-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-                  <span>Product Ratings &amp; Reviews</span>
-                  {product.reviewsCount > 0 && (
-                    <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full">
-                      ★ {product.rating}
-                    </span>
-                  )}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {product.reviewsCount > 0
-                    ? `${product.reviewsCount} Ratings • Verified Buyers`
-                    : 'No ratings yet • Verified buyers can rate after delivery'}
-                </p>
-              </div>
-
+    {/* Full-Width Section below 2-Column Grid: Ratings & Reviews + Similar Products */}
+    <div className="mt-10 lg:mt-14 space-y-6">
+      {/* Customer Ratings & Reviews Card */}
+      <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
+              <span>Product Ratings &amp; Reviews</span>
               {product.reviewsCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onNavigate(`/reviews?productId=${product.id}`)}
-                  className="text-[#b90041] hover:text-[#900030] text-xs font-bold hover:underline cursor-pointer flex items-center gap-0.5"
-                >
-                  <span>View All</span>
-                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                </button>
+                <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full">
+                  ★ {product.rating}
+                </span>
               )}
-            </div>
-
-            {/* Quick action to write review - ONLY VISIBLE IF PRODUCT IS DELIVERED AND NOT YET REVIEWED */}
-            {canReviewProduct && !hasUserReviewed && (
-              <div className="p-3.5 bg-[#fdf2f5] rounded-2xl flex items-center justify-between gap-3 border border-pink-100 animate-in fade-in">
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-[#b90041] text-xl">rate_review</span>
-                  <div className="text-xs">
-                    <p className="font-extrabold text-[#b90041]">
-                      You bought this item!
-                    </p>
-                    <p className="text-slate-500 text-[11px]">
-                      Order delivered! Rate quality, fit and delivery
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onNavigate(
-                      `/write-review?productId=${product.id}${userOrderId ? `&orderId=${userOrderId}` : ''}`
-                    )
-                  }
-                  className="bg-[#b90041] hover:bg-[#900030] text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs cursor-pointer transition-all active:scale-95 shrink-0"
-                >
-                  Rate Product
-                </button>
-              </div>
-            )}
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {product.reviewsCount > 0
+                ? `${product.reviewsCount} Ratings • Verified Buyers`
+                : 'No ratings yet • Verified buyers can rate after delivery'}
+            </p>
           </div>
 
-          {/* Similar Products Recommendation Carousel (Meesho Core Feature) */}
-          {similarProducts.length > 0 && (
-            <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-xs mb-6 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-black text-sm text-slate-900 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[#FF3F6C] text-lg">auto_awesome</span>
-                    <span>Similar Products</span>
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-medium">Customers also viewed these items</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigate(`/search?category=${product.categorySlug}`)}
-                  className="text-xs font-bold text-[#b90041] hover:underline cursor-pointer flex items-center gap-0.5"
-                >
-                  <span>View All</span>
-                  <span className="material-symbols-outlined text-xs">arrow_forward</span>
-                </button>
-              </div>
+          {product.reviewsCount > 0 && (
+            <button
+              type="button"
+              onClick={() => onNavigate(`/reviews?productId=${product.id}`)}
+              className="text-[#b90041] hover:text-[#900030] text-xs font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+            >
+              <span>View All</span>
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+          )}
+        </div>
 
-              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-                {similarProducts.map((sim) => (
-                  <div
-                    key={sim.id}
-                    onClick={() => {
-                      navigate(`/product?id=${sim.id}`);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="w-36 sm:w-44 shrink-0 bg-slate-50 border border-slate-200/80 rounded-2xl p-2 cursor-pointer hover:shadow-md hover:border-pink-300 transition-all group"
-                  >
-                    <div className="w-full aspect-[4/5] bg-white rounded-xl overflow-hidden mb-2 p-1">
-                      <img
-                        src={sim.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400'}
-                        alt={sim.title}
-                        className="w-full h-full object-contain group-hover:scale-105 transition-transform"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400';
-                        }}
-                      />
-                    </div>
-                    <p className="text-xs font-bold text-slate-800 line-clamp-1">{sim.title}</p>
-                    <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="text-xs font-black text-slate-900">₹{sim.price}</span>
-                      {sim.originalPrice && sim.originalPrice > sim.price && (
-                        <span className="text-[10px] text-slate-400 line-through">₹{sim.originalPrice}</span>
-                      )}
-                    </div>
-                    <span className="inline-block text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100 mt-1">
-                      Free Delivery
-                    </span>
-                  </div>
-                ))}
+        {/* Quick action to write review - ONLY VISIBLE IF PRODUCT IS DELIVERED AND NOT YET REVIEWED */}
+        {canReviewProduct && !hasUserReviewed && (
+          <div className="p-3.5 bg-[#fdf2f5] rounded-2xl flex items-center justify-between gap-3 border border-pink-100 animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-[#b90041] text-xl">rate_review</span>
+              <div className="text-xs">
+                <p className="font-extrabold text-[#b90041]">
+                  You bought this item!
+                </p>
+                <p className="text-slate-500 text-[11px]">
+                  Order delivered! Rate quality, fit and delivery
+                </p>
               </div>
             </div>
-          )}
-        </section>
-      </main>
+            <button
+              type="button"
+              onClick={() =>
+                onNavigate(
+                  `/write-review?productId=${product.id}${userOrderId ? `&orderId=${userOrderId}` : ''}`
+                )
+              }
+              className="bg-[#b90041] hover:bg-[#900030] text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs cursor-pointer transition-all active:scale-95 shrink-0"
+            >
+              Rate Product
+            </button>
+          </div>
+        )}
+      </div>
 
-      {/* Sticky Bottom Actions Bar - Customer + Reseller WhatsApp Share */}
-      <div className="fixed bottom-0 left-0 w-full z-40 bg-white/95 backdrop-blur-xl shadow-[0_-8px_30px_rgba(0,0,0,0.08)] px-3 sm:px-4 py-3 border-t border-slate-100">
-        <div className="max-w-4xl mx-auto flex items-center gap-2 sm:gap-3">
+      {/* Similar Products Recommendation Carousel (Meesho Core Feature) */}
+      {similarProducts.length > 0 && (
+        <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-black text-sm text-slate-900 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[#FF3F6C] text-lg">auto_awesome</span>
+                <span>Similar Products</span>
+              </h3>
+              <p className="text-[11px] text-slate-400 font-medium">Customers also viewed these items</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate(`/search?category=${product.categorySlug}`)}
+              className="text-xs font-bold text-[#b90041] hover:underline cursor-pointer flex items-center gap-0.5"
+            >
+              <span>View All</span>
+              <span className="material-symbols-outlined text-xs">arrow_forward</span>
+            </button>
+          </div>
+
+          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+            {similarProducts.map((sim) => (
+              <div
+                key={sim.id}
+                onClick={() => {
+                  navigate(`/product?id=${sim.id}`);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="w-36 sm:w-44 shrink-0 bg-slate-50 border border-slate-200/80 rounded-2xl p-2 cursor-pointer hover:shadow-md hover:border-pink-300 transition-all group"
+              >
+                <div className="w-full aspect-[4/5] bg-white rounded-xl overflow-hidden mb-2 p-1">
+                  <img
+                    src={sim.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400'}
+                    alt={sim.title}
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400';
+                    }}
+                  />
+                </div>
+                <p className="text-xs font-bold text-slate-800 line-clamp-1">{sim.title}</p>
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className="text-xs font-black text-slate-900">₹{sim.price}</span>
+                  {sim.originalPrice && sim.originalPrice > sim.price && (
+                    <span className="text-[10px] text-slate-400 line-through">₹{sim.originalPrice}</span>
+                  )}
+                </div>
+                <span className="inline-block text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100 mt-1">
+                  Free Delivery
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </main>
+
+  {/* Sticky Bottom Actions Bar (Mobile Only: hidden on desktop screens) */}
+  <div className="lg:hidden fixed bottom-0 left-0 w-full z-40 bg-white/95 backdrop-blur-xl shadow-[0_-8px_30px_rgba(0,0,0,0.08)] px-3 sm:px-4 py-3 border-t border-slate-100">
+    <div className="max-w-md mx-auto flex items-center gap-2 sm:gap-3">
           {/* WhatsApp Share & Earn Button (ONLY visible in Reseller Mode, never to normal customers) */}
           {isResellerMode && (
           <button
