@@ -3,6 +3,8 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { auth } from '../../../utils/firebase';
 import { API_V1_BASE } from '../../../config/apiConfig';
+import { exportToCsv } from '../../../utils/csvExporter';
+import FilterBar from '../../common/FilterBar';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -214,6 +216,27 @@ export default function AdminReviewsManagement() {
     });
   };
 
+  // CSV Export for reviews
+  const handleExportCsv = () => {
+    exportToCsv({
+      data: reviews,
+      filename: `mshoppy_reviews_${activeStarTab}_star`,
+      columns: [
+        { key: 'id', label: 'Review ID' },
+        { key: 'user.fullName', label: 'Customer Name' },
+        { key: 'user.email', label: 'Customer Email' },
+        { key: 'product.title', label: 'Product Title' },
+        { key: 'product.price', label: 'Price (INR)', formatter: (v) => (v ? `₹${v}` : '—') },
+        { key: 'rating', label: 'Rating (Stars)', formatter: (v) => `${v} Stars` },
+        { key: 'title', label: 'Review Title', formatter: (v) => v || '—' },
+        { key: 'comment', label: 'Review Comment', formatter: (v) => v || '—' },
+        { key: 'status', label: 'Status' },
+        { key: 'adminReply', label: 'Official Admin Reply', formatter: (v) => v || '—' },
+        { key: 'createdAt', label: 'Submitted Date', formatter: (v) => formatDate(v) }
+      ]
+    });
+  };
+
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-150">
       {/* ── 1. Top KPI Summary Cards ────────────────────────────── */}
@@ -279,109 +302,56 @@ export default function AdminReviewsManagement() {
         </Card>
       </div>
 
-      {/* ── 2. Filter & Search Controls ─────────────────────────── */}
-      <Card className="border border-gray-100 shadow-xs">
-        <CardContent className="p-4 space-y-3">
-          {/* Top row: Search + Status + Media + Refresh */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search by product, customer, or comment..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setPage(1);
-                    fetchReviews();
-                  }
-                }}
-                className="pl-9 text-xs h-9 bg-gray-50/50 border-gray-200 rounded-lg focus:bg-white"
-              />
-            </div>
-
-            {/* Dropdown Filters & Actions */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                }}
-                className="text-xs h-9 px-3 bg-gray-50/50 border border-gray-200 rounded-lg text-gray-700 font-medium focus:outline-none focus:border-pink-500"
-              >
-                <option value="all">All Moderation Status</option>
-                <option value="published">Published / Visible Only</option>
-                <option value="hidden">Hidden / Suppressed Only</option>
-              </select>
-
-              {/* Has Photos Toggle */}
-              <button
-                type="button"
-                onClick={() => {
-                  setHasImagesOnly(!hasImagesOnly);
-                  setPage(1);
-                }}
-                className={`text-xs h-9 px-3.5 rounded-lg border font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                  hasImagesOnly
-                    ? 'bg-pink-50 border-pink-200 text-pink-700 font-semibold'
-                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <Camera className="w-3.5 h-3.5" />
-                <span>With Photos</span>
-              </button>
-
-              {/* Refresh Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchReviews(true)}
-                disabled={refreshing}
-                className="h-9 px-3 text-xs border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-            </div>
-          </div>
-
-          {/* Bottom row: Star Rating Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-gray-100">
-            <span className="text-xs font-semibold text-gray-400 mr-2 flex items-center gap-1">
-              <Filter className="w-3.5 h-3.5" /> Rating:
-            </span>
-            {STAR_TABS.map((tab) => {
-              const count = tab.id === 'all' ? stats.totalReviews : stats.breakdown?.[tab.id] || 0;
-              const isActive = activeStarTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveStarTab(tab.id);
-                    setPage(1);
-                  }}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                    isActive
-                      ? 'bg-pink-600 text-white shadow-xs'
-                      : 'bg-gray-100/80 text-gray-600 hover:bg-gray-200/70'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                    isActive ? 'bg-pink-700/80 text-white' : 'bg-gray-200 text-gray-600'
-                  }`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── 2. Reusable Common FilterBar Component ─────────────── */}
+      <FilterBar
+        searchPlaceholder="Search reviews by product, customer, or comment keywords..."
+        searchValue={searchTerm}
+        onSearchChange={(val) => setSearchTerm(val)}
+        onSearchSubmit={() => {
+          setPage(1);
+          fetchReviews();
+        }}
+        tabs={STAR_TABS.map((tab) => ({
+          id: tab.id,
+          label: `${tab.label} (${tab.id === 'all' ? stats.totalReviews : (stats.breakdown?.[tab.id] || 0)})`
+        }))}
+        activeTab={activeStarTab}
+        onTabChange={(tabId) => {
+          setActiveStarTab(tabId);
+          setPage(1);
+        }}
+        dropdowns={[
+          {
+            value: statusFilter,
+            onChange: (val) => {
+              setStatusFilter(val);
+              setPage(1);
+            },
+            options: [
+              { value: 'all', label: 'All Moderation Status' },
+              { value: 'published', label: 'Published / Live Only' },
+              { value: 'hidden', label: 'Hidden / Suppressed Only' }
+            ]
+          },
+          {
+            value: hasImagesOnly ? 'yes' : 'no',
+            onChange: (val) => {
+              setHasImagesOnly(val === 'yes');
+              setPage(1);
+            },
+            options: [
+              { value: 'no', label: 'All Media Types' },
+              { value: 'yes', label: '📸 With Photos Only' }
+            ]
+          }
+        ]}
+        totalCount={totalCount}
+        countLabel="Reviews"
+        onRefresh={() => fetchReviews(true)}
+        refreshing={refreshing}
+        onExport={handleExportCsv}
+        exportLabel="Export CSV"
+      />
 
       {/* ── 3. Reviews Feed List ───────────────────────────────── */}
       <div className="space-y-4">
