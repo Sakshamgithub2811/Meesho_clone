@@ -37,16 +37,25 @@ export default function OrderTrackingModal({
   const price = Number(order.price ?? order.totalAmount ?? 0);
 
   const orderDate = order.createdAt ? new Date(order.createdAt) : new Date();
+
+  const addr = (typeof order.shippingAddress === 'object' && order.shippingAddress !== null)
+    ? order.shippingAddress
+    : {};
+
+  const realCourier = addr.courier || addr.courierPartner || 'Delhivery Express';
+  const realAwb = addr.awb || addr.trackingNumber || ('DEL' + (order.id?.slice(0, 8).toUpperCase() || '1029384'));
+  const realTrackingUrl = addr.trackingUrl || '';
+
   const defaultTimeline = {
-    trackingPartner: 'Shadowfax Logistics (AWB: SF' + (order.id?.slice(0, 8).toUpperCase() || '1029384') + ')',
+    trackingPartner: `${realCourier} (AWB: ${realAwb})`,
     placedDateStr: orderDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-    shippedDateStr: new Date(orderDate.getTime() + 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-    expectedDeliveryStr: new Date(orderDate.getTime() + 4 * 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+    shippedDateStr: addr.shippedAt ? new Date(addr.shippedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : new Date(orderDate.getTime() + 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+    expectedDeliveryStr: addr.estimatedDelivery ? new Date(addr.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(orderDate.getTime() + 4 * 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
     events: {
       placed: `${orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Order received & verified`,
       processed: 'Seller acknowledged & packed item',
-      pickedUp: 'Courier picked up from warehouse hub',
-      arrived1: 'Arrived at sorting facility',
+      pickedUp: `Courier partner (${realCourier}) picked up package from warehouse`,
+      arrived1: 'Arrived at nearest sorting hub facility',
       left: 'In transit to destination city hub',
     }
   };
@@ -445,10 +454,39 @@ export default function OrderTrackingModal({
                   <span className="text-slate-500 font-semibold">{track?.shippedDateStr}</span>
                 </div>
 
+                {/* Real Courier & AWB Tracking Card */}
+                <div className="mt-2.5 bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      🚚 {realCourier}
+                    </span>
+                    {realTrackingUrl && (
+                      <a
+                        href={realTrackingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 bg-white border border-emerald-200 px-2 py-0.5 rounded-md shadow-xs"
+                      >
+                        Track on Portal ↗
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-600 font-mono">
+                    <span>AWB: <strong className="text-slate-900">{realAwb}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(realAwb, 'AWB Copied to clipboard!')}
+                      className="text-[10px] text-blue-600 font-sans font-semibold hover:underline cursor-pointer"
+                    >
+                      Copy AWB
+                    </button>
+                  </div>
+                </div>
+
                 <div className="mt-2.5 space-y-2.5 pl-1 text-slate-600 font-medium">
                   <div>
                     <p className="text-slate-800 font-semibold">
-                      Courier partner ({track?.trackingPartner}) has picked up your item.
+                      Courier partner ({realCourier}) has dispatched your item.
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">{track?.events?.pickedUp}</p>
                   </div>
