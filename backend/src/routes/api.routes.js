@@ -20,6 +20,8 @@ import adminBannersRoutes from './admin/adminBanners.routes.js';
 import adminCmsRoutes from './admin/adminCms.routes.js';
 import adminReviewsRoutes from './admin/adminReviews.routes.js';
 import adminFlashSaleRoutes from './admin/adminFlashSale.routes.js';
+import adminSettingsRoutes from './admin/adminSettings.routes.js';
+import { getPublicSettings } from '../controllers/admin/adminSettings.controller.js';
 import authRoutes from './auth.routes.js';
 import affiliateAuthRoutes from './affiliate/affiliateAuth.routes.js';
 import userAuthRoutes from './user/userAuth.routes.js';
@@ -64,6 +66,8 @@ apiRouter.use('/banners', adminBannersRoutes);
 apiRouter.use('/admin-cms', adminCmsRoutes);
 apiRouter.use('/admin-reviews', adminReviewsRoutes);
 apiRouter.use('/admin-flash-sale', adminFlashSaleRoutes);
+apiRouter.use('/admin-settings', adminSettingsRoutes);
+apiRouter.get('/settings/public', getPublicSettings);
 
 // Supplier Module endpoints
 apiRouter.use('/supplier/auth', supplierAuthRoutes);

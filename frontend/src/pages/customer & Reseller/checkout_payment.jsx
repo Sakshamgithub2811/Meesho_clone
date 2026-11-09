@@ -13,6 +13,7 @@ import {
 } from '../../services/ecommerceService';
 import { recordAffiliateOrder } from '../../services/affiliateAuthService';
 import { addNotification } from '../../services/notificationService';
+import { API_BASE } from '../../config/apiConfig';
 
 export default function CheckoutPayment({ onNavigate, onBack }) {
   const navigate = useNavigate();
@@ -22,6 +23,11 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
   };
 
   const [selectedPayment, setSelectedPayment] = useState('cod');
+  const [platformSettings, setPlatformSettings] = useState({
+    codEnabled: true,
+    freeShippingThreshold: 499,
+    shippingFee: 49
+  });
   const [isReselling, setIsReselling] = useState(false);
   const [marginAmount, setMarginAmount] = useState(150);
   const [cartItems, setCartItems] = useState([]);
@@ -67,6 +73,19 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
   useEffect(() => {
     async function init() {
       try {
+        // Fetch real-time public platform settings
+        fetch(`${API_BASE}/settings/public`)
+          .then((res) => res.json())
+          .then((settingsRes) => {
+            if (settingsRes?.success && settingsRes?.data) {
+              setPlatformSettings(settingsRes.data);
+              if (settingsRes.data.codEnabled === false) {
+                setSelectedPayment('online');
+              }
+            }
+          })
+          .catch((err) => console.warn('Public settings fetch notice:', err));
+
         const [cartRes, addrsRes, coupsRes] = await Promise.all([
           getCart(),
           getAddresses(),
@@ -578,26 +597,38 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                   {/* Option 1: Cash on Delivery (COD) */}
                   <div
                     onClick={() => {
+                      if (!platformSettings.codEnabled) {
+                        triggerToast('⚠️ Cash on Delivery is currently disabled by admin. Please pay online.');
+                        return;
+                      }
                       setSelectedPayment('cod');
                       triggerToast('Selected Cash on Delivery (COD)');
                     }}
-                    className={`p-4 sm:p-5 rounded-3xl shadow-sm flex items-center gap-4 relative overflow-hidden cursor-pointer transition-all ${
-                      selectedPayment === 'cod'
-                        ? 'bg-white ring-2 ring-[#FF3F6C]'
-                        : 'bg-white hover:bg-slate-50 border border-slate-100'
+                    className={`p-4 sm:p-5 rounded-3xl shadow-sm flex items-center gap-4 relative overflow-hidden transition-all ${
+                      !platformSettings.codEnabled
+                        ? 'opacity-60 bg-gray-50 border border-gray-200 cursor-not-allowed'
+                        : selectedPayment === 'cod'
+                        ? 'bg-white ring-2 ring-[#FF3F6C] cursor-pointer'
+                        : 'bg-white hover:bg-slate-50 border border-slate-100 cursor-pointer'
                     }`}
                   >
-                    <div className="absolute top-0 right-0 bg-[#008644] text-white px-3 py-0.5 rounded-bl-xl text-[9px] font-black uppercase tracking-wider">
-                      Zero Advance Fee
+                    <div
+                      className={`absolute top-0 right-0 px-3 py-0.5 rounded-bl-xl text-[9px] font-black uppercase tracking-wider ${
+                        platformSettings.codEnabled
+                          ? 'bg-[#008644] text-white'
+                          : 'bg-gray-500 text-white'
+                      }`}
+                    >
+                      {platformSettings.codEnabled ? 'Zero Advance Fee' : 'Temporarily Disabled'}
                     </div>
                     <div
                       className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                        selectedPayment === 'cod'
+                        selectedPayment === 'cod' && platformSettings.codEnabled
                           ? 'border-[#FF3F6C] bg-[#FF3F6C]'
                           : 'border-slate-300'
                       }`}
                     >
-                      {selectedPayment === 'cod' && (
+                      {selectedPayment === 'cod' && platformSettings.codEnabled && (
                         <div className="w-2 h-2 rounded-full bg-white" />
                       )}
                     </div>
@@ -605,11 +636,20 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                       <span className="material-symbols-outlined text-2xl">payments</span>
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-extrabold text-sm sm:text-base text-[#191c1e]">
-                        Cash on Delivery (COD)
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-extrabold text-sm sm:text-base text-[#191c1e]">
+                          Cash on Delivery (COD)
+                        </h3>
+                        {!platformSettings.codEnabled && (
+                          <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                            Offline Mode
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Pay cash or UPI to delivery rider at your doorstep.
+                        {platformSettings.codEnabled
+                          ? 'Pay cash or UPI to delivery rider at your doorstep.'
+                          : 'Cash on delivery is currently paused by platform. Please pay online with UPI/Cards.'}
                       </p>
                     </div>
                   </div>

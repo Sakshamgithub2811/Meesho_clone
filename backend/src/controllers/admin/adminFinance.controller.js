@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { getDirectSettings } from './adminSettings.controller.js';
 
 /**
  * 1. GET FINANCE OVERVIEW, WALLETS & TRANSACTIONS
@@ -88,7 +89,11 @@ export const getFinanceOverview = async (req, res) => {
     const totalEscrow = allWallets.reduce((acc, w) => acc + (w.balance || 0), 0);
     const totalPending = allWallets.reduce((acc, w) => acc + (w.pending || 0), 0);
     const grossVolume = orders.reduce((acc, o) => acc + (o.paymentStatus === 'PAID' ? o.totalAmount : 0), 0);
-    const platformCommissions = Number((grossVolume * 0.05 + 1250).toFixed(2));
+    
+    // Read dynamic platform commission rate
+    const currentSettings = getDirectSettings();
+    const activeCommissionRate = (currentSettings.commissionRate ?? 5.0) / 100;
+    const platformCommissions = Number((grossVolume * activeCommissionRate + 1250).toFixed(2));
 
     const stats = {
       totalEscrowBalance: Number(totalEscrow.toFixed(2)),

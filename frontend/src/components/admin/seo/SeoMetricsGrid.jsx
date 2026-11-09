@@ -43,3 +43,4 @@ export default function SeoMetricsGrid({ stats = null, loading = false }) {
     </div>
   );
 }
+

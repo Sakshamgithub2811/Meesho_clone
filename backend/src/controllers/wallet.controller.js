@@ -1,4 +1,5 @@
 import prisma from '../config/prisma.js';
+import { getDirectSettings } from './admin/adminSettings.controller.js';
 
 const getUserId = (req) => {
   return (
@@ -144,11 +145,14 @@ export const requestWithdrawal = async (req, res) => {
     const userId = getUserId(req);
     const { amount, method = 'bank', destination = 'Bank Account' } = req.body;
 
+    const currentSettings = getDirectSettings();
+    const minPayout = Number(currentSettings.minPayoutThreshold ?? 500);
+
     const numAmount = parseFloat(amount);
-    if (!numAmount || isNaN(numAmount) || numAmount < 100) {
+    if (!numAmount || isNaN(numAmount) || numAmount < minPayout) {
       return res.status(400).json({
         success: false,
-        message: 'Minimum withdrawal amount is ₹100.00'
+        message: `Minimum withdrawal amount is ₹${minPayout.toFixed(2)}`
       });
     }
 

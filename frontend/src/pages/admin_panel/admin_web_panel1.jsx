@@ -19,11 +19,12 @@ import AdminCmsManagement from '../../components/admin/cms/AdminCmsManagement';
 import AdminSeoManagement from '../../components/admin/seo/AdminSeoManagement';
 import AdminReviewsManagement from '../../components/admin/reviews/AdminReviewsManagement';
 import AdminFlashSaleManagement from '../../components/admin/flashSale/AdminFlashSaleManagement';
+import AdminSettingsManagement from '../../components/admin/settings/AdminSettingsManagement';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
   Package, ShoppingCart, RotateCcw, LineChart,
-  Wallet, Banknote, Store, Headphones, Layers, Ticket, Image, FileText, Globe, Star, Zap
+  Wallet, Banknote, Store, Headphones, Layers, Ticket, Image, FileText, Globe, Star, Zap, Sliders
 } from 'lucide-react';
 // Yeh raha aapka MASTER MENU (with Sub-menus)
 const ADMIN_MENU = [
@@ -46,6 +47,7 @@ const ADMIN_MENU = [
   { id: 'banners', label: 'Banners 🎨', icon: Image },
   { id: 'cms', label: 'CMS Pages 📄', icon: FileText },
   { id: 'seo', label: 'SEO & Sitemap 🌐', icon: Globe },
+  { id: 'settings', label: 'Platform Settings ⚙️', icon: Sliders },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
   { id: 'returns', label: 'Returns & Refunds ', icon: RotateCcw },
   { id: 'sellers', label: 'Sellers ', icon: Store },
@@ -96,6 +98,8 @@ export default function AdminWebPanel() {
         return { title: "CMS & Legal Policy Pages", subtitle: "Manage Privacy Policy, Terms, Return policies, and custom storefront pages with SEO tags" };
       case 'seo':
         return { title: "Technical SEO & Sitemap Manager", subtitle: "Live search engine indexing, robots.txt directives, and sitemaps.org protocol" };
+      case 'settings':
+        return { title: "Global Platform Business Settings", subtitle: "Configure commission cuts, reseller payouts, free delivery thresholds, and payment gateway controls" };
       case 'orders':
         return { title: "Manage Orders", subtitle: "Track, fulfill, and monitor customer orders" };
       case 'returns':
@@ -187,6 +191,10 @@ export default function AdminWebPanel() {
 
       {activeTab === 'seo' && (
         <AdminSeoManagement />
+      )}
+
+      {activeTab === 'settings' && (
+        <AdminSettingsManagement />
       )}
 
       {activeTab === 'orders' && (
