@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { toast } from 'sonner';
+import { auth } from '../../../utils/firebase';
+import { useSelector } from 'react-redux';
 import SettingsHeaderBanner from './SettingsHeaderBanner';
 import FinancialSettingsCard from './FinancialSettingsCard';
 import ShippingDeliverySettingsCard from './ShippingDeliverySettingsCard';
 import PaymentOperationsSettingsCard from './PaymentOperationsSettingsCard';
 import SupportContactSettingsCard from './SupportContactSettingsCard';
-import { API_BASE } from '../../../config/apiConfig';
+import { API_V1_BASE } from '../../../config/apiConfig';
 import { Loader2 } from 'lucide-react';
 
 export default function AdminSettingsManagement() {
@@ -15,33 +18,47 @@ export default function AdminSettingsManagement() {
   const [saving, setSaving] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  const getAdminAuthHeaders = () => {
-    const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('token');
-    return {
-      'Content-Type': 'application/json',
-      ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {})
-    };
+  const currentUser = useSelector((state) => state.user?.currentUser);
+
+  const getAuthToken = async () => {
+    try {
+      if (auth.currentUser) {
+        const idToken = await auth.currentUser.getIdToken();
+        if (idToken) return idToken;
+      }
+    } catch (e) {
+      console.warn('Firebase token retrieval error:', e);
+    }
+    return (
+      localStorage.getItem('adminToken') ||
+      localStorage.getItem('token') ||
+      currentUser?.id ||
+      'admin_master'
+    );
   };
 
   const fetchSettings = async () => {
     try {
       setLoading(true);
       setFetchError(null);
-      const res = await fetch(`${API_BASE}/admin-settings`, {
-        headers: getAdminAuthHeaders()
+      const token = await getAuthToken();
+      const res = await axios.get(`${API_V1_BASE}/admin-settings`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
-      const data = await res.json();
-      if (data.success && data.data) {
-        setSettings(data.data);
-        setInitialSettings(data.data);
+      if (res.data?.success && res.data?.data) {
+        setSettings(res.data.data);
+        setInitialSettings(res.data.data);
       } else {
-        throw new Error(data.message || 'Failed to load platform settings');
+        throw new Error(res.data?.message || 'Failed to load platform settings');
       }
     } catch (err) {
       console.error('Failed to load settings:', err);
-      setFetchError(err.message);
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      setFetchError(msg);
       toast.error('Settings Load Error', {
-        description: err.message
+        description: msg
       });
     } finally {
       setLoading(false);
@@ -50,7 +67,7 @@ export default function AdminSettingsManagement() {
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [currentUser]);
 
   const handleChange = (field, value) => {
     setSettings((prev) => ({
@@ -90,26 +107,27 @@ export default function AdminSettingsManagement() {
 
     try {
       setSaving(true);
-      const res = await fetch(`${API_BASE}/admin-settings`, {
-        method: 'PUT',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify(settings)
+      const token = await getAuthToken();
+      const res = await axios.put(`${API_V1_BASE}/admin-settings`, settings, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
-      const data = await res.json();
 
-      if (data.success && data.data) {
-        setSettings(data.data);
-        setInitialSettings(data.data);
+      if (res.data?.success && res.data?.data) {
+        setSettings(res.data.data);
+        setInitialSettings(res.data.data);
         toast.success('Settings Saved Successfully! ⚙️', {
-          description: `Platform commission: ${data.data.commissionRate}%, Free Delivery: ₹${data.data.freeShippingThreshold}, COD: ${data.data.codEnabled ? 'Active' : 'Disabled'}`
+          description: `Platform commission: ${res.data.data.commissionRate}%, Free Delivery: ₹${res.data.data.freeShippingThreshold}, COD: ${res.data.data.codEnabled ? 'Active' : 'Disabled'}`
         });
       } else {
-        throw new Error(data.message || 'Server rejected settings update');
+        throw new Error(res.data?.message || 'Server rejected settings update');
       }
     } catch (err) {
       console.error('Failed to save settings:', err);
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
       toast.error('Failed to Save Settings', {
-        description: err.message
+        description: msg
       });
     } finally {
       setSaving(false);

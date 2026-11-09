@@ -1,0 +1,12 @@
+{
+  "commissionRate": 5,
+  "minPayoutThreshold": 500,
+  "freeShippingThreshold": 499,
+  "shippingFee": 49,
+  "codEnabled": true,
+  "maintenanceMode": false,
+  "supportEmail": "support@mshoppy.in",
+  "supportPhone": "1800-890-1234",
+  "updatedAt": "2026-11-10T01:38:00.000Z",
+  "updatedBy": "Super Admin"
+}
