@@ -251,3 +251,71 @@ export const deleteProduct = async (req, res) => {
     });
   }
 };
+
+/**
+ * 5. BULK ACTION ON MULTIPLE PRODUCTS (ACTIVATE / DEACTIVATE / DELETE)
+ * Route: PATCH /api/v1/admin-products/bulk-status
+ */
+export const bulkUpdateProductStatus = async (req, res) => {
+  try {
+    const { productIds, action } = req.body;
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide at least one product ID in productIds array.'
+      });
+    }
+
+    if (!['ACTIVATE', 'DEACTIVATE', 'DELETE'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid action. Must be ACTIVATE, DEACTIVATE, or DELETE.'
+      });
+    }
+
+    let resultMessage = '';
+
+    if (action === 'ACTIVATE') {
+      const updateResult = await prisma.product.updateMany({
+        where: { id: { in: productIds } },
+        data: { isActive: true, isDeleted: false }
+      });
+      resultMessage = `Successfully activated ${updateResult.count} products!`;
+
+    } else if (action === 'DEACTIVATE') {
+      const updateResult = await prisma.product.updateMany({
+        where: { id: { in: productIds } },
+        data: { isActive: false }
+      });
+      resultMessage = `Successfully delisted/deactivated ${updateResult.count} products!`;
+
+    } else if (action === 'DELETE') {
+      // 1. Remove references from active cart & wishlists to prevent DB foreign key errors
+      await Promise.all([
+        prisma.cartItem.deleteMany({ where: { productId: { in: productIds } } }),
+        prisma.wishlistItem.deleteMany({ where: { productId: { in: productIds } } })
+      ]);
+
+      // 2. Soft delete selected products
+      const deleteResult = await prisma.product.updateMany({
+        where: { id: { in: productIds } },
+        data: { isDeleted: true, isActive: false, deletedAt: new Date() }
+      });
+      resultMessage = `Successfully deleted ${deleteResult.count} products from catalog!`;
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: resultMessage,
+      count: productIds.length
+    });
+  } catch (error) {
+    console.error('Error performing bulk product action:', error);
+    return res.status(500).json({
+      success: false,
+      message: `Bulk update failed: ${error.message}`
+    });
+  }
+};
+

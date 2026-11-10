@@ -8,13 +8,45 @@ export default function ProductsTable({
   products = [],
   loading = false,
   onInspectProduct,
-  formatCurrency
+  formatCurrency,
+  selectedIds = [],
+  onToggleSelect,
+  onToggleSelectAll
 }) {
+  const isAllSelected = products.length > 0 && selectedIds.length === products.length;
+
   const columns = [
+    // 0. Checkbox Column
+    {
+      header: (
+        <div className="flex items-center justify-center">
+          <input
+            type="checkbox"
+            checked={isAllSelected}
+            onChange={onToggleSelectAll}
+            className="w-4 h-4 rounded accent-[#b7004d] border-gray-300 cursor-pointer"
+            title={isAllSelected ? 'Deselect All' : 'Select All'}
+          />
+        </div>
+      ),
+      headerClassName: 'py-3.5 px-3 w-10 text-center',
+      cellClassName: 'py-3.5 px-3 w-10 text-center',
+      render: (product) => (
+        <div className="flex items-center justify-center">
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(product.id)}
+            onChange={() => onToggleSelect?.(product.id)}
+            className="w-4 h-4 rounded accent-[#b7004d] border-gray-300 cursor-pointer"
+          />
+        </div>
+      )
+    },
     {
       header: 'Product Details',
       render: (product) => {
-        const thumbnail = product.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100';
+        const thumbnail =
+          product.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100';
         return (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
@@ -48,7 +80,9 @@ export default function ProductsTable({
       render: (product) => {
         const priceStr = formatCurrency ? formatCurrency(product.price) : `₹${product.price}`;
         const originalPriceStr = product.originalPrice
-          ? (formatCurrency ? formatCurrency(product.originalPrice) : `₹${product.originalPrice}`)
+          ? formatCurrency
+            ? formatCurrency(product.originalPrice)
+            : `₹${product.originalPrice}`
           : null;
 
         return (
@@ -71,6 +105,28 @@ export default function ProductsTable({
     {
       header: 'Stock Inventory',
       render: (product) => <ProductStockBadge stock={product.stock} />
+    },
+    {
+      header: 'Listing Status',
+      headerClassName: 'py-3.5 px-4 font-semibold text-center',
+      cellClassName: 'py-3.5 px-4 text-center',
+      render: (product) => {
+        const isActive = product.isActive !== false;
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+              isActive
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border border-amber-200'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-amber-500'}`}
+            ></span>
+            {isActive ? 'Active' : 'Delisted'}
+          </span>
+        );
+      }
     },
     {
       header: 'Supplier & Delivery',

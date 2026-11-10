@@ -10,6 +10,7 @@ import ProductsStatsGrid from './ProductsStatsGrid';
 import FilterBar from '../../common/FilterBar';
 import ProductsTable from './ProductsTable';
 import ProductDetailModal from './ProductDetailModal';
+import BulkActionBar from './BulkActionBar';
 
 const STOCK_TABS = [
   { id: 'ALL', label: 'All Inventory 📦' },
@@ -42,6 +43,70 @@ export default function AdminProductsManagement() {
   // Selected Product for modal inspection & stock editing
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Multi-Selection State for Bulk Actions
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const handleToggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.length === products.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(products.map((p) => p.id));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const handleBulkAction = async (action) => {
+    if (selectedIds.length === 0) return;
+
+    if (action === 'DELETE') {
+      const confirmed = window.confirm(
+        `Are you sure you want to permanently delete ${selectedIds.length} selected products? This will also remove them from active carts and wishlists.`
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      setBulkLoading(true);
+      const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      const res = await axios.patch(
+        `${API_V1_BASE}/admin-products/bulk-status`,
+        { productIds: selectedIds, action },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (res.data?.success) {
+        toast.success('Bulk Action Completed! ✅', {
+          description: res.data.message || `Processed ${selectedIds.length} products successfully.`
+        });
+        setSelectedIds([]);
+        fetchProducts();
+      } else {
+        throw new Error(res.data?.message || 'Server rejected bulk action');
+      }
+    } catch (err) {
+      console.error('Error executing bulk product action:', err);
+      toast.error('Bulk Action Failed', {
+        description: err.response?.data?.message || err.message
+      });
+    } finally {
+      setBulkLoading(false);
+    }
+  };
 
   // Helper: Format Currency (INR)
   const formatCurrency = (amount) => {
@@ -255,9 +320,23 @@ export default function AdminProductsManagement() {
         loading={loading}
         onInspectProduct={setSelectedProduct}
         formatCurrency={formatCurrency}
+        selectedIds={selectedIds}
+        onToggleSelect={handleToggleSelect}
+        onToggleSelectAll={handleToggleSelectAll}
       />
 
-      {/* ── 4. PRODUCT INSPECT & EDIT MODAL ────────────────────────── */}
+      {/* ── 4. STICKY BULK ACTIONS FLOATING BAR ────────────────────── */}
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        totalCount={products.length}
+        onClearSelection={handleClearSelection}
+        onBulkActivate={() => handleBulkAction('ACTIVATE')}
+        onBulkDeactivate={() => handleBulkAction('DEACTIVATE')}
+        onBulkDelete={() => handleBulkAction('DELETE')}
+        loading={bulkLoading}
+      />
+
+      {/* ── 5. PRODUCT INSPECT & EDIT MODAL ────────────────────────── */}
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}

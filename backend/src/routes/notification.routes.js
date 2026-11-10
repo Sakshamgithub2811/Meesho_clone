@@ -15,3 +15,4 @@ router.patch('/:id/read', markNotificationRead);
 router.patch('/read-all', markAllNotificationsRead);
 
 export default router;
+
