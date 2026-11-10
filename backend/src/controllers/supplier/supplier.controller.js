@@ -583,6 +583,14 @@ export const getSupplierOrders = async (req, res, next) => {
  */
 export const updateOrderStatus = async (req, res, next) => {
   try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
     const { id } = req.params;
     const { orderStatus } = req.body;
 
@@ -601,6 +609,33 @@ export const updateOrderStatus = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}`,
+      });
+    }
+
+    // Verify order exists and contains items for this supplier (Prevent cross-supplier order tampering)
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            product: { select: { supplierId: true } },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const hasSupplierProduct = order.items.some(
+      (item) => item.product?.supplierId === supplierId
+    );
+
+    if (!hasSupplierProduct) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to modify status for another supplier\'s order',
       });
     }
 
@@ -917,10 +952,23 @@ export const downloadOrderInvoice = async (req, res, next) => {
     }
 
     const supplierId = req.supplierId || req.user?.id;
-    let supplierProfile = null;
-    if (supplierId) {
-      supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
+    if (!supplierId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
     }
+
+    // Verify supplier ownership of this order
+    const hasSupplierProduct = order.items.some(
+      (item) => item.product?.supplierId === supplierId
+    );
+
+    if (!hasSupplierProduct) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to download another supplier\'s shipping label',
+      });
+    }
+
+    let supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Invoice-${order.id.slice(0, 8).toUpperCase()}.pdf"`);
@@ -957,10 +1005,23 @@ export const downloadShippingLabel = async (req, res, next) => {
     }
 
     const supplierId = req.supplierId || req.user?.id;
-    let supplierProfile = null;
-    if (supplierId) {
-      supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
+    if (!supplierId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
     }
+
+    // Verify supplier ownership of this order
+    const hasSupplierProduct = order.items.some(
+      (item) => item.product?.supplierId === supplierId
+    );
+
+    if (!hasSupplierProduct) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to download another supplier\'s shipping label',
+      });
+    }
+
+    let supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="ShippingLabel-${order.id.slice(0, 8).toUpperCase()}.pdf"`);
@@ -997,14 +1058,14 @@ export const getSupplierReturns = async (req, res, next) => {
         order: {
           include: {
             user: {
-              select: { id: true, name: true, email: true, phone: true },
+              select: { id: true, fullName: true, email: true, phone: true },
             },
             returnRequest: true,
           },
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        order: { createdAt: 'desc' },
       },
     });
 
