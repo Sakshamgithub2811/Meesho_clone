@@ -6,6 +6,7 @@ import slugify from 'slugify';
 import { dispatchDeliveryOtpEmail } from '../order.controller.js';
 import { getUploadDir } from '../../middlewares/upload.middleware.js';
 import { uploadFileToSupabase } from '../../services/supabaseStorage.service.js';
+import { generateOrderPdf } from '../../services/invoicePdf.service.js';
 
 // Helper to persist uploaded files to Supabase Storage or fallback to local/tmp URL
 const uploadFileToStorage = async (file, baseUrl) => {
@@ -828,6 +829,86 @@ export const getSupplierAnalytics = async (req, res, next) => {
       },
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 11. Download Tax Invoice PDF
+ * GET /api/supplier/orders/:id/invoice
+ */
+export const downloadOrderInvoice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const supplierId = req.supplierId || req.user?.id;
+    let supplierProfile = null;
+    if (supplierId) {
+      supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Invoice-${order.id.slice(0, 8).toUpperCase()}.pdf"`);
+
+    const pdfDoc = generateOrderPdf(order, supplierProfile, 'invoice');
+    pdfDoc.pipe(res);
+  } catch (error) {
+    console.error('Error generating invoice PDF:', error);
+    next(error);
+  }
+};
+
+/**
+ * 12. Download 4x6 Shipping Label PDF
+ * GET /api/supplier/orders/:id/shipping-label
+ */
+export const downloadShippingLabel = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const supplierId = req.supplierId || req.user?.id;
+    let supplierProfile = null;
+    if (supplierId) {
+      supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="ShippingLabel-${order.id.slice(0, 8).toUpperCase()}.pdf"`);
+
+    const pdfDoc = generateOrderPdf(order, supplierProfile, 'label');
+    pdfDoc.pipe(res);
+  } catch (error) {
+    console.error('Error generating shipping label PDF:', error);
     next(error);
   }
 };

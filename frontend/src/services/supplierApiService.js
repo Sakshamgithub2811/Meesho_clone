@@ -331,6 +331,18 @@ export async function fetchSupplierAnalytics() {
   return data.data;
 }
 
+export function downloadOrderInvoice(orderId) {
+  const token = getAuthToken();
+  const url = `${API_BASE_URL}/supplier/orders/${orderId}/invoice${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  window.open(url, '_blank');
+}
+
+export function downloadShippingLabel(orderId) {
+  const token = getAuthToken();
+  const url = `${API_BASE_URL}/supplier/orders/${orderId}/shipping-label${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  window.open(url, '_blank');
+}
+
 export default {
   getAuthToken,
   getCurrentSupplier,
@@ -359,4 +371,6 @@ export default {
   updateOrderStatus,
   fetchSupplierSettlements,
   fetchSupplierAnalytics,
+  downloadOrderInvoice,
+  downloadShippingLabel,
 };

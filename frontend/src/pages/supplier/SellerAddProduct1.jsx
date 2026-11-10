@@ -30,33 +30,6 @@ import {
   Info
 } from 'lucide-react';
 
-// Preset sample images for rapid supplier testing
-const SAMPLE_PRESETS = [
-  {
-    name: '👗 Silk Saree Set (3 Photos)',
-    images: [
-      'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=800&q=80',
-    ],
-  },
-  {
-    name: '👕 Cotton Kurti (2 Photos)',
-    images: [
-      'https://images.unsplash.com/photo-1583391733975-087023d8544e?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1609357605129-26f69add5d6e?auto=format&fit=crop&w=800&q=80',
-    ],
-  },
-  {
-    name: '👞 Casual Shoes (3 Photos)',
-    images: [
-      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=800&q=80',
-    ],
-  },
-];
-
 // Client-side image compressor: Resizes device images to max 1280px & 0.75 JPEG quality (~90-150KB)
 const compressImageFile = (file) => {
   return new Promise((resolve) => {
