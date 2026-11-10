@@ -20,11 +20,12 @@ import AdminSeoManagement from '../../components/admin/seo/AdminSeoManagement';
 import AdminReviewsManagement from '../../components/admin/reviews/AdminReviewsManagement';
 import AdminFlashSaleManagement from '../../components/admin/flashSale/AdminFlashSaleManagement';
 import AdminSettingsManagement from '../../components/admin/settings/AdminSettingsManagement';
+import AdminBroadcastManagement from '../../components/admin/broadcast/AdminBroadcastManagement';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
   Package, ShoppingCart, RotateCcw, LineChart,
-  Wallet, Banknote, Store, Headphones, Layers, Ticket, Image, FileText, Globe, Star, Zap, Sliders
+  Wallet, Banknote, Store, Headphones, Layers, Ticket, Image, FileText, Globe, Star, Zap, Sliders, Megaphone
 } from 'lucide-react';
 // Yeh raha aapka MASTER MENU (with Sub-menus)
 const ADMIN_MENU = [
@@ -48,6 +49,7 @@ const ADMIN_MENU = [
   { id: 'cms', label: 'CMS Pages 📄', icon: FileText },
   { id: 'seo', label: 'SEO & Sitemap 🌐', icon: Globe },
   { id: 'settings', label: 'Platform Settings ⚙️', icon: Sliders },
+  { id: 'broadcast', label: 'Announcements 📢', icon: Megaphone },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
   { id: 'returns', label: 'Returns & Refunds ', icon: RotateCcw },
   { id: 'sellers', label: 'Sellers ', icon: Store },
@@ -100,6 +102,8 @@ export default function AdminWebPanel() {
         return { title: "Technical SEO & Sitemap Manager", subtitle: "Live search engine indexing, robots.txt directives, and sitemaps.org protocol" };
       case 'settings':
         return { title: "Global Platform Business Settings", subtitle: "Configure commission cuts, reseller payouts, free delivery thresholds, and payment gateway controls" };
+      case 'broadcast':
+        return { title: "Push Announcements & Broadcast Center", subtitle: "Dispatch targeted marketing alerts and platform notifications across all user devices" };
       case 'orders':
         return { title: "Manage Orders", subtitle: "Track, fulfill, and monitor customer orders" };
       case 'returns':
@@ -195,6 +199,10 @@ export default function AdminWebPanel() {
 
       {activeTab === 'settings' && (
         <AdminSettingsManagement />
+      )}
+
+      {activeTab === 'broadcast' && (
+        <AdminBroadcastManagement />
       )}
 
       {activeTab === 'orders' && (
