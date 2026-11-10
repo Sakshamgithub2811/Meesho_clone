@@ -443,12 +443,9 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
     };
     try {
       localStorage.setItem('mshoppy_buynow_item', JSON.stringify(buynowItem));
+      localStorage.setItem('mshoppy_checkout_mode', 'buynow');
     } catch (e) {}
-    try {
-      await addItem(product.id, 1, sizeToPass, product);
-    } catch (err) {
-      console.warn('Buy Now addItem fallback:', err);
-    }
+    // Express Buy Now checkout: do NOT add this item to persistent cart
     if (onNavigate) {
       onNavigate('address');
     } else {

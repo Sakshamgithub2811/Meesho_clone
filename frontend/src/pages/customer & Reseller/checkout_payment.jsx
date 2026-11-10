@@ -9,7 +9,8 @@ import {
   validateCoupon,
   getRazorpayConfig,
   createRazorpayOrder,
-  verifyRazorpayPayment
+  verifyRazorpayPayment,
+  clearCart
 } from '../../services/ecommerceService';
 import { recordAffiliateOrder } from '../../services/affiliateAuthService';
 import { addNotification } from '../../services/notificationService';
@@ -73,14 +74,21 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
           getActiveCoupons()
         ]);
 
-        let items = (cartRes?.items && cartRes.items.length > 0) ? cartRes.items : [];
-        if (items.length === 0) {
+        const checkoutMode = localStorage.getItem('mshoppy_checkout_mode');
+        let items = [];
+
+        if (checkoutMode === 'buynow') {
           try {
             const buynow = JSON.parse(localStorage.getItem('mshoppy_buynow_item') || 'null');
             if (buynow) {
               items = [buynow];
             }
           } catch (e) {}
+        }
+
+        // Only fall back to cart items if not in Buy Now mode
+        if (items.length === 0) {
+          items = (cartRes?.items && cartRes.items.length > 0) ? cartRes.items : [];
         }
         setCartItems(items);
 
@@ -269,6 +277,16 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
 
       if (res?.success && res.data) {
         setConfirmedOrder({ ...res.data, referralCode });
+        const checkoutMode = localStorage.getItem('mshoppy_checkout_mode');
+        if (checkoutMode === 'buynow') {
+          localStorage.removeItem('mshoppy_buynow_item');
+          localStorage.removeItem('mshoppy_checkout_mode');
+        } else {
+          try {
+            await clearCart();
+            localStorage.removeItem('mshoppy_checkout_mode');
+          } catch (e) {}
+        }
       } else {
         throw new Error(res?.message || 'Failed to place order in database');
       }
@@ -397,6 +415,16 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                   }
 
                   setConfirmedOrder({ ...verifyRes.data, referralCode });
+                  const checkoutMode = localStorage.getItem('mshoppy_checkout_mode');
+                  if (checkoutMode === 'buynow') {
+                    localStorage.removeItem('mshoppy_buynow_item');
+                    localStorage.removeItem('mshoppy_checkout_mode');
+                  } else {
+                    try {
+                      await clearCart();
+                      localStorage.removeItem('mshoppy_checkout_mode');
+                    } catch (e) {}
+                  }
                   triggerToast('🎉 Payment Verified & Order Placed Successfully!');
                   verified = true;
                 }
@@ -463,6 +491,8 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
     handleRazorpayPayment();
   };
 
+  const isBuyNow = typeof window !== 'undefined' && localStorage.getItem('mshoppy_checkout_mode') === 'buynow';
+
   return (
     <div className="bg-[#f8f9fb] text-[#191c1e] font-sans antialiased min-h-screen pb-36 selection:bg-pink-100 selection:text-pink-600">
       {/* Toast Alert */}
@@ -497,13 +527,13 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
           {/* Stepper (Desktop) */}
           <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-400">
             <span
-              onClick={() => handleNav('/cart')}
+              onClick={() => handleNav(isBuyNow ? '/user-home' : '/cart')}
               className="text-[#008644] font-extrabold flex items-center gap-1 cursor-pointer hover:underline"
             >
               <span className="w-5 h-5 rounded-full bg-[#008644] text-white flex items-center justify-center text-[10px]">
                 ✓
               </span>
-              Cart
+              {isBuyNow ? 'Product' : 'Cart'}
             </span>
             <span>─────</span>
             <span
@@ -805,7 +835,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
               {/* Payment Summary */}
               <section className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
                 <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2.5">
-                  Payment Summary ({cartItems.length} items)
+                  Payment Summary ({cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}{isBuyNow ? ' • Buy Now' : ''})
                 </h3>
 
                 <div className="space-y-3 text-xs sm:text-sm">
