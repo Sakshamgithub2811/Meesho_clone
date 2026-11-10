@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getAddresses, saveAddress } from '../../services/ecommerceService';
 import INDIAN_STATES from '../../utils/indianStates';
 
@@ -258,6 +258,12 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
     }));
   };
 
+  const [searchParams] = useSearchParams();
+  const urlMode = searchParams.get('mode');
+  const urlProductId = searchParams.get('productId');
+  const urlSize = searchParams.get('size');
+  const isBuyNow = (urlMode === 'buynow') || (typeof window !== 'undefined' && localStorage.getItem('mshoppy_checkout_mode') === 'buynow');
+
   const handleProceedToPayment = () => {
     if (selectedAddressId) {
       const chosen = addresses.find(a => a.id === selectedAddressId);
@@ -265,7 +271,10 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
     } else if (addresses.length > 0) {
       handleSelectAddress(addresses[0]);
     }
-    handleNav('/payment');
+    const query = isBuyNow
+      ? `?mode=buynow${urlProductId ? `&productId=${urlProductId}` : ''}${urlSize ? `&size=${encodeURIComponent(urlSize)}` : ''}`
+      : '';
+    handleNav(`/payment${query}`);
   };
 
   return (
@@ -283,7 +292,14 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
         <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16 max-w-7xl mx-auto w-full">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => (onBack ? onBack() : handleNav('/cart'))}
+              onClick={() => {
+                if (onBack) return onBack();
+                if (isBuyNow) {
+                  navigate(-1);
+                } else {
+                  handleNav('/cart');
+                }
+              }}
               className="p-2 rounded-full hover:bg-slate-100 active:scale-95 text-[#FF3F6C] cursor-pointer transition-colors"
               title="Back"
             >
@@ -302,13 +318,13 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
           {/* Stepper (Desktop) */}
           <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-400">
             <span
-              onClick={() => handleNav('/cart')}
+              onClick={() => handleNav(isBuyNow ? '/user-home' : '/cart')}
               className="text-[#008644] font-extrabold flex items-center gap-1 cursor-pointer hover:underline"
             >
               <span className="w-5 h-5 rounded-full bg-[#008644] text-white flex items-center justify-center text-[10px]">
                 ✓
               </span>
-              Cart
+              {isBuyNow ? 'Product' : 'Cart'}
             </span>
             <span>─────</span>
             <span className="text-[#FF3F6C] font-extrabold flex items-center gap-1">

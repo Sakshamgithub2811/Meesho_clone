@@ -439,20 +439,28 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
       productId: product.id,
       quantity: 1,
       size: sizeToPass,
-      product: product
+      product: {
+        id: product.id,
+        title: product.title,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        images: product.images,
+        categorySlug: product.categorySlug,
+        sizes: product.sizes
+      }
     };
     try {
       localStorage.setItem('mshoppy_buynow_item', JSON.stringify(buynowItem));
-    } catch (e) {}
-    try {
-      await addItem(product.id, 1, sizeToPass, product);
-    } catch (err) {
-      console.warn('Buy Now addItem fallback:', err);
+      localStorage.setItem('mshoppy_checkout_mode', 'buynow');
+    } catch (e) {
+      console.warn('LocalStorage buynow save warning:', e);
     }
+    // Express Buy Now checkout: do NOT add this item to persistent cart
+    const targetUrl = `/address?mode=buynow&productId=${product.id}&size=${encodeURIComponent(sizeToPass)}`;
     if (onNavigate) {
-      onNavigate('address');
+      onNavigate(targetUrl);
     } else {
-      navigate('/address');
+      navigate(targetUrl);
     }
   };
 

@@ -364,16 +364,6 @@ export default function SellerKyc1({ onNavigate }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleAutofillDemo}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-bold transition border border-amber-200 cursor-pointer"
-              title="Autofill verified business sample data for quick demonstration"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>Autofill Demo</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => loadKyc(true)}
               className="p-2.5 rounded-2xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
               title="Refresh KYC Status"

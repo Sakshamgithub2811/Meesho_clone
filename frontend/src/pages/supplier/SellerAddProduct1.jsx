@@ -571,21 +571,6 @@ export default function SellerAddProduct1({ onNavigate }) {
                 </div>
               </div>
 
-              {/* Sample Presets Helper */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[11px]">
-                <span className="text-slate-400 font-semibold shrink-0">Quick Fill:</span>
-                {SAMPLE_PRESETS.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => applyPreset(preset.images)}
-                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-pink-300 text-slate-600 hover:text-[#b7004d] font-medium transition shrink-0 cursor-pointer shadow-2xs"
-                  >
-                    {preset.name}
-                  </button>
-                ))}
-              </div>
-
               {/* Image Input Rows */}
               <div className="space-y-2.5">
                 {images.map((url, idx) => {

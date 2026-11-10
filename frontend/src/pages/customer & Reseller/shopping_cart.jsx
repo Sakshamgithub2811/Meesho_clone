@@ -58,6 +58,10 @@ export default function ShoppingCart({ onNavigate, onBack }) {
       setShowLoginModal(true);
       return;
     }
+    try {
+      localStorage.removeItem('mshoppy_buynow_item');
+      localStorage.setItem('mshoppy_checkout_mode', 'cart');
+    } catch (e) {}
     handleNav('/address');
   };
   const [couponDiscount, setCouponDiscount] = useState(0);
@@ -1301,6 +1305,10 @@ export default function ShoppingCart({ onNavigate, onBack }) {
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         onSuccess={() => {
+          try {
+            localStorage.removeItem('mshoppy_buynow_item');
+            localStorage.setItem('mshoppy_checkout_mode', 'cart');
+          } catch (e) {}
           handleNav('/address');
         }}
         actionTitle="Login to Checkout Your Cart"

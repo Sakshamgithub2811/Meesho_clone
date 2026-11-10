@@ -29,7 +29,9 @@ import {
   ShoppingBag,
   ArrowUpRight,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Banknote,
+  LineChart
 } from 'lucide-react';
 
 import { SUPPLIER_MENU } from './supplierNavConfig';
@@ -195,7 +197,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
     Array.isArray(stats?.recentOrders) && stats.recentOrders.length > 0
       ? stats.recentOrders
       : safeOrders.slice(0, 5).map((o, idx) => ({
-          orderId: o?.id || o?.orderId || `#ORD-${1000 + idx}`,
+          orderId: o?.id ? `#${String(o.id).slice(-8).toUpperCase()}` : (o?.orderId || 'Order'),
           productTitle: o?.productTitle || o?.title || o?.product?.title || 'Catalog Item',
           quantity: o?.quantity || 1,
           price: o?.price || o?.totalAmount || 0,
@@ -497,7 +499,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             {[
               {
                 title: 'Add Product',
@@ -521,6 +523,13 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
                 path: '/supplier-orders1',
               },
               {
+                title: 'Payouts',
+                desc: 'Bank & UTR ledger',
+                icon: Banknote,
+                color: 'text-emerald-700 bg-emerald-50 border-emerald-100',
+                path: '/supplier-settlements1',
+              },
+              {
                 title: 'Dropship Portal',
                 desc: 'Wholesale partner orders',
                 icon: Truck,
@@ -533,6 +542,13 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
                 icon: RotateCcw,
                 color: 'text-rose-600 bg-rose-50 border-rose-100',
                 path: '/supplier-returns1',
+              },
+              {
+                title: 'Analytics',
+                desc: 'Revenue & velocity',
+                icon: LineChart,
+                color: 'text-cyan-700 bg-cyan-50 border-cyan-100',
+                path: '/supplier-analytics1',
               },
               {
                 title: 'KYC & Profile',
@@ -635,7 +651,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
                       {recentOrdersList.map((order, idx) => (
                         <tr key={order.orderId || idx} className="hover:bg-slate-50/70 transition-colors">
                           <td className="py-3.5 px-2 font-mono font-bold text-slate-800">
-                            {order.orderId || `#ORD-${1000 + idx}`}
+                            {order.orderId || (order.id ? `#${String(order.id).slice(-8).toUpperCase()}` : 'Order')}
                           </td>
                           <td className="py-3.5 px-2 font-medium text-slate-700 max-w-[160px] truncate">
                             {order.productTitle || 'Catalog Product'}

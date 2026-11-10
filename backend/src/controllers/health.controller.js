@@ -9,6 +9,7 @@ export const checkHealth = (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     version: '1.0.0',
+
     modules: [
       'Customer & Reseller Shopping Flow',
       'Reseller & Dropshipper Hub',
