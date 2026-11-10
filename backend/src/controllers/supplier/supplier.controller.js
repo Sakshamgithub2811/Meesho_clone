@@ -70,7 +70,13 @@ const saveBase64Image = async (base64Str, baseUrl) => {
  */
 export const getDashboardStats = async (req, res, next) => {
   try {
-    const supplierId = req.supplierId || 'supplier_demo_001';
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
 
     // Total products for this supplier
     const totalProducts = await prisma.product.count({
@@ -127,7 +133,13 @@ export const getDashboardStats = async (req, res, next) => {
  */
 export const getSupplierProducts = async (req, res, next) => {
   try {
-    const supplierId = req.supplierId || 'supplier_demo_001';
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
     const { search, category, page = 1, limit = 20 } = req.query;
 
     const where = {};
@@ -171,7 +183,13 @@ export const getSupplierProducts = async (req, res, next) => {
  */
 export const addProduct = async (req, res, next) => {
   try {
-    const supplierId = req.supplierId || 'supplier_demo_001';
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
     const {
       title,
       description,
@@ -462,7 +480,13 @@ export const addCategory = async (req, res, next) => {
  */
 export const getSupplierOrders = async (req, res, next) => {
   try {
-    const supplierId = req.supplierId || 'supplier_demo_001';
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
 
     const orders = await prisma.order.findMany({
       where: {

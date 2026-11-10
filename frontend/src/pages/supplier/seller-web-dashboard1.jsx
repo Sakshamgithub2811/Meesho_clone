@@ -197,7 +197,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
     Array.isArray(stats?.recentOrders) && stats.recentOrders.length > 0
       ? stats.recentOrders
       : safeOrders.slice(0, 5).map((o, idx) => ({
-          orderId: o?.id || o?.orderId || `#ORD-${1000 + idx}`,
+          orderId: o?.id ? `#${String(o.id).slice(-8).toUpperCase()}` : (o?.orderId || 'Order'),
           productTitle: o?.productTitle || o?.title || o?.product?.title || 'Catalog Item',
           quantity: o?.quantity || 1,
           price: o?.price || o?.totalAmount || 0,
@@ -651,7 +651,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
                       {recentOrdersList.map((order, idx) => (
                         <tr key={order.orderId || idx} className="hover:bg-slate-50/70 transition-colors">
                           <td className="py-3.5 px-2 font-mono font-bold text-slate-800">
-                            {order.orderId || `#ORD-${1000 + idx}`}
+                            {order.orderId || (order.id ? `#${String(order.id).slice(-8).toUpperCase()}` : 'Order')}
                           </td>
                           <td className="py-3.5 px-2 font-medium text-slate-700 max-w-[160px] truncate">
                             {order.productTitle || 'Catalog Product'}

@@ -23,8 +23,10 @@ import {
   User,
   MapPin,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Printer
 } from 'lucide-react';
+import OrderPrintSlipModal from '../../components/admin/orders/OrderPrintSlipModal';
 
 const STATUS_OPTIONS = [
   { id: 'ALL', label: 'All Orders' },
@@ -53,6 +55,7 @@ export default function SellerOrders1({ onNavigate }) {
 
   // Selected Order for Detail Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [printOrder, setPrintOrder] = useState(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Load real orders from backend
@@ -440,6 +443,15 @@ export default function SellerOrders1({ onNavigate }) {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setPrintOrder(ord)}
+                              className="p-1.5 rounded-xl text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200 transition cursor-pointer"
+                              title="Print Shipping Label & AWB Barcode"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -524,9 +536,31 @@ export default function SellerOrders1({ onNavigate }) {
                     </select>
                   </div>
                 </div>
+
+                {/* Print Shipping Label CTA */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ord = selectedOrder;
+                    setSelectedOrder(null);
+                    setPrintOrder(ord);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-[#b7004d] hover:bg-[#92003d] text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print 4x6 Shipping Label & AWB Barcode</span>
+                </button>
               </div>
             </div>
           </div>
+        )}
+
+        {/* Printable Shipping Label & Barcode Modal */}
+        {printOrder && (
+          <OrderPrintSlipModal
+            order={printOrder}
+            onClose={() => setPrintOrder(null)}
+          />
         )}
       </div>
 
