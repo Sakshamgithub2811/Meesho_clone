@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. GET ALL SELLERS / SUPPLIERS FOR ADMIN
@@ -201,6 +202,16 @@ export const updateSellerTier = async (req, res) => {
         tier: formattedTier,
         tierLabel: `${formattedTier} Verified Supplier`
       }
+    });
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'SELLER_TIER_UPDATED',
+      targetType: 'SELLER',
+      targetId: id,
+      details: `Upgraded supplier "${updatedSeller.storeName || updatedSeller.fullName}" to ${formattedTier} Tier`
     });
 
     return res.status(200).json({

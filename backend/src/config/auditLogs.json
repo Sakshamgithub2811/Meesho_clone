@@ -1,5 +1,16 @@
 [
   {
+    "id": "log_1794308598505_j2rv",
+    "adminEmail": "sakshamshrivastava2811@gmail.com",
+    "adminName": "Saksham Shrivastava ",
+    "action": "BULK_PRODUCT_DEACTIVATE",
+    "targetType": "PRODUCT",
+    "targetId": "1_PRODUCTS",
+    "details": "Successfully delisted/deactivated 1 products!",
+    "ipAddress": "127.0.0.1",
+    "timestamp": "2026-11-10T11:03:18.506Z"
+  },
+  {
     "id": "log_seed_1",
     "adminEmail": "admin@meesho.com",
     "adminName": "Saksham (Super Admin)",
@@ -11,4 +22,3 @@
     "timestamp": "2026-11-10T15:30:00.000Z"
   }
 ]
-

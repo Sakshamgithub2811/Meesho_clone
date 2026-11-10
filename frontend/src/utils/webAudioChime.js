@@ -75,3 +75,4 @@ export function playNewOrderChime(volume = 0.4) {
     console.warn('Web Audio playback prevented by browser audio policy:', err);
   }
 }
+

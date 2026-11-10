@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. PUBLIC: Customer App Homepage Banners (Only active, sorted by displayOrder)
@@ -98,6 +99,16 @@ export const createAdminBanner = async (req, res) => {
       },
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'BANNER_CREATED',
+      targetType: 'MARKETING',
+      targetId: banner.id,
+      details: `Created homepage banner "${banner.title}" (Target: ${banner.targetUrl})`
+    });
+
     return res.status(201).json({
       success: true,
       message: `Banner "${banner.title}" saved to database`,
@@ -150,6 +161,16 @@ export const updateAdminBanner = async (req, res) => {
       data: updateData,
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'BANNER_UPDATED',
+      targetType: 'MARKETING',
+      targetId: id,
+      details: `Updated parameters for banner "${banner.title}"`
+    });
+
     return res.status(200).json({
       success: true,
       message: `Banner "${banner.title}" updated in database`,
@@ -182,6 +203,16 @@ export const toggleAdminBanner = async (req, res) => {
       data: { isActive: !existing.isActive },
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: banner.isActive ? 'BANNER_ACTIVATED' : 'BANNER_DISABLED',
+      targetType: 'MARKETING',
+      targetId: id,
+      details: `${banner.isActive ? 'Activated' : 'Hidden'} homepage banner "${banner.title}"`
+    });
+
     return res.status(200).json({
       success: true,
       message: `Banner is now ${banner.isActive ? 'Active on Homepage' : 'Hidden'}`,
@@ -211,6 +242,16 @@ export const deleteAdminBanner = async (req, res) => {
     }
 
     await prisma.banner.delete({ where: { id } });
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'BANNER_DELETED',
+      targetType: 'MARKETING',
+      targetId: id,
+      details: `Permanently deleted banner "${existing.title}"`
+    });
 
     return res.status(200).json({
       success: true,

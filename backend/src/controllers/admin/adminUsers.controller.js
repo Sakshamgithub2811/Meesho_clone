@@ -1,5 +1,6 @@
 import prisma from '../../config/prisma.js';
 import admin from '../../config/firebaseAdmin.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 const ALLOWED_ROLES = ['CUSTOMER', 'RESELLER', 'SUPPLIER', 'DRIVER', 'ADMIN', 'DROPSHIPPER'];
 
@@ -90,6 +91,16 @@ export const updateUserRole = async (req, res) => {
         avatarUrl: true,
         createdAt: true,
       }
+    });
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'USER_ROLE_CHANGED',
+      targetType: 'USER',
+      targetId: id,
+      details: `Changed role of user "${updatedUser.fullName || updatedUser.email}" from ${existing.role} to ${formattedRole}`
     });
 
     return res.status(200).json({
@@ -283,6 +294,16 @@ export const toggleUserStatus = async (req, res) => {
       }
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: isActive ? 'USER_ACCOUNT_ACTIVATED' : 'USER_ACCOUNT_SUSPENDED',
+      targetType: 'USER',
+      targetId: id,
+      details: `${isActive ? 'Activated' : 'Suspended/Deactivated'} account for user "${updatedUser.fullName || updatedUser.email}"`
+    });
+
     return res.status(200).json({
       success: true,
       message: `User account has been ${isActive ? 'activated' : 'deactivated'} successfully`,
@@ -320,6 +341,16 @@ export const deleteUser = async (req, res) => {
         console.warn("Firebase Auth deleteUser notice:", fbErr.message);
       }
     }
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'USER_DELETED',
+      targetType: 'USER',
+      targetId: id,
+      details: `Permanently deleted user account with ID ${id}`
+    });
 
     return res.status(200).json({
       success: true,

@@ -1,5 +1,6 @@
 import prisma from '../../config/prisma.js';
 import { readConfig, writeConfig, getDefaultConfig } from '../flashSale.controller.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. GET FLASH SALE MANAGEMENT DATA FOR ADMIN
@@ -124,6 +125,16 @@ export const updateAdminFlashSale = async (req, res) => {
       });
     }
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'FLASH_SALE_CONFIG_UPDATED',
+      targetType: 'MARKETING',
+      targetId: 'FLASH_SALE',
+      details: `Updated Flash Sale settings (Status: ${updated.status}, Min Discount: ${updated.minDiscount}%, Featured: ${updated.featuredProductIds?.length || 0} products)`
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Flash Sale configuration saved and live on storefront',
@@ -167,6 +178,16 @@ export const quickExtendTimer = async (req, res) => {
     };
 
     writeConfig(updated);
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'FLASH_SALE_TIMER_EXTENDED',
+      targetType: 'MARKETING',
+      targetId: 'FLASH_SALE',
+      details: `Quick extended Flash Sale campaign by ${addHours} hours until ${new Date(newEnd).toLocaleString('en-IN')}`
+    });
 
     return res.status(200).json({
       success: true,

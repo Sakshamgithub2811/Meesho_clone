@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. GET ALL COUPONS WITH STATS FOR ADMIN
@@ -112,6 +113,16 @@ export const createAdminCoupon = async (req, res) => {
       }
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'COUPON_CREATED',
+      targetType: 'MARKETING',
+      targetId: newCoupon.id,
+      details: `Created promo coupon "${cleanCode}" (${type === 'PERCENT' ? `${discountVal}%` : `₹${discountVal}`} discount, Min Order: ₹${minOrderVal})`
+    });
+
     return res.status(201).json({
       success: true,
       message: `Coupon "${cleanCode}" created successfully`,
@@ -182,6 +193,16 @@ export const updateAdminCoupon = async (req, res) => {
       data: updateData
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'COUPON_UPDATED',
+      targetType: 'MARKETING',
+      targetId: id,
+      details: `Updated parameters for promo coupon "${updated.code}"`
+    });
+
     return res.status(200).json({
       success: true,
       message: `Coupon "${updated.code}" updated successfully`,
@@ -215,6 +236,16 @@ export const toggleAdminCoupon = async (req, res) => {
       data: { isActive: !existing.isActive }
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: updated.isActive ? 'COUPON_ACTIVATED' : 'COUPON_DISABLED',
+      targetType: 'MARKETING',
+      targetId: id,
+      details: `${updated.isActive ? 'Activated' : 'Disabled'} promo coupon "${updated.code}"`
+    });
+
     return res.status(200).json({
       success: true,
       message: `Coupon "${updated.code}" is now ${updated.isActive ? 'Active' : 'Disabled'}`,
@@ -245,6 +276,16 @@ export const deleteAdminCoupon = async (req, res) => {
     }
 
     await prisma.coupon.delete({ where: { id } });
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'COUPON_DELETED',
+      targetType: 'MARKETING',
+      targetId: id,
+      details: `Permanently deleted coupon "${existing.code}"`
+    });
 
     return res.status(200).json({
       success: true,

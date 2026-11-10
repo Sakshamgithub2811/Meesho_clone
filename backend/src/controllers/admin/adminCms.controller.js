@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * Standard seed templates for default e-commerce legal & informational policies
@@ -328,6 +329,16 @@ export const createAdminCmsPage = async (req, res) => {
       }
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'CMS_PAGE_CREATED',
+      targetType: 'SYSTEM',
+      targetId: newPage.id,
+      details: `Created CMS legal/policy page "${newPage.title}" (Slug: /${newPage.slug})`
+    });
+
     return res.status(201).json({
       success: true,
       message: 'CMS page created successfully',
@@ -391,6 +402,16 @@ export const updateAdminCmsPage = async (req, res) => {
       }
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'CMS_PAGE_UPDATED',
+      targetType: 'SYSTEM',
+      targetId: id,
+      details: `Updated CMS policy page "${updated.title}"`
+    });
+
     return res.status(200).json({
       success: true,
       message: 'CMS page updated successfully',
@@ -430,6 +451,16 @@ export const toggleAdminCmsPageStatus = async (req, res) => {
       data: { status: newStatus }
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: newStatus === 'PUBLISHED' ? 'CMS_PAGE_PUBLISHED' : 'CMS_PAGE_UNPUBLISHED',
+      targetType: 'SYSTEM',
+      targetId: id,
+      details: `${newStatus === 'PUBLISHED' ? 'Published' : 'Unpublished (Draft)'} CMS page "${page.title}"`
+    });
+
     return res.status(200).json({
       success: true,
       message: `Page marked as ${newStatus}`,
@@ -466,6 +497,16 @@ export const deleteAdminCmsPage = async (req, res) => {
 
     await prisma.cmsPage.delete({
       where: { id }
+    });
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'CMS_PAGE_DELETED',
+      targetType: 'SYSTEM',
+      targetId: id,
+      details: `Permanently deleted CMS page "${existing.title}"`
     });
 
     return res.status(200).json({

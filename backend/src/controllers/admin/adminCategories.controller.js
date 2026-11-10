@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. GET ALL CATEGORIES & STATS FOR ADMIN (Including Parent/Subcategory Hierarchy)
@@ -120,6 +121,16 @@ export const createCategory = async (req, res) => {
       }
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: parentId ? 'SUBCATEGORY_CREATED' : 'CATEGORY_CREATED',
+      targetType: 'CATALOG',
+      targetId: newCategory.id,
+      details: `Created ${parentId ? 'subcategory' : 'category'} "${newCategory.name}" (Slug: ${newCategory.slug})`
+    });
+
     res.status(201).json({
       success: true,
       message: parentId ? 'Subcategory created successfully' : 'Category created successfully',
@@ -210,6 +221,16 @@ export const updateCategory = async (req, res) => {
       }
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'CATEGORY_UPDATED',
+      targetType: 'CATALOG',
+      targetId: id,
+      details: `Updated category "${updated.name}" (Slug: ${updated.slug})`
+    });
+
     res.status(200).json({
       success: true,
       message: 'Category updated successfully',
@@ -258,6 +279,16 @@ export const deleteCategory = async (req, res) => {
     }
 
     await prisma.category.delete({ where: { id } });
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'CATEGORY_DELETED',
+      targetType: 'CATALOG',
+      targetId: id,
+      details: `Permanently deleted category "${category.name}"`
+    });
 
     res.status(200).json({
       success: true,

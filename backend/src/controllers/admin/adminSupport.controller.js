@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. GET ALL SUPPORT TICKETS FOR ADMIN (With Filters, Search & Summary KPIs)
@@ -202,6 +203,16 @@ export const updateTicketStatus = async (req, res) => {
         console.warn('Could not create notification for user:', notifErr.message);
       }
     }
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: `SUPPORT_TICKET_${status}`,
+      targetType: 'SUPPORT',
+      targetId: id,
+      details: `Support ticket #${id.slice(-6)} marked as ${status} (Subject: "${existing.subject}")${adminNotes ? ` - Notes: ${adminNotes}` : ''}`
+    });
 
     res.status(200).json({
       success: true,

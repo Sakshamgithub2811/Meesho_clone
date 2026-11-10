@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. GET ALL RETURN REQUESTS FOR ADMIN (With Filters, Search & Summary KPIs)
@@ -325,6 +326,16 @@ export const updateReturnStatus = async (req, res) => {
       }
 
       return updatedReturn;
+    });
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: `RETURN_${lowerStatus.toUpperCase()}`,
+      targetType: 'RETURN',
+      targetId: id,
+      details: `Return request #${id.slice(-6)} marked as ${lowerStatus.toUpperCase()} (Order #${existingReturn.orderId?.slice(-6) || 'N/A'})${adminNotes ? ` - Notes: ${adminNotes}` : ''}`
     });
 
     return res.status(200).json({

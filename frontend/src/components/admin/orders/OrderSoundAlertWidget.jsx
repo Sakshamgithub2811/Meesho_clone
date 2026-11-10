@@ -256,3 +256,4 @@ export default function OrderSoundAlertWidget({ onNavigateToOrders }) {
     </div>
   );
 }
+

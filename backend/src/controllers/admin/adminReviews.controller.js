@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. GET ALL REVIEWS FOR ADMIN WITH PAGINATION, FILTER & KPIS
@@ -220,6 +221,16 @@ export const toggleReviewVisibility = async (req, res) => {
       }
     });
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: isHidden ? 'REVIEW_HIDDEN' : 'REVIEW_APPROVED',
+      targetType: 'UGC',
+      targetId: id,
+      details: `${isHidden ? 'Hidden' : 'Approved'} customer review for product #${existing.productId.slice(-6)}`
+    });
+
     return res.status(200).json({
       success: true,
       message: isHidden ? 'Review hidden from customer storefront' : 'Review approved and visible to customers',
@@ -264,6 +275,16 @@ export const replyToReview = async (req, res) => {
       data: {
         adminReply: adminReply ? adminReply.trim() : null
       }
+    });
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'REVIEW_REPLIED',
+      targetType: 'UGC',
+      targetId: id,
+      details: `Admin replied to review #${id.slice(-6)}: "${(adminReply || '').slice(0, 40)}..."`
     });
 
     return res.status(200).json({
@@ -325,6 +346,16 @@ export const deleteReview = async (req, res) => {
         rating: newAvgRating,
         reviewsCount: newReviewsCount
       }
+    });
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'REVIEW_DELETED',
+      targetType: 'UGC',
+      targetId: id,
+      details: `Permanently deleted abusive/spam review #${id.slice(-6)} from product #${existing.productId.slice(-6)}`
     });
 
     return res.status(200).json({
