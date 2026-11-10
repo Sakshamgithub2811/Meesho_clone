@@ -9,3 +9,4 @@ router.use(verifyAuth, authorizeRole('ADMIN'));
 router.get('/', getAuditLogs);
 
 export default router;
+

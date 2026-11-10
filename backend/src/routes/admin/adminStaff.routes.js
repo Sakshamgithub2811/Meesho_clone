@@ -17,3 +17,4 @@ router.patch('/:id', updateStaffMember);
 router.delete('/:id', deleteStaffMember);
 
 export default router;
+

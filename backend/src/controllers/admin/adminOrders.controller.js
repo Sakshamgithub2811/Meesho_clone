@@ -1,5 +1,6 @@
 import prisma from '../../config/prisma.js';
 import { dispatchDeliveryOtpEmail } from '../order.controller.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. GET ALL ORDERS FOR ADMIN (With Filters, Search & Summary KPIs)
@@ -386,6 +387,16 @@ export const updateOrderStatus = async (req, res) => {
       }
     }
 
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'ORDER_STATUS_UPDATED',
+      targetType: 'ORDER',
+      targetId: id,
+      details: `Updated order #${id.slice(-6)} status to ${upperOrder} (Courier: ${courierPartner || 'N/A'}, AWB: ${trackingNumber || 'N/A'})`
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Order updated successfully with logistics details',
@@ -398,5 +409,78 @@ export const updateOrderStatus = async (req, res) => {
       message: 'Failed to update order status',
       error: error.message
     });
+  }
+};
+
+/**
+ * 4. GET LIVE ORDER UPDATES (Heartbeat Polling for Real-Time Chime & Toasts)
+ * Route: GET /api/v1/admin-orders/live-poll?since=<ISOString>
+ */
+export const getLiveOrderUpdates = async (req, res) => {
+  try {
+    const { since } = req.query;
+
+    if (!since) {
+      const latestOrder = await prisma.order.findFirst({
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, createdAt: true }
+      });
+      return res.status(200).json({
+        success: true,
+        hasNewOrders: false,
+        count: 0,
+        latestTimestamp: latestOrder?.createdAt || new Date().toISOString(),
+        orders: []
+      });
+    }
+
+    const sinceDate = new Date(since);
+    const newOrders = await prisma.order.findMany({
+      where: {
+        createdAt: { gt: sinceDate }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true
+          }
+        },
+        orderItems: {
+          take: 3,
+          include: {
+            product: {
+              select: { title: true }
+            }
+          }
+        }
+      }
+    });
+
+    const hasNewOrders = newOrders.length > 0;
+    const latestTimestamp = hasNewOrders ? newOrders[0].createdAt : since;
+
+    return res.status(200).json({
+      success: true,
+      hasNewOrders,
+      count: newOrders.length,
+      latestTimestamp,
+      orders: newOrders.map((o) => ({
+        id: o.id,
+        orderNumber: o.id ? `#ORD-${o.id.slice(-6).toUpperCase()}` : '#ORD',
+        customerName: o.user?.fullName || 'Customer',
+        totalAmount: o.totalAmount,
+        status: o.orderStatus,
+        createdAt: o.createdAt,
+        firstItemTitle: o.orderItems?.[0]?.product?.title || 'Meesho Product'
+      }))
+    });
+  } catch (error) {
+    console.error('Error in live order polling:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -26,6 +26,7 @@ import AdminSettingsManagement from '../../components/admin/settings/AdminSettin
 import AdminBroadcastManagement from '../../components/admin/broadcast/AdminBroadcastManagement';
 import AdminStaffManagement from '../../components/admin/staff/AdminStaffManagement';
 import AdminAuditManagement from '../../components/admin/audit/AdminAuditManagement';
+import OrderSoundAlertWidget from '../../components/admin/orders/OrderSoundAlertWidget';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
@@ -288,6 +289,9 @@ export default function AdminWebPanel() {
       {activeTab === 'support' && (
         <AdminSupportManagement />
       )}
+
+      {/* Real-Time Order Sound Alert & Live Radar Widget */}
+      <OrderSoundAlertWidget onNavigateToOrders={setActiveTab} />
 
     </DashboardLayout>
   );
