@@ -295,6 +295,18 @@ export async function updateOrderStatus(orderId, orderStatus) {
   return data.data;
 }
 
+// Get Settlements & Payouts (Finance)
+export async function fetchSupplierSettlements() {
+  const data = await request('/supplier/finance-settlements');
+  return data.data;
+}
+
+// Get Supplier Analytics & Performance
+export async function fetchSupplierAnalytics() {
+  const data = await request('/supplier/analytics');
+  return data.data;
+}
+
 export default {
   getAuthToken,
   getCurrentSupplier,
@@ -320,4 +332,6 @@ export default {
   createCategory,
   fetchSupplierOrders,
   updateOrderStatus,
+  fetchSupplierSettlements,
+  fetchSupplierAnalytics,
 };

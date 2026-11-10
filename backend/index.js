@@ -5,7 +5,10 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config();
 
 // Auto-reloaded for soft-delete & Prisma client sync
@@ -21,9 +24,6 @@ import prisma from './src/config/prisma.js';
 import apiRouter from './src/routes/api.routes.js';
 import seoRoutes from './src/routes/seo.routes.js';
 import { notFoundHandler, errorHandler } from './src/middlewares/errorHandler.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 5000;
