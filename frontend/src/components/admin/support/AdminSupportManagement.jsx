@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
@@ -58,13 +59,14 @@ export default function AdminSupportManagement() {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
       const params = new URLSearchParams();
 
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
       if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
       const res = await axios.get(
-        `http://localhost:5000/api/v1/admin-support?${params.toString()}`,
+        `${API_V1_BASE}/admin-support?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -95,7 +97,9 @@ export default function AdminSupportManagement() {
   };
 
   useEffect(() => {
-    fetchTickets();
+    if (auth.currentUser || currentUser?.id) {
+      fetchTickets();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchTickets();
@@ -117,9 +121,10 @@ export default function AdminSupportManagement() {
     try {
       setActionLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const res = await axios.patch(
-        `http://localhost:5000/api/v1/admin-support/${ticketId}/status`,
+        `${API_V1_BASE}/admin-support/${ticketId}/status`,
         { status: newStatus, adminNotes },
         {
           headers: {

@@ -19,7 +19,23 @@ export default function AppBottomNav({ activeNav, active, onNavigate, role = 're
     }
   };
 
-  const isCustomer = role === 'customer' || homePath === '/user-home';
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isCustomerPath = [
+    '/user-home',
+    '/flash',
+    '/explorer',
+    '/categories',
+    '/search',
+    '/product',
+    '/cart',
+    '/wishlist',
+    '/orders',
+    '/sarees',
+    '/western',
+    '/spotlight'
+  ].some((p) => currentPath.startsWith(p));
+
+  const isCustomer = role === 'customer' || homePath === '/user-home' || isCustomerPath;
   const effectiveHome = homePath || (isCustomer ? '/user-home' : '/reseller-home');
 
   const navItems = isCustomer ? [
@@ -28,19 +44,17 @@ export default function AppBottomNav({ activeNav, active, onNavigate, role = 're
     { id: 'orders', label: 'Orders', icon: 'shopping_bag', path: '/orders' },
     { id: 'wishlist', label: 'Wishlist', icon: 'favorite', path: '/wishlist' },
     { id: 'profile', label: 'Profile', icon: 'person', path: '/user-dashboard1?tab=profile' },
-    { id: 'screens', label: 'Screens', icon: 'layers', badge: '68' },
   ] : [
     { id: 'home', label: 'Home', icon: 'home', path: '/reseller-home' },
     { id: 'categories', label: 'Categories', icon: 'grid_view', path: '/explorer' },
     { id: 'orders', label: 'Orders', icon: 'shopping_bag', path: '/orders' },
     { id: 'earnings', label: 'Earnings', icon: 'payments', path: '/earnings-dashboard-1' },
     { id: 'profile', label: 'Profile', icon: 'person', path: '/user-dashboard1?tab=profile' },
-    { id: 'screens', label: 'Screens', icon: 'layers', badge: '68' },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-t-[1.75rem] md:rounded-t-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.08)] md:shadow-[0_-12px_40px_rgba(0,0,0,0.12)] border-t border-gray-100 dark:border-slate-800 pb-safe">
-      <div className="max-w-md sm:max-w-xl md:max-w-3xl lg:max-w-5xl mx-auto grid grid-cols-6 items-center px-1 sm:px-4 md:px-8 py-1.5 md:py-2.5">
+    <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-t-[1.75rem] shadow-[0_-8px_30px_rgba(0,0,0,0.08)] border-t border-gray-100 dark:border-slate-800 pb-safe">
+      <div className="max-w-md mx-auto grid grid-cols-5 items-center px-1 py-1.5">
         {navItems.map((item) => {
           const isActive = effectiveActive === item.id;
           return (

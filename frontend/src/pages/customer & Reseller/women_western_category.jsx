@@ -36,7 +36,7 @@ export default function WomenWesternCategory({ onNavigate, onBack }) {
       setLoading(true);
       try {
         const [prods, cart, wish] = await Promise.all([
-          getProducts({ category: 'women-western' }),
+          getProducts({ category: 'women-western', all: true }),
           getCart(),
           getWishlist()
         ]);
@@ -78,7 +78,7 @@ export default function WomenWesternCategory({ onNavigate, onBack }) {
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     try {
-      await addToCart(product.id, 1, product.sizes?.[0] || 'Free Size');
+      await addToCart(product.id, 1, product.sizes?.[0] || 'Free Size', product);
       setCartCount((c) => c + 1);
       triggerToast(`Added ${product.title.slice(0, 20)}... to Cart! 🛍️`);
     } catch (e) {
@@ -245,7 +245,7 @@ export default function WomenWesternCategory({ onNavigate, onBack }) {
         )}
       </main>
 
-      <AppBottomNav activeNav="search" onNavigate={handleNav} />
+      <AppBottomNav activeNav="categories" onNavigate={handleNav} role="customer" homePath="/user-home" />
     </div>
   );
 }

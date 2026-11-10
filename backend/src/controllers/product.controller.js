@@ -1,20 +1,39 @@
 import prisma from '../config/prisma.js';
+import redisClient from '../config/redisClient.js';
 
 /**
  * Controller to fetch all products with optional filters, search, and sorting.
  */
 export const getProducts = async (req, res) => {
   try {
-    const { category, search, minPrice, maxPrice, sort, page = 1, limit = 50 } = req.query;
+    const { category, search, minPrice, maxPrice, sort, page = 1, limit, all } = req.query;
 
-    const conditions = [];
+    const isFetchAll = all === 'true' || limit === 'all' || limit === '0' || limit === 'max';
+    const pageNum = parseInt(page) || 1;
+    const take = isFetchAll ? undefined : (parseInt(limit) || 24);
+    const skip = isFetchAll ? undefined : ((pageNum - 1) * take);
+
+    // Fast-path: Check Redis cache if running
+    const cacheKey = `products:${category || 'all'}:${search || ''}:${minPrice || ''}:${maxPrice || ''}:${sort || 'default'}:${isFetchAll ? 'all' : pageNum}:${isFetchAll ? 'all' : take}`;
+    if (redisClient?.isOpen) {
+      try {
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+          return res.status(200).json(JSON.parse(cached));
+        }
+      } catch (cacheErr) {}
+    }
+
+    const conditions = [
+      { isDeleted: false } // Soft delete filter: do not show discontinued/deleted products in live catalog
+    ];
 
     // Category filter - exact slug/name matching (prevents 'men' from loosely matching 'women-ethnic')
     if (category && category !== 'All' && category !== 'all') {
       const catLower = category.toLowerCase().trim();
       let targetSlugs = [];
 
-      if (catLower === 'men') {
+      if (catLower === 'men' || catLower === 'men-western' || catLower === 'menswear') {
         targetSlugs = ['men'];
       } else if (catLower === 'women' || catLower === 'women ethnic' || catLower === 'women-ethnic' || catLower === 'ethnic wear') {
         targetSlugs = ['women-ethnic'];
@@ -77,9 +96,6 @@ export const getProducts = async (req, res) => {
     if (sort === 'rating' || sort === 'highest_rating') orderBy = { rating: 'desc' };
     if (sort === 'popular') orderBy = { reviewsCount: 'desc' };
 
-    const take = parseInt(limit);
-    const skip = (parseInt(page) - 1) * take;
-
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -89,18 +105,30 @@ export const getProducts = async (req, res) => {
           }
         },
         orderBy,
-        skip,
-        take
+        ...(take !== undefined ? { skip, take } : {})
       }),
       prisma.product.count({ where })
     ]);
 
-    return res.status(200).json({
+    const totalPages = isFetchAll ? 1 : Math.ceil(total / (take || 1));
+    const hasMore = isFetchAll ? false : (skip + products.length < total);
+
+    const responsePayload = {
       success: true,
       count: products.length,
       total,
+      page: isFetchAll ? 1 : pageNum,
+      limit: isFetchAll ? total : take,
+      totalPages,
+      hasMore,
       data: products
-    });
+    };
+
+    if (redisClient?.isOpen) {
+      redisClient.setEx(cacheKey, 60, JSON.stringify(responsePayload)).catch(() => {});
+    }
+
+    return res.status(200).json(responsePayload);
   } catch (error) {
     console.error('Error fetching products:', error);
     return res.status(500).json({
@@ -352,25 +380,71 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
-    // Safely delete associated cart items, wishlist items, reviews, and order items first
-    await prisma.$transaction([
-      prisma.cartItem.deleteMany({ where: { productId: id } }),
-      prisma.wishlistItem.deleteMany({ where: { productId: id } }),
-      prisma.review.deleteMany({ where: { productId: id } }),
-      prisma.orderItem.deleteMany({ where: { productId: id } }),
-      prisma.product.delete({ where: { id } })
-    ]);
+    // Soft delete: remove from active carts and wishlists so new customers cannot buy,
+    // but PRESERVE all historical orderItems and reviews so past customer orders remain intact!
+    const softDeleted = await prisma.$transaction(async (tx) => {
+      await tx.cartItem.deleteMany({ where: { productId: id } });
+      await tx.wishlistItem.deleteMany({ where: { productId: id } });
+      return await tx.product.update({
+        where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date()
+        }
+      });
+    });
 
     return res.status(200).json({
       success: true,
-      message: 'Product deleted successfully',
-      deletedProduct: existing
+      message: 'Product discontinued & soft-deleted successfully. Historical customer orders preserved.',
+      deletedProduct: softDeleted
     });
   } catch (error) {
-    console.error('Error deleting product:', error);
+    console.error('Error soft-deleting product:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to delete product: ' + error.message,
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Controller to restore a soft-deleted product back to active catalog.
+ */
+export const restoreProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.product.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const restoredProduct = await prisma.product.update({
+      where: { id },
+      data: {
+        isDeleted: false,
+        deletedAt: null
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Product restored to active catalog successfully',
+      product: restoredProduct
+    });
+  } catch (error) {
+    console.error('Error restoring product:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to restore product: ' + error.message,
       error: error.message
     });
   }

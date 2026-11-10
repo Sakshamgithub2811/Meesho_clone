@@ -1,46 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
-
-const INITIAL_PROOFS = [
-  {
-    id: 'proof-1',
-    name: 'payment_error.png',
-    url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCdMvx2gLqJxS_W4A4BC1WWdLa0acmtXKywSzjchEJVYtKjfBC3cyxE3Mo2NwW-qRUL1w2o3PKGalp71o82pGzcNzcUZTtBNzcu5liASHfOGgZlmfH884lrnFmqDZD7YKUuWvI81uim7mJxFn3reHE0BFETRGHIczrsel35zSm0XDQ9fUYI8Qf9p2jU8eguJkhyvwcAHVEmRR2jcI4bdxNsVuwPLWyNC2n6t_PYN7hvQoALFghJm2SYdWwF1GfmIpH0yG6Jlj1CE68',
-  },
-  {
-    id: 'proof-2',
-    name: 'digital_receipt.png',
-    url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBhB9TSDaNVuUVE_tf6avhFubnnLx4NKuFGU0SI0AYC1mKGDMTUovPPCLKipCAVNM4d1w90F3efZD2-0IaOekGK6POmR9XYh-NBQAR1_KiCcG-ijYRMH_nz3RYG0NRgfG8s8irhwR9KSSdT_H6NrIgWJR2l01L2BJKijn9YWy1I7bPGuM4sJGtEmg47RyN-z_O6BJzFYwZDuCagLOT33GIKHmXtTuNcdMOwkgWqkgQvu8PM9lAUZssSzj2TmR_MPQu3SC33RZFUgDI',
-  },
-];
-
-const INITIAL_PAST_TICKETS = [
-  {
-    id: '#TICK-9942',
-    subject: 'Delayed margin credit for Order #MS-7718',
-    category: 'Reseller Earnings',
-    status: 'In Review',
-    statusStyle: 'bg-amber-100 text-amber-800',
-    date: '10 Sep 2026',
-  },
-  {
-    id: '#TICK-8812',
-    subject: 'Return parcel damaged in transit',
-    category: 'Order & Delivery',
-    status: 'Resolved',
-    statusStyle: 'bg-emerald-100 text-emerald-800',
-    date: '02 Sep 2026',
-  },
-];
+import { getOrders, getAuthHeaders } from '../../services/ecommerceService';
+import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import { API_V1_BASE } from '../../config/apiConfig';
 
 export function RaiseATicket({ onNavigate, onBack }) {
   const [category, setCategory] = useState('order');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [orderId, setOrderId] = useState('');
-  const [proofs, setProofs] = useState(INITIAL_PROOFS);
-  const [tickets, setTickets] = useState(INITIAL_PAST_TICKETS);
+  const [proofs, setProofs] = useState([]);
+  const [tickets, setTickets] = useState([]);
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // Fetch real user tickets directly from PostgreSQL database
+  useEffect(() => {
+    let isMounted = true;
+    fetch(`${API_V1_BASE}/admin-support/my-tickets`, {
+      headers: getAuthHeaders(),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data?.data && Array.isArray(data.data)) {
+          const mapped = data.data.map((t) => ({
+            id: `#TICK-${String(t.id).slice(-6).toUpperCase()}`,
+            dbId: t.id,
+            subject: t.subject,
+            category: t.category,
+            status: t.status === 'OPEN' ? 'In Review' : t.status === 'RESOLVED' ? 'Resolved' : t.status,
+            statusStyle: t.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800',
+            date: new Date(t.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+            description: t.description,
+          }));
+          setTickets(mapped);
+        }
+      })
+      .catch((err) => console.warn('Could not fetch tickets from backend:', err));
+
+    return () => { isMounted = false; };
+  }, []);
 
   // Modals
   const [submittedTicket, setSubmittedTicket] = useState(null);
@@ -64,74 +64,158 @@ export function RaiseATicket({ onNavigate, onBack }) {
     showToast('Removed attachment.');
   };
 
-  const handleAddSampleProof = () => {
-    const newProof = {
-      id: `proof-${Date.now()}`,
-      name: `screenshot_${proofs.length + 1}.png`,
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDNwJNreXrxO2McKFSQplCmbdn4grgCMWr1TneXlp18OAHUwMguAUJKl_366lS42uli0pQOedVG5u0ELftJDfIexTYo1mjZh7tkRJSdLt9hgvKY880sA9_2SNY-8RFjUXJFn1fyJ8VKQ3YmuBqmuvq7xx9sZtSdcwsyMrjA28X4lsC3Ld66dqaI3wSenhfVG88zlHWjyLnP_nb_WEK-9jOzrhXq4wS4O27KwszZscow0STK8MdWDpDR5KNSZZ9lVwvyLvkHqGXAJTQ',
-    };
-    setProofs([...proofs, newProof]);
-    showToast('Screenshot attached successfully!');
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const newItems = files.map((file) => ({
+      id: `proof-${Date.now()}-${Math.random()}`,
+      name: file.name,
+      url: URL.createObjectURL(file),
+      file
+    }));
+    setProofs((prev) => [...prev, ...newItems]);
+    showToast(`${files.length} photo proof attached!`);
   };
 
-  const handleSubmitTicket = (e) => {
+  const handleSubmitTicket = async (e) => {
     e.preventDefault();
     if (!subject.trim() || !description.trim()) {
       showToast('Please fill in both subject and description.');
       return;
     }
 
-    const ticketNumber = `#TICK-${Math.floor(10000 + Math.random() * 90000)}`;
-    const newTicket = {
-      id: ticketNumber,
-      subject: subject.trim(),
-      category:
-        category === 'order'
-          ? 'Order & Delivery'
-          : category === 'payment'
-          ? 'Payment & Refunds'
-          : category === 'reseller'
-          ? 'Reseller Earnings'
-          : category === 'account'
-          ? 'Account & Security'
-          : 'Other Concerns',
-      status: 'In Review',
-      statusStyle: 'bg-amber-100 text-amber-800',
-      date: 'Today',
-      description: description.trim(),
-      orderId: orderId.trim(),
-    };
+    if (isSubmittingTicket) return;
+    setIsSubmittingTicket(true);
 
-    setTickets([newTicket, ...tickets]);
-    setSubmittedTicket(newTicket);
-    setSubject('');
-    setDescription('');
-    setOrderId('');
-    showToast(`Ticket ${ticketNumber} raised successfully!`);
+    const formattedCat =
+      category === 'order'
+        ? 'Order & Delivery'
+        : category === 'payment'
+        ? 'Payment & Refunds'
+        : category === 'reseller'
+        ? 'Reseller Earnings'
+        : category === 'account'
+        ? 'Account & Security'
+        : 'Other Concerns';
+
+    try {
+      const res = await fetch(`${API_V1_BASE}/admin-support/create`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          subject: subject.trim(),
+          description: description.trim(),
+          category: formattedCat,
+          orderId: orderId.trim() || undefined
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || 'Failed to submit ticket');
+      }
+
+      const serverTicket = data.data;
+      const ticketNumber = `#TICK-${String(serverTicket.id).slice(-6).toUpperCase()}`;
+      const newTicket = {
+        id: ticketNumber,
+        dbId: serverTicket.id,
+        subject: serverTicket.subject,
+        category: serverTicket.category,
+        status: 'In Review',
+        statusStyle: 'bg-amber-100 text-amber-800',
+        date: 'Today',
+        description: serverTicket.description,
+        orderId: orderId.trim(),
+      };
+
+      setTickets((prev) => [newTicket, ...prev]);
+      setSubmittedTicket(newTicket);
+      setSubject('');
+      setDescription('');
+      setOrderId('');
+      setProofs([]);
+      showToast(`Ticket ${ticketNumber} raised successfully in database! 🎫`);
+    } catch (err) {
+      console.error('Error submitting support ticket:', err);
+      showToast(err.message || 'Could not raise ticket. Please try again.');
+    } finally {
+      setIsSubmittingTicket(false);
+    }
   };
 
   const handleSendAiMessage = (e) => {
     e.preventDefault();
     if (!aiChatInput.trim()) return;
 
-    const userMsg = { id: `u-${Date.now()}`, sender: 'user', text: aiChatInput.trim() };
+    const userQuery = aiChatInput.trim();
+    const userMsg = { id: `u-${Date.now()}`, sender: 'user', text: userQuery };
     setAiChatMessages((prev) => [...prev, userMsg]);
-    const query = aiChatInput.trim().toLowerCase();
+    const query = userQuery.toLowerCase();
     setAiChatInput('');
 
-    setTimeout(() => {
-      let botResponse = 'I have checked your query with our support center. For orders in transit, tracking coordinates refresh every 6 hours.';
-      if (query.includes('refund') || query.includes('margin') || query.includes('payment')) {
-        botResponse = 'Reseller payouts are processed via NEFT/UPI within 48 hours of return window expiration.';
-      } else if (query.includes('return') || query.includes('damage')) {
-        botResponse = 'Pickup for damaged items will be dispatched via Delhivery/BlueDart. Please ensure original box packaging is retained.';
+    setTimeout(async () => {
+      let botResponse = '';
+
+      // 1. Greetings
+      if (/^(hi|hello|hey|namaste|good\s*(morning|afternoon|evening)|hola|hii+)/i.test(query.trim())) {
+        botResponse = `Hello! 👋 Welcome to MShoppy Support Desk.\n\nHow can I help you today? You can ask me about:\n• 📦 Tracking your order or delivery status\n• 🔄 Returns, damaged items & replacements\n• 🤝 Affiliate KYC verification & custom profit margins\n• 🏦 Reseller wallet, margin credit & bank payouts`;
+      }
+      // 2. Affiliate & KYC
+      else if (query.includes('kyc') || query.includes('affiliate') || query.includes('commission') || query.includes('partner') || query.includes('margin')) {
+        const affApp = getAffiliateApp();
+        const currentStatus = affApp?.status || affApp?.kycStatus || 'NOT_SUBMITTED';
+        if (currentStatus === 'Approved') {
+          botResponse = `✅ Your Affiliate KYC is Approved!\n• Profit Margin: Set your own custom margin per product\n• Partner Code: ${affApp?.applicationId || affApp?.referralCode || 'Active'}\n• Your referral earnings credit automatically after the 7-day return window expires.`;
+        } else if (currentStatus === 'Under Review' || currentStatus === 'Pending') {
+          botResponse = `⏳ Your Affiliate KYC Application is Under Review.\n• Admin typically verifies PAN & Bank details within 24 hours.\n• You will receive a real-time notification once approved!`;
+        } else {
+          botResponse = `🤝 MShoppy Affiliate Program:\n• Set your own custom profit margin on catalog products.\n• Simply submit your KYC (PAN + Bank Account) at '/affiliate-kyc' to get your custom shareable referral links.`;
+        }
+      }
+      // 3. Orders & Tracking
+      else if (query.includes('order') || query.includes('track') || query.includes('delivery') || query.includes('ship') || query.includes('courier') || query.includes('b6dd9eb7')) {
+        try {
+          const orders = await getOrders();
+          if (orders && orders.length > 0) {
+            const latest = orders[0];
+            const orderShortId = (latest.id || '').slice(0, 8);
+            const status = latest.orderStatus || latest.status || 'Confirmed & Processing';
+            const total = latest.totalAmount || 849;
+            botResponse = `📦 Latest Order #${orderShortId}:\n• Status: ${status}\n• Total Amount: ₹${total} (Cash on Delivery)\n• Courier: Dispatch scheduled with Shadowfax Logistics\n• Check 'My Orders' for full live milestone timeline!`;
+          } else {
+            botResponse = `📦 Order Tracking: All platform orders are tracked via multi-day milestone checkpoints (Hub -> In Transit -> Delivery Hub -> Out for Delivery). Check the 'My Orders' section for live courier updates.`;
+          }
+        } catch (err) {
+          botResponse = `📦 Order Tracking: You can check live status and courier tracking anytime by visiting the 'My Orders' tab in your profile.`;
+        }
+      }
+      // 4. Returns & Damage
+      else if (query.includes('return') || query.includes('damage') || query.includes('broken') || query.includes('replace') || query.includes('exchange')) {
+        botResponse = `🔄 7-Day Hassle-Free Returns:\n• If you received a defective, damaged, or incorrect product, you can request a return directly from 'My Orders'.\n• Our delivery executive will complete doorstep inspection & pickup within 48 hours.\n• Free reverse shipping is provided!`;
+      }
+      // 5. Refunds & Payments
+      else if (query.includes('refund') || query.includes('payment') || query.includes('money') || query.includes('upi')) {
+        botResponse = `💰 Refunds & Payment Policy:\n• Online Payments (UPI/Cards): Refund reflects in 24–48 hours to original payment source.\n• COD Orders: Refund is credited directly to your registered bank account or Meesho wallet.`;
+      }
+      // 6. Reseller Wallet & Payouts
+      else if (query.includes('payout') || query.includes('withdraw') || query.includes('wallet') || query.includes('margin')) {
+        botResponse = `🏦 Wallet & Payout Withdrawals:\n• Reseller margins & affiliate earnings are deposited into your wallet.\n• Withdraw anytime via '/withdraw-earnings' to your linked Bank Account or UPI.\n• Official settlements occur weekly every Wednesday!`;
+      }
+      // 7. Cancellation
+      else if (query.includes('cancel')) {
+        botResponse = `❌ Order Cancellation:\n• Orders can be cancelled instantly before dispatch from 'My Orders' -> 'Cancel Order'.\n• If already shipped, you can simply refuse delivery at your doorstep with ₹0 penalty.`;
+      }
+      // 8. Default fallback
+      else {
+        botResponse = `I have noted your inquiry regarding "${userQuery}".\n\nIf you need custom human assistance, please fill out the ticket form on this page and our support specialists will respond within 2-4 hours.`;
       }
 
       setAiChatMessages((prev) => [
         ...prev,
         { id: `b-${Date.now()}`, sender: 'bot', text: botResponse },
       ]);
-    }, 1000);
+    }, 600);
   };
 
   return (
@@ -227,7 +311,9 @@ export function RaiseATicket({ onNavigate, onBack }) {
                 Track Existing Tickets
               </h3>
               <p className="text-xs text-slate-600 mb-4">
-                You have {tickets.length} submitted requests in our support system.
+                {tickets.length > 0 
+                  ? `You have ${tickets.length} submitted support request${tickets.length > 1 ? 's' : ''}.` 
+                  : 'Track and review the status of your submitted support tickets here.'}
               </p>
               <button
                 type="button"
@@ -328,8 +414,16 @@ export function RaiseATicket({ onNavigate, onBack }) {
                     Upload Proof (Screenshots/Receipts)
                   </label>
 
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileUpload} 
+                    accept="image/*" 
+                    multiple 
+                    className="hidden" 
+                  />
                   <div
-                    onClick={handleAddSampleProof}
+                    onClick={() => fileInputRef.current?.click()}
                     className="border-2 border-dashed border-slate-300 hover:border-[#b90041] rounded-3xl p-8 flex flex-col items-center justify-center bg-slate-50 hover:bg-pink-50/40 transition-colors cursor-pointer group"
                   >
                     <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mb-3 shadow-2xs group-hover:scale-110 transition-transform">
@@ -454,23 +548,35 @@ export function RaiseATicket({ onNavigate, onBack }) {
             </div>
 
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-              {tickets.map((t) => (
-                <div
-                  key={t.id}
-                  className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#b90041]">{t.id}</span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${t.statusStyle}`}>
-                      {t.status}
-                    </span>
+              {tickets.length === 0 ? (
+                <div className="text-center py-8 px-4 bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                  <div className="w-12 h-12 rounded-full bg-pink-50 text-[#b90041] flex items-center justify-center mx-auto mb-2.5">
+                    <span className="material-symbols-outlined text-2xl">confirmation_number</span>
                   </div>
-                  <h4 className="font-bold text-xs text-slate-800 leading-snug">{t.subject}</h4>
-                  <p className="text-[10px] text-slate-400">
-                    Category: {t.category} • Date: {t.date}
+                  <p className="text-xs font-bold text-slate-800">No Support Tickets Raised Yet</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                    Submit the form to raise a support ticket. It will automatically show up here for live tracking.
                   </p>
                 </div>
-              ))}
+              ) : (
+                tickets.map((t) => (
+                  <div
+                    key={t.id}
+                    className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-[#b90041]">{t.id}</span>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${t.statusStyle}`}>
+                        {t.status}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-xs text-slate-800 leading-snug">{t.subject}</h4>
+                    <p className="text-[10px] text-slate-400">
+                      Category: {t.category} • Date: {t.date}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="flex justify-end pt-2">
@@ -514,7 +620,7 @@ export function RaiseATicket({ onNavigate, onBack }) {
                   className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs font-medium shadow-2xs ${
+                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs font-medium shadow-2xs whitespace-pre-line ${
                       msg.sender === 'user'
                         ? 'bg-emerald-700 text-white rounded-br-xs'
                         : 'bg-white text-slate-800 border border-slate-200 rounded-bl-xs'
@@ -593,6 +699,9 @@ export function RaiseATicket({ onNavigate, onBack }) {
           </div>
         </div>
       )}
+
+      {/* Bottom Nav */}
+      <AppBottomNav role="customer" homePath="/user-home" />
     </div>
   );
 }

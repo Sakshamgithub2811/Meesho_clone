@@ -4,12 +4,35 @@ import { useSelector } from 'react-redux';
 import { isCustomerAuthenticated } from '../services/customerAuthService';
 import { isAffiliateAuthenticated } from '../services/affiliateAuthService';
 import { isResellerAuthenticated } from '../services/resellerAuthService';
+import { isDropshipperAuthenticated, getDropshipperKycState } from '../services/dropshipperService';
+import KycGateLockScreen from './common/KycGateLockScreen';
 
-const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
+const ProtectedRoute = ({ children, role = 'customer', allowedRoles, requiresKyc = false, featureName }) => {
   const location = useLocation();
   const { currentUser, isAuthenticated: isReduxAuth } = useSelector((state) => state.user || {});
 
-  // Check if authenticated via Redux (Firebase login)
+  // 1. STRICT DROPSHIPPER GUARD (Prevents normal customers or expired sessions from entering)
+  if (role === 'dropshipper') {
+    const isLocalAuth = isDropshipperAuthenticated();
+    const isReduxDropship = isReduxAuth && currentUser && (currentUser.role?.toUpperCase() === 'DROPSHIPPER');
+    const isAuthorizedDropshipper = isLocalAuth || isReduxDropship;
+
+    if (!isAuthorizedDropshipper) {
+      return <Navigate to={`/dropshipper-login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
+    }
+
+    // 1.1 KYC Verification Gate (Blocks unverified dropshippers from sensitive trade operations)
+    if (requiresKyc) {
+      const { isKycApproved } = getDropshipperKycState();
+      if (!isKycApproved) {
+        return <KycGateLockScreen featureName={featureName} />;
+      }
+    }
+
+    return children ? children : <Outlet />;
+  }
+
+  // 2. OTHER ROLES (Customer, Affiliate, Reseller)
   let isAuth = isReduxAuth && !!currentUser;
 
   // If not authenticated via Redux, fallback to role-based local storage check
@@ -21,7 +44,7 @@ const ProtectedRoute = ({ children, role = 'customer', allowedRoles }) => {
     } else if (role === 'reseller') {
       isAuth = isResellerAuthenticated();
     } else if (role === 'any') {
-      isAuth = isCustomerAuthenticated() || isAffiliateAuthenticated() || isResellerAuthenticated();
+      isAuth = isCustomerAuthenticated() || isAffiliateAuthenticated() || isResellerAuthenticated() || isDropshipperAuthenticated();
     }
   }
 

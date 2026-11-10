@@ -1,3 +1,62 @@
+
+/**
+ * Normalizes KYC application documents so that nested pan, aadhaar, and bank objects
+ * are guaranteed to exist, even if submitted with flat fields.
+ */
+export const normalizeKycApplication = (app) => {
+  if (!app) return app;
+  const docs = app.documents || {};
+  const holderName = (docs.accountHolderName || docs.fullName || app.user?.fullName || '').toUpperCase();
+  const panNum = docs.pan?.number || docs.panNumber || '';
+  const aadhaarNum = docs.aadhaar?.number || docs.aadhaarNumber || '';
+  const bankName = docs.bank?.bankName || docs.bankName || '';
+  const accNum = docs.bank?.accountNumber || docs.accountNumber || '';
+  const ifsc = (docs.bank?.ifsc || docs.ifscCode || '').toUpperCase();
+  const upi = docs.bank?.upiId || docs.upiId || '';
+
+  const panImg = docs.pan?.image || docs.panPreview || docs.panPreviewUrl || null;
+  const aadhaarImg = docs.aadhaar?.image || docs.aadhaarPreview || docs.aadhaarPreviewUrl || null;
+  const chequeImg = docs.bank?.image || docs.chequePreview || docs.chequePreviewUrl || null;
+
+  const normalizedDocs = {
+    ...docs,
+    panNumber: panNum,
+    aadhaarNumber: aadhaarNum,
+    bankName,
+    accountNumber: accNum,
+    ifscCode: ifsc,
+    upiId: upi,
+    pan: docs.pan || (panNum ? {
+      number: panNum.toUpperCase(),
+      nameOnDoc: docs.pan?.nameOnDoc || holderName,
+      status: docs.pan?.status || 'Submitted',
+      image: panImg,
+      docName: docs.pan?.docName || docs.panDocName || ''
+    } : null),
+    aadhaar: docs.aadhaar || (aadhaarNum ? {
+      number: aadhaarNum,
+      nameOnDoc: docs.aadhaar?.nameOnDoc || holderName,
+      status: docs.aadhaar?.status || 'Submitted',
+      image: aadhaarImg,
+      docName: docs.aadhaar?.docName || docs.aadhaarDocName || ''
+    } : null),
+    bank: docs.bank || (accNum ? {
+      bankName: bankName,
+      accountNumber: accNum,
+      ifsc: ifsc,
+      holderName: docs.bank?.holderName || holderName,
+      upiId: upi,
+      image: chequeImg,
+      docName: docs.bank?.docName || docs.chequeDocName || ''
+    } : null)
+  };
+
+  return {
+    ...app,
+    documents: normalizedDocs
+  };
+};
+
 import prisma from '../../config/prisma.js';
 
 /**
@@ -121,13 +180,30 @@ export const updateKycStatus = async (req, res) => {
       }
     });
 
-    // If APPROVED, update applicant's role in Profile table
+    // If APPROVED, update applicant's role in Profile table and sync verified KYC fields
     if (normalizedStatus === 'APPROVED' && existing.userId) {
       if (existing.type?.toLowerCase() === 'dropshipper') {
+        const docs = typeof existing.documents === 'object' && existing.documents !== null ? existing.documents : {};
+        const bank = docs.bank || {};
+        const panObj = docs.pan || {};
+        const taxObj = docs.tax || {};
+
         await prisma.profile.update({
           where: { id: existing.userId },
-          data: { role: 'DROPSHIPPER' }
-        }).catch(() => {});
+          data: {
+            role: 'DROPSHIPPER',
+            storeName: docs.brandName || docs.businessName || undefined,
+            pan: (panObj.number || docs.panNumber || '').toUpperCase() || undefined,
+            gstin: (taxObj.gstin || docs.gstin || '').toUpperCase() || undefined,
+            bankDetails: {
+              bankName: bank.bankName || docs.bankName || '',
+              accountNumber: bank.accountNumber || docs.accountNumber || '',
+              ifscCode: (bank.ifsc || docs.ifscCode || '').toUpperCase(),
+              upiId: bank.upiId || docs.upiId || '',
+              accountHolder: bank.holderName || docs.accountHolder || ''
+            }
+          }
+        }).catch((err) => console.warn('Dropshipper profile auto-update warning:', err.message));
       } else if (existing.type?.toLowerCase() === 'supplier') {
         const docs = existing.documents || {};
         await prisma.profile.update({
@@ -142,6 +218,13 @@ export const updateKycStatus = async (req, res) => {
             tierLabel: 'Verified Supplier'
           }
         }).catch((err) => console.warn('Supplier profile auto-update warning:', err.message));
+      } else if (existing.type?.toLowerCase() === 'affiliate') {
+        await prisma.profile.update({
+          where: { id: existing.userId },
+          data: { 
+            role: 'RESELLER'
+          }
+        }).catch((err) => console.warn('Affiliate profile auto-update warning:', err.message));
       }
     }
 
@@ -193,6 +276,330 @@ export const getKycDetails = async (req, res) => {
 
   } catch (error) {
     console.error("Get KYC Details Error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * 4. SUBMIT AFFILIATE KYC APPLICATION (Real Database Persistence)
+ * POST /api/v1/admin-kyc/submit-affiliate
+ */
+export const submitAffiliateKyc = async (req, res) => {
+  try {
+    const {
+      userId,
+      applicationId,
+      fullName,
+      email,
+      phone,
+      handle,
+      platform,
+      followers,
+      panNumber,
+      panDocName,
+      panPreview,
+      aadhaarNumber,
+      aadhaarDocName,
+      aadhaarPreview,
+      bankName,
+      accountHolderName,
+      accountNumber,
+      ifscCode,
+      upiId,
+      chequeDocName,
+      chequePreview,
+      documents
+    } = req.body || {};
+
+    const cleanPhone = phone ? phone.toString().replace(/\D/g, '').slice(-10) : '';
+    const cleanEmail = email ? email.trim().toLowerCase() : '';
+
+    // 1. Locate existing Profile by userId, email, or phone
+    let profile = null;
+    if (userId) {
+      profile = await prisma.profile.findUnique({ where: { id: userId } });
+    }
+    if (!profile && cleanEmail) {
+      profile = await prisma.profile.findFirst({ where: { email: cleanEmail } });
+    }
+    if (!profile && cleanPhone) {
+      profile = await prisma.profile.findFirst({ where: { phone: cleanPhone } });
+    }
+
+    if (!profile) {
+      const generatedId = userId || `affiliate_${cleanPhone || Date.now()}`;
+      let safePhone = cleanPhone || null;
+      let safeEmail = cleanEmail || `${generatedId}@affiliate.meesho`;
+
+      if (safePhone) {
+        const phoneExists = await prisma.profile.findFirst({ where: { phone: safePhone } });
+        if (phoneExists) safePhone = null;
+      }
+      if (safeEmail) {
+        const emailExists = await prisma.profile.findFirst({ where: { email: safeEmail } });
+        if (emailExists) safeEmail = `${generatedId}_${Date.now()}@affiliate.meesho`;
+      }
+
+      try {
+        profile = await prisma.profile.create({
+          data: {
+            id: generatedId,
+            fullName: fullName || 'Affiliate Creator',
+            phone: safePhone,
+            email: safeEmail,
+            role: 'CUSTOMER'
+          }
+        });
+      } catch (createErr) {
+        profile = await prisma.profile.create({
+          data: {
+            id: generatedId,
+            fullName: fullName || 'Affiliate Creator',
+            phone: null,
+            email: `${generatedId}_${Date.now()}@affiliate.meesho`,
+            role: 'CUSTOMER'
+          }
+        });
+      }
+    } else {
+      // Safely update profile without overriding with colliding email or phone
+      const updateData = {};
+      if (fullName && (!profile.fullName || profile.fullName === 'Affiliate Creator' || profile.fullName === 'MShoppy Customer')) {
+        updateData.fullName = fullName;
+      }
+      if (cleanPhone && !profile.phone) {
+        const phoneExists = await prisma.profile.findFirst({ where: { phone: cleanPhone } });
+        if (!phoneExists) updateData.phone = cleanPhone;
+      }
+      if (cleanEmail && !profile.email) {
+        const emailExists = await prisma.profile.findFirst({ where: { email: cleanEmail } });
+        if (!emailExists) updateData.email = cleanEmail;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        try {
+          profile = await prisma.profile.update({
+            where: { id: profile.id },
+            data: updateData
+          });
+        } catch (updateErr) {
+          console.warn('Profile soft update skipped in submitAffiliateKyc:', updateErr.message);
+        }
+      }
+    }
+
+    const holderName = (accountHolderName || fullName || profile.fullName || '').toUpperCase();
+    const finalPan = (panNumber || documents?.panNumber || '').toUpperCase();
+    const finalAadhaar = aadhaarNumber || documents?.aadhaarNumber || '';
+    const finalBankName = bankName || documents?.bankName || '';
+    const finalAccNum = accountNumber || documents?.accountNumber || '';
+    const finalIfsc = (ifscCode || documents?.ifscCode || '').toUpperCase();
+    const finalUpi = upiId || documents?.upiId || '';
+
+    const panImg = panPreview || documents?.panPreview || documents?.panPreviewUrl || documents?.pan?.image || null;
+    const aadhaarImg = aadhaarPreview || documents?.aadhaarPreview || documents?.aadhaarPreviewUrl || documents?.aadhaar?.image || null;
+    const chequeImg = chequePreview || documents?.chequePreview || documents?.chequePreviewUrl || documents?.bank?.image || null;
+
+    const docPayload = {
+      ...(documents || {}),
+      applicationId: applicationId || `KYC-AFF-${Math.floor(100000 + Math.random() * 900000)}`,
+      fullName: fullName || profile.fullName || '',
+      email: cleanEmail || profile.email || '',
+      phone: cleanPhone || profile.phone || '',
+      handle: handle || '',
+      platform: platform || 'Direct / Social',
+      followers: followers || '0',
+      panNumber: finalPan,
+      panDocName: panDocName || documents?.panDocName || '',
+      panPreview: panImg,
+      aadhaarNumber: finalAadhaar,
+      aadhaarDocName: aadhaarDocName || documents?.aadhaarDocName || '',
+      aadhaarPreview: aadhaarImg,
+      bankName: finalBankName,
+      accountHolderName: holderName,
+      accountNumber: finalAccNum,
+      ifscCode: finalIfsc,
+      upiId: finalUpi,
+      chequeDocName: chequeDocName || documents?.chequeDocName || '',
+      chequePreview: chequeImg,
+      // Structured objects required by Admin KYC Review modals
+      pan: {
+        number: finalPan,
+        nameOnDoc: holderName,
+        status: 'Submitted',
+        image: panImg,
+        docName: panDocName || documents?.panDocName || ''
+      },
+      aadhaar: {
+        number: finalAadhaar,
+        nameOnDoc: holderName,
+        status: 'Submitted',
+        image: aadhaarImg,
+        docName: aadhaarDocName || documents?.aadhaarDocName || ''
+      },
+      bank: {
+        bankName: finalBankName,
+        accountNumber: finalAccNum,
+        ifsc: finalIfsc,
+        holderName: holderName,
+        upiId: finalUpi,
+        image: chequeImg,
+        docName: chequeDocName || documents?.chequeDocName || ''
+      },
+      submittedAt: new Date().toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+
+    // Check if an existing KYC application exists for this user and type 'affiliate'
+    const existing = await prisma.kYCApplication.findFirst({
+      where: {
+        userId: profile.id,
+        type: 'affiliate'
+      }
+    });
+
+    let kycApp;
+    if (existing) {
+      kycApp = await prisma.kYCApplication.update({
+        where: { id: existing.id },
+        data: {
+          status: 'PENDING',
+          documents: docPayload,
+          adminNotes: ''
+        },
+        include: { user: true }
+      });
+    } else {
+      kycApp = await prisma.kYCApplication.create({
+        data: {
+          userId: profile.id,
+          type: 'affiliate',
+          status: 'PENDING',
+          documents: docPayload,
+          adminNotes: ''
+        },
+        include: { user: true }
+      });
+    }
+
+    // Create Notification
+    await prisma.notification.create({
+      data: {
+        userId: profile.id,
+        title: 'Affiliate KYC Under Review ⏳',
+        body: `Your KYC Application #${docPayload.applicationId} has been successfully submitted to Admin Desk for compliance verification.`,
+        type: 'earning',
+        data: {
+          applicationId: docPayload.applicationId,
+          kycId: kycApp.id
+        }
+      }
+    }).catch(() => {});
+
+    return res.status(201).json({
+      success: true,
+      message: 'Affiliate KYC application submitted successfully to Admin Desk!',
+      application: kycApp
+    });
+  } catch (error) {
+    console.error("Submit Affiliate KYC Error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * 5. GET AFFILIATE KYC STATUS FOR CREATOR DESK
+ * GET /api/v1/admin-kyc/affiliate-status
+ */
+export const getAffiliateKycStatus = async (req, res) => {
+  try {
+    const { userId, email, phone, applicationId } = req.query;
+
+    let application = null;
+    const cleanPhone = phone ? phone.toString().replace(/\D/g, '').slice(-10) : '';
+    const cleanEmail = email ? email.toString().trim().toLowerCase() : '';
+
+    // 1. Locate user if userId, email, or phone is provided
+    let user = null;
+    if (userId || cleanEmail || cleanPhone) {
+      user = await prisma.profile.findFirst({
+        where: {
+          OR: [
+            userId ? { id: userId } : undefined,
+            cleanEmail ? { email: cleanEmail } : undefined,
+            cleanPhone ? { phone: cleanPhone } : undefined,
+            cleanPhone ? { id: `affiliate_${cleanPhone}` } : undefined
+          ].filter(Boolean)
+        }
+      });
+    }
+
+    // 2. If user exists, find THEIR affiliate KYC
+    if (user) {
+      application = await prisma.kYCApplication.findFirst({
+        where: {
+          userId: user.id,
+          type: 'affiliate'
+        },
+        orderBy: { createdAt: 'desc' },
+        include: { user: true }
+      });
+    }
+
+    // 3. If still not found, and applicationId is provided ALONG WITH user verification
+    if (!application && applicationId && user) {
+      const match = await prisma.kYCApplication.findFirst({
+        where: {
+          OR: [
+            { id: applicationId },
+            { documents: { path: ['applicationId'], equals: applicationId } }
+          ],
+          userId: user.id,
+          type: 'affiliate'
+        },
+        include: { user: true }
+      });
+      if (match) {
+        application = match;
+      }
+    }
+
+    // If no KYC application exists for this verified user, return null (NEVER return other users' applications)
+    return res.status(200).json({
+      success: true,
+      application: application || null
+    });
+  } catch (error) {
+    console.error("Get Affiliate KYC Status Error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * 6. GET ALL AFFILIATE KYC APPLICATIONS FOR ADMIN
+ * GET /api/v1/admin-kyc/affiliates
+ */
+export const getAllAffiliateKyc = async (req, res) => {
+  try {
+    const applications = await prisma.kYCApplication.findMany({
+      where: { type: 'affiliate' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: true
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      applications
+    });
+  } catch (error) {
+    console.error("Get All Affiliate KYC Error:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };

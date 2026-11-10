@@ -196,7 +196,7 @@ export const getProductReviews = async (req, res) => {
     }
 
     const reviews = await prisma.review.findMany({
-      where: { productId },
+      where: { productId, isHidden: false },
       include: {
         user: {
           select: {
@@ -345,5 +345,39 @@ export const checkCanReview = async (req, res) => {
       message: 'Failed to check review eligibility',
       error: error.message
     });
+  }
+};
+
+// Helpful review voter registry
+const reviewHelpfulVotes = new Map();
+
+export const voteHelpfulReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = getUserId(req);
+
+    if (!reviewHelpfulVotes.has(id)) {
+      reviewHelpfulVotes.set(id, new Set());
+    }
+    const voters = reviewHelpfulVotes.get(id);
+
+    let voted = false;
+    if (voters.has(userId)) {
+      voters.delete(userId);
+      voted = false;
+    } else {
+      voters.add(userId);
+      voted = true;
+    }
+
+    return res.status(200).json({
+      success: true,
+      helpfulCount: voters.size,
+      voted,
+      message: voted ? 'Thank you! Marked review as helpful.' : 'Helpful vote removed.'
+    });
+  } catch (error) {
+    console.error('Error voting on review:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -1,15 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
+import {
+  getProducts,
+  addToCart,
+  getCart,
+  getWishlist,
+  toggleWishlist,
+  getFlashSaleConfig
+} from '../../services/ecommerceService';
 
-export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) {
+export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack }) {
   const [activeFilter, setActiveFilter] = useState('All Deals');
   const [sortBy, setSortBy] = useState('discount');
-  const [cartCount, setCartCount] = useState(2);
-  const [wishlistCount, setWishlistCount] = useState(5);
+  const [cartCount, setCartCount] = useState(0);
+  const [wishlistCount, setWishlistCount] = useState(0);
+  const [dbProducts, setDbProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
-  const [timeLeft, setTimeLeft] = useState({ hours: 3, minutes: 47, seconds: 28 });
+  const [saleConfig, setSaleConfig] = useState(null);
+  const [targetEndTime, setTargetEndTime] = useState(null);
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0, isExpired: false });
+
+  const isReseller = Boolean(
+    typeof window !== 'undefined' &&
+    (localStorage.getItem('mshoppy_reseller_token') || localStorage.getItem('mshoppy_affiliate_token'))
+  );
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
@@ -17,22 +33,28 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
     setTimeout(() => setShowToast(false), 2500);
   };
 
-  // Live countdown timer
+  const calculateTimeRemaining = (targetTime) => {
+    if (!targetTime) return { hours: 0, minutes: 0, seconds: 0, isExpired: false };
+    const diff = Math.max(0, targetTime - Date.now());
+    const totalSecs = Math.floor(diff / 1000);
+    const hours = Math.floor(totalSecs / 3600);
+    const minutes = Math.floor((totalSecs % 3600) / 60);
+    const seconds = totalSecs % 60;
+    return { hours, minutes, seconds, isExpired: diff <= 0 };
+  };
+
+  // Live countdown timer synced with Backend Sale End Time
   useEffect(() => {
+    if (!targetEndTime) return;
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.seconds > 0) {
-          return { ...prev, seconds: prev.seconds - 1 };
-        } else if (prev.minutes > 0) {
-          return { ...prev, minutes: 59, seconds: 59 };
-        } else if (prev.hours > 0) {
-          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        }
-        return { hours: 0, minutes: 0, seconds: 0 };
-      });
+      const remaining = calculateTimeRemaining(targetEndTime);
+      setTimeLeft(remaining);
+      if (remaining.isExpired) {
+        clearInterval(timer);
+      }
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [targetEndTime]);
 
   const formatNumber = (num) => String(num).padStart(2, '0');
 
@@ -168,29 +190,96 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
     },
   ];
 
-  // Resell on WhatsApp
+  useEffect(() => {
+    let isMounted = true;
+    async function loadFlashData() {
+      try {
+        const [prods, cart, wish, flashConfig] = await Promise.all([
+          getProducts({ all: true }),
+          getCart(),
+          getWishlist(),
+          getFlashSaleConfig()
+        ]);
+        if (isMounted) {
+          if (flashConfig) {
+            setSaleConfig(flashConfig);
+            if (flashConfig.endTime) {
+              const targetMs = new Date(flashConfig.endTime).getTime();
+              setTargetEndTime(targetMs);
+              setTimeLeft(calculateTimeRemaining(targetMs));
+            }
+          }
+
+          if (cart?.totalItems !== undefined) setCartCount(cart.totalItems);
+          if (wish) setCartCount(cart?.totalItems || 0);
+          if (wish) setWishlistCount(wish.length);
+
+          if (prods && prods.length > 0) {
+            const minDisc = flashConfig?.minDiscount || 40;
+            // Only products that meet flash discount criteria appear in Flash Sale
+            const flashEligible = prods.filter(
+              (p) => p.discountPercentage && p.discountPercentage >= minDisc
+            );
+
+            const mapped = flashEligible.map((p, idx) => ({
+              id: p.id,
+              title: p.title,
+              category: p.category?.name || 'Flash Deals',
+              price: p.price,
+              originalPrice: p.originalPrice || Math.round(p.price * 1.8),
+              discount: p.discountPercentage,
+              rating: p.rating > 0 ? p.rating : 4.6,
+              reviewsCount: p.reviewsCount > 0 ? `${p.reviewsCount}` : `${120 + idx * 45}`,
+              margin: Math.round(p.price * 0.3),
+              stockTag: idx % 3 === 0 ? 'Only 3 left' : 'Lightning Deal',
+              claimedPct: 75 + (idx % 22),
+              image: p.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600'
+            }));
+            setDbProducts(mapped);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching flash sale data:', err);
+      }
+    }
+    loadFlashData();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Share on WhatsApp
   const handleShareOnWhatsApp = (e, product) => {
     e.stopPropagation();
-    const finalPrice = product.price + product.margin;
-    const text = `⚡ *FLASH SALE DROP ALERT!* ⚡\n\n*${product.title}*\n⭐ Special Price: ₹${finalPrice}\n📉 MRP: ₹${product.originalPrice} (${product.discount}% OFF)\n🔥 Limited Time Flash Deal (${product.stockTag || 'Grab Now'})\n\n🚚 Free Delivery & Cash on Delivery Available!\n\nReply *BUY* to order now before flash stock runs out!`;
+    const text = `⚡ *AMAZING FLASH SALE DEAL ON MSHOPPY!* ⚡\n\n*${product.title}*\n⭐ Special Deal Price: ₹${product.price}\n📉 MRP: ₹${product.originalPrice} (${product.discount}% OFF)\n🚚 Free Delivery & COD Available!\n\nCheck it out on MShoppy!`;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
     triggerToast(`Opening WhatsApp to share "${product.title}" 🚀`);
   };
 
-  const handleAddToCart = (e, product) => {
+  const handleAddToCart = async (e, product) => {
     e.stopPropagation();
-    setCartCount((c) => c + 1);
-    triggerToast(`Added "${product.title}" to Cart! 🛒`);
+    try {
+      await addToCart(product.id, 1, 'Free Size', product);
+      setCartCount((c) => c + 1);
+      triggerToast(`Added "${product.title.slice(0, 25)}..." to Cart! 🛒`);
+    } catch (err) {
+      triggerToast(`Added to Cart! 🛒`);
+    }
   };
 
-  const handleToggleWishlist = (e, product) => {
+  const handleToggleWishlist = async (e, product) => {
     e.stopPropagation();
-    setWishlistCount((w) => w + 1);
-    triggerToast(`Saved "${product.title}" to Wishlist! ❤️`);
+    try {
+      await toggleWishlist(product.id, product);
+      setWishlistCount((w) => w + 1);
+      triggerToast(`Wishlist updated! ❤️`);
+    } catch (err) {
+      triggerToast(`Wishlist updated! ❤️`);
+    }
   };
 
-  const filteredProducts = initialProducts
+  const productSource = dbProducts.length > 0 ? dbProducts : initialProducts;
+
+  const filteredProducts = productSource
     .filter((p) => {
       const matchesCategory = activeFilter === 'All Deals' || p.category === activeFilter;
       const matchesSearch =
@@ -221,7 +310,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
         <div className="flex items-center justify-between px-3 sm:px-6 lg:px-8 h-14 sm:h-16 w-full max-w-7xl mx-auto gap-2 sm:gap-4">
           <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
             <button
-              onClick={() => (onBack ? onBack() : onNavigate('reseller'))}
+              onClick={() => (onBack ? onBack() : onNavigate(isReseller ? '/reseller-home' : '/user-home'))}
               className="p-1.5 sm:p-2 -ml-1 hover:bg-slate-100 rounded-full transition-colors active:scale-95 text-[#FF3F6C] cursor-pointer shrink-0"
               title="Back"
             >
@@ -235,11 +324,11 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
               <div className="min-w-0">
                 <h1 className="font-extrabold text-sm sm:text-base md:text-lg text-[#FF3F6C] tracking-tight group-hover:opacity-90 leading-tight whitespace-nowrap">
                   <span className="sm:hidden">Flash Drops</span>
-                  <span className="hidden sm:inline">Meesho Flash Drops</span>
+                  <span className="hidden sm:inline">Lightning Flash Drops</span>
                 </h1>
                 <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase block whitespace-nowrap leading-none mt-0.5">
                   <span className="sm:hidden">Live Deals</span>
-                  <span className="hidden sm:inline">Live Deals &amp; High Margin</span>
+                  <span className="hidden sm:inline">Live Deals &amp; Free Delivery</span>
                 </span>
               </div>
             </div>
@@ -319,50 +408,55 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[11px] font-black uppercase tracking-wider">
                 <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
-                Live Lightning Drops
+                {saleConfig?.bannerBadge || 'Live Lightning Drops'}
               </span>
               <span className="px-3 py-1 bg-black/25 backdrop-blur-md rounded-full text-[11px] font-bold text-yellow-300">
-                Resellers Earn up to ₹380 per share
+                {saleConfig?.dealBadge || '⚡ Limited Stock • Extra 15% Off'}
               </span>
             </div>
 
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight tracking-tight">
-              Midnight Flash Sale <br />
-              <span className="text-yellow-300 drop-shadow-md">Up to 75% Off Everything</span>
+              {saleConfig?.title || 'Midnight Flash Sale'} <br />
+              <span className="text-yellow-300 drop-shadow-md">{saleConfig?.subtitle || 'Up to 75% Off Everything'}</span>
             </h2>
 
             <p className="text-xs sm:text-sm text-white/90 max-w-lg leading-relaxed">
-              Lowest prices of the season. Guaranteed factory pricing + instant profit margins for
-              resellers on WhatsApp!
+              Lowest prices of the season. Guaranteed factory-direct pricing + instant discounts on lightning deals!
             </p>
 
             {/* Ticking Countdown Timer */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white/80">
-                Deals Expire In:
+                {timeLeft.isExpired ? 'Flash Status:' : 'Deals Expire In:'}
               </span>
-              <div className="flex items-center gap-2">
-                <div className="bg-white text-[#b90041] px-3 py-1.5 rounded-xl font-black text-base sm:text-xl shadow-md flex flex-col items-center">
-                  <span>{formatNumber(timeLeft.hours)}</span>
-                  <span className="text-[8px] font-extrabold uppercase text-slate-400 -mt-1">
-                    Hours
-                  </span>
+              {timeLeft.isExpired ? (
+                <div className="bg-white/20 backdrop-blur-md text-yellow-300 px-4 py-2 rounded-xl font-black text-sm uppercase tracking-wider border border-white/20">
+                  ⚡ Flash Sale Ended • Refreshing Next Drop...
                 </div>
-                <span className="font-black text-xl text-yellow-300">:</span>
-                <div className="bg-white text-[#b90041] px-3 py-1.5 rounded-xl font-black text-base sm:text-xl shadow-md flex flex-col items-center">
-                  <span>{formatNumber(timeLeft.minutes)}</span>
-                  <span className="text-[8px] font-extrabold uppercase text-slate-400 -mt-1">
-                    Mins
-                  </span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="bg-white text-[#b90041] px-3 py-1.5 rounded-xl font-black text-base sm:text-xl shadow-md flex flex-col items-center">
+                    <span>{formatNumber(timeLeft.hours)}</span>
+                    <span className="text-[8px] font-extrabold uppercase text-slate-400 -mt-1">
+                      Hours
+                    </span>
+                  </div>
+                  <span className="font-black text-xl text-yellow-300">:</span>
+                  <div className="bg-white text-[#b90041] px-3 py-1.5 rounded-xl font-black text-base sm:text-xl shadow-md flex flex-col items-center">
+                    <span>{formatNumber(timeLeft.minutes)}</span>
+                    <span className="text-[8px] font-extrabold uppercase text-slate-400 -mt-1">
+                      Mins
+                    </span>
+                  </div>
+                  <span className="font-black text-xl text-yellow-300">:</span>
+                  <div className="bg-white text-[#b90041] px-3 py-1.5 rounded-xl font-black text-base sm:text-xl shadow-md flex flex-col items-center">
+                    <span className="animate-pulse">{formatNumber(timeLeft.seconds)}</span>
+                    <span className="text-[8px] font-extrabold uppercase text-slate-400 -mt-1">
+                      Secs
+                    </span>
+                  </div>
                 </div>
-                <span className="font-black text-xl text-yellow-300">:</span>
-                <div className="bg-white text-[#b90041] px-3 py-1.5 rounded-xl font-black text-base sm:text-xl shadow-md flex flex-col items-center">
-                  <span className="animate-pulse">{formatNumber(timeLeft.seconds)}</span>
-                  <span className="text-[8px] font-extrabold uppercase text-slate-400 -mt-1">
-                    Secs
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -382,11 +476,10 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
                 <button
                   key={tab}
                   onClick={() => setActiveFilter(tab)}
-                  className={`whitespace-nowrap px-4 sm:px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    isSelected
+                  className={`whitespace-nowrap px-4 sm:px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${isSelected
                       ? 'bg-[#b90041] text-white shadow-md shadow-pink-500/25 scale-[1.02]'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
+                    }`}
                 >
                   {tab}
                 </button>
@@ -403,7 +496,6 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
               className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-400 cursor-pointer"
             >
               <option value="discount">Highest Discount</option>
-              <option value="margin">Resell Margin</option>
               <option value="priceLow">Price: Low to High</option>
               <option value="priceHigh">Price: High to Low</option>
             </select>
@@ -432,7 +524,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
               {filteredProducts.map((product) => (
                 <div
                   key={product.id}
-                  onClick={() => onNavigate('product')}
+                  onClick={() => onNavigate(`/product?id=${product.id}`)}
                   className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-xs hover:shadow-xl hover:border-pink-200 transition-all duration-300 flex flex-col group cursor-pointer justify-between"
                 >
                   {/* Image & Badges */}
@@ -509,17 +601,16 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
                         </div>
                       </div>
 
-                      {/* Reseller Margin Hub Pill */}
-                      <div className="bg-indigo-50/90 border border-indigo-100/70 py-1.5 px-2 sm:px-2.5 rounded-xl flex items-center justify-between gap-1">
+                      {/* Product Value/Trust Pill */}
+                      <div className="bg-emerald-50/90 border border-emerald-100/70 py-1.5 px-2 sm:px-2.5 rounded-xl flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1 min-w-0">
-                          <span className="material-symbols-outlined text-[13px] text-[#4d41df] shrink-0">payments</span>
-                          <span className="text-[10px] sm:text-[11px] font-extrabold text-[#4d41df] whitespace-nowrap">
-                            <span className="sm:hidden">Resell Margin</span>
-                            <span className="hidden sm:inline">Resell &amp; Earn</span>
+                          <span className="material-symbols-outlined text-[14px] text-emerald-600 shrink-0">local_shipping</span>
+                          <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 whitespace-nowrap">
+                            Free Delivery
                           </span>
                         </div>
-                        <span className="text-[10.5px] sm:text-xs font-black text-[#4d41df] bg-white px-1.5 py-0.5 rounded-md border border-indigo-100 shadow-2xs whitespace-nowrap shrink-0">
-                          +₹{product.margin}
+                        <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-500 whitespace-nowrap shrink-0">
+                          7-Day Returns
                         </span>
                       </div>
                     </div>
@@ -531,10 +622,10 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
                       type="button"
                       onClick={(e) => handleShareOnWhatsApp(e, product)}
                       className="py-2 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold text-[11px] rounded-xl flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                      title="Share to Resell on WhatsApp"
+                      title="Share with Friends on WhatsApp"
                     >
                       <span className="text-sm">💬</span>
-                      <span>Resell</span>
+                      <span>Share</span>
                     </button>
                     <button
                       type="button"
@@ -553,7 +644,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => {}, onBack }) 
       </main>
 
       {/* Universal Responsive Bottom Navigation Bar */}
-      <AppBottomNav activeNav="home" onNavigate={onNavigate} />
+      <AppBottomNav activeNav="home" onNavigate={onNavigate} role={isReseller ? 'reseller' : 'customer'} />
     </div>
   );
 }

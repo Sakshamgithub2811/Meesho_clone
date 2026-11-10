@@ -36,7 +36,7 @@ export default function SareesCategoryListing({ onNavigate, onBack }) {
       setLoading(true);
       try {
         const [prods, cart, wish] = await Promise.all([
-          getProducts({ category: 'women-ethnic' }),
+          getProducts({ category: 'women-ethnic', all: true }),
           getCart(),
           getWishlist()
         ]);
@@ -78,7 +78,7 @@ export default function SareesCategoryListing({ onNavigate, onBack }) {
   const handleAddToCart = async (e, saree) => {
     e.stopPropagation();
     try {
-      await addToCart(saree.id, 1, saree.sizes?.[0] || 'Free Size');
+      await addToCart(saree.id, 1, saree.sizes?.[0] || 'Free Size', saree);
       setCartCount((c) => c + 1);
       triggerToast(`Added ${saree.title.slice(0, 20)}... to Cart! 🛍️`);
     } catch (e) {
@@ -245,7 +245,7 @@ export default function SareesCategoryListing({ onNavigate, onBack }) {
         )}
       </main>
 
-      <AppBottomNav activeNav="search" onNavigate={handleNav} />
+      <AppBottomNav activeNav="categories" onNavigate={handleNav} role="customer" homePath="/user-home" />
     </div>
   );
 }

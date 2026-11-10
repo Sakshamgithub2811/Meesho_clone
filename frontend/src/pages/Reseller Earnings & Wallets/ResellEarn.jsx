@@ -1,14 +1,45 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
+import { getProducts } from '../../services/ecommerceService';
 
 export default function ResellAndEarn({ onBack }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const supplierPrice = 480;
+  
+  const [activeProduct, setActiveProduct] = useState({
+    title: 'Silk Handblock Print Anarkali',
+    price: 480,
+    mrp: 899,
+    description: 'Handcrafted by master artisans with premium silk-blend fabric and traditional floral motifs.',
+    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80'
+  });
+
+  const supplierPrice = activeProduct.price || 480;
   const [customerPrice, setCustomerPrice] = useState(600);
   const [activeNav, setActiveNav] = useState('orders');
+
+  useEffect(() => {
+    getProducts({ all: true }).then((prods) => {
+      if (prods && prods.length > 0) {
+        const queryParams = new URLSearchParams(location.search);
+        const prodId = queryParams.get('id');
+        const matched = prodId ? prods.find(p => p.id === prodId) : prods[0];
+        const selected = matched || prods[0];
+        
+        setActiveProduct({
+          title: selected.title || 'Silk Handblock Print Anarkali',
+          price: selected.price || 480,
+          mrp: selected.originalPrice || Math.round((selected.price || 480) * 1.6),
+          description: selected.description || 'Premium marketplace catalog product with verified supplier guarantee.',
+          image: selected.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80'
+        });
+        setCustomerPrice(Math.round((selected.price || 480) * 1.25));
+      }
+    }).catch(() => {});
+  }, [location.search]);
 
   // Live Profit Calculation
   const numericPrice = Number(customerPrice) || 0;
@@ -21,7 +52,7 @@ export default function ResellAndEarn({ onBack }) {
 
   const handleWhatsAppShare = () => {
     const finalPrice = numericPrice < supplierPrice ? supplierPrice : numericPrice;
-    const message = `✨ Premium Silk Handblock Print Anarkali ✨\n\nPrice: ₹${finalPrice} only (Free Delivery + 7-Day Easy Returns)\n\nReply to place your order!`;
+    const message = `✨ ${activeProduct.title} ✨\n\nPrice: ₹${finalPrice} only (Free Delivery + 7-Day Easy Returns)\n\nReply to place your order!`;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -85,36 +116,42 @@ export default function ResellAndEarn({ onBack }) {
             <div className="flex flex-col md:flex-row">
               <div className="md:w-1/2 aspect-[4/5] relative overflow-hidden">
                 <img
-                  alt="Premium Ethnic Wear"
+                  alt={activeProduct.title}
                   className="w-full h-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0ZnPCaQs1V-mDSDM7ur2kI3Dz5Nbk7XDFuZH3o4lRL3dsUn6O1yaEEHy-VLMCln7Sd6be5Qrq94Zfg63DDyBzVhYJePlmHDXghznQTyuuKMUm5Mm87Ajqce1Y0O-aCUAclPK1J3ONzX2FEjylGuRwxAPi7MjwxctToYvQMizwARfCrJZ5eBA2dlEycS3G6fvLnnmrYBrguUZ5NFiw9091KDpVXtHLkqcVjyakyCacLuB5sq9QG0-dXjlee_MI1KD7fzfqJZ9hE7U"
+                  src={activeProduct.image}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80';
+                  }}
                 />
                 <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
                   <svg className="w-3.5 h-3.5 fill-current text-[#b90041]" viewBox="0 0 24 24">
                     <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                   </svg>
-                  <span className="text-xs font-bold font-sans">4.5</span>
+                  <span className="text-xs font-bold font-sans">4.8</span>
                 </div>
               </div>
 
               <div className="p-6 md:w-1/2 flex flex-col justify-between">
                 <div>
                   <p className="text-[#b90041] font-bold text-xs uppercase tracking-widest mb-2">
-                    Exclusive Collection
+                    Verified Wholesale Catalog
                   </p>
                   <h2 className="text-2xl font-extrabold text-[#191c1e] leading-tight mb-2 font-['Plus_Jakarta_Sans',sans-serif]">
-                    Silk Handblock Print Anarkali
+                    {activeProduct.title}
                   </h2>
                   <p className="text-[#5b4042] text-sm line-clamp-2 mb-4 leading-relaxed">
-                    Handcrafted by master artisans with premium silk-blend fabric and traditional floral motifs.
+                    {activeProduct.description}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[#5b4042] text-xs">Supplier Price</p>
+                  <p className="text-[#5b4042] text-xs">Supplier Price (Wholesale)</p>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-[#191c1e]">₹480</span>
-                    <span className="text-[#5b4042] line-through text-sm">₹899</span>
-                    <span className="text-[#006a34] font-bold text-sm">45% OFF</span>
+                    <span className="text-3xl font-black text-[#191c1e]">₹{activeProduct.price}</span>
+                    <span className="text-[#5b4042] line-through text-sm">₹{activeProduct.mrp}</span>
+                    <span className="text-[#006a34] font-bold text-sm">
+                      {Math.round(((activeProduct.mrp - activeProduct.price) / activeProduct.mrp) * 100)}% OFF
+                    </span>
                   </div>
                 </div>
               </div>
@@ -129,14 +166,14 @@ export default function ResellAndEarn({ onBack }) {
               <img
                 className="w-full h-full object-cover"
                 alt="Reseller 1"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBu1i3UcAw_mLKDXnyxXC6ZQF9coPpy-EaFt1EiyMosqnXottVZqCbLK-UBa28UFae5dPjUuTj1ZD0U3IXgmV8lsvvORbHbsdEkeMxZgmQjx-4UTYMxIxoBFZIszTQCRkvnx4R0787kL1KjkYN-sN6Z4uU1p1HbIvzM590hQHMZ2417d_hhn1esV1JTn8hROyl8mDr-h1giiBwDz0pJ_6l4y3WS-5QKrefLhrciANDGdH8riEsi6NEyBMeDza8m6qjAjYMTMxQOL1s"
+                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
               />
             </div>
             <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-300 overflow-hidden">
               <img
                 className="w-full h-full object-cover"
                 alt="Reseller 2"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7t5Ne6EZqqBz-A00YXILg702dJUAsR2sAMnamzc516YhUu0LALx1Ri3B0P4BsOqgatzGjZ1IdZXYAY5OgL-DzNxtCFFvh07nUv8iUFXAYhjO4nHpDwltRaaqiPYN50KGEmQ54V3-MxRDyRDd3Gn_V09CCryfWD_q-Ats7wd6H_LqVs_QnNcNLGLHy7LNWMeA-URDcr96z4Kq4Exs1lFkXHYLH9HEuJgJrJCXOgtLYUNZeDwdeQmamEm1Iy1J8Q6jvPCvyU_Ymf_8"
+                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"
               />
             </div>
           </div>

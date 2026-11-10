@@ -46,12 +46,26 @@ export default function UserWishlist({ onNavigate, onBack }) {
 
   useEffect(() => {
     loadData();
+
+    const handleDataChanged = () => {
+      loadData();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mshoppy-wishlist-changed', handleDataChanged);
+      window.addEventListener('mshoppy-cart-changed', handleDataChanged);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('mshoppy-wishlist-changed', handleDataChanged);
+        window.removeEventListener('mshoppy-cart-changed', handleDataChanged);
+      }
+    };
   }, []);
 
   const handleRemove = async (productId) => {
     try {
       await toggleWishlist(productId);
-      setWishlistItems(prev => prev.filter(w => w.productId !== productId));
+      setWishlistItems(prev => prev.filter(w => w.productId !== productId && w.id !== productId));
       triggerToast('Item removed from Wishlist');
     } catch (e) {
       triggerToast('Item removed from Wishlist');
@@ -60,13 +74,13 @@ export default function UserWishlist({ onNavigate, onBack }) {
 
   const handleMoveToCart = async (item) => {
     try {
-      await addToCart(item.productId, 1, item.product?.sizes?.[0] || 'Free Size');
+      await addToCart(item.productId, 1, item.product?.sizes?.[0] || 'Free Size', item.product);
       await toggleWishlist(item.productId);
-      setWishlistItems(prev => prev.filter(w => w.productId !== item.productId));
+      setWishlistItems(prev => prev.filter(w => w.productId !== item.productId && w.id !== item.productId));
       setCartCount(c => c + 1);
-      triggerToast(`Moved "${item.product?.title?.slice(0, 20)}..." to Cart! 🛒`);
+      triggerToast(`Moved "${item.product?.title?.slice(0, 20) || 'Item'}..." to Cart! 🛒`);
     } catch (e) {
-      triggerToast('Moved to Cart! 🛒');
+      triggerToast('Moved item to Cart! 🛒');
     }
   };
 
@@ -229,7 +243,7 @@ export default function UserWishlist({ onNavigate, onBack }) {
         )}
       </main>
 
-      <AppBottomNav activeNav="home" onNavigate={handleNav} />
+      <AppBottomNav activeNav="wishlist" onNavigate={handleNav} role="customer" homePath="/user-home" />
     </div>
   );
 }

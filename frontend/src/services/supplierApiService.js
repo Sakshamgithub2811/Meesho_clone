@@ -1,6 +1,7 @@
 // frontend/src/services/supplierApiService.js
+import { API_BASE } from '../config/apiConfig';
 
-const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = API_BASE;
 
 const TOKEN_KEY = 'meesho_supplier_token';
 const SUPPLIER_KEY = 'meesho_supplier_user';
@@ -88,7 +89,7 @@ async function request(endpoint, options = {}) {
   } catch (error) {
     console.warn(`[SupplierAPI] Request to ${endpoint} failed:`, error.message);
     if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('NetworkError'))) {
-      throw new Error('Backend server is offline. Please start backend on http://localhost:5000');
+      throw new Error(`Backend server is offline or unreachable at ${API_BASE_URL}.`);
     }
     throw error;
   }

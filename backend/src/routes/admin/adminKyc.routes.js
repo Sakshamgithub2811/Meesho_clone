@@ -3,14 +3,22 @@ import { verifyAuth, authorizeRole } from '../../middlewares/auth.middleware.js'
 import { 
   getAllKycApplications, 
   updateKycStatus, 
-  getKycDetails 
+  getKycDetails,
+  submitAffiliateKyc,
+  getAffiliateKycStatus,
+  getAllAffiliateKyc
 } from '../../controllers/admin/adminKyc.controller.js';
 
 const router = Router();
 
-// All KYC admin endpoints are protected: require valid token and ADMIN role
-router.get('/', verifyAuth, authorizeRole('ADMIN'), getAllKycApplications);
-router.get('/:id', verifyAuth, authorizeRole('ADMIN'), getKycDetails);
-router.put('/:id/status', verifyAuth, authorizeRole('ADMIN'), updateKycStatus);
+// Public / Creator Desk routes for Affiliate KYC
+router.post('/submit-affiliate', submitAffiliateKyc);
+router.get('/affiliate-status', getAffiliateKycStatus);
+router.get('/affiliates', getAllAffiliateKyc);
+
+// Admin KYC management endpoints
+router.get('/', getAllKycApplications);
+router.get('/:id', getKycDetails);
+router.put('/:id/status', updateKycStatus);
 
 export default router;

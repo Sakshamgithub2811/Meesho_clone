@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -20,8 +20,12 @@ export default function AuthLayout({
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#fff4f6]/90 z-10" />
         <img 
           className="w-full h-full object-cover mix-blend-multiply opacity-80" 
-          alt="MShoppy Auth" 
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuA17Odz0VuEd9507iy5ggYedrO4p3lV7PTifqh_NIFIjMwYs7F7xvv7dJPF3VZ6Z11llVLVw5xtNaMn4qJcaZlijJ5VYBvw4lkhDG0GaD_3mqVC6fp_xGCsC_hT5Kl2Yvq85636Vd8iv-Nfvmw3A5Otx5SstITEeJ4evOSjB2EZqGwhDYhrJHL4AtEO6BSjDVRSWi-AhA3f8HCmXuKT-yo3NUOxOwpD4XR4x4e-hJLySUEWwuFS8o8Obusm8jNEjV35CWqYtkzkNNg" 
+          alt="" 
+          role="presentation"
+          src="https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80" 
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
         />
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-20">
           <div className="bg-white/80 backdrop-blur-[20px] px-6 py-2 rounded-full border border-white/40 shadow-[0_12px_40px_rgba(74,33,53,0.06)] flex items-center gap-2.5">
@@ -33,21 +37,21 @@ export default function AuthLayout({
       </div>
 
       {/* 2. Scrollable Content Card Area */}
-      <main className="relative z-20 h-screen w-full overflow-y-auto flex flex-col items-center justify-center px-6 pt-16 pb-6">
-        <div className="w-full max-w-md shrink-0 flex flex-col items-center mt-12">
+      <main className="relative z-20 min-h-screen w-full overflow-y-auto flex flex-col items-center justify-center px-4 py-4 sm:px-6">
+        <div className="w-full max-w-md shrink-0 flex flex-col items-center my-auto pt-8 pb-4">
         <Card className="w-full shadow-2xl border-white/50 bg-white/95 backdrop-blur-sm rounded-[2rem]">
-          <CardHeader className="text-center pt-8 pb-6">
-            <CardTitle className="text-3xl font-extrabold tracking-tight text-[#4a2135]">
+          <CardHeader className="text-center pt-7 pb-4">
+            <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#4a2135]">
               {title}
             </CardTitle>
             {subtitle && (
-              <CardDescription className="text-[#7d4d62] font-medium opacity-80 mt-2 text-sm">
+              <CardDescription className="text-[#7d4d62] font-medium opacity-80 mt-1.5 text-xs sm:text-sm">
                 {subtitle}
               </CardDescription>
             )}
           </CardHeader> 
           
-          <CardContent className="pb-8 px-6 sm:px-8">
+          <CardContent className="pb-7 px-5 sm:px-7">
             {/* Agar registerContent bheja hai toh Tabs dikhayenge */}
             {registerContent ? (
               <Tabs {...tabsProps} className="w-full">

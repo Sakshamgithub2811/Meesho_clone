@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getWishlist, toggleWishlist as apiToggleWishlist } from '../../services/ecommerceService';
 import AppBottomNav from '../../components/AppBottomNav';
 
 export default function HomeUserReseller({ onNavigate = () => {} }) {
@@ -13,13 +14,33 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
     setTimeout(() => setShowToast(false), 2500); 
   };
 
-  const toggleWishlist = (e, id) => {
+  useEffect(() => {
+    async function loadWish() {
+      try {
+        const wish = await getWishlist();
+        if (Array.isArray(wish)) {
+          const map = {};
+          wish.forEach(w => {
+            const pid = w.productId || w.id;
+            if (pid) map[pid] = true;
+          });
+          setWishlist(map);
+        }
+      } catch (e) {}
+    }
+    loadWish();
+  }, []);
+
+  const toggleWishlist = async (e, id) => {
     e.stopPropagation();
-    setWishlist((prev) => {
-      const next = !prev[id];
-      triggerToast(next ? 'Saved to Wishlist ❤️' : 'Removed from Wishlist');
-      return { ...prev, [id]: next };
-    });
+    const next = !wishlist[id];
+    setWishlist((prev) => ({ ...prev, [id]: next }));
+    triggerToast(next ? 'Saved to Wishlist ❤️' : 'Removed from Wishlist');
+    try {
+      await apiToggleWishlist(id);
+    } catch (err) {
+      console.warn('apiToggleWishlist fallback:', err);
+    }
   };
 
   const handleSearch = (e) => {

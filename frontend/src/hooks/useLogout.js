@@ -11,9 +11,30 @@ export const useLogout = (redirectPath = '/') => {
       // 1. Firebase se bahar aana
       await signOut(auth);
 
-      // 2. Browser ka purana data/tokens saaf karna
-      localStorage.clear();
-      sessionStorage.clear();
+      // 2. Selective auth session cleanup (sirf auth tokens hatana, pura storage wipe na karna)
+      const authKeysToRemove = [
+        'token',
+        'user',
+        'mshoppy_customer_token',
+        'mshoppy_customer_user',
+        'mshoppy_affiliate_token',
+        'mshoppy_affiliate_user',
+        'mshoppy_reseller_token',
+        'mshoppy_reseller_user',
+        'meesho_admin_token',
+        'meesho_admin_user',
+        'meesho_supplier_token',
+        'meesho_supplier_user',
+        'meesho_dropshipper_session'
+      ];
+      authKeysToRemove.forEach((key) => {
+        try {
+          localStorage.removeItem(key);
+        } catch (_) {}
+      });
+      try {
+        sessionStorage.clear();
+      } catch (_) {}
 
       // 3. User ko seedha login page par bhej dena
       navigate(redirectPath);

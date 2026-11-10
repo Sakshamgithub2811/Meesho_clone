@@ -1,24 +1,19 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
+import { recordAffiliateClick } from './services/affiliateAuthService';
 
 // Reseller & Fintech Pages (Shruti Branch)
 import HomeUserReseller from './pages/Reseller Earnings & Wallets/HomeUserReseller';
 import ShareEarnConfig from './pages/Reseller Earnings & Wallets/ShareEarnConfig';
 import AffiliateProgram from './pages/Reseller Earnings & Wallets/AffiliateProgram';
 import AffiliateProgramPanel from './pages/Reseller Earnings & Wallets/AffiliateProgramPanel';
-import MyWalletFintechStyle from './pages/Reseller Earnings & Wallets/MyWalletFintechStyle';
-import CommunityHub from './pages/Reseller Earnings & Wallets/CommunityHub';
 import PayoutSettings from './pages/Reseller Earnings & Wallets/PayoutSettings';
-import PayoutConfirmation from './pages/Reseller Earnings & Wallets/PayoutConfirmation';
 import NotificationCenter from './pages/Reseller Earnings & Wallets/NotificationCenter';
-import ConversationScreen from './pages/Reseller Earnings & Wallets/ConversationScreen';
-import MeeshoMessengerChatHub from './pages/Reseller Earnings & Wallets/MeeshoMessengerChatHub';
 import LoginSignup from './pages/Reseller Earnings & Wallets/LoginSignup';
 import ReferEarn from './pages/Reseller Earnings & Wallets/ReferEarn';
 import ResellEarn from './pages/Reseller Earnings & Wallets/ResellEarn';
 import EarningsDashboard1 from './pages/Reseller Earnings & Wallets/EarningsDashboard1';
-import EarningsDashboard2 from './pages/Reseller Earnings & Wallets/EarningsDashboard2';
 import ResellerWallet from './pages/Reseller Earnings & Wallets/ResellerWallet';
 import WithdrawEarnings from './pages/Reseller Earnings & Wallets/WithdrawEarnings';
 import ResellerReturnsLedger from './pages/Reseller Earnings & Wallets/ResellerReturnsLedger';
@@ -27,13 +22,17 @@ import SupplierProductAccess from './pages/Reseller Earnings & Wallets/SupplierP
 // Dropshipper Hub Pages
 import DropshipperLogin from './pages/dropshipper/DropshipperLogin';
 import DropshipperDashboard from './pages/dropshipper/DropshipperDashboard';
+import DropshipperProfileView from './pages/dropshipper/DropshipperProfileView';
 import DropshipperKYCRegister from './pages/dropshipper/DropshipperKYCRegister';
 import DropshipperSettlementTracking from './pages/dropshipper/DropshipperSettlementTracking';
 import DropshipperRotManager from './pages/dropshipper/DropshipperRotManager';
+import DropshipperMarginConfig from './pages/dropshipper/DropshipperMarginConfig';
+import DropshipperSupportDesk from './pages/dropshipper/DropshipperSupportDesk';
+import DropshipperOrdersPush from './pages/dropshipper/DropshipperOrdersPush';
+import DropshipperIntegrations from './pages/dropshipper/DropshipperIntegrations';
 
 // Customer & Reseller Shopping Pages
 import HomeUserCustomer from './pages/customer & Reseller/HomeUserCustomer';
-import HomeScreenFlutterLuxe from './pages/customer & Reseller/home_screen_flutter_luxe';
 import FlashSaleLandingPage from './pages/customer & Reseller/flash_sale_landing_page';
 import CuratedSpotlight from './pages/customer & Reseller/curated_spotlight';
 import SearchCategoriesExplorer from './pages/customer & Reseller/search_categories_explorer';
@@ -53,6 +52,7 @@ import CustomerOrders from './pages/customer & Reseller/CustomerOrders';
 import ReturnRequest from './pages/customer & Reseller/ReturnRequest';
 import AffiliateKYC from './pages/customer & Reseller/AffiliateKYC';
 import AffiliateKycStatus from './pages/customer & Reseller/AffiliateKycStatus';
+import PolicyPage from './pages/customer & Reseller/PolicyPage';
 
 // Delivery & Driver Logistics Pages
 import DriverDashboardMobile from './pages/delivery & driver logistics/driver_dashboard_mobile';
@@ -74,7 +74,6 @@ import SupplierOrdersList from './pages/supplier/supplier_orders_list';
 import SupplierProfile from './pages/supplier/supplier_profile';
 import AddNewProductSupplier from './pages/supplier/add_new_product_supplier';
 import AddCategorySupplier from './pages/supplier/add_category_supplier';
-import SellerWebDashboard from './pages/supplier/seller_web_dashboard';
 import SellerWebDashboard1 from './pages/supplier/seller-web-dashboard1';
 import SellerInventory1 from './pages/supplier/SellerInventory1';
 import SellerOrders1 from './pages/supplier/SellerOrders1';
@@ -83,6 +82,8 @@ import SellerReturns1 from './pages/supplier/SellerReturns1';
 import SellerAddProduct1 from './pages/supplier/SellerAddProduct1';
 import SellerProfile1 from './pages/supplier/SellerProfile1';
 import SellerKyc1 from './pages/supplier/SellerKyc1';
+import SellerSettlements1 from './pages/supplier/SellerSettlements1';
+import SellerAnalytics1 from './pages/supplier/SellerAnalytics1';
 import SupplierReturnsRTO from './pages/supplier/SupplierReturnsRTO';
 import SupplierRotLedger from './pages/supplier/SupplierRotLedger';
 import CustomerOrderSupplierFulfilment from './pages/supplier/CustomerOrderSupplierFulfilment';
@@ -95,16 +96,7 @@ import AdminLogin from './pages/admin_panel/adminLogin';
 import UserLogin from './pages/customer & Reseller/UserLogin';
 import AffiliateLogin from './pages/Reseller Earnings & Wallets/AffiliateLogin';
 import { LogoutPage, SupplierLogoutPage } from './pages/auth/logout';
-import AdminWebPanel from './pages/admin_panel/admin_web_panel';
-import AdminWebPanel1 from './pages/admin_panel/admin_web_panel1';
-import AdminProductCatalog from './pages/admin_panel/admin_product_catalog';
-import CampaignCreationFlowAdmin from './pages/admin_panel/campaign_creation_flow_admin';
-import PerformanceAnalyticsDashboardAdmin from './pages/admin_panel/performance_analytics_dashboard_admin';
-import AdminReturnRefundHub from './pages/admin_panel/AdminReturnRefundHub';
-import AdminDropshipperKyc from './pages/admin_panel/AdminDropshipperKyc';
-import AdminAffiliateKycApproval from './pages/admin_panel/AdminAffiliateKycApproval';
-import AdminRotRulesConfigurator from './pages/admin_panel/AdminRotRulesConfigurator';
-import AdminSupportDesk from './pages/admin_panel/AdminSupportDesk';
+import AdminWebPanel from './pages/admin_panel/admin_web_panel1';
 
 // Support & Ticketing Pages
 import SupportCenter from './pages/Community_Social_Chat_&_Customer_Support/support_center';
@@ -122,15 +114,15 @@ import StructureFlow from './pages/Design_Ecosystem_&_Theme_Variations/structure
 const screenCatalog = [
   // 1. Dropshipper Portal Screens
   { path: '/dropshipper-dashboard', name: 'Dropshipper Dashboard', icon: '📊', group: 'Dropshipper' },
-  { path: '/dropshipper-settlements', name: 'Settlement & Tracking', icon: '📊', group: 'Dropshipper' },
+  { path: '/dropshipper-margin-config', name: 'Margin & Price Rules', icon: '🏷️', group: 'Dropshipper' },
+  { path: '/dropshipper-support', name: 'Disputes & Support Desk', icon: '🎧', group: 'Dropshipper' },
+  { path: '/dropshipper-settlements', name: 'Settlement & Tracking', icon: '📈', group: 'Dropshipper' },
   { path: '/dropshipper-rot-manager', name: 'ROT Liability & Policy Manager', icon: '🛡️', group: 'Dropshipper' },
-  { path: '/share-earn-config', name: 'Share & Margin Config', icon: '🔗', group: 'Dropshipper' },
   { path: '/reseller-returns', name: 'Returns & Margin Ledger', icon: '🔄', group: 'Dropshipper' },
   { path: '/my-wallet', name: 'Fintech Wallet & Passbook', icon: '👛', group: 'Dropshipper' },
-  { path: '/reseller-wallet', name: 'Reseller Earnings Wallet', icon: '💳', group: 'Dropshipper' },
   { path: '/withdraw-earnings', name: 'Withdraw Margin to Bank', icon: '🏦', group: 'Dropshipper' },
   { path: '/payout-settings', name: 'Bank & UPI Settings', icon: '⚙️', group: 'Dropshipper' },
-  { path: '/admin-dropshipper-kyc', name: 'Dropshipper KYC Audit', icon: '📦', group: 'Dropshipper' },
+  { path: '/dropshipper-register', name: '4-Step KYC Verification', icon: '🚀', group: 'Dropshipper' },
 
   // 2. Reseller & Fintech 
   { path: '/reseller-home', name: 'Reseller Home', icon: '🛍️', group: 'Reseller & Shop' },
@@ -172,6 +164,8 @@ const screenCatalog = [
   { path: '/user-dashboard1?tab=profile', name: 'Account Profile & Settings', icon: '👤', group: 'Shopping' },
   { path: '/orders', name: 'Customer My Orders', icon: '📦', group: 'Shopping' },
   { path: '/return-request', name: 'Return / Exchange Flow', icon: '🔄', group: 'Shopping' },
+  { path: '/support-center', name: 'Customer Support Center', icon: '🎧', group: 'Shopping' },
+  { path: '/raise-a-ticket', name: 'Raise Support Ticket', icon: '🎫', group: 'Shopping' },
 
   // 4. Logistics & Driver Fleet
   { path: '/driver-dashboard', name: 'Driver Dashboard', icon: '🛵', group: 'Logistics' },
@@ -197,11 +191,13 @@ const screenCatalog = [
   { path: '/seller-web-dashboard1', name: 'Seller Web Dashboard (Live)', icon: '💻', group: 'Supplier' },
   { path: '/supplier-inventory1', name: 'Supplier Inventory (Live)', icon: '📦', group: 'Supplier' },
   { path: '/supplier-orders1', name: 'Supplier Orders (Live)', icon: '📑', group: 'Supplier' },
+  { path: '/supplier-settlements1', name: 'Settlements & Payouts (Live)', icon: '💳', group: 'Supplier' },
   { path: '/supplier-dropship1', name: 'Dropship Fulfillment (Live)', icon: '🚚', group: 'Supplier' },
   { path: '/supplier-returns1', name: 'Returns & RTO Hub (Live)', icon: '🔄', group: 'Supplier' },
   { path: '/supplier-add-product1', name: 'Add Product (Live)', icon: '➕', group: 'Supplier' },
-  { path: '/supplier-profile1', name: 'Supplier Profile (Live)', icon: '👤', group: 'Supplier' },
   { path: '/supplier-kyc1', name: 'Supplier KYC Hub (Live)', icon: '🛡️', group: 'Supplier' },
+  { path: '/supplier-analytics1', name: 'Sales Analytics (Live)', icon: '📊', group: 'Supplier' },
+  { path: '/supplier-profile1', name: 'Supplier Profile (Live)', icon: '👤', group: 'Supplier' },
   { path: '/seller-dashboard', name: 'Seller Web Dashboard', icon: '💻', group: 'Supplier' },
   { path: '/supplier-returns', name: 'Returns, RTO & Claims Hub', icon: '🔄', group: 'Supplier' },
   { path: '/supplier-rot-ledger', name: 'Supplier ROT & Freight Ledger', icon: '🧾', group: 'Supplier' },
@@ -211,15 +207,8 @@ const screenCatalog = [
 
   // 6. Admin Panel & Support
   { path: '/admin-panel', name: 'Admin Web Panel', icon: '🛡️', group: 'Admin' },
-  { path: '/admin-support', name: 'Admin Support Desk', icon: '🎧', group: 'Admin' },
-  { path: '/admin-affiliate-kyc', name: 'Affiliate KYC & Access', icon: '🤝', group: 'Admin' },
-  { path: '/admin-rot-rules', name: 'ROT Business Rules Configurator', icon: '⚙️', group: 'Admin' },
-  { path: '/admin-returns', name: 'Returns & Refund Hub', icon: '⚖️', group: 'Admin' },
-  { path: '/admin-catalog', name: 'Admin Catalog', icon: '📁', group: 'Admin' },
-  { path: '/campaign-flow', name: 'Campaign Creation', icon: '📢', group: 'Admin' },
-  { path: '/admin-analytics', name: 'Performance Analytics', icon: '📊', group: 'Admin' },
-  { path: '/support-center', name: 'Support Center', icon: '🎧', group: 'Admin' },
-  { path: '/raise-ticket', name: 'Raise A Ticket', icon: '🎫', group: 'Admin' },
+  { path: '/support-center', name: 'Support Center', icon: '🎧', group: 'Support' },
+  { path: '/raise-ticket', name: 'Raise A Ticket', icon: '🎫', group: 'Support' },
 
   // 7. Themes & Design Ecosystem
   { path: '/digital-curator', name: 'Digital Curator', icon: '🎨', group: 'Themes' },
@@ -505,6 +494,25 @@ function FloatingNavigator() {
 // Router Bridge Component
 function AppRoutes() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Real-time Referral & Affiliate Link Attribution Engine
+  React.useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(location.search);
+      const refCode = searchParams.get('ref') || searchParams.get('aff');
+      const customMargin = searchParams.get('margin') || searchParams.get('m');
+      if (refCode && refCode.trim()) {
+        const cleanRef = refCode.trim().toUpperCase();
+        localStorage.setItem('mshoppy_referral_code', cleanRef);
+        localStorage.setItem('mshoppy_referral_timestamp', Date.now().toString());
+        if (customMargin && !isNaN(Number(customMargin))) {
+          localStorage.setItem('mshoppy_affiliate_margin', Number(customMargin).toString());
+        }
+        recordAffiliateClick(cleanRef);
+      }
+    } catch (e) {}
+  }, [location.search]);
 
   // Helper navigate prop for legacy components expecting onNavigate/onBack
   const handleNav = (pathOrId) => {
@@ -565,6 +573,8 @@ function AppRoutes() {
       '/products': '/supplier-products',
       'dropshipper-login': '/dropshipper-login',
       'dropshipper-dashboard': '/dropshipper-dashboard',
+      'dropshipper-profile': '/dropshipper-profile',
+      'view-profile': '/dropshipper-profile',
       dropshipperDashboard: '/dropshipper-dashboard',
       dropshipperLogin: '/dropshipper-login',
       'supplier-products': '/supplier-products',
@@ -588,6 +598,8 @@ function AppRoutes() {
       reseller_returns: '/reseller-returns',
       resellerReturns: '/reseller-returns',
       'dropshipper-settlements': '/dropshipper-settlements',
+      'dropshipper-settlement': '/dropshipper-settlements',
+      'dropshipper-settlement-tracking': '/dropshipper-settlements',
       'dropshipper-tracking': '/dropshipper-settlements',
       'settlement-tracking': '/dropshipper-settlements',
       'dropshipper-rot-manager': '/dropshipper-rot-manager',
@@ -675,28 +687,31 @@ function AppRoutes() {
 
       // Admin & Community
       adminPanel: '/admin-panel',
-      adminSupport: '/admin-support',
-      'admin-support': '/admin-support',
-      '/admin-support': '/admin-support',
-      support: '/admin-support',
-      '/support': '/admin-support',
-      admin_support: '/admin-support',
-      supportDesk: '/admin-support',
-      adminReturns: '/admin-returns',
-      'admin-returns': '/admin-returns',
-      admin_returns: '/admin-returns',
-      'admin-rot-rules': '/admin-rot-rules',
-      'rot-rules': '/admin-rot-rules',
-      refunds: '/admin-returns',
-      adminCatalog: '/admin-catalog',
-      campaignFlow: '/campaign-flow',
-      adminAnalytics: '/admin-analytics',
-      'admin-analytics': '/admin-analytics',
-      '/admin-analytics': '/admin-analytics',
-      analytics: '/admin-analytics',
-      '/analytics': '/admin-analytics',
-      'admin-dropshipper-kyc': '/admin-dropshipper-kyc',
-      adminDropshipperKyc: '/admin-dropshipper-kyc',
+      'admin-panel': '/admin-panel',
+      adminPanel1: '/admin-panel',
+      'admin-panel1': '/admin-panel',
+      adminSupport: '/admin-panel',
+      'admin-support': '/admin-panel',
+      '/admin-support': '/admin-panel',
+      support: '/admin-panel',
+      '/support': '/admin-panel',
+      admin_support: '/admin-panel',
+      supportDesk: '/admin-panel',
+      adminReturns: '/admin-panel',
+      'admin-returns': '/admin-panel',
+      admin_returns: '/admin-panel',
+      'admin-rot-rules': '/admin-panel',
+      'rot-rules': '/admin-panel',
+      refunds: '/admin-panel',
+      adminCatalog: '/admin-panel',
+      campaignFlow: '/admin-panel',
+      adminAnalytics: '/admin-panel',
+      'admin-analytics': '/admin-panel',
+      '/admin-analytics': '/admin-panel',
+      analytics: '/admin-panel',
+      '/analytics': '/admin-panel',
+      'admin-dropshipper-kyc': '/admin-panel',
+      adminDropshipperKyc: '/admin-panel',
       'dropshipper-register': '/dropshipper-register',
       dropshipperRegister: '/dropshipper-register',
       'dropshipper-kyc': '/dropshipper-register',
@@ -751,7 +766,7 @@ function AppRoutes() {
         <Route path="/earnings" element={<EarningsDashboard1 onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/earnings-dashboard" element={<EarningsDashboard1 onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/earnings-dashboard-1" element={<EarningsDashboard1 onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/earnings-dashboard-2" element={<EarningsDashboard2 onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/earnings-dashboard-2" element={<Navigate to="/earnings" replace />} />
         <Route path="/refer-earn" element={<ReferEarn />} />
         <Route path="/affiliate-program" element={<AffiliateProgram />} />
         <Route
@@ -766,19 +781,71 @@ function AppRoutes() {
         <Route path="/become-affiliate" element={<AffiliateKYC onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/affiliate-kyc-status" element={<AffiliateKycStatus onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/affiliate-status" element={<AffiliateKycStatus onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/my-wallet" element={<MyWalletFintechStyle />} />
+        <Route path="/my-wallet" element={<Navigate to="/reseller-wallet" replace />} />
         <Route path="/reseller-wallet" element={<ResellerWallet />} />
         <Route path="/reseller-returns" element={<ResellerReturnsLedger onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-settlements" element={<DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-tracking" element={<DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-rot-manager" element={<DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/dropshipper-register" element={<DropshipperKYCRegister onNavigate={handleNav} onBack={handleBack} />} />
+        <Route 
+          path="/dropshipper-settlements" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-settlement" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-settlement-tracking" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-tracking" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Settlement Tracking">
+              <DropshipperSettlementTracking onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-rot-manager" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="ROT Liability & Policy Manager">
+              <DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/rot-manager" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="ROT Liability & Policy Manager">
+              <DropshipperRotManager onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-register" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperKYCRegister onNavigate={handleNav} onBack={handleBack} />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/withdraw-earnings" element={<WithdrawEarnings />} />
         <Route path="/payout-settings" element={<PayoutSettings />} />
-        <Route path="/payout-confirmation" element={<PayoutConfirmation />} />
-        <Route path="/community-hub" element={<CommunityHub />} />
-        <Route path="/messenger" element={<MeeshoMessengerChatHub />} />
-        <Route path="/conversation" element={<ConversationScreen />} />
+        <Route path="/payout-confirmation" element={<Navigate to="/reseller-wallet" replace />} />
+        <Route path="/community-hub" element={<Navigate to="/affiliate-program" replace />} />
+        <Route path="/messenger" element={<Navigate to="/support" replace />} />
+        <Route path="/conversation" element={<Navigate to="/support" replace />} />
         <Route path="/notifications" element={<NotificationCenter />} />
         <Route path="/" element={<LoginSignup />} />
         <Route path="/login" element={<LoginSignup />} />
@@ -789,13 +856,77 @@ function AppRoutes() {
         <Route path="/affiliate/login" element={<AffiliateLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
-        <Route path="/dropshipper-dashboard" element={<DropshipperDashboard />} />
+        <Route 
+          path="/dropshipper-dashboard" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-profile" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperProfileView />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-margin-config" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperMarginConfig />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-support" 
+          element={
+            <ProtectedRoute role="dropshipper">
+              <DropshipperSupportDesk />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-orders-push" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Push Customer Orders to Supplier">
+              <DropshipperOrdersPush />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-orders" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Push Customer Orders to Supplier">
+              <DropshipperOrdersPush />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-push-orders" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Push Customer Orders to Supplier">
+              <DropshipperOrdersPush />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dropshipper-integrations" 
+          element={
+            <ProtectedRoute role="dropshipper" requiresKyc={true} featureName="Store Integrations & Webhook Channels">
+              <DropshipperIntegrations />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
 
         {/* Customer Shopping Routes */}
         <Route path="/user-home" element={<HomeUserCustomer />} />
         <Route path="/product" element={<ProductDetail onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/product/:id" element={<ProductDetail onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/cart" element={<ShoppingCart onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/address" element={<CheckoutAddressSelection onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/payment" element={<CheckoutPayment onNavigate={handleNav} onBack={handleBack} />} />
@@ -803,11 +934,12 @@ function AppRoutes() {
         <Route path="/explorer" element={<SearchCategoriesExplorer onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/categories" element={<SearchCategoriesExplorer onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/search" element={<SearchResults onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/category/:categorySlug" element={<SearchResults onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/sarees" element={<SareesCategoryListing onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/western" element={<WomenWesternCategory onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/spotlight" element={<CuratedSpotlight onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/flash" element={<FlashSaleLandingPage onNavigate={handleNav} onBack={handleBack} />} />
-        <Route path="/luxe" element={<HomeScreenFlutterLuxe onNavigate={handleNav} />} />
+        <Route path="/luxe" element={<Navigate to="/user-home" replace />} />
         <Route path="/reviews" element={<RatingsReviews onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/write-review" element={<WriteAReview onNavigate={handleNav} onBack={handleBack} />} />
         {/* Customer Dashboard - redirected to new /user-dashboard1 */}
@@ -860,6 +992,11 @@ function AppRoutes() {
           }
         />
         <Route path="/return-request" element={<ReturnRequest onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/support-center" element={<SupportCenter onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/support" element={<SupportCenter onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/help" element={<SupportCenter onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/raise-a-ticket" element={<RaiseATicket onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/raise-ticket" element={<RaiseATicket onNavigate={handleNav} onBack={handleBack} />} />
 
         {/* Logistics & Driver Fleet Routes */}
         <Route path="/driver-dashboard" element={<DriverDashboardMobile onNavigate={handleNav} />} />
@@ -902,7 +1039,7 @@ function AppRoutes() {
             <SupplierDashboard1
               onNavigate={handleNav}
               onShipNow={() => handleNav('/supplier-orders')}
-              onClaimCredit={() => handleNav('/admin-analytics')}
+              onClaimCredit={() => handleNav('/admin-panel')}
             />
           }
         />
@@ -1074,35 +1211,65 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/seller-dashboard"
+          path="/supplier-settlements1"
           element={
-            <SellerWebDashboard
+            <SellerSettlements1
               onNavigate={handleNav}
               onBack={handleBack}
-              onViewProducts={() => handleNav('/supplier-inventory')}
-              onViewOrders={() => handleNav('/supplier-orders')}
+            />
+          }
+        />
+        <Route
+          path="/seller-settlements1"
+          element={
+            <SellerSettlements1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/supplier-analytics1"
+          element={
+            <SellerAnalytics1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/seller-analytics1"
+          element={
+            <SellerAnalytics1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/seller-dashboard"
+          element={
+            <SellerWebDashboard1
+              onNavigate={handleNav}
+              onBack={handleBack}
             />
           }
         />
         <Route
           path="/sellers"
           element={
-            <SellerWebDashboard
+            <SellerWebDashboard1
               onNavigate={handleNav}
               onBack={handleBack}
-              onViewProducts={() => handleNav('/supplier-inventory')}
-              onViewOrders={() => handleNav('/supplier-orders')}
             />
           }
         />
         <Route
           path="/seller"
           element={
-            <SellerWebDashboard
+            <SellerWebDashboard1
               onNavigate={handleNav}
               onBack={handleBack}
-              onViewProducts={() => handleNav('/supplier-inventory')}
-              onViewOrders={() => handleNav('/supplier-orders')}
             />
           }
         />
@@ -1132,57 +1299,21 @@ function AppRoutes() {
         />
 
         {/* Admin Panel Routes (Protected) */}
-        <Route path="/admin-panel1" element={<AdminWebPanel1 />} />
 
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-          <Route
-            path="/admin-panel"
-            element={
-              <AdminWebPanel
-                onNavigate={handleNav}
-                onSwitchView={() => handleNav('/seller-dashboard')}
-                onLogout={() => handleNav('/login')}
-              />
-            }
-          />
-          <Route
-            path="/admin-support"
-            element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/support"
-            element={<AdminSupportDesk onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-rot-rules"
-            element={<AdminRotRulesConfigurator onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-dropshipper-kyc"
-            element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-kyc"
-            element={<AdminDropshipperKyc onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-affiliate-kyc"
-            element={<AdminAffiliateKycApproval onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-returns"
-            element={<AdminReturnRefundHub onNavigate={handleNav} onBack={handleBack} />}
-          />
-          <Route
-            path="/admin-catalog"
-            element={<AdminProductCatalog onNavigate={handleNav} onAddNewProduct={() => handleNav('/add-product')} />}
-          />
-          <Route
-            path="/campaign-flow"
-            element={<CampaignCreationFlowAdmin onNavigate={handleNav} onCancel={() => handleNav('/admin-panel')} />}
-          />
-          <Route path="/admin-analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
-          <Route path="/analytics" element={<PerformanceAnalyticsDashboardAdmin onNavigate={handleNav} onBack={handleBack} />} />
+          <Route path="/admin-panel" element={<AdminWebPanel />} />
+          <Route path="/admin-panel1" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-support" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/support" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-rot-rules" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-dropshipper-kyc" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-kyc" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-affiliate-kyc" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-returns" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-catalog" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/campaign-flow" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin-analytics" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/analytics" element={<Navigate to="/admin-panel" replace />} />
         </Route>
         <Route
           path="/support-center"
@@ -1197,6 +1328,8 @@ function AppRoutes() {
         <Route path="/gilded-pulse" element={<GildedPulse onNavigate={handleNav} />} />
         <Route path="/social-commerce-luxe" element={<SocialCommerceLuxe onNavigate={handleNav} />} />
         <Route path="/signal-core" element={<SignalCore onNavigate={handleNav} />} />
+        {/* Dynamic Published CMS & Policies Route (Method 2) */}
+        <Route path="/p/:slug" element={<PolicyPage />} />
       </Routes>
     </div>
   );

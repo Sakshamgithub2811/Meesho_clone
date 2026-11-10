@@ -1,13 +1,131 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
+import {
+  getCategories,
+  getCategoryBySlug,
+  toggleWishlist,
+  getWishlist
+} from '../../services/ecommerceService';
+import { useCart } from '../../hooks/useCart';
 
-export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBack }) {
+// Rich icon & metadata mapping for categories
+const CATEGORY_ICONS = {
+  'women-ethnic': 'styler',
+  'women-western': 'checkroom',
+  'men': 'man',
+  'kids': 'child_care',
+  'home-kitchen': 'flatware',
+  'beauty-health': 'face',
+  'jewellery': 'diamond',
+  'footwear': 'steps',
+  'electronics': 'earbuds',
+  'default': 'sell'
+};
+
+const CATEGORY_TAGLINES = {
+  'women-ethnic': {
+    subtitle: 'Curated traditional sarees, kurtis, lehengas & festive ethnic wear',
+    bannerTitle: 'Flat 60% Off on Festive Ethnic Wear',
+    bannerTag: 'Mega Festive Drop',
+    subcategories: ['All', 'Saree', 'Kurti', 'Silk Saree', 'Anarkali']
+  },
+  'women-western': {
+    subtitle: 'Trendy streetwear, chic workwear, casual tops & denim essentials',
+    bannerTitle: 'Summer Western Runway Styles',
+    bannerTag: 'Runway Collection',
+    subcategories: ['All', 'Dress', 'Top', 'Jeans', 'Skirt']
+  },
+  'men': {
+    subtitle: 'Premium casual shirts, graphic tees, trousers & daily footwear',
+    bannerTitle: 'Trending Men Shirts & Casuals',
+    bannerTag: 'Top Trending Picks',
+    subcategories: ['All', 'Shirt', 'T-Shirt', 'Track Pants']
+  },
+  'kids': {
+    subtitle: 'Comfortable clothing, gentle fabrics, infant essentials & festive sets',
+    bannerTitle: 'Soft & Gentle Kidswear Collection',
+    bannerTag: 'Newborn to 14Y',
+    subcategories: ['All', 'Toys', 'Infant Romper', 'Boys Set']
+  },
+  'home-kitchen': {
+    subtitle: 'Modern living, bedsheets, curtains, cookware & aesthetic decor',
+    bannerTitle: 'Aesthetic Home Living & Kitchenware',
+    bannerTag: 'Home Express',
+    subcategories: ['All', 'Bedsheet', 'Wall Decor', 'Curtain', 'Cookware', 'Storage Container']
+  },
+  'beauty-health': {
+    subtitle: 'Skincare, herbal cosmetics, lip shades & daily grooming essentials',
+    bannerTitle: 'Glow Essentials & Makeup Picks',
+    bannerTag: '100% Authentic',
+    subcategories: ['All', 'Face Wash', 'Lipstick', 'Serum', 'Sunscreen', 'Perfume', 'Body Lotion', 'Kajal']
+  },
+  'jewellery': {
+    subtitle: 'Oxidised silver, bridal chokers, temple jewellery & fashion earrings',
+    bannerTitle: 'Designer Jewellery Sets & Chokers',
+    bannerTag: 'Bridal & Party',
+    subcategories: ['All', 'Necklace', 'Earrings', 'Choker', 'Rings']
+  },
+  'footwear': {
+    subtitle: 'Ethnic juttis, running sneakers, block heels & comfortable sliders',
+    bannerTitle: 'Footwear Collection: Daily to Party',
+    bannerTag: 'Comfort First',
+    subcategories: ['All', 'Flats', 'Sneakers', 'Sliders', 'Jutti', 'Loafers']
+  },
+  'electronics': {
+    subtitle: 'Wireless earbuds, smartwatches, power accessories & soundbars',
+    bannerTitle: 'Top Rated Gadgets & Audio Gear',
+    bannerTag: 'Tech Verified',
+    subcategories: ['All', 'Phone Covers', 'Earbuds', 'Smartwatch', 'Charger', 'Cable', 'Neckband']
+  }
+};
+
+const CATEGORY_GRADIENTS = {
+  'women-ethnic': 'bg-gradient-to-r from-[#831843] via-[#9d174d] to-[#be185d]',
+  'women-western': 'bg-gradient-to-r from-[#4c1d95] via-[#5b21b6] to-[#7c3aed]',
+  'men': 'bg-gradient-to-r from-[#0f172a] via-[#1e293b] to-[#334155]',
+  'kids': 'bg-gradient-to-r from-[#9a3412] via-[#c2410c] to-[#ea580c]',
+  'home-kitchen': 'bg-gradient-to-r from-[#064e3b] via-[#047857] to-[#059669]',
+  'beauty-health': 'bg-gradient-to-r from-[#881337] via-[#be123c] to-[#e11d48]',
+  'jewellery': 'bg-gradient-to-r from-[#78350f] via-[#b45309] to-[#d97706]',
+  'footwear': 'bg-gradient-to-r from-[#1e1b4b] via-[#312e81] to-[#4338ca]',
+  'electronics': 'bg-gradient-to-r from-[#0f172a] via-[#0c4a6e] to-[#0284c7]',
+  'default': 'bg-gradient-to-r from-[#831843] via-[#be185d] to-[#db2777]'
+};
+
+// Curated high-resolution aesthetic hero banner images per category
+const CATEGORY_HERO_IMAGES = {
+  'women-ethnic': 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80',
+  'women-western': 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=80',
+  'men': 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=800&auto=format&fit=crop&q=80',
+  'kids': 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=800&auto=format&fit=crop&q=80',
+  'home-kitchen': 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=800&auto=format&fit=crop&q=80',
+  'beauty-health': 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800&auto=format&fit=crop&q=80',
+  'jewellery': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800&auto=format&fit=crop&q=80',
+  'footwear': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80',
+  'electronics': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
+  'default': 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80'
+};
+
+export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack }) {
   const navigate = useNavigate();
-  const [activeCategory, setActiveCategory] = useState('ethnic');
+  const [searchParams] = useSearchParams();
+  const initialCategoryParam = searchParams.get('category');
+
+  // Dynamic States
+  const [categories, setCategories] = useState([]);
+  const [activeSlug, setActiveSlug] = useState(initialCategoryParam || 'women-ethnic');
+  const [categoryData, setCategoryData] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [selectedSubcat, setSelectedSubcat] = useState('All');
+  const [wishlist, setWishlist] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [showToast, setShowToast] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
+
+  const { cartCount, addItem } = useCart();
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
@@ -15,485 +133,162 @@ export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBac
     setTimeout(() => setShowToast(false), 2500);
   };
 
+  // 1. Initial Load: Fetch categories from Database
+  useEffect(() => {
+    let isMounted = true;
+    async function initCategories() {
+      setLoading(true);
+      try {
+        const [catsRes, wishRes] = await Promise.all([
+          getCategories(),
+          getWishlist()
+        ]);
+
+        if (isMounted) {
+          if (catsRes && catsRes.length > 0) {
+            setCategories(catsRes);
+            // Default to param or first category slug
+            if (!initialCategoryParam) {
+              setActiveSlug(catsRes[0].slug);
+            }
+          }
+          if (wishRes) {
+            setWishlist(new Set(wishRes.map(w => w.productId)));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    initCategories();
+    return () => { isMounted = false; };
+  }, [initialCategoryParam]);
+
+  // 2. Load active category details & products from database
+  useEffect(() => {
+    if (!activeSlug) return;
+    let isMounted = true;
+
+    async function loadCategoryContent() {
+      setLoadingProducts(true);
+      setSelectedSubcat('All');
+      try {
+        const catDetail = await getCategoryBySlug(activeSlug);
+        if (isMounted && catDetail) {
+          setCategoryData(catDetail);
+          setProducts(catDetail.products || []);
+        }
+      } catch (err) {
+        console.error(`Error loading category ${activeSlug}:`, err);
+      } finally {
+        if (isMounted) setLoadingProducts(false);
+      }
+    }
+
+    loadCategoryContent();
+    return () => { isMounted = false; };
+  }, [activeSlug]);
+
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     } else {
-      onNavigate('search');
+      navigate('/search');
     }
   };
 
   const handleSubcategoryClick = (subName) => {
-    navigate(`/search?q=${encodeURIComponent(subName)}`);
+    if (subName === 'All') {
+      setSelectedSubcat('All');
+      return;
+    }
+    setSelectedSubcat(subName);
   };
 
-  const categories = [
-    { id: 'ethnic', name: 'Women Ethnic', icon: 'styler' },
-    { id: 'western', name: 'Women Western', icon: 'checkroom' },
-    { id: 'men', name: 'Men', icon: 'man' },
-    { id: 'kids', name: 'Kids', icon: 'child_care' },
-    { id: 'home', name: 'Home & Kitchen', icon: 'flatware' },
-    { id: 'beauty', name: 'Beauty & Health', icon: 'face' },
-    { id: 'jewellery', name: 'Jewellery & Acc', icon: 'diamond' },
-    { id: 'footwear', name: 'Footwear', icon: 'steps' },
-    { id: 'brands', name: 'Top Brands', icon: 'verified' },
-  ];
-
-  const categoryData = {
-    ethnic: {
-      title: 'Women Ethnic',
-      subtitle: 'Curated traditional wear for every occasion & celebration',
-      bannerTitle: 'Earn 2x Profit on Ethnic Wear',
-      bannerTag: 'Mega Reseller Sale',
-      featured: {
-        title: 'Sarees Collection',
-        subtitle: 'Silk, Cotton, Georgette & Party Wear',
-        image:
-          'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=700&auto=format&fit=crop&q=80',
-        badge: 'Trending Now',
-      },
-      subcategories: [
-        {
-          name: 'Kurtis & Sets',
-          items: '1,420+ styles',
-          image:
-            'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Jewellery Sets',
-          items: '890+ designs',
-          image:
-            'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Lehengas',
-          items: '640+ pieces',
-          image:
-            'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Dress Materials',
-          items: '950+ sets',
-          image:
-            'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Ethnic Footwear',
-          items: '380+ juttis',
-          image:
-            'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Blouse & Inners',
-          items: '520+ styles',
-          image:
-            'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&auto=format&fit=crop&q=80',
-        },
-      ],
-    },
-    western: {
-      title: 'Women Western',
-      subtitle: 'Trendy streetwear, chic workwear & casual essentials',
-      bannerTitle: 'Flat 50% Off On Summer Western Wear',
-      bannerTag: 'Luxe Runway Drop',
-      featured: {
-        title: 'Floral & Midi Dresses',
-        subtitle: 'Maxi, Wrap & Bodycon Dresses',
-        image:
-          'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=700&auto=format&fit=crop&q=80',
-        badge: 'Hot Seller',
-      },
-      subcategories: [
-        {
-          name: 'Tops & Tees',
-          items: '2,100+ styles',
-          image:
-            'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Jeans & Jeggings',
-          items: '780+ fits',
-          image:
-            'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Satin & Denim Skirts',
-          items: '430+ styles',
-          image:
-            'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Co-ord Sets',
-          items: '620+ sets',
-          image:
-            'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Blazers & Jackets',
-          items: '310+ pieces',
-          image:
-            'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Activewear',
-          items: '490+ gears',
-          image:
-            'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400&auto=format&fit=crop&q=80',
-        },
-      ],
-    },
-    men: {
-      title: 'Men Fashion',
-      subtitle: 'Premium casuals, formals & ethnic wear for men',
-      bannerTitle: 'Up to 60% Margin on Men Shirts & Polos',
-      bannerTag: 'Top Earner Choice',
-      featured: {
-        title: 'Casual & Formal Shirts',
-        subtitle: 'Cotton, Linen & Oxford Weaves',
-        image:
-          'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=700&auto=format&fit=crop&q=80',
-        badge: 'Best Value',
-      },
-      subcategories: [
-        {
-          name: 'Graphic T-Shirts',
-          items: '3,200+ designs',
-          image:
-            'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Trousers & Chinos',
-          items: '940+ styles',
-          image:
-            'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Men Ethnic Kurtas',
-          items: '580+ sets',
-          image:
-            'https://images.unsplash.com/photo-1597983073493-88cd35cf93b0?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Jackets & Hoodies',
-          items: '760+ designs',
-          image:
-            'https://images.unsplash.com/photo-1544441893-675973e31985?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Men Footwear',
-          items: '1,100+ shoes',
-          image:
-            'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Accessories & Belts',
-          items: '420+ items',
-          image:
-            'https://images.unsplash.com/photo-1627123424574-724758594e93?w=400&auto=format&fit=crop&q=80',
-        },
-      ],
-    },
-    kids: {
-      title: 'Kids & Infants',
-      subtitle: 'Comfortable clothing, baby care & fun accessories',
-      bannerTitle: 'Newborn to 14 Years Collections',
-      bannerTag: 'Soft & Gentle Fabrics',
-      featured: {
-        title: 'Festive & Party Wear',
-        subtitle: 'Kurta sets, gowns & frocks',
-        image:
-          'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=700&auto=format&fit=crop&q=80',
-        badge: 'Popular',
-      },
-      subcategories: [
-        {
-          name: 'Boys Clothing Sets',
-          items: '1,200+ outfits',
-          image:
-            'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Girls Frocks & Dresses',
-          items: '1,450+ styles',
-          image:
-            'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Infant Essentials',
-          items: '620+ packs',
-          image:
-            'https://images.unsplash.com/photo-1522771930-78848d9293e8?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Kids Footwear',
-          items: '530+ pairs',
-          image:
-            'https://images.unsplash.com/photo-1514989940723-e8e51635b782?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Toys & Games',
-          items: '890+ toys',
-          image:
-            'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'School Supplies',
-          items: '310+ items',
-          image:
-            'https://images.unsplash.com/photo-1588072432836-e10032774350?w=400&auto=format&fit=crop&q=80',
-        },
-      ],
-    },
-    home: {
-      title: 'Home & Kitchen',
-      subtitle: 'Elevate living spaces with curtains, bedsheets & cookware',
-      bannerTitle: 'Direct Factory Prices for Home Decor',
-      bannerTag: 'High Repeat Orders',
-      featured: {
-        title: 'Bedsheets & Comforters',
-        subtitle: '100% Pure Cotton & Microfiber',
-        image:
-          'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=700&auto=format&fit=crop&q=80',
-        badge: 'Top Pick',
-      },
-      subcategories: [
-        {
-          name: 'Curtains & Drapes',
-          items: '740+ designs',
-          image:
-            'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Kitchen Storage',
-          items: '1,120+ containers',
-          image:
-            'https://images.unsplash.com/photo-1584269600519-112d071b35e6?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Cookware & Pans',
-          items: '480+ utensils',
-          image:
-            'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Wall Decor & Clocks',
-          items: '670+ frames',
-          image:
-            'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Bathroom Essentials',
-          items: '390+ sets',
-          image:
-            'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Lighting & Lamps',
-          items: '310+ lamps',
-          image:
-            'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400&auto=format&fit=crop&q=80',
-        },
-      ],
-    },
-    beauty: {
-      title: 'Beauty & Wellness',
-      subtitle: 'Skincare, makeup, hair remedies & wellness essentials',
-      bannerTitle: 'Trending Herbal & Organic Cosmetics',
-      bannerTag: 'Dermat Tested',
-      featured: {
-        title: 'Skincare Serums & Creams',
-        subtitle: 'Vitamin C, Niacinamide & Glow Boosters',
-        image:
-          'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=700&auto=format&fit=crop&q=80',
-        badge: 'Glow Drops',
-      },
-      subcategories: [
-        {
-          name: 'Lipsticks & Lip Gels',
-          items: '890+ shades',
-          image:
-            'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Hair Oils & Shampoos',
-          items: '640+ products',
-          image:
-            'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Foundation & Compact',
-          items: '420+ shades',
-          image:
-            'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Fragrances & Deos',
-          items: '530+ perfumes',
-          image:
-            'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Eye Makeup & Kajal',
-          items: '310+ items',
-          image:
-            'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Beauty Appliances',
-          items: '280+ tools',
-          image:
-            'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80',
-        },
-      ],
-    },
-    jewellery: {
-      title: 'Jewellery & Accessories',
-      subtitle: 'Oxidised silver, bridal sets, fashion earrings & rings',
-      bannerTitle: 'Flat 65% Margin on Designer Jewellery',
-      bannerTag: 'Wedding Special',
-      featured: {
-        title: 'Kundan & Temple Sets',
-        subtitle: 'Choker sets, pearls & semi-precious stones',
-        image:
-          'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=700&auto=format&fit=crop&q=80',
-        badge: 'High Demand',
-      },
-      subcategories: [
-        {
-          name: 'Earrings & Studs',
-          items: '2,400+ styles',
-          image:
-            'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Necklace & Chokers',
-          items: '1,200+ pieces',
-          image:
-            'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Bangles & Bracelets',
-          items: '890+ sets',
-          image:
-            'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Rings & Toe Rings',
-          items: '710+ designs',
-          image:
-            'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Watches & Clutches',
-          items: '540+ items',
-          image:
-            'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Hair Accessories',
-          items: '420+ clips',
-          image:
-            'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=400&auto=format&fit=crop&q=80',
-        },
-      ],
-    },
-    footwear: {
-      title: 'Footwear Collection',
-      subtitle: 'Ethnic juttis, casual sneakers, stylish heels & sliders',
-      bannerTitle: 'Daily Wear to Party Heels',
-      bannerTag: 'Comfort First',
-      featured: {
-        title: 'Ethnic Juttis & Mojaris',
-        subtitle: 'Hand-embroidered Punjabi Juttis',
-        image:
-          'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=700&auto=format&fit=crop&q=80',
-        badge: 'Top Pick',
-      },
-      subcategories: [
-        {
-          name: 'Sneakers & Sports Shoes',
-          items: '1,400+ pairs',
-          image:
-            'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Flats & Kolhapuris',
-          items: '950+ styles',
-          image:
-            'https://images.unsplash.com/photo-1562273138-f46be4ebdf33?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Block Heels & Wedges',
-          items: '620+ pairs',
-          image:
-            'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Men Formal Shoes',
-          items: '780+ pairs',
-          image:
-            'https://images.unsplash.com/photo-1614252235316-8c857d38b5f4?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Kids School Shoes',
-          items: '410+ models',
-          image:
-            'https://images.unsplash.com/photo-1514989940723-e8e51635b782?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Comfort Sliders',
-          items: '380+ designs',
-          image:
-            'https://images.unsplash.com/photo-1603808033192-082d6919d3e1?w=400&auto=format&fit=crop&q=80',
-        },
-      ],
-    },
-    brands: {
-      title: 'Top Verified Brands',
-      subtitle: 'Shop authentic products directly from verified national & premium brands',
-      bannerTitle: 'Up to 70% Off on Top Brands',
-      bannerTag: 'Brand Mall',
-      featured: {
-        title: 'boAt Audio & Wearables',
-        subtitle: 'Headphones, Earbuds & Smartwatches',
-        image:
-          'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=700&auto=format&fit=crop&q=80',
-        badge: 'Verified Brand',
-      },
-      subcategories: [
-        {
-          name: 'Puma Sports & Shoes',
-          items: '520+ styles',
-          image:
-            'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'boAt Audio & Gear',
-          items: '380+ items',
-          image:
-            'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Libas Ethnic Kurti',
-          items: '450+ styles',
-          image:
-            'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400&auto=format&fit=crop&q=80',
-        },
-        {
-          name: 'Roadster Denims & Jackets',
-          items: '610+ styles',
-          image:
-            'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=400&auto=format&fit=crop&q=80',
-        },
-      ],
-    },
+  const handleExploreAllSearch = () => {
+    if (categoryData?.slug) {
+      navigate(`/search?category=${categoryData.slug}`);
+    } else {
+      navigate('/search');
+    }
   };
 
-  const currentData = categoryData[activeCategory] || categoryData.ethnic;
+  const handleToggleWishlist = async (e, productId) => {
+    e.stopPropagation();
+    try {
+      await toggleWishlist(productId);
+      setWishlist((prev) => {
+        const next = new Set(prev);
+        if (next.has(productId)) {
+          next.delete(productId);
+          triggerToast('Removed from favorites');
+        } else {
+          next.add(productId);
+          triggerToast('Saved to Wishlist ❤️');
+        }
+        return next;
+      });
+    } catch (e) {
+      triggerToast('Wishlist updated ❤️');
+    }
+  };
+
+  const handleQuickAddToCart = async (e, prod) => {
+    e.stopPropagation();
+    try {
+      const sizeToUse = (prod.sizes && prod.sizes[0]) || 'Free Size';
+      await addItem(prod.id, 1, sizeToUse);
+      triggerToast(`Added ${prod.title.slice(0, 20)}... to Cart! 🛍️`);
+    } catch (err) {
+      triggerToast('Added to Cart! 🛍️');
+    }
+  };
+
+  // Filter products by selected subcategory chip
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    if (selectedSubcat === 'All') return products;
+    const term = selectedSubcat.toLowerCase().trim();
+    return products.filter((p) => {
+      const pSub = (p.subCategory || '').toLowerCase().trim();
+      if (pSub === term) return true;
+      if (pSub) return false;
+      const fullText = `${p.title || ''} ${p.description || ''}`.toLowerCase();
+      return fullText.includes(term);
+    });
+  }, [products, selectedSubcat]);
+
+  const activeCategoryMeta = CATEGORY_TAGLINES[activeSlug] || {
+    subtitle: 'Explore authentic verified supplier collections at lowest wholesale prices',
+    bannerTitle: 'Mega Wholesale Collection',
+    bannerTag: 'Verified Direct',
+    subcategories: ['All', 'Trending', 'Best Sellers', 'New Arrival']
+  };
+
+  const currentCategory = categories.find(c => c.slug === activeSlug) || categoryData || {
+    name: 'Category Explorer',
+    slug: activeSlug,
+    imageUrl: CATEGORY_HERO_IMAGES[activeSlug] || CATEGORY_HERO_IMAGES['default']
+  };
+
+  const bannerImage =
+    CATEGORY_HERO_IMAGES[activeSlug] ||
+    currentCategory?.imageUrl ||
+    (products[0]?.images && products[0].images[0]) ||
+    CATEGORY_HERO_IMAGES['default'];
+
+  const dynamicSubcategories = useMemo(() => {
+    if (currentCategory?.subcategories && currentCategory.subcategories.length > 0) {
+      return currentCategory.subcategories;
+    }
+    return activeCategoryMeta.subcategories || ['All'];
+  }, [currentCategory, activeCategoryMeta]);
 
   return (
-    <div className="bg-[#f8f9fb] text-[#191c1e] min-h-screen w-full max-w-full overflow-x-hidden flex flex-col font-sans antialiased selection:bg-pink-100 selection:text-pink-600 pb-20">
+    <div className="bg-[#f8f9fb] font-sans text-[#191c1e] h-screen max-h-screen overflow-hidden flex flex-col antialiased selection:bg-pink-100 selection:text-pink-700">
       {/* Toast Alert */}
       {showToast && (
         <div className="fixed top-20 right-6 z-50 bg-[#008644] text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-bounce">
@@ -502,36 +297,41 @@ export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBac
         </div>
       )}
 
-      {/* Top Search Bar */}
-      <header className="sticky top-0 z-40 w-full bg-white shadow-xs border-b border-gray-100">
-        <div className="max-w-7xl w-full mx-auto flex items-center justify-between px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 gap-2 sm:gap-4">
+      {/* Top Header */}
+      <header className="shrink-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-xs">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+          {/* Logo & Back button */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
-              onClick={() => (onBack ? onBack() : onNavigate('reseller'))}
-              className="p-1.5 rounded-full hover:bg-gray-100 active:scale-95 transition-all text-[#FF3F6C] cursor-pointer"
-              title="Go Back"
+              onClick={() => (onBack ? onBack() : navigate('/user-home'))}
+              className="p-1.5 rounded-full hover:bg-slate-100 text-slate-700 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+              title="Back"
             >
               <span className="material-symbols-outlined text-2xl">arrow_back</span>
             </button>
-            <span
-              onClick={() => onNavigate('reseller')}
-              className="font-black text-xl tracking-tight text-[#FF3F6C] cursor-pointer hidden sm:inline"
+            <div 
+              onClick={() => navigate('/user-home')}
+              className="flex items-center gap-1.5 cursor-pointer group"
             >
-              Meesho
-            </span>
+              <img 
+                src="/mshoppy-logo.png" 
+                alt="MShoppy" 
+                className="w-8 h-8 object-contain rounded-xl shadow-xs transition-transform group-hover:scale-105" 
+              />
+              <span className="text-xl font-black text-[#FF3F6C] font-headline tracking-tight hidden sm:inline">
+                MShoppy
+              </span>
+            </div>
           </div>
 
+          {/* Search input */}
           <div className="flex-1 min-w-0 max-w-2xl">
-            <form
-              onSubmit={handleSearchSubmit}
-              className="w-full"
-            >
+            <form onSubmit={handleSearchSubmit} className="w-full">
               <div className="bg-[#f2f4f6] hover:bg-slate-200/60 focus-within:bg-white flex items-center px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full gap-2 border border-slate-200/60 focus-within:border-pink-400 focus-within:ring-2 focus-within:ring-[#FF3F6C]/20 transition-all shadow-inner h-9 sm:h-10">
                 <button
                   type="submit"
                   className="text-slate-400 hover:text-[#FF3F6C] flex items-center shrink-0 cursor-pointer transition-colors"
                   title="Search"
-                  aria-label="Submit search"
                 >
                   <span className="material-symbols-outlined text-lg sm:text-xl">search</span>
                 </button>
@@ -539,16 +339,15 @@ export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBac
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleSearchSubmit}
-                  placeholder="Search products, categories..."
-                  className="w-full bg-transparent text-xs sm:text-sm font-medium text-[#191c1e] focus:outline-none placeholder:text-slate-400 placeholder:text-xs sm:placeholder:text-sm placeholder:truncate min-w-0"
+                  placeholder="Search in all categories..."
+                  className="w-full bg-transparent text-xs sm:text-sm font-medium text-[#191c1e] focus:outline-none placeholder:text-slate-400"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
                     className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200/50 shrink-0 text-xs font-bold transition-all cursor-pointer"
-                    title="Clear search"
+                    title="Clear"
                   >
                     <span className="material-symbols-outlined text-sm sm:text-base">close</span>
                   </button>
@@ -557,171 +356,323 @@ export default function SearchCategoriesExplorer({ onNavigate = () => { }, onBac
             </form>
           </div>
 
+          {/* Cart & Wishlist */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <button
-              onClick={() => onNavigate('wishlist')}
+              onClick={() => navigate('/wishlist')}
               className="p-2 rounded-full hover:bg-slate-100 text-slate-700 active:scale-95 transition-all cursor-pointer hidden sm:flex"
               title="Wishlist"
             >
               <span className="material-symbols-outlined text-2xl">favorite</span>
             </button>
             <button
-              onClick={() => onNavigate('cart')}
+              onClick={() => navigate('/cart')}
               className="p-2 rounded-full hover:bg-pink-50 text-[#FF3F6C] active:scale-95 transition-all cursor-pointer relative"
               title="Shopping Bag"
             >
               <span className="material-symbols-outlined text-2xl">shopping_bag</span>
+              {cartCount > 0 && (
+                <span className="absolute top-1 right-1 bg-[#FF3F6C] text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
+                  {cartCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Split Layout */}
-      <main className="max-w-7xl w-full mx-auto flex flex-1 overflow-hidden h-[calc(100vh-130px)] px-0 sm:px-4 lg:px-8 py-0 sm:py-4 touch-pan-y">
-        {/* Navigation Sidebar Drawer */}
-        <aside className="h-full w-24 sm:w-48 md:w-56 lg:w-64 flex flex-col bg-[#F2F4F6] sm:rounded-2xl border-r sm:border border-slate-200/60 overflow-y-auto overflow-x-hidden [overflow-x:clip] touch-pan-y shrink-0 select-none shadow-sm">
+      <main className="max-w-7xl w-full mx-auto flex-1 min-h-0 flex overflow-hidden px-0 sm:px-4 lg:px-8 py-1 sm:py-3">
+        {/* Category Navigation Sidebar */}
+        <aside className="h-full w-20 sm:w-52 md:w-60 lg:w-64 flex flex-col bg-[#F2F4F6] sm:rounded-2xl border-r sm:border border-slate-200/60 overflow-y-auto overscroll-contain shrink-0 select-none shadow-sm pb-20 md:pb-4 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent">
           <div className="p-3 hidden sm:block border-b border-slate-200/50">
-            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">
-              Explore Categories
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500">
+              Categories
             </span>
           </div>
-          <nav className="flex flex-col py-2 space-y-1 w-full max-w-full overflow-hidden">
-            {categories.map((cat) => {
-              const isActive = activeCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`py-3 px-2 sm:px-4 flex sm:flex-row flex-col items-center sm:gap-3 gap-1 transition-all cursor-pointer relative text-left rounded-xl mx-1 sm:mx-1.5 w-[calc(100%-8px)] sm:w-[calc(100%-12px)] max-w-full min-w-0 ${isActive
-                      ? 'bg-white text-[#FF3F6C] font-extrabold shadow-sm'
-                      : 'text-slate-600 opacity-80 hover:opacity-100 hover:bg-white/50'
+
+          <nav className="flex flex-col py-2 space-y-1 w-full">
+            {loading ? (
+              // Skeleton loading sidebar
+              [1, 2, 3, 4, 5, 6].map((n) => (
+                <div key={n} className="h-12 bg-slate-200/60 rounded-xl mx-2 animate-pulse mb-1" />
+              ))
+            ) : (
+              categories.map((cat) => {
+                const isActive = activeSlug === cat.slug;
+                const iconName = CATEGORY_ICONS[cat.slug] || CATEGORY_ICONS['default'];
+                const count = cat._count?.products || 0;
+
+                return (
+                  <button
+                    key={cat.id || cat.slug}
+                    onClick={() => setActiveSlug(cat.slug)}
+                    className={`py-2.5 px-1 sm:px-4 flex sm:flex-row flex-col items-center sm:gap-3 gap-1 transition-all cursor-pointer relative text-left rounded-xl mx-1 sm:mx-1.5 w-[calc(100%-8px)] sm:w-[calc(100%-12px)] ${
+                      isActive
+                        ? 'bg-white text-[#FF3F6C] font-extrabold shadow-sm'
+                        : 'text-slate-600 opacity-80 hover:opacity-100 hover:bg-white/50'
                     }`}
-                >
-                  {isActive && (
-                    <span className="absolute left-0 top-1 bottom-1 w-1.5 bg-[#FF3F6C] rounded-r-full sm:hidden" />
-                  )}
-                  <span
-                    className="material-symbols-outlined text-2xl sm:text-xl shrink-0 select-none pointer-events-none"
-                    style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}
                   >
-                    {cat.icon}
-                  </span>
-                  <span className="text-[10.5px] sm:text-xs leading-tight font-bold truncate max-w-full">
-                    {cat.name}
-                  </span>
-                </button>
-              );
-            })}
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1.5 bg-[#FF3F6C] rounded-r-full sm:hidden" />
+                    )}
+                    <span
+                      className="material-symbols-outlined text-2xl sm:text-xl shrink-0 pointer-events-none"
+                      style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}
+                    >
+                      {iconName}
+                    </span>
+                    <div className="w-full min-w-0 text-center sm:text-left px-0.5">
+                      <span className="text-[10px] sm:text-xs leading-[13px] sm:leading-tight font-bold block break-words line-clamp-2">
+                        {cat.name}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </nav>
         </aside>
 
         {/* Dynamic Category Content Canvas */}
-        <section className="flex-1 min-w-0 w-full max-w-full bg-white sm:rounded-2xl sm:border border-slate-200/60 sm:ml-4 overflow-y-auto overflow-x-hidden [overflow-x:clip] overscroll-x-none touch-pan-y p-3 sm:p-6 lg:p-8 shadow-sm">
-          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3 sm:pb-4 min-w-0 w-full max-w-full overflow-hidden">
-            <div className="min-w-0 w-full max-w-full overflow-hidden">
-              <h2 className="text-lg sm:text-2xl md:text-3xl font-black text-[#191c1e] truncate w-full max-w-full">
-                {currentData.title}
-              </h2>
-              <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5 line-clamp-1 sm:line-clamp-none w-full max-w-full truncate sm:overflow-visible">
-                {currentData.subtitle}
+        <section className="flex-1 min-h-0 h-full w-full bg-white sm:rounded-2xl sm:border border-slate-200/60 sm:ml-4 overflow-y-auto overscroll-contain p-3 sm:p-6 lg:p-8 pb-24 md:pb-8 shadow-sm [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent">
+          {/* Category Header */}
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3 sm:pb-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-2xl md:text-3xl font-black text-[#191c1e] leading-snug">
+                  {currentCategory.name}
+                </h2>
+              </div>
+              <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
+                {activeCategoryMeta.subtitle}
               </p>
             </div>
             <button
-              onClick={() => handleSubcategoryClick(currentData.title)}
-              className="text-xs font-bold text-[#FF3F6C] bg-pink-50 hover:bg-pink-100 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full cursor-pointer transition-all self-start sm:self-auto shadow-sm shrink-0 whitespace-nowrap max-w-full"
+              onClick={handleExploreAllSearch}
+              className="text-xs font-bold text-[#FF3F6C] bg-pink-50 hover:bg-pink-100 px-4 py-2 rounded-full cursor-pointer transition-all self-start sm:self-auto shadow-xs shrink-0 whitespace-nowrap active:scale-95"
             >
-              Explore All Styles ➔
+              Explore All in Search ➔
             </button>
           </div>
 
-          {/* Hero Feature Banner Card */}
+          {/* Dynamic Hero Banner Card - Modern Split Layout */}
           <div
-            onClick={() => handleSubcategoryClick(currentData.featured.title)}
-            className="relative group cursor-pointer overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 w-full max-w-full h-44 sm:h-56 md:h-64 lg:h-72 mb-6 sm:mb-8 shadow-md border border-slate-100 active:scale-[0.99] transition-transform isolate touch-pan-y select-none"
+            onClick={handleExploreAllSearch}
+            className={`relative group cursor-pointer overflow-hidden rounded-2xl sm:rounded-3xl ${CATEGORY_GRADIENTS[activeSlug] || CATEGORY_GRADIENTS['default']} w-full min-h-[165px] sm:h-52 md:h-60 mb-5 sm:mb-6 shadow-md border border-white/10 active:scale-[0.99] transition-all flex items-center justify-between text-white isolate`}
           >
-            <img
-              src={currentData.featured.image}
-              alt={currentData.featured.title}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src =
-                  'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=700&auto=format&fit=crop&q=80';
-              }}
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 pointer-events-none select-none"
-            />
-            <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-3.5 sm:p-6 md:p-8 overflow-hidden pointer-events-none">
-              <div className="w-full max-w-full min-w-0 flex flex-col items-start overflow-hidden">
-                <span className="bg-[#FF3F6C] text-white text-[9px] sm:text-xs font-extrabold uppercase tracking-wider px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full w-max max-w-full truncate mb-1.5 sm:mb-2 shadow-sm shrink-0">
-                  {currentData.featured.badge}
-                </span>
-                <h3 className="text-white font-black text-base sm:text-2xl md:text-3xl leading-tight line-clamp-1 sm:line-clamp-2 drop-shadow-sm w-full max-w-full truncate">
-                  {currentData.featured.title}
-                </h3>
-                <p className="text-white/90 text-[11px] sm:text-sm mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2 drop-shadow-sm w-full max-w-full truncate">
-                  {currentData.featured.subtitle}
-                </p>
-              </div>
-            </div>
-          </div>
+            {/* Ambient background glows */}
+            <div className="absolute -right-8 -bottom-8 w-64 h-64 rounded-full bg-white/15 blur-3xl pointer-events-none" />
+            <div className="absolute left-1/3 top-0 w-44 h-44 rounded-full bg-white/5 blur-2xl pointer-events-none" />
 
-          {/* Subcategories Bento Grid: 2 cols on mobile, 3 on sm, 4 on lg, 5 on xl */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-6 gap-2.5 sm:gap-4 md:gap-5 w-full max-w-full min-w-0">
-            {currentData.subcategories.map((sub, idx) => (
-              <div
-                key={idx}
-                onClick={() => handleSubcategoryClick(sub.name)}
-                className="group cursor-pointer bg-[#f8f9fb] hover:bg-white p-2 sm:p-3 rounded-2xl border border-slate-100 hover:border-pink-300 hover:shadow-xl transition-all duration-300 active:scale-95 flex flex-col items-center min-w-0 w-full max-w-full overflow-hidden transform hover:-translate-y-1 touch-pan-y"
-              >
-                <div className="w-full aspect-square rounded-xl bg-slate-200 overflow-hidden mb-1.5 sm:mb-2.5 relative shadow-inner isolate">
-                  <img
-                    src={sub.image}
-                    alt={sub.name}
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src =
-                        'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&auto=format&fit=crop&q=80';
-                    }}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 pointer-events-none select-none"
-                  />
-                  <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 z-10 max-w-[calc(100%-10px)] truncate whitespace-nowrap bg-black/65 backdrop-blur-md text-white text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold select-none shadow-sm text-center">
-                    {sub.items}
-                  </span>
-                </div>
-                <span
-                  title={sub.name}
-                  className="w-full text-[11px] sm:text-xs md:text-sm font-bold text-center text-[#191c1e] group-hover:text-[#FF3F6C] transition-colors px-0.5 line-clamp-2 min-h-[2rem] sm:min-h-[2.5rem] flex items-center justify-center leading-tight break-words"
-                >
-                  {sub.name}
+            {/* Left Column: Rich Typography and Taglines */}
+            <div className="relative z-10 p-4 sm:p-7 md:p-8 flex-1 max-w-[58%] sm:max-w-[62%] flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                <span className="bg-white/20 backdrop-blur-md text-white text-[9px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border border-white/25 shadow-xs">
+                  {activeCategoryMeta.bannerTag}
+                </span>
+                <span className="text-[10px] sm:text-xs text-white/80 font-bold hidden md:inline">
+                  • Verified Direct
                 </span>
               </div>
-            ))}
-          </div>
-
-          {/* Reseller Promotion Banner */}
-          <div className="mt-8 sm:mt-10 mb-6 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#FF3F6C] via-[#e02659] to-[#910031] text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-pink-500/20 w-full max-w-full overflow-hidden touch-pan-y">
-            <div className="w-full max-w-full min-w-0 overflow-hidden">
-              <p className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-pink-200 truncate">
-                {currentData.bannerTag}
-              </p>
-              <h3 className="text-base sm:text-2xl md:text-3xl font-black leading-tight mt-1 line-clamp-2 w-full max-w-full">
-                {currentData.bannerTitle}
+              <h3 className="text-white font-black text-base sm:text-2xl md:text-3xl leading-tight drop-shadow-sm line-clamp-2">
+                {activeCategoryMeta.bannerTitle}
               </h3>
-              <button
-                onClick={() => onNavigate('flash')}
-                className="mt-3 sm:mt-4 bg-white text-[#FF3F6C] hover:bg-pink-50 px-4 py-2 sm:px-6 sm:py-2.5 rounded-full text-xs font-extrabold active:scale-95 transition-all cursor-pointer shadow-lg max-w-full truncate"
+              <p className="text-white/85 text-[11px] sm:text-xs md:text-sm mt-1 sm:mt-1.5 line-clamp-2 leading-relaxed">
+                {activeCategoryMeta.subtitle}
+              </p>
+              <div className="mt-3 sm:mt-4 flex items-center gap-2">
+                <span className="bg-white text-slate-900 font-extrabold text-[10px] sm:text-xs px-3 sm:px-4 py-1.5 rounded-full shadow-md group-hover:bg-pink-50 transition-colors flex items-center gap-1.5">
+                  Shop {currentCategory.name} <span className="text-xs">➔</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Right Column: Premium Showcase Card with EXACT 2:3 Portrait Aspect (Zero Cropping, Full Head & Body Visible) */}
+            <div className="relative shrink-0 flex items-center justify-center p-3 sm:p-5 md:p-6 z-10 self-center">
+              <div 
+                key={`banner-card-${activeSlug}`}
+                className="relative h-32 sm:h-44 md:h-50 aspect-[2/3] rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/40 ring-4 ring-black/10 bg-black/20 group-hover:scale-[1.02] transition-transform duration-300"
               >
-                Shop Flash Deals ⚡
-              </button>
+                <img
+                  key={`hero-img-${activeSlug}`}
+                  src={bannerImage}
+                  alt={currentCategory.name}
+                  className="w-full h-full object-cover object-top transition-all duration-300"
+                  onError={(e) => {
+                    const fallback = (products[0]?.images && products[0].images[0]) || CATEGORY_HERO_IMAGES['default'];
+                    if (e.target.src !== fallback) {
+                      e.target.src = fallback;
+                    }
+                  }}
+                />
+              </div>
             </div>
-            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-white/20 rounded-2xl sm:rounded-3xl flex items-center justify-center backdrop-blur-md shadow-inner shrink-0 self-end sm:self-center overflow-hidden">
-              <span className="material-symbols-outlined text-2xl sm:text-4xl text-white select-none pointer-events-none">trending_up</span>
+          </div>
+
+          {/* Subcategory Chips Filter */}
+          <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {dynamicSubcategories.map((sub, idx) => {
+              const isSelected = selectedSubcat === sub;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handleSubcategoryClick(sub)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                    isSelected
+                      ? 'bg-[#FF3F6C] text-white shadow-sm'
+                      : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
+                  }`}
+                >
+                  {sub}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Live Products Grid */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                {selectedSubcat === 'All' ? 'Available Products' : `${selectedSubcat} Styles`}
+              </h3>
+              
             </div>
+
+            {loadingProducts ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="h-64 bg-slate-100 rounded-2xl animate-pulse" />
+                ))}
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 text-center my-4">
+                <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">inventory_2</span>
+                <p className="text-sm font-bold text-slate-700">No products found matching "{selectedSubcat}"</p>
+                <p className="text-xs text-slate-400 mt-1">Showing all products in this category instead:</p>
+                <button
+                  onClick={() => setSelectedSubcat('All')}
+                  className="mt-3 px-4 py-1.5 bg-[#FF3F6C] text-white text-xs font-bold rounded-full shadow-xs cursor-pointer active:scale-95"
+                >
+                  View All {currentCategory.name}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {filteredProducts.map((prod) => {
+                  const isFav = wishlist.has(prod.id);
+                  const image = (prod.images && prod.images[0]) || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
+                  const discount = prod.discountPercentage || Math.round(((prod.originalPrice - prod.price) / (prod.originalPrice || prod.price)) * 100) || 0;
+
+                  return (
+                    <div
+                      key={prod.id}
+                      onClick={() => navigate(`/product?id=${prod.id}`)}
+                      className="group bg-white rounded-2xl border border-slate-100 hover:border-pink-200 hover:shadow-lg transition-[border-color,box-shadow,transform] duration-200 overflow-hidden flex flex-col cursor-pointer relative hover:-translate-y-0.5"
+                    >
+                      {/* Thumbnail & Wishlist Button */}
+                      <div className="aspect-[4/5] bg-slate-100 relative overflow-hidden">
+                        <img
+                          src={image}
+                          alt={prod.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        {discount > 0 && (
+                          <span className="absolute top-2 left-2 bg-[#008644] text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-xs">
+                            {discount}% OFF
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleWishlist(e, prod.id)}
+                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-slate-400 hover:text-[#FF3F6C] active:scale-90 transition-all shadow-xs cursor-pointer"
+                          title="Save to Wishlist"
+                        >
+                          <span
+                            className="material-symbols-outlined text-lg"
+                            style={isFav ? { color: '#FF3F6C', fontVariationSettings: "'FILL' 1" } : {}}
+                          >
+                            favorite
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-3 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-[#FF3F6C] transition-colors line-clamp-2 mt-0.5 leading-snug">
+                            {prod.title}
+                          </h4>
+                        </div>
+
+                        <div className="mt-2.5 pt-2 border-t border-slate-50 flex items-center justify-between">
+                          <div>
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-sm sm:text-base font-black text-slate-900">
+                                ₹{prod.price}
+                              </span>
+                              {prod.originalPrice && prod.originalPrice > prod.price && (
+                                <span className="text-[10px] text-slate-400 line-through">
+                                  ₹{prod.originalPrice}
+                                </span>
+                              )}
+                            </div>
+                            {prod.rating > 0 && (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="bg-[#008644] text-white text-[9px] font-extrabold px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                                  {prod.rating} ★
+                                </span>
+                                {prod.reviewsCount > 0 && (
+                                  <span className="text-[9px] text-slate-400">
+                                    ({prod.reviewsCount})
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => handleQuickAddToCart(e, prod)}
+                            className="w-8 h-8 rounded-xl bg-pink-50 hover:bg-[#FF3F6C] text-[#FF3F6C] hover:text-white transition-all flex items-center justify-center active:scale-95 cursor-pointer shadow-xs"
+                            title="Add to Cart"
+                          >
+                            <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Flash Sale Banner at Bottom */}
+          <div className="mt-8 mb-12 p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#FF3F6C] via-[#e02659] to-[#910031] text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg shadow-pink-500/10">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-pink-200">
+                Special Category Deals
+              </p>
+              <h3 className="text-base sm:text-xl font-black mt-0.5">
+                Looking for steepest discounts?
+              </h3>
+              <p className="text-xs text-white/90 mt-0.5">
+                Check today's active lightning deals and limited flash discounts.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/flash')}
+              className="bg-white text-[#FF3F6C] hover:bg-pink-50 px-5 py-2.5 rounded-full text-xs font-black active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+            >
+              Shop Flash Deals ⚡
+            </button>
           </div>
         </section>
       </main>
 
       {/* Universal Bottom Navigation Bar */}
-      <AppBottomNav activeNav="categories" onNavigate={onNavigate} />
+      <AppBottomNav activeNav="categories" onNavigate={onNavigate} role="customer" homePath="/user-home" />
     </div>
   );
 }

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Logout from '../auth/logout';
+import { useSelector } from 'react-redux';
+import { getStoredCustomer, subscribeCustomerAuth } from '../../services/customerAuthService';
 import NavDrawer from "../../components/NavDrawer";
 import AppBottomNav from "../../components/AppBottomNav";
 import {
@@ -8,83 +9,298 @@ import {
   getCategories,
   getWishlist,
   toggleWishlist,
-  getCart
+  getBanners,
 } from "../../services/ecommerceService";
+import { useCart } from "../../hooks/useCart";
+import { getUnreadCount, subscribeNotifications } from "../../services/notificationService";
+
+const REAL_DATABASE_BANNERS = [
+  {
+    id: "a60f4f58-a862-4256-8067-c7e3b9218109",
+    title: "Mega Blockbuster Festive Sale",
+    subtitle: "Flat 70% Off on Sarees, Kurtis & Ethnic Sets",
+    imageUrl: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=80",
+    targetUrl: "/category/women-ethnic",
+    badgeText: "MEGA SALE",
+    badgeColor: "bg-rose-500 text-white",
+    displayOrder: 1,
+    isActive: true,
+    gradient: "from-rose-700 via-pink-600 to-amber-600",
+    accentColor: "text-rose-600"
+  },
+  {
+    id: "cfccdceb-478e-4588-b303-0251a7d961e1",
+    title: "Trending Men Fashion & Streetwear",
+    subtitle: "Casual Shirts, Denim & Oversized Tees from ?199",
+    imageUrl: "https://images.unsplash.com/photo-1516826957135-700dedea698c?auto=format&fit=crop&w=1200&q=80",
+    targetUrl: "/category/men-western",
+    badgeText: "TRENDING",
+    badgeColor: "bg-indigo-500 text-white",
+    displayOrder: 2,
+    isActive: true,
+    gradient: "from-indigo-700 via-blue-600 to-cyan-600",
+    accentColor: "text-indigo-700"
+  },
+  {
+    id: "9b76bb94-5cfe-4cab-9874-5fa5977682db",
+    title: "Smart Electronics & Audio Accessories",
+    subtitle: "TWS Earbuds, Smartwatches & Chargers at Factory Prices",
+    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+    targetUrl: "/category/electronics",
+    badgeText: "BESTSELLER",
+    badgeColor: "bg-amber-500 text-white",
+    displayOrder: 3,
+    isActive: true,
+    gradient: "from-amber-600 via-orange-600 to-yellow-600",
+    accentColor: "text-amber-600"
+  },
+  {
+    id: "5c16330f-9da8-477c-8884-718fe1388975",
+    title: "Home Makeover & Kitchen Essentials",
+    subtitle: "Bedsheets, Curtains & Storage Boxes under ?299",
+    imageUrl: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+    targetUrl: "/category/home-kitchen",
+    badgeText: "HOT DEAL",
+    badgeColor: "bg-emerald-500 text-white",
+    displayOrder: 4,
+    isActive: true,
+    gradient: "from-emerald-700 via-teal-600 to-cyan-700",
+    accentColor: "text-emerald-700"
+  }
+];
 
 export default function HomeUserCustomer() {
   const navigate = useNavigate();
   const bannerRef = React.useRef(null);
   const searchContainerRef = React.useRef(null);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [isBannerPaused, setIsBannerPaused] = useState(false);
+  const [banners, setBanners] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mshoppy_cached_banners');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return REAL_DATABASE_BANNERS;
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedSubcat, setSelectedSubcat] = useState("All");
   const [products, setProducts] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
   const [favorites, setFavorites] = useState([]);
-  const [cartCount, setCartCount] = useState(0);
+  const { cartCount } = useCart();
   const [loading, setLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(() => getUnreadCount());
 
-  // Load Categories & Initial Products from Database
+  // Real Registered Customer User State
+  const reduxUser = useSelector((state) => state.user?.currentUser);
+  const [currentUser, setCurrentUser] = useState(() => {
+    return getStoredCustomer()?.user || reduxUser || null;
+  });
+
+  useEffect(() => {
+    const unsub = subscribeCustomerAuth((session) => {
+      if (session?.user) {
+        setCurrentUser(session.user);
+      } else {
+        setCurrentUser(null);
+      }
+    });
+    return unsub;
+  }, []);
+
+  const registeredUser = useMemo(() => {
+    if (currentUser?.fullName || currentUser?.name) return currentUser;
+    if (reduxUser?.fullName || reduxUser?.name) return reduxUser;
+    const stored = getStoredCustomer()?.user;
+    if (stored?.fullName || stored?.name) return stored;
+    try {
+      const raw = localStorage.getItem('mshoppy_customer_user') || localStorage.getItem('mshoppy_reseller_user') || localStorage.getItem('mshoppy_affiliate_user') || localStorage.getItem('mshoppy_kyc_app');
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return currentUser || reduxUser || stored || null;
+  }, [currentUser, reduxUser]);
+
+  const registeredName = useMemo(() => {
+    if (!registeredUser) return null;
+    return (
+      registeredUser.fullName ||
+      registeredUser.name ||
+      registeredUser.displayName ||
+      (registeredUser.email ? registeredUser.email.split('@')[0] : null) ||
+      (registeredUser.phone ? `+91 ${registeredUser.phone.slice(-4)}` : null)
+    );
+  }, [registeredUser]);
+  
+  // Real Meesho Infinite Scroll State & Stable Refs
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalProducts, setTotalProducts] = useState(0);
+
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
+  const loadingMoreRef = useRef(false);
+  const loadingRef = useRef(true);
+  const sentinelRef = useRef(null);
+
+  pageRef.current = page;
+  hasMoreRef.current = hasMore;
+  loadingMoreRef.current = loadingMore;
+  loadingRef.current = loading;
+
+  useEffect(() => {
+    const unsub = subscribeNotifications(() => {
+      setUnreadNotifs(getUnreadCount());
+    });
+    return unsub;
+  }, []);
+
+  // 1. Load Categories, Banners & Wishlist on initial mount
   useEffect(() => {
     let isMounted = true;
-    async function loadData() {
-      setLoading(true);
+    async function loadStaticData() {
       try {
-        const [catsData, prodsData, wishData, cartData] = await Promise.all([
+        const [catsData, wishData, bannersData] = await Promise.all([
           getCategories(),
-          getProducts(),
           getWishlist(),
-          getCart()
+          getBanners(),
         ]);
 
         if (isMounted) {
-          if (catsData && catsData.length > 0) {
-            setDbCategories(catsData);
-          }
-          if (prodsData) {
-            setProducts(prodsData);
-          }
-          if (wishData) {
-            setFavorites(wishData.map(w => w.productId));
-          }
-          if (cartData?.totalItems !== undefined) {
-            setCartCount(cartData.totalItems);
-          }
+          if (bannersData && bannersData.length > 0) setBanners(bannersData);
+          if (catsData && catsData.length > 0) setDbCategories(catsData);
+          if (wishData) setFavorites(wishData.map(w => w.productId));
         }
       } catch (err) {
-        console.error("Error loading initial ecommerce data:", err);
-      } finally {
-        if (isMounted) setLoading(false);
+        console.error("Error loading static ecommerce data:", err);
       }
     }
-    loadData();
+    loadStaticData();
     return () => { isMounted = false; };
   }, []);
 
-  // Fetch when category changes
+  // 2. Fetch Products on Initial Mount & whenever Category or Search Query changes
   useEffect(() => {
     let isMounted = true;
-    async function filterByCategory() {
+    async function fetchInitialProducts() {
       setLoading(true);
+      setLoadingMore(false);
+      setPage(1);
+      setHasMore(true);
+      pageRef.current = 1;
+      hasMoreRef.current = true;
+
       try {
-        const prods = await getProducts({
-          category: selectedCategory === "All" ? "" : selectedCategory,
-          search: searchQuery
+        const targetCategory = selectedCategory === "All" ? "" : selectedCategory;
+        const res = await getProducts({
+          category: targetCategory,
+          search: searchQuery,
+          page: 1,
+          limit: 28,
+          withMeta: true
         });
+
         if (isMounted) {
-          setProducts(prods);
+          setProducts(res.products || []);
+          setTotalProducts(res.total || 0);
+          setHasMore(res.hasMore);
+          hasMoreRef.current = res.hasMore;
         }
       } catch (err) {
-        console.error("Error filtering products:", err);
+        console.error("Error loading initial products:", err);
       } finally {
         if (isMounted) setLoading(false);
       }
     }
-    filterByCategory();
+
+    setSelectedSubcat("All");
+    fetchInitialProducts();
     return () => { isMounted = false; };
-  }, [selectedCategory]);
+  }, [selectedCategory, searchQuery]);
+
+  // 3. Load Next Batch (Infinite Scroll)
+  const loadMoreProducts = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+
+    const nextPage = pageRef.current + 1;
+    const targetCategory = selectedCategory === "All" ? "" : selectedCategory;
+
+    try {
+      const res = await getProducts({
+        category: targetCategory,
+        search: searchQuery,
+        page: nextPage,
+        limit: 28,
+        withMeta: true
+      });
+
+      if (res.products && res.products.length > 0) {
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newItems = res.products.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newItems];
+        });
+        setPage(nextPage);
+        pageRef.current = nextPage;
+        setHasMore(res.hasMore);
+        hasMoreRef.current = res.hasMore;
+        setTotalProducts(res.total || 0);
+      } else {
+        setHasMore(false);
+        hasMoreRef.current = false;
+      }
+    } catch (err) {
+      console.error("Error loading more products:", err);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [selectedCategory, searchQuery]);
+
+  // 4. Dual Sentinel (IntersectionObserver + Smooth Window Scroll Listener)
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    let observer = null;
+
+    if (sentinel) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) {
+            loadMoreProducts();
+          }
+        },
+        { rootMargin: '450px' }
+      );
+      observer.observe(sentinel);
+    }
+
+    const handleWindowScroll = () => {
+      if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+      const scrollY = window.scrollY || window.pageYOffset;
+      const visibleHeight = window.innerHeight;
+      const totalHeight = document.documentElement.scrollHeight;
+
+      if (totalHeight - (scrollY + visibleHeight) < 600) {
+        loadMoreProducts();
+      }
+    };
+
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('scroll', handleWindowScroll);
+    };
+  }, [loadMoreProducts]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -96,33 +312,24 @@ export default function HomeUserCustomer() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleBannerScroll = () => {
-    if (bannerRef.current) {
-      const { scrollLeft, clientWidth } = bannerRef.current;
-      const index = Math.round(scrollLeft / clientWidth);
-      setActiveSlide(index);
-    }
-  };
+  // Auto-scroll hero banner carousel dynamically across all active banners
+  useEffect(() => {
+    if (isBannerPaused || !banners || banners.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % banners.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [isBannerPaused, banners]);
 
-  const scrollToSlide = (index) => {
-    if (bannerRef.current) {
-      bannerRef.current.scrollTo({
-        left: index * bannerRef.current.clientWidth,
-        behavior: 'smooth'
-      });
-      setActiveSlide(index);
-    }
-  };
-
-  const handleToggleFavorite = async (id, e) => {
+  const handleToggleFavorite = async (id, e, productObj = null) => {
     e.stopPropagation();
     try {
       setFavorites(prev =>
         prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
       );
-      await toggleWishlist(id);
+      await toggleWishlist(id, productObj);
     } catch (err) {
-      console.error("Failed to toggle favorite:", err);
+      console.warn("Toggle favorite:", err);
     }
   };
 
@@ -149,7 +356,30 @@ export default function HomeUserCustomer() {
     'Electronics & Gadgets': 'earbuds'
   };
 
-  // Map category list with "All" option
+  // Dynamic subcategories from live Database Category query
+  const activeCategoryObj = useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'All') return null;
+    return dbCategories.find(c => c.name === selectedCategory || c.slug === selectedCategory);
+  }, [dbCategories, selectedCategory]);
+
+  const activeSubcats = useMemo(() => {
+    if (!activeCategoryObj) return [];
+    return activeCategoryObj.subcategories || ['All'];
+  }, [activeCategoryObj]);
+
+  const displayedProducts = useMemo(() => {
+    if (!products) return [];
+    if (selectedSubcat === 'All') return products;
+    const term = selectedSubcat.toLowerCase().trim();
+    return products.filter((p) => {
+      const pSub = (p.subCategory || '').toLowerCase().trim();
+      if (pSub === term) return true;
+      if (pSub) return false;
+      const full = `${p.title || ''} ${p.description || ''}`.toLowerCase();
+      return full.includes(term);
+    });
+  }, [products, selectedSubcat]);
+
   const categoryChips = [
     { name: "All", slug: "All", icon: "dashboard" },
     ...dbCategories.map(c => ({
@@ -322,38 +552,73 @@ export default function HomeUserCustomer() {
           </div>
 
           {/* Action Icons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-0.5 sm:gap-2.5 shrink-0">
+            <button 
+              onClick={() => navigate('/notifications')} 
+              className="relative text-[#191C1E] dark:text-slate-200 p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
+              title="Notifications"
+            >
+              <span className="material-symbols-outlined text-[22px] sm:text-2xl">notifications</span>
+              {unreadNotifs > 0 && (
+                <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-4 h-4 bg-[#FF3F6C] text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                  {unreadNotifs}
+                </span>
+              )}
+            </button>
             <button 
               onClick={() => navigate('/wishlist')} 
-              className="relative text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
+              className="relative text-[#191C1E] dark:text-slate-200 p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
               title="My Wishlist"
             >
-
-              <span className="material-symbols-outlined text-2xl">favorite</span>
+              <span className="material-symbols-outlined text-[22px] sm:text-2xl">favorite</span>
               {favorites.length > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-[#FF3F6C] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-4 h-4 bg-[#FF3F6C] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                   {favorites.length}
                 </span>
               )}
             </button>
             <button 
               onClick={() => navigate('/cart')} 
-              className="relative text-[#191C1E] dark:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
+              className="relative text-[#191C1E] dark:text-slate-200 p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full active:scale-95 duration-200 cursor-pointer" 
               title="Shopping Cart"
             >
-              <span className="material-symbols-outlined text-2xl">shopping_bag</span>
+              <span className="material-symbols-outlined text-[22px] sm:text-2xl">shopping_bag</span>
               {cartCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-[#b90041] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-4 h-4 bg-[#b90041] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
             </button>
-            <Logout />
+            {registeredName ? (
+              <button
+                type="button"
+                onClick={() => navigate('/user-dashboard1?tab=profile')}
+                className="flex items-center gap-1.5 sm:gap-2 p-1 sm:pl-1.5 sm:pr-3 py-1 bg-rose-50/90 dark:bg-slate-800/80 hover:bg-rose-100 dark:hover:bg-slate-700/80 border border-rose-200/90 dark:border-rose-900/60 rounded-full transition-all active:scale-95 cursor-pointer shadow-xs group shrink-0"
+                title={`Logged in as ${registeredName} (Click to open profile)`}
+              >
+                <div className="w-7 h-7 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-[#FF3F6C] to-rose-500 text-white flex items-center justify-center font-extrabold text-xs uppercase shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                  {registeredName.trim().charAt(0) || 'U'}
+                </div>
+                <span className="hidden sm:inline text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[120px] md:max-w-[160px] truncate">
+                  {registeredName}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate('/user-login')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-[#FF3F6C] bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer active:scale-95 shrink-0"
+                title="Sign In / Register"
+              >
+                <span className="material-symbols-outlined text-base">person</span>
+                <span className="hidden sm:inline">Sign In</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 pb-32">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pb-24 md:pb-12">
         {/* Mobile Search */}
         <div className="md:hidden pt-2 pb-4">
           <form 
@@ -382,73 +647,127 @@ export default function HomeUserCustomer() {
           </form>
         </div>
 
-        {/* Hero Carousel */}
-        <div className="relative mt-2">
+        {/* Hero Carousel - Dynamic Backend Banners */}
+        <div 
+          className="relative mt-2 overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm group select-none"
+          onMouseEnter={() => setIsBannerPaused(true)}
+          onMouseLeave={() => setIsBannerPaused(false)}
+        >
           <div 
-            ref={bannerRef}
-            onScroll={handleBannerScroll}
-            className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar rounded-2xl sm:rounded-3xl shadow-sm"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            className="flex transition-transform duration-500 ease-in-out h-48 sm:h-64 md:h-80"
+            style={{ transform: `translateX(-${activeSlide * 100}%)` }}
           >
-            {/* Slide 1 */}
-            <div className="min-w-full snap-start relative h-48 sm:h-64 md:h-80 overflow-hidden bg-gradient-to-r from-pink-600 via-rose-600 to-red-600 flex items-center px-6 sm:px-12 md:px-16 text-white">
-              <div className="max-w-md z-10">
-                <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2 inline-block">
-                  Special Festive Deals 🛍️
-                </span>
-                <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
-                  Grand Festive Sale! Up to 70% Off
-                </h2>
-                <p className="text-xs sm:text-sm text-pink-100 mb-4 line-clamp-2">
-                  100% verified factory direct prices with Free Delivery & Easy 7-day returns.
-                </p>
-                <button 
-                  onClick={() => navigate('/explorer')}
-                  className="bg-white text-pink-600 font-bold px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm hover:bg-pink-50 transition-colors shadow-md cursor-pointer active:scale-95"
-                >
-                  Explore Catalog
-                </button>
-              </div>
-              <img 
-                src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800" 
-                alt="Festive Fashion" 
-                className="absolute right-0 top-0 h-full w-1/2 object-cover mask-gradient-left opacity-90 hidden sm:block"
-              />
-            </div>
+            {banners.map((banner, idx) => {
+              const bgGradients = [
+                'from-rose-600 via-pink-600 to-red-600',
+                'from-indigo-700 via-blue-600 to-cyan-600',
+                'from-purple-700 via-pink-600 to-rose-600',
+                'from-emerald-700 via-teal-600 to-cyan-700'
+              ];
+              const bannerGrad = banner.gradient || bgGradients[idx % bgGradients.length];
+              const badgeLabel = banner.badgeText || banner.badge;
+              const btnLabel = banner.buttonText || 'Shop Now';
 
-            {/* Slide 2 */}
-            <div className="min-w-full snap-start relative h-48 sm:h-64 md:h-80 overflow-hidden bg-gradient-to-r from-indigo-700 via-blue-600 to-cyan-600 flex items-center px-6 sm:px-12 md:px-16 text-white">
-              <div className="max-w-md z-10">
-                <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2 inline-block">
-                  Lowest Price Guarantee
-                </span>
-                <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
-                  Trending Menswear & Gadgets
-                </h2>
-                <p className="text-xs sm:text-sm text-blue-100 mb-4 line-clamp-2">
-                  Casual shirts, sneakers, audio gear & everyday essentials directly at wholesale rates.
-                </p>
-                <button 
-                  onClick={() => setSelectedCategory("Men")}
-                  className="bg-white text-indigo-700 font-bold px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm hover:bg-indigo-50 transition-colors shadow-md cursor-pointer active:scale-95"
+              return (
+                <div 
+                  key={banner.id || idx}
+                  onClick={() => {
+                    if (banner.targetCategory) {
+                      setSelectedCategory(banner.targetCategory);
+                    } else if (banner.targetUrl) {
+                      navigate(banner.targetUrl);
+                    }
+                  }}
+                  className={`w-full shrink-0 relative h-full bg-gradient-to-r ${bannerGrad} flex items-center px-6 sm:px-12 md:px-16 text-white cursor-pointer`}
                 >
-                  Shop Men
-                </button>
-              </div>
-              <img 
-                src="https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=800" 
-                alt="Men Collection" 
-                className="absolute right-0 top-0 h-full w-1/2 object-cover mask-gradient-left opacity-90 hidden sm:block"
-              />
-            </div>
+                  <div className="max-w-md z-10">
+                    {badgeLabel && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-white/20 backdrop-blur-md text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 shadow-xs">
+                          <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
+                          {badgeLabel}
+                        </span>
+                        {banner.badgeStatus && (
+                          <span className="bg-yellow-400 text-slate-900 text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs">
+                            {banner.badgeStatus}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <h2 className="text-xl sm:text-3xl md:text-4xl font-black font-headline leading-tight mb-2">
+                      {banner.title}
+                    </h2>
+                    {banner.subtitle && (
+                      <p className="text-xs sm:text-sm text-white/90 mb-4 line-clamp-2">
+                        {banner.subtitle}
+                      </p>
+                    )}
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (banner.targetCategory) {
+                          setSelectedCategory(banner.targetCategory);
+                        } else if (banner.targetUrl) {
+                          navigate(banner.targetUrl);
+                        }
+                      }}
+                      className={`bg-white ${banner.accentColor || 'text-rose-600'} font-extrabold px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm hover:bg-rose-50 transition-all shadow-md cursor-pointer active:scale-95 flex items-center gap-1.5`}
+                    >
+                      <span>{btnLabel}</span>
+                      <span>➔</span>
+                    </button>
+                  </div>
+                  {banner.imageUrl && (
+                    <img 
+                      src={banner.imageUrl} 
+                      alt={banner.title} 
+                      className="absolute right-0 top-0 h-full w-1/2 object-cover object-center mask-gradient-left opacity-90 hidden sm:block"
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Dots Indicator */}
+          {/* Previous Arrow Button */}
+          {banners.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveSlide((prev) => (prev - 1 + banners.length) % banners.length);
+              }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-md z-20"
+              aria-label="Previous slide"
+            >
+              <span className="material-symbols-outlined text-lg">chevron_left</span>
+            </button>
+          )}
+
+          {/* Next Arrow Button */}
+          {banners.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveSlide((prev) => (prev + 1) % banners.length);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-md z-20"
+              aria-label="Next slide"
+            >
+              <span className="material-symbols-outlined text-lg">chevron_right</span>
+            </button>
+          )}
+        </div>
+
+        {/* Dots Indicator for dynamic Banners */}
+        {banners.length > 1 && (
           <div className="flex justify-center gap-1.5 mt-3">
-            {[0, 1].map((idx) => (
+            {banners.map((_, idx) => (
               <button
                 key={idx}
-                onClick={() => scrollToSlide(idx)}
+                onClick={() => setActiveSlide(idx)}
                 className={`h-2 rounded-full transition-all cursor-pointer ${
                   activeSlide === idx ? 'w-6 bg-[#FF3F6C]' : 'w-2 bg-slate-300 dark:bg-slate-700'
                 }`}
@@ -456,10 +775,10 @@ export default function HomeUserCustomer() {
               />
             ))}
           </div>
-        </div>
+        )}
 
         {/* Feature Badges */}
-        <section className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <section className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-3 flex items-center gap-3 shadow-2xs">
             <div className="w-10 h-10 rounded-xl bg-pink-50 dark:bg-pink-950/30 flex items-center justify-center text-[#FF3F6C] shrink-0">
               <span className="material-symbols-outlined text-xl">local_shipping</span>
@@ -534,6 +853,26 @@ export default function HomeUserCustomer() {
               </div>
             ))}
           </div>
+                  {/* Subcategory Filter Chips */}
+          {activeSubcats.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pt-3 pb-1">
+              {activeSubcats.map((sub, sIdx) => (
+                <button
+                  key={sIdx}
+                  type="button"
+                  onClick={() => setSelectedSubcat(sub)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                    selectedSubcat === sub
+                      ? 'bg-[#FF3F6C] text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-[#FF3F6C]/40'
+                  }`}
+                >
+                  {sub}
+                </button>
+              ))}
+            </div>
+          )}
+
         </section>
 
         {/* Real Products Grid from PostgreSQL Database */}
@@ -547,13 +886,11 @@ export default function HomeUserCustomer() {
                 Lowest prices, verified suppliers & top quality products
               </p>
             </div>
-            <span className="text-xs text-slate-400 font-medium">
-              {products.length} products
-            </span>
+
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                 <div key={n} className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 animate-pulse">
                   <div className="aspect-[3/4] bg-slate-200 dark:bg-slate-800 rounded-xl mb-3"></div>
@@ -579,15 +916,15 @@ export default function HomeUserCustomer() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-              {products.map((p) => {
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+              {displayedProducts.map((p) => {
                 const isFav = favorites.includes(p.id);
                 const mainImg = p.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
 
                 return (
                   <div 
                     key={p.id} 
-                    className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                    className="bg-white dark:bg-slate-900 rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 dark:border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
                   >
                     <div 
                       onClick={() => navigate(`/product?id=${p.id}`)} 
@@ -602,7 +939,7 @@ export default function HomeUserCustomer() {
                           loading="lazy"
                           onError={(e) => {
                             e.currentTarget.onerror = null;
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600';
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
                           }}
                         />
                         {p.rating > 0 && (
@@ -612,7 +949,7 @@ export default function HomeUserCustomer() {
                           </span>
                         )}
                         <button 
-                          onClick={(e) => handleToggleFavorite(p.id, e)}
+                          onClick={(e) => handleToggleFavorite(p.id, e, p)}
                           className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md flex items-center justify-center shadow-sm active:scale-90 transition-transform cursor-pointer hover:bg-white"
                           title="Wishlist"
                         >
@@ -626,11 +963,6 @@ export default function HomeUserCustomer() {
                       </div>
 
                       <div className="px-1 min-w-0">
-                        {p.supplierName && (
-                          <span className="text-[10px] font-bold text-[#b90041] uppercase tracking-wider block mb-0.5 truncate">
-                            {p.supplierName}
-                          </span>
-                        )}
                         <h4 
                           className="text-[11.5px] sm:text-xs md:text-sm font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 mb-1 leading-snug min-h-[2.25rem] break-words"
                           title={p.title}
@@ -673,6 +1005,16 @@ export default function HomeUserCustomer() {
               })}
             </div>
           )}
+
+          {/* Real Meesho Infinite Scroll Sentinel & Loader */}
+          <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[90px]">
+            {loadingMore && (
+              <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-extrabold text-[#b90041] animate-pulse">
+                <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
+                <span>Loading more trending products for you...</span>
+              </div>
+            )}
+          </div>
         </section>
       </main>
 

@@ -11,7 +11,9 @@ export default function UserTable({
   currentAdminId,
   actionLoadingId,
   onRoleChange,
-  onDeleteUser
+  onDeleteUser,
+  onEditUser,
+  onToggleStatus,
 }) {
   const columns = [
     {
@@ -64,6 +66,28 @@ export default function UserTable({
       render: (u) => <RoleBadge role={u.role} />
     },
     {
+      header: 'Status',
+      render: (u) => {
+        const isActive = u.isActive !== false;
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+              isActive
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                : 'bg-rose-50 text-rose-700 border border-rose-200/80'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isActive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+              }`}
+            />
+            {isActive ? 'Active' : 'Deactivated'}
+          </span>
+        );
+      }
+    },
+    {
       header: 'Joined Date',
       render: (u) => {
         const joinFormatted = u.createdAt 
@@ -88,6 +112,8 @@ export default function UserTable({
           actionLoadingId={actionLoadingId}
           onRoleChange={onRoleChange}
           onDeleteUser={onDeleteUser}
+          onEditUser={onEditUser}
+          onToggleStatus={onToggleStatus}
         />
       )
     }

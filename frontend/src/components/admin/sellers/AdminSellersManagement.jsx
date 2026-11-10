@@ -1,8 +1,10 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import SellersStatsGrid from './SellersStatsGrid';
 import FilterBar from '../../common/FilterBar';
@@ -56,7 +58,7 @@ export default function AdminSellersManagement() {
       if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
       const res = await axios.get(
-        `http://localhost:5000/api/v1/admin-sellers?${params.toString()}`,
+        `${API_V1_BASE}/admin-sellers?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -112,7 +114,7 @@ export default function AdminSellersManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const res = await axios.get(
-        `http://localhost:5000/api/v1/admin-sellers/${seller.id}`,
+        `${API_V1_BASE}/admin-sellers/${seller.id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -135,7 +137,7 @@ export default function AdminSellersManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const res = await axios.patch(
-        `http://localhost:5000/api/v1/admin-sellers/${sellerId}/tier`,
+        `${API_V1_BASE}/admin-sellers/${sellerId}/tier`,
         { tier: newTier },
         {
           headers: {
@@ -170,6 +172,24 @@ export default function AdminSellersManagement() {
     }
   };
 
+  // ── 5. EXPORT SUPPLIERS TO CSV ──────────────────────────────────────
+  const handleExportSellers = () => {
+    exportToCsv({
+      data: sellers,
+      filename: `suppliers_directory_${tierFilter.toLowerCase()}`,
+      columns: [
+        { key: 'storeName', label: 'Store Name' },
+        { key: 'fullName', label: 'Proprietor Name' },
+        { key: 'email', label: 'Email' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'gstin', label: 'GSTIN' },
+        { key: 'tier', label: 'Vendor Tier' },
+        { key: '_count.products', label: 'Active Catalog Products' },
+        { key: 'createdAt', label: 'Onboarded Date', formatter: (val) => val ? new Date(val).toLocaleDateString('en-IN') : '—' }
+      ]
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* ── 1. KPI STATS SUMMARY ────────────────────────────────────── */}
@@ -187,6 +207,8 @@ export default function AdminSellersManagement() {
         countLabel="Suppliers"
         onRefresh={() => fetchSellers(true)}
         refreshing={refreshing}
+        onExport={handleExportSellers}
+        exportLabel="Export Suppliers"
       />
 
       {/* ── 3. SELLERS DATA TABLE ──────────────────────────────────── */}

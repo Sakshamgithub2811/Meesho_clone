@@ -2,6 +2,7 @@ import prisma from '../config/prisma.js';
 
 export const getCategories = async (req, res) => {
   try {
+    // 1. Fetch all categories and counts
     const categories = await prisma.category.findMany({
       include: {
         _count: {
@@ -11,10 +12,46 @@ export const getCategories = async (req, res) => {
       orderBy: { name: 'asc' }
     });
 
+    // 2. Fetch distinct subcategories dynamically from the products table
+    const subcategoryGroups = await prisma.product.groupBy({
+      by: ['categorySlug', 'subCategory'],
+      where: {
+        subCategory: { not: null }
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Map subcategories grouped by categorySlug
+    const subcategoryMap = {};
+    for (const group of subcategoryGroups) {
+      if (!group.subCategory || !group.subCategory.trim()) continue;
+      const slug = group.categorySlug;
+      if (!subcategoryMap[slug]) {
+        subcategoryMap[slug] = [];
+      }
+      subcategoryMap[slug].push(group.subCategory.trim());
+    }
+
+    // Sort subcategories alphabetically within each category
+    for (const slug in subcategoryMap) {
+      subcategoryMap[slug].sort((a, b) => a.localeCompare(b));
+    }
+
+    // Attach dynamic subcategories to each category
+    const enrichedCategories = categories.map((cat) => {
+      const subs = subcategoryMap[cat.slug] || [];
+      return {
+        ...cat,
+        subcategories: ['All', ...subs]
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      count: categories.length,
-      data: categories
+      count: enrichedCategories.length,
+      data: enrichedCategories
     });
   } catch (error) {
     console.error('Error fetching categories:', error);
@@ -33,8 +70,10 @@ export const getCategoryBySlug = async (req, res) => {
       where: { slug },
       include: {
         products: {
-          take: 20,
           orderBy: { createdAt: 'desc' }
+        },
+        _count: {
+          select: { products: true }
         }
       }
     });
@@ -46,9 +85,26 @@ export const getCategoryBySlug = async (req, res) => {
       });
     }
 
+    // Get subcategories dynamically for this specific category
+    const subcategoryGroups = await prisma.product.groupBy({
+      by: ['subCategory'],
+      where: {
+        categorySlug: slug,
+        subCategory: { not: null }
+      }
+    });
+
+    const subs = subcategoryGroups
+      .map((g) => g.subCategory?.trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+
     return res.status(200).json({
       success: true,
-      data: category
+      data: {
+        ...category,
+        subcategories: ['All', ...subs]
+      }
     });
   } catch (error) {
     console.error('Error fetching category by slug:', error);

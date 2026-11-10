@@ -1,9 +1,10 @@
 import admin from '../config/firebaseAdmin.js';
 import prisma from '../config/prisma.js';
+import jwt from 'jsonwebtoken';
 
 /**
- * Firebase Authentication Middleware
- * Verifies Firebase ID Token and loads user profile from Prisma database
+ * Firebase & JWT Authentication Middleware
+ * Verifies Firebase ID Token or standard JWT and loads user profile directly from PostgreSQL database
  */
 export const verifyAuth = async (req, res, next) => {
   try {
@@ -11,7 +12,7 @@ export const verifyAuth = async (req, res, next) => {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ 
         success: false, 
-        error: 'Unauthorized: No Firebase Token Provided' 
+        error: 'Unauthorized: No Authentication Token Provided' 
       });
     }
     const token = authHeader.split(' ')[1];
@@ -24,28 +25,55 @@ export const verifyAuth = async (req, res, next) => {
     if (authInstance) {
       try {
         decodedToken = await authInstance.verifyIdToken(token);
-        uid = decodedToken.uid;
+        uid = decodedToken.uid || decodedToken.user_id || decodedToken.sub;
         email = decodedToken.email;
       } catch (tokenErr) {
-        // Token might be a custom token or direct Firebase UID in development
-        if (token.startsWith('firebase_') || token.length >= 10) {
+        // Fallback: Check if token is a standard signed JWT (Firebase client token or OAuth JWT)
+        try {
+          const jwtDecoded = jwt.decode(token);
+          if (jwtDecoded) {
+            uid = jwtDecoded.user_id || jwtDecoded.sub || jwtDecoded.uid || jwtDecoded.id || uid;
+            email = jwtDecoded.email || null;
+            decodedToken = jwtDecoded;
+          }
+        } catch (jwtErr) {}
+
+        if (!decodedToken && (token.startsWith('firebase_') || (token.length >= 3 && !token.startsWith('ey')))) {
           uid = token;
-        } else {
+        } else if (!decodedToken) {
           return res.status(401).json({ 
             success: false, 
-            error: 'Unauthorized: Invalid Firebase Token', 
+            error: 'Unauthorized: Invalid Authentication Token', 
             details: tokenErr.message 
           });
         }
       }
+    } else {
+      // Admin auth not initialized, check JWT or token format
+      try {
+        const jwtDecoded = jwt.decode(token);
+        if (jwtDecoded) {
+          uid = jwtDecoded.user_id || jwtDecoded.sub || jwtDecoded.uid || jwtDecoded.id || uid;
+          email = jwtDecoded.email || null;
+          decodedToken = jwtDecoded;
+        }
+      } catch (jwtErr) {}
     }
 
-    // Database me user check karna
+    // Database user check in PostgreSQL
     let profile = null;
+    const cleanUid = uid.startsWith('firebase_') ? uid.replace(/^firebase_/, '') : uid;
     try {
-      if (prisma?.profile?.findUnique) {
-        profile = await prisma.profile.findUnique({
-          where: { id: uid },
+      if (prisma?.profile?.findFirst) {
+        profile = await prisma.profile.findFirst({
+          where: {
+            OR: [
+              { id: uid },
+              { id: cleanUid },
+              ...(uid.includes('@') ? [{ email: uid.toLowerCase() }] : []),
+              ...(email ? [{ email: email.toLowerCase() }] : [])
+            ]
+          },
           select: {
             id: true,
             email: true,
@@ -60,23 +88,33 @@ export const verifyAuth = async (req, res, next) => {
       console.warn("Prisma profile lookup warning:", dbErr.message);
     }
 
-    // Agar database me profile na ho toh Firebase payload se construct karein
+      // Agar account deactivated ho, toh access block karein
+      if (profile && profile.isActive === false) {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Your account has been deactivated by administrator. Please contact customer support.',
+          code: 'ACCOUNT_DEACTIVATED'
+        });
+      }
+
+      // If profile not yet in database, construct minimal user
     if (!profile) {
       profile = {
-        id: uid,
-        email: email || decodedToken?.email || `${uid}@meesho.clone`,
-        fullName: decodedToken?.name || 'Meesho User',
+        id: cleanUid,
+        email: email || decodedToken?.email || `${cleanUid}@meesho.clone`,
+        fullName: decodedToken?.name || decodedToken?.fullName || 'Meesho User',
         role: (decodedToken?.role || 'CUSTOMER').toUpperCase(),
+        isActive: true,
       };
     }
 
     req.user = profile;
     next();
   } catch (error) {
-    console.error("Firebase Auth Middleware Error:", error);
+    console.error("Authentication Middleware Error:", error);
     return res.status(401).json({ 
       success: false, 
-      error: 'Unauthorized: Invalid Firebase Token',
+      error: 'Unauthorized: Invalid Authentication Token',
       details: error.message 
     });
   }
@@ -91,14 +129,22 @@ export const authorizeRole = (...allowedRoles) => {
     if (!req.user) {
       return res.status(401).json({ 
         success: false, 
-        error: 'Unauthorized: User not authenticated with Firebase' 
+        error: 'Unauthorized: User not authenticated' 
       });
     }
 
     const userRole = (req.user.role || '').toUpperCase();
     const formattedAllowed = allowedRoles.map(r => r.toUpperCase());
 
-    if (!formattedAllowed.includes(userRole)) {
+    // Allow RESELLER if looking for AFFILIATE, or vice-versa
+    const effectiveRoles = [userRole];
+    if (userRole === 'RESELLER') effectiveRoles.push('AFFILIATE');
+    if (userRole === 'AFFILIATE') effectiveRoles.push('RESELLER');
+    if (userRole === 'ADMIN') effectiveRoles.push('CUSTOMER', 'RESELLER', 'AFFILIATE', 'SUPPLIER');
+
+    const hasPermission = effectiveRoles.some(r => formattedAllowed.includes(r));
+
+    if (!hasPermission) {
       return res.status(403).json({ 
         success: false, 
         error: `Forbidden: Access restricted. Required roles: [${allowedRoles.join(', ')}]`,

@@ -1,8 +1,10 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import ProductsStatsGrid from './ProductsStatsGrid';
 import FilterBar from '../../common/FilterBar';
@@ -60,7 +62,7 @@ export default function AdminProductsManagement() {
       if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
       const res = await axios.get(
-        `http://localhost:5000/api/v1/admin-products?${params.toString()}`,
+        `${API_V1_BASE}/admin-products?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -119,7 +121,7 @@ export default function AdminProductsManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const res = await axios.patch(
-        `http://localhost:5000/api/v1/admin-products/${productId}/stock`,
+        `${API_V1_BASE}/admin-products/${productId}/stock`,
         { stock: newStock },
         {
           headers: {
@@ -167,7 +169,7 @@ export default function AdminProductsManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
 
       const res = await axios.delete(
-        `http://localhost:5000/api/v1/admin-products/${productId}`,
+        `${API_V1_BASE}/admin-products/${productId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -190,6 +192,24 @@ export default function AdminProductsManagement() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  // ── 5. EXPORT PRODUCTS CATALOG TO CSV ───────────────────────────────
+  const handleExportProducts = () => {
+    exportToCsv({
+      data: products,
+      filename: `products_catalog_${stockFilter.toLowerCase()}`,
+      columns: [
+        { key: 'id', label: 'Product ID' },
+        { key: 'title', label: 'Product Title' },
+        { key: 'category.name', label: 'Category' },
+        { key: 'supplier.storeName', label: 'Supplier Store' },
+        { key: 'price', label: 'Customer Price (₹)' },
+        { key: 'supplierPrice', label: 'Wholesale Price (₹)' },
+        { key: 'stock', label: 'Inventory Stock' },
+        { key: 'rating', label: 'Rating' }
+      ]
+    });
   };
 
   // Category Dropdown options
@@ -225,6 +245,8 @@ export default function AdminProductsManagement() {
         countLabel="Products"
         onRefresh={() => fetchProducts(true)}
         refreshing={refreshing}
+        onExport={handleExportProducts}
+        exportLabel="Export Products"
       />
 
       {/* ── 3. PRODUCTS DATA TABLE ─────────────────────────────────── */}

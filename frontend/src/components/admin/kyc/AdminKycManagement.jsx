@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
@@ -5,6 +6,7 @@ import { useSelector } from 'react-redux';
 import { Button } from '../../ui/button';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import KycStatsGrid from './KycStatsGrid';
 import FilterBar from '../../common/FilterBar';
@@ -56,12 +58,13 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
       const params = new URLSearchParams();
       if (selectedStatus !== 'ALL') params.append('status', selectedStatus);
       if (selectedType !== 'all') params.append('type', selectedType);
       if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-      const res = await axios.get(`http://localhost:5000/api/v1/admin-kyc?${params.toString()}`, {
+      const res = await axios.get(`${API_V1_BASE}/admin-kyc?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -84,7 +87,9 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
   };
 
   useEffect(() => {
-    fetchApplications();
+    if (auth.currentUser || currentUser?.id) {
+      fetchApplications();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchApplications();
@@ -118,8 +123,9 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
     try {
       setActionLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
       const res = await axios.put(
-        `http://localhost:5000/api/v1/admin-kyc/${reviewApp.id}/status`,
+        `${API_V1_BASE}/admin-kyc/${reviewApp.id}/status`,
         {
           status: newStatus,
           adminNotes: adminNote.trim()
@@ -148,11 +154,17 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
-    return new Date(dateStr).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return String(dateStr);
+      return d.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch {
+      return String(dateStr);
+    }
   };
 
   return (
@@ -201,6 +213,25 @@ export default function AdminKycManagement({ initialType = 'ALL' }) {
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         onSearchSubmit={handleSearchSubmit}
+        onExport={() => {
+          exportToCsv({
+            data: applications,
+            filename: `kyc_applications_${selectedType}_${selectedStatus.toLowerCase()}`,
+            columns: [
+              { key: 'id', label: 'Application ID' },
+              { key: 'applicantName', label: 'Applicant Name' },
+              { key: 'businessName', label: 'Business / Store Name' },
+              { key: 'type', label: 'Partner Type', formatter: (val) => String(val || '').toUpperCase() },
+              { key: 'email', label: 'Email' },
+              { key: 'phone', label: 'Phone' },
+              { key: 'status', label: 'Verification Status' },
+              { key: 'panNumber', label: 'PAN Number' },
+              { key: 'gstin', label: 'GSTIN' },
+              { key: 'createdAt', label: 'Submitted Date', formatter: (val) => val ? new Date(val).toLocaleDateString('en-IN') : '—' }
+            ]
+          });
+        }}
+        exportLabel="Export KYC"
       />
 
       {/* ── APPLICATIONS TABLE ───────────────────────────────── */}

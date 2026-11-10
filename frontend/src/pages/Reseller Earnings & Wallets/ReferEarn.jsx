@@ -2,10 +2,22 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavDrawer from "../../components/NavDrawer";
 import AppBottomNav from "../../components/AppBottomNav";
+import { getStoredAffiliate } from "../../services/affiliateAuthService";
+import { getAffiliateApp } from "../../services/affiliateSessionStore";
+import { getStoredCustomer } from "../../services/customerAuthService";
 
 export default function ReferEarn({ onBack }) {
   const navigate = useNavigate();
-  const referralCode = "MISH100X";
+  const storedAff = getStoredAffiliate();
+  const affApp = getAffiliateApp();
+  const custUser = getStoredCustomer();
+
+  const referralCode = storedAff?.user?.referralCode 
+    || custUser?.user?.storeName
+    || affApp?.referralCode 
+    || affApp?.applicationId 
+    || (custUser?.user?.fullName ? (custUser.user.fullName.replace(/[^a-zA-Z]/g, '').slice(0, 5).toUpperCase() + '100') : 'AFF-REFER100');
+
   const [copied, setCopied] = useState(false);
   const [activeNav, setActiveNav] = useState("account");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -28,7 +40,7 @@ export default function ReferEarn({ onBack }) {
   };
 
   const handleWhatsAppShare = () => {
-    const message = `Join me on The Atelier! Use my referral code ${referralCode} to get 25% OFF on your first order. Download now!`;
+    const message = `Join me on MShoppy! Use my referral code ${referralCode} to get 25% OFF on your first order. Shop trending catalog now: ${window.location.origin}/?ref=${referralCode}`;
 
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(
       message
@@ -84,7 +96,7 @@ export default function ReferEarn({ onBack }) {
               <img
                 alt="Friends celebrating and sharing"
                 className="w-full h-full object-cover rounded-3xl shadow-xl rotate-1 relative z-10"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCDNDeTW1jqZyZOnSw-BAICbGCCrKCvBCaC6rCymCMJE2Md01F8pa4Dv_iMMy_Q9f1pwowrZLJ44ehcGjI0BkMtEHH2YybaMTGWdxzpFNUZh_g0gctSzaWY11AqSCYY3T63MVVxKUSq3wek9585b-BZU7uep2rmeI_ROFP-nwk-h6HVmC-ACGtbCLARgu79XkZtaLQZTYNzXgKSeROLf5KcHbHOEYkbkIDbatFzLSrZm_F5VShwd6xE0R0e4nIHt9ceRRd1lOofyoc"
+                src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&auto=format&fit=crop&q=80"
               />
             </div>
 

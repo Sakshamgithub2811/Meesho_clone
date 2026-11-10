@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { dispatchDeliveryOtpEmail } from '../order.controller.js';
 
 /**
  * 1. GET ALL ORDERS FOR ADMIN (With Filters, Search & Summary KPIs)
@@ -172,12 +173,51 @@ export const getOrderDetails = async (req, res) => {
 };
 
 /**
- * 3. UPDATE ORDER STATUS & PAYMENT STATUS
+ * Helper to generate official public tracking URLs for Indian couriers
+ */
+export const getCourierTrackingUrl = (courier = '', awb = '') => {
+  if (!awb) return '';
+  const c = (courier || '').toLowerCase();
+  const cleanAwb = String(awb).trim();
+
+  if (c.includes('delhivery')) {
+    return `https://www.delhivery.com/track/package/${cleanAwb}`;
+  }
+  if (c.includes('blue') || c.includes('bluedart')) {
+    return `https://www.bluedart.com/tracking?trackNumber=${cleanAwb}`;
+  }
+  if (c.includes('shadowfax')) {
+    return `https://tracker.shadowfax.in/#/track?awb=${cleanAwb}`;
+  }
+  if (c.includes('dtdc')) {
+    return `https://www.dtdc.in/tracking/tracking_results.asp?trType=awb_no&strAwbNo=${cleanAwb}`;
+  }
+  if (c.includes('xpress') || c.includes('xpressbees')) {
+    return `https://www.xpressbees.com/track?awb=${cleanAwb}`;
+  }
+  if (c.includes('ekart')) {
+    return `https://ekartlogistics.com/shipmenttrack/${cleanAwb}`;
+  }
+  if (c.includes('speed') || c.includes('post') || c.includes('india post')) {
+    return `https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx`;
+  }
+  return '';
+};
+
+/**
+ * 3. UPDATE ORDER STATUS & PAYMENT STATUS (With Logistics AWB Tracking)
  */
 export const updateOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { orderStatus, paymentStatus } = req.body;
+    const {
+      orderStatus,
+      paymentStatus,
+      courierPartner,
+      trackingNumber,
+      trackingUrl,
+      estimatedDelivery
+    } = req.body;
 
     const validOrderStatuses = [
       'ORDERED',
@@ -193,10 +233,26 @@ export const updateOrderStatus = async (req, res) => {
 
     const validPaymentStatuses = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'];
 
+    const existingOrder = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        items: { include: { product: true } }
+      }
+    });
+
+    if (!existingOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
     const updateData = {};
+    let upperOrder = null;
 
     if (orderStatus) {
-      const upperOrder = orderStatus.toUpperCase();
+      upperOrder = orderStatus.toUpperCase();
       if (!validOrderStatuses.includes(upperOrder)) {
         return res.status(400).json({
           success: false,
@@ -207,8 +263,7 @@ export const updateOrderStatus = async (req, res) => {
 
       // Auto update payment status for COD on delivery if still pending
       if (upperOrder === 'DELIVERED') {
-        const currentOrder = await prisma.order.findUnique({ where: { id } });
-        if (currentOrder && currentOrder.paymentMethod === 'COD' && currentOrder.paymentStatus === 'PENDING') {
+        if (existingOrder.paymentMethod === 'COD' && existingOrder.paymentStatus === 'PENDING') {
           updateData.paymentStatus = 'PAID';
         }
       }
@@ -223,6 +278,32 @@ export const updateOrderStatus = async (req, res) => {
         });
       }
       updateData.paymentStatus = upperPayment;
+    }
+
+    // Process Courier Partner & AWB tracking details into shippingAddress JSON
+    const currAddr = (typeof existingOrder.shippingAddress === 'object' && existingOrder.shippingAddress !== null)
+      ? existingOrder.shippingAddress
+      : {};
+
+    const cleanCourier = courierPartner !== undefined ? courierPartner : (currAddr.courier || currAddr.courierPartner || '');
+    const cleanAwb = trackingNumber !== undefined ? trackingNumber : (currAddr.awb || currAddr.trackingNumber || '');
+    const computedTrackingUrl = trackingUrl || getCourierTrackingUrl(cleanCourier, cleanAwb) || currAddr.trackingUrl || '';
+
+    if (courierPartner !== undefined || trackingNumber !== undefined || upperOrder === 'SHIPPED') {
+      const fallbackAwb = cleanAwb || (upperOrder === 'SHIPPED' ? `AWB${Date.now().toString().slice(-8)}` : null);
+      const fallbackCourier = cleanCourier || (upperOrder === 'SHIPPED' ? 'Delhivery Surface' : '');
+      const finalTrackingUrl = computedTrackingUrl || getCourierTrackingUrl(fallbackCourier, fallbackAwb);
+
+      updateData.shippingAddress = {
+        ...currAddr,
+        courier: fallbackCourier,
+        courierPartner: fallbackCourier,
+        awb: fallbackAwb,
+        trackingNumber: fallbackAwb,
+        trackingUrl: finalTrackingUrl,
+        shippedAt: upperOrder === 'SHIPPED' ? (currAddr.shippedAt || new Date().toISOString()) : currAddr.shippedAt,
+        estimatedDelivery: estimatedDelivery || currAddr.estimatedDelivery || null
+      };
     }
 
     const updatedOrder = await prisma.order.update({
@@ -247,13 +328,67 @@ export const updateOrderStatus = async (req, res) => {
               }
             }
           }
-        }
+        },
+        deliveryTask: true
       }
     });
 
+    // Synchronize DeliveryTask state based on order progress
+    if (upperOrder === 'SHIPPED') {
+      await prisma.deliveryTask.upsert({
+        where: { orderId: id },
+        update: {
+          status: 'in_transit',
+          pickupTime: new Date()
+        },
+        create: {
+          orderId: id,
+          status: 'in_transit',
+          pickupTime: new Date()
+        }
+      }).catch(() => {});
+
+      // In-App Notification to Customer
+      if (existingOrder.userId) {
+        const finalCourier = updateData.shippingAddress?.courier || 'Delhivery';
+        const finalAwb = updateData.shippingAddress?.awb || '';
+        await prisma.notification.create({
+          data: {
+            userId: existingOrder.userId,
+            title: 'Order Dispatched! 📦',
+            body: `Your order #${id.slice(-8)} has been shipped via ${finalCourier}${finalAwb ? ` (AWB: ${finalAwb})` : ''}. Tap to track live.`,
+            type: 'order',
+            data: {
+              orderId: id,
+              courier: finalCourier,
+              awb: finalAwb,
+              trackingUrl: updateData.shippingAddress?.trackingUrl
+            }
+          }
+        }).catch(() => {});
+      }
+    } else if (upperOrder === 'DELIVERED') {
+      await prisma.deliveryTask.updateMany({
+        where: { orderId: id },
+        data: {
+          status: 'delivered',
+          deliveryTime: new Date()
+        }
+      }).catch(() => {});
+    }
+
+    if (upperOrder === 'OUT_FOR_DELIVERY') {
+      try {
+        const otpResult = await dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' });
+        console.log(`🚚 [Admin Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${otpResult.sentTo}`);
+      } catch (err) {
+        console.error(`⚠️ [Admin Order ${id}] OTP email failed:`, err.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      message: 'Order updated successfully',
+      message: 'Order updated successfully with logistics details',
       order: updatedOrder
     });
   } catch (error) {

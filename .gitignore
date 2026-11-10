@@ -37,8 +37,15 @@ pnpm-debug.log*
 # Design references
 stitch_meesho_clone_design_prd/
 
-# Generated PDF flows
+# Generated PDF flows & Audit Reports
 pdf_navigation_flows/
+*.pdf
+*AUDIT_REPORT*
+*SPECIFICATION*
+*Quality_Analysis*
+SIR_DEMO*
+generate_*.py
+generate_*.cjs
 
 # Duplicate directory ignore
 frontend/frontend/

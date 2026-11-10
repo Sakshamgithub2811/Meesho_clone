@@ -756,7 +756,7 @@ export default function WriteAReview({ onNavigate = () => {}, onBack }) {
       )}
 
       {/* Responsive Bottom Navigation Bar */}
-      <AppBottomNav activeNav="account" onNavigate={onNavigate} />
+      <AppBottomNav activeNav="orders" onNavigate={onNavigate} role="customer" homePath="/user-home" />
     </div>
   );
 }

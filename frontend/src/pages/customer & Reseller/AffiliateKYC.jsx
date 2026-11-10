@@ -1,8 +1,14 @@
+import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 import BankAutocompleteSelect from '../../components/BankAutocompleteSelect';
+import { INDIAN_STATES } from '../../utils/indianStates';
 import { getAffiliateApp, saveAffiliateApp } from '../../services/affiliateSessionStore';
+import { getStoredCustomer } from '../../services/customerAuthService';
+import { getStoredAffiliate } from '../../services/affiliateAuthService';
+import { auth } from '../../utils/firebase';
+import { addNotification } from '../../services/notificationService';
 
 export default function AffiliateKYC({ onNavigate, onBack }) {
   const navigate = useNavigate();
@@ -91,33 +97,83 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    try {
-      const app = getAffiliateApp();
-      const searchParams = new URLSearchParams(location.search);
-      const isEditRequested = searchParams.get('edit') === 'true';
+    let isMounted = true;
+    async function checkKycFromDb() {
+      try {
+        const searchParams = new URLSearchParams(location.search);
+        const isEditRequested = searchParams.get('edit') === 'true';
 
-      if (app) {
-        setExistingSubmission(app);
-        setFormData((prev) => ({ ...prev, ...app }));
+        const storedCust = getStoredCustomer();
+        const storedAff = getStoredAffiliate();
+        const currentUser = storedCust?.user || storedAff?.user;
+        const curId = currentUser?.id || currentUser?.uid;
+        const curEmail = currentUser?.email;
+        const curPhone = currentUser?.phone;
 
-        if (isEditRequested) {
-          setIsEditing(true);
-        } else {
-          // If already submitted and not explicitly editing, redirect to the new dedicated status page
-          if (onNavigate) {
-            onNavigate('/affiliate-kyc-status');
-          } else {
-            navigate('/affiliate-kyc-status', { replace: true });
+        if (curId || curEmail || curPhone) {
+          const queryParams = [];
+          if (curId) queryParams.push(`userId=${encodeURIComponent(curId)}`);
+          if (curEmail) queryParams.push(`email=${encodeURIComponent(curEmail)}`);
+          if (curPhone) queryParams.push(`phone=${encodeURIComponent(curPhone)}`);
+
+          const res = await fetch(`${API_V1_BASE}/admin-kyc/affiliate-status?${queryParams.join('&')}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (isMounted && data?.application) {
+              const dbApp = data.application;
+              const isDbApproved = dbApp.status === 'APPROVED';
+              const isDbRejected = dbApp.status === 'REJECTED';
+              const updated = {
+                ...(dbApp.documents || {}),
+                id: dbApp.id,
+                dbId: dbApp.id,
+                applicationId: dbApp.documents?.applicationId || dbApp.id,
+                fullName: dbApp.documents?.fullName || dbApp.user?.fullName || '',
+                status: isDbApproved ? 'Approved' : isDbRejected ? 'Rejected' : 'Under Review',
+                kycStatus: isDbApproved ? 'Approved' : isDbRejected ? 'Rejected' : 'Pending',
+                rejectionReason: dbApp.adminNotes || '',
+                userId: dbApp.userId,
+              };
+              setExistingSubmission(updated);
+              setFormData((prev) => ({ ...prev, ...updated }));
+
+              if (isEditRequested) {
+                setIsEditing(true);
+              } else {
+                if (onNavigate) {
+                  onNavigate('/affiliate-kyc-status');
+                } else {
+                  navigate('/affiliate-kyc-status', { replace: true });
+                }
+              }
+              return;
+            }
           }
         }
-      } else {
-        setExistingSubmission(null);
-        setIsEditing(false);
+
+        // If no DB submission found, initialize fresh form with user profile
+        if (isMounted) {
+          setExistingSubmission(null);
+          setIsEditing(false);
+          const fbUser = auth?.currentUser;
+          const prefillName = currentUser?.fullName || fbUser?.displayName || '';
+          const prefillEmail = currentUser?.email || fbUser?.email || '';
+          const prefillPhone = currentUser?.phone || fbUser?.phoneNumber || '';
+
+          setFormData((prev) => ({
+            ...prev,
+            fullName: prev.fullName || prefillName,
+            email: prev.email || prefillEmail,
+            phone: prev.phone || prefillPhone,
+          }));
+        }
+      } catch (e) {
+        console.error('Error loading live KYC application from database:', e);
       }
-    } catch (e) {
-      console.error('Error loading KYC application', e);
     }
-  }, [location.search]);
+    checkKycFromDb();
+    return () => { isMounted = false; };
+  }, [location.search, navigate, onNavigate]);
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
@@ -211,9 +267,6 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
       if (!formData.agreeInfoCorrect) {
         newErrors.agreeInfoCorrect = 'You must declare that provided details are accurate';
       }
-      if (!formData.agreeAdminApproval) {
-        newErrors.agreeAdminApproval = 'You must acknowledge that Admin approval is required';
-      }
     }
 
     setErrors(newErrors);
@@ -234,7 +287,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateStep(4)) {
       triggerToast('Please accept the required declarations to proceed');
@@ -243,48 +296,113 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const submission = {
-        ...formData,
-        panNumber: formData.panNumber.toUpperCase(),
-        ifscCode: formData.ifscCode.toUpperCase(),
-        applicationId: existingSubmission?.applicationId || `KYC-AFF-${Math.floor(100000 + Math.random() * 900000)}`,
-        status: 'PENDING_ADMIN_APPROVAL',
-        submittedAt: new Date().toLocaleString('en-IN', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+
+    const storedCust = getStoredCustomer();
+    const storedAff = getStoredAffiliate();
+    const currentUser = storedCust?.user || storedAff?.user;
+    const firebaseUser = auth?.currentUser;
+    const currentUserId = currentUser?.id || currentUser?.uid || firebaseUser?.uid;
+
+    const isOwned = existingSubmission && (
+      (existingSubmission.userId && currentUserId && existingSubmission.userId === currentUserId) ||
+      (existingSubmission.email && currentUser?.email && existingSubmission.email === currentUser.email)
+    );
+
+    const appId = isOwned
+      ? (existingSubmission.applicationId || existingSubmission.id)
+      : `KYC-AFF-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const submission = {
+      ...formData,
+      id: appId,
+      applicationId: appId,
+      userId: currentUserId,
+      email: formData.email || currentUser?.email || '',
+      panNumber: (formData.panNumber || '').toUpperCase(),
+      ifscCode: (formData.ifscCode || '').toUpperCase(),
+      panPreview: panPreviewUrl || null,
+      aadhaarPreview: aadhaarPreviewUrl || null,
+      status: 'Under Review',
+      kycStatus: 'PENDING',
+      submittedAt: new Date().toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+
+    // 1. Submit to Real PostgreSQL Database via Backend API
+    try {
+      const payload = {
+        userId: currentUserId,
+        applicationId: appId,
+        fullName: formData.fullName || currentUser?.fullName || '',
+        email: formData.email || currentUser?.email || firebaseUser?.email || '',
+        phone: formData.phone || currentUser?.phone || firebaseUser?.phoneNumber || '',
+        handle: formData.socialHandle || formData.handle || '',
+        platform: formData.socialPlatform || formData.platform || 'Direct / Social',
+        followers: formData.followersCount || formData.followers || '0',
+        panNumber: (formData.panNumber || '').toUpperCase(),
+        panDocName: formData.panDocName || '',
+        panPreview: panPreviewUrl || null,
+        aadhaarNumber: formData.aadhaarNumber || '',
+        aadhaarDocName: formData.aadhaarDocName || '',
+        aadhaarPreview: aadhaarPreviewUrl || null,
+        bankName: formData.bankName || '',
+        accountHolderName: (formData.accountHolderName || formData.fullName || currentUser?.fullName || '').toUpperCase(),
+        accountNumber: formData.accountNumber || '',
+        ifscCode: (formData.ifscCode || '').toUpperCase(),
+        upiId: formData.upiId || '',
+        chequeDocName: formData.chequeDocName || '',
+        documents: submission
+
       };
 
-      try {
-        localStorage.setItem('affiliate_kyc_application', JSON.stringify(submission));
-        saveAffiliateApp(submission);
-
-        // Save to admin pending applications registry for admin review
-        const adminQueue = JSON.parse(localStorage.getItem('admin_kyc_applications') || '[]');
-        const existingIdx = adminQueue.findIndex((item) => item.applicationId === submission.applicationId);
-        if (existingIdx >= 0) {
-          adminQueue[existingIdx] = submission;
-        } else {
-          adminQueue.push(submission);
-        }
-        localStorage.setItem('admin_kyc_applications', JSON.stringify(adminQueue));
-      } catch (err) {
-        console.error('Storage error', err);
+      const res = await fetch(`${API_V1_BASE}/admin-kyc/submit-affiliate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || data.message || 'Failed to submit KYC to server');
       }
-
-      setExistingSubmission(submission);
-      setIsEditing(false);
+      if (data?.application?.id) {
+        submission.dbId = data.application.id;
+      }
+    } catch (apiErr) {
+      console.error('Failed to submit affiliate KYC to backend API:', apiErr);
       setIsSubmitting(false);
-      triggerToast('KYC application submitted successfully! Opening Live Verification Desk...');
-      setTimeout(() => {
-        if (onNavigate) onNavigate('/affiliate-kyc-status');
-        else navigate('/affiliate-kyc-status');
-      }, 1000);
-    }, 1200);
+      triggerToast(apiErr.message || 'Submission failed. Please check details and try again.');
+      return;
+    }
+
+
+
+    // Real Earnings Notification
+    try {
+      addNotification({
+        title: 'Affiliate KYC Under Review ⏳',
+        message: `Your KYC Application #${submission.applicationId} has been submitted for compliance verification.`,
+        category: 'Earnings',
+        icon: 'verified',
+        iconBg: 'bg-amber-50 text-amber-600',
+        actionPath: '/affiliate-kyc-status',
+        actionText: 'Check KYC Status',
+        data: { applicationId: submission.applicationId }
+      });
+    } catch (e) {}
+
+    setExistingSubmission(submission);
+    setIsEditing(false);
+    setIsSubmitting(false);
+    triggerToast('KYC application submitted successfully! Opening Live Verification Desk...');
+    setTimeout(() => {
+      if (onNavigate) onNavigate('/affiliate-kyc-status');
+      else navigate('/affiliate-kyc-status');
+    }, 1000);
   };
 
   const handlePrintSlip = () => {
@@ -300,8 +418,8 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
 
   const faqs = [
     {
-      q: 'How long does Admin verification and approval take?',
-      a: 'Admin verification is typically completed within 24 to 48 business hours. You can return to this page at any time to check your live application status.',
+      q: 'How long does application verification take?',
+      a: 'Verification is typically completed within 24 to 48 business hours. You can return to this page at any time to check your live application status.',
     },
     {
       q: 'When and how are affiliate commissions paid?',
@@ -350,7 +468,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
-              Submit details for Admin verification & approval
+              Submit details to activate your affiliate partner account
             </p>
           </div>
         </div>
@@ -455,21 +573,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
           </div>
         )}
 
-        {/* Important Admin Disclaimer Banner */}
-        <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 p-4 sm:p-5 flex items-start gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
-            <span className="material-symbols-outlined text-2xl">admin_panel_settings</span>
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-xs sm:text-sm font-black text-amber-900 font-['Plus_Jakarta_Sans'] uppercase tracking-wide">
-              Official Admin Approval Notice
-            </h2>
-            <p className="text-xs text-amber-800 leading-relaxed">
-              All submitted KYC documents are directly queued for <strong>Admin Verification & Approval</strong>.
-              Approval will be granted exclusively by the Admin team after verification.
-            </p>
-          </div>
-        </div>
+
 
         {/* If in edit mode, show banner with quick cancel */}
         {isEditing && (
@@ -572,7 +676,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Rahul Sharma"
+                      placeholder="Enter legal name as per PAN"
                       value={formData.fullName}
                       onChange={(e) => handleInputChange('fullName', e.target.value)}
                       className={`w-full px-3.5 py-2.5 rounded-xl border text-xs bg-slate-50/50 focus:bg-white focus:outline-none transition-colors ${
@@ -605,7 +709,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                     </label>
                     <input
                       type="email"
-                      placeholder="e.g. rahul.sharma@example.com"
+                      placeholder="Enter registered email address"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
                       className={`w-full px-3.5 py-2.5 rounded-xl border text-xs bg-slate-50/50 focus:bg-white focus:outline-none transition-colors ${
@@ -664,15 +768,23 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                       <label className="block text-xs font-bold text-slate-700 mb-1">
                         State <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Maharashtra"
+                      <select
                         value={formData.state}
                         onChange={(e) => handleInputChange('state', e.target.value)}
-                        className={`w-full px-3 py-2.5 rounded-xl border text-xs bg-slate-50/50 focus:bg-white focus:outline-none transition-colors ${
+                        className={`w-full px-3 py-2.5 rounded-xl border text-xs bg-slate-50/50 focus:bg-white focus:outline-none transition-colors cursor-pointer ${
                           errors.state ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:border-[#FF3F6C]'
                         }`}
-                      />
+                      >
+                        <option value="">Select State</option>
+                        {INDIAN_STATES.map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                        {formData.state && !INDIAN_STATES.includes(formData.state) && (
+                          <option value={formData.state}>{formData.state}</option>
+                        )}
+                      </select>
                       {errors.state && <p className="text-[10px] text-red-500 mt-1">{errors.state}</p>}
                     </div>
                     <div>
@@ -920,7 +1032,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                       Step 3: Bank Account for Payouts
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      Commissions will be transferred directly to this bank account upon Admin approval
+                      Commissions will be transferred directly to this bank account upon verification
                     </p>
                   </div>
                 </div>
@@ -1011,7 +1123,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. rahul@okaxis"
+                      placeholder="e.g. mobile@upi or username@bank"
                       value={formData.upiId}
                       onChange={(e) => handleInputChange('upiId', e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50/50 focus:bg-white focus:outline-none focus:border-[#FF3F6C]"
@@ -1056,7 +1168,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                           Step 4: Review Your Details
                         </h3>
                         <p className="text-[11px] text-slate-500">
-                          Please verify your entered KYC details before submitting to Admin
+                          Please verify your entered details before submitting
                         </p>
                       </div>
                     </div>
@@ -1154,7 +1266,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                       <h3 className="font-['Plus_Jakarta_Sans'] font-extrabold text-sm sm:text-base text-slate-900">
                         Declarations & Verification Agreement
                       </h3>
-                      <p className="text-[11px] text-slate-400">Please confirm before submitting for Admin approval</p>
+                      <p className="text-[11px] text-slate-400">Please confirm before submitting your application</p>
                     </div>
                   </div>
 
@@ -1166,29 +1278,13 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                         onChange={(e) => handleInputChange('agreeInfoCorrect', e.target.checked)}
                         className="mt-0.5 w-4 h-4 text-[#FF3F6C] rounded border-slate-300 focus:ring-[#FF3F6C]"
                       />
-                      <span className="text-xs text-slate-700 leading-relaxed">
+                      <span className="text-xs text-slate-700 leading-relaxed font-medium">
                         I declare and confirm that all the personal, identity (PAN/Aadhaar), and banking details provided by me
                         are genuine, complete, and belong to me.
                       </span>
                     </label>
                     {errors.agreeInfoCorrect && (
                       <p className="text-[10px] text-red-500 pl-7">{errors.agreeInfoCorrect}</p>
-                    )}
-
-                    <label className="flex items-start gap-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={formData.agreeAdminApproval}
-                        onChange={(e) => handleInputChange('agreeAdminApproval', e.target.checked)}
-                        className="mt-0.5 w-4 h-4 text-[#FF3F6C] rounded border-slate-300 focus:ring-[#FF3F6C]"
-                      />
-                      <span className="text-xs text-slate-800 leading-relaxed font-semibold">
-                        I understand that submitting this application does NOT give automatic approval. My application will be reviewed
-                        and approved exclusively by Admin.
-                      </span>
-                    </label>
-                    {errors.agreeAdminApproval && (
-                      <p className="text-[10px] text-red-500 pl-7">{errors.agreeAdminApproval}</p>
                     )}
                   </div>
                 </section>
@@ -1212,12 +1308,12 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
                     {isSubmitting ? (
                       <>
                         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        <span>Submitting KYC to Admin...</span>
+                        <span>Submitting Application...</span>
                       </>
                     ) : (
                       <>
                         <span className="material-symbols-outlined text-base">send</span>
-                        <span>Submit KYC Details for Admin Approval</span>
+                        <span>Submit Application</span>
                       </>
                     )}
                   </button>
@@ -1295,7 +1391,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
               <div className="flex justify-between items-center pb-2 border-b border-slate-200">
                 <span className="text-slate-500 font-sans text-[11px]">Status</span>
                 <span className="bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded text-[10px]">
-                  PENDING ADMIN APPROVAL
+                  UNDER VERIFICATION
                 </span>
               </div>
               <div className="flex justify-between">

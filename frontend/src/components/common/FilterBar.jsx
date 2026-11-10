@@ -2,12 +2,12 @@ import React from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { Search, RefreshCw } from 'lucide-react';
+import { Search, RefreshCw, Download } from 'lucide-react';
 
 /**
  * Reusable FilterBar Component
  * Unifies Search, Dynamic Category/Role Tabs, Dropdown Select Filters,
- * Item Counter, and Refresh action in a consistent responsive card.
+ * Item Counter, Refresh action, and CSV/Excel Export in a consistent responsive card.
  */
 export default function FilterBar({
   // Search
@@ -25,11 +25,15 @@ export default function FilterBar({
   // Dropdown Selects
   dropdowns = [], // [{ value, onChange, options: [{ value, label }] }]
 
-  // Counter & Refresh
+  // Counter & Actions
   totalCount,
   countLabel = 'Items',
   onRefresh,
   refreshing = false,
+
+  // Export to CSV / Excel
+  onExport,
+  exportLabel = 'Export CSV',
 
   className = ''
 }) {
@@ -77,6 +81,19 @@ export default function FilterBar({
               <span className="text-xs font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg whitespace-nowrap">
                 Total: <strong className="text-gray-900">{totalCount}</strong> {countLabel}
               </span>
+            )}
+
+            {onExport && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onExport}
+                className="h-9 rounded-lg px-3 flex items-center gap-1.5 text-xs font-semibold cursor-pointer border-emerald-300 text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100 hover:text-emerald-800 transition-all shadow-xs"
+              >
+                <Download className="h-3.5 w-3.5 text-emerald-600" />
+                <span>{exportLabel}</span>
+              </Button>
             )}
 
             {onRefresh && (

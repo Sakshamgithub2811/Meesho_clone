@@ -172,11 +172,13 @@ export const getReturnRequestDetails = async (req, res) => {
 
 /**
  * 3. UPDATE RETURN STATUS (Approve, Picked Up, Refund, Reject)
+ * - When marked 'refunded': Automatically credits customer's wallet atomically,
+ *   records a credit wallet_transaction, updates order status, and notifies customer.
  */
 export const updateReturnStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, refundAmount: customRefundAmount, adminNotes } = req.body;
 
     const validStatuses = ['requested', 'approved', 'picked_up', 'refunded', 'rejected'];
 
@@ -189,12 +191,9 @@ export const updateReturnStatus = async (req, res) => {
 
     const lowerStatus = status.toLowerCase();
 
-    // 1. Update ReturnRequest record
-    const updatedReturn = await prisma.returnRequest.update({
+    // 1. Fetch existing ReturnRequest record
+    const existingReturn = await prisma.returnRequest.findUnique({
       where: { id },
-      data: {
-        status: lowerStatus
-      },
       include: {
         order: {
           include: {
@@ -207,30 +206,133 @@ export const updateReturnStatus = async (req, res) => {
       }
     });
 
-    // 2. Synchronize Order status based on return state
-    if (updatedReturn.orderId) {
-      if (lowerStatus === 'refunded') {
-        await prisma.order.update({
-          where: { id: updatedReturn.orderId },
-          data: {
-            orderStatus: 'REFUNDED',
-            paymentStatus: 'REFUNDED'
-          }
-        });
-      } else if (lowerStatus === 'approved' || lowerStatus === 'picked_up') {
-        await prisma.order.update({
-          where: { id: updatedReturn.orderId },
-          data: {
-            orderStatus: lowerStatus === 'picked_up' ? 'RETURNED' : 'RETURN_REQUESTED'
-          }
-        });
-      }
+    if (!existingReturn) {
+      return res.status(404).json({
+        success: false,
+        message: 'Return request not found'
+      });
     }
+
+    // Prevent double-refunding
+    if (lowerStatus === 'refunded' && existingReturn.status === 'refunded') {
+      return res.status(400).json({
+        success: false,
+        message: 'This return request has already been refunded.'
+      });
+    }
+
+    // 2. Process status update with atomic database transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // A. Update ReturnRequest status
+      const updatedReturn = await tx.returnRequest.update({
+        where: { id },
+        data: {
+          status: lowerStatus
+        },
+        include: {
+          order: {
+            include: {
+              user: true,
+              items: {
+                include: { product: true }
+              }
+            }
+          }
+        }
+      });
+
+      // B. Synchronize Order status based on return state
+      if (updatedReturn.orderId) {
+        if (lowerStatus === 'refunded') {
+          await tx.order.update({
+            where: { id: updatedReturn.orderId },
+            data: {
+              orderStatus: 'REFUNDED',
+              paymentStatus: 'REFUNDED'
+            }
+          });
+
+          // C. Compute refund amount (custom or entire order amount)
+          const refundAmt = customRefundAmount !== undefined && !isNaN(parseFloat(customRefundAmount))
+            ? parseFloat(customRefundAmount)
+            : (updatedReturn.order?.totalAmount || 0);
+
+          const customerId = updatedReturn.order?.userId;
+
+          if (customerId && refundAmt > 0) {
+            // Ensure customer wallet exists
+            const wallet = await tx.wallet.upsert({
+              where: { userId: customerId },
+              update: {
+                balance: { increment: refundAmt }
+              },
+              create: {
+                userId: customerId,
+                balance: refundAmt,
+                pending: 0.0
+              }
+            });
+
+            // Record double-entry credit in transaction ledger
+            await tx.walletTransaction.create({
+              data: {
+                walletId: wallet.id,
+                amount: refundAmt,
+                type: 'credit',
+                description: `Refund credited for Return #${id.slice(0, 8)} (Order #${updatedReturn.orderId.slice(-8)})`,
+                orderId: updatedReturn.orderId
+              }
+            });
+
+            // Send notification to customer
+            await tx.notification.create({
+              data: {
+                userId: customerId,
+                title: 'Refund Credited to Wallet! 💰',
+                body: `₹${refundAmt.toLocaleString('en-IN')} has been refunded to your wallet for Order #${updatedReturn.orderId.slice(-8)}.`,
+                type: 'order',
+                data: {
+                  returnId: id,
+                  orderId: updatedReturn.orderId,
+                  amount: refundAmt,
+                  notes: adminNotes || 'Return approved and refunded'
+                }
+              }
+            }).catch(() => {});
+          }
+        } else if (lowerStatus === 'approved' || lowerStatus === 'picked_up') {
+          await tx.order.update({
+            where: { id: updatedReturn.orderId },
+            data: {
+              orderStatus: lowerStatus === 'picked_up' ? 'RETURNED' : 'RETURN_REQUESTED'
+            }
+          });
+        } else if (lowerStatus === 'rejected') {
+          // Notify customer of rejection
+          const customerId = updatedReturn.order?.userId;
+          if (customerId) {
+            await tx.notification.create({
+              data: {
+                userId: customerId,
+                title: 'Return Request Update',
+                body: `Your return request for Order #${updatedReturn.orderId.slice(-8)} could not be approved.${adminNotes ? ` Reason: ${adminNotes}` : ''}`,
+                type: 'order',
+                data: { returnId: id, orderId: updatedReturn.orderId }
+              }
+            }).catch(() => {});
+          }
+        }
+      }
+
+      return updatedReturn;
+    });
 
     return res.status(200).json({
       success: true,
-      message: `Return request marked as ${lowerStatus}`,
-      returnRequest: updatedReturn
+      message: lowerStatus === 'refunded'
+        ? 'Return request approved and refund amount credited to customer wallet successfully!'
+        : `Return request marked as ${lowerStatus}`,
+      returnRequest: result
     });
   } catch (error) {
     console.error('Error updating return status:', error);

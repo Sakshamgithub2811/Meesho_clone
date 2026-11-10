@@ -1,5 +1,8 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { auth } from '../utils/firebase';
+import { signOut } from 'firebase/auth';
+import { logoutCustomer } from '../services/customerAuthService';
 
 const navSections = [
   {
@@ -15,19 +18,16 @@ const navSections = [
     title: "Business & Earnings",
     items: [
       { name: "My Business Dashboard", path: "/earnings-dashboard-1", icon: "trending_up" },
-      { name: "Analytics & Performance", path: "/earnings-dashboard-2", icon: "query_stats" },
-      { name: "Fintech Wallet", path: "/my-wallet", icon: "account_balance_wallet" },
-      { name: "Reseller Wallet", path: "/reseller-wallet", icon: "payments" },
+      { name: "Reseller Wallet & Payouts", path: "/reseller-wallet", icon: "payments" },
       { name: "Withdraw Earnings", path: "/withdraw-earnings", icon: "savings" },
       { name: "Payout Settings", path: "/payout-settings", icon: "settings_suggest" },
     ]
   },
   {
-    title: "Community & Network",
+    title: "Alerts & Notifications",
     items: [
-      { name: "Community Hub", path: "/community-hub", icon: "groups", badge: "Live" },
-      { name: "Reseller Messenger", path: "/messenger", icon: "chat" },
       { name: "Notification Center", path: "/notifications", icon: "notifications" },
+      { name: "Help & Support", path: "/support-center", icon: "support_agent" },
     ]
   },
   {
@@ -208,9 +208,11 @@ export default function NavDrawer({ isOpen, onClose, role = 'reseller', isCustom
             <span>{customerMode ? '100% Genuine Shopping' : '100% Safe Reselling'}</span>
           </div>
           <button 
-            onClick={() => {
+            onClick={async () => {
               onClose();
-              navigate('/login');
+              try { await signOut(auth); } catch (e) {}
+              logoutCustomer();
+              navigate('/user-login');
             }}
             className="text-xs font-semibold text-[#FF3F6C] hover:underline cursor-pointer"
           >

@@ -1,7 +1,9 @@
 // frontend/src/services/affiliateAuthService.js
 import { getAffiliateApp } from './affiliateSessionStore';
+import { addNotification } from './notificationService';
+import { API_V1_BASE } from '../config/apiConfig';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = API_V1_BASE;
 const TOKEN_KEY = 'mshoppy_affiliate_token';
 const USER_KEY = 'mshoppy_affiliate_user';
 const STATS_KEY = 'mshoppy_affiliate_stats';
@@ -13,7 +15,7 @@ function notifyListeners() {
   listeners.forEach((fn) => {
     try {
       fn(current);
-    } catch (e) {}
+    } catch (e) { }
   });
 }
 
@@ -70,12 +72,14 @@ export async function loginAffiliate({ phone, email, fullName, referralCode, otp
     };
 
     const fallbackStats = {
-      totalCommission: 12450.50,
-      pendingCommission: 2450.00,
-      withdrawnAmount: 10000.00,
-      clicks: 1240,
-      convertedOrders: 84,
-      conversionRate: '6.77%',
+      totalCommission: 0,
+      pendingCommission: 0,
+      withdrawnAmount: 0,
+      clicks: 0,
+      convertedOrders: 0,
+      conversionRate: '0%',
+      recentOrders: [],
+      dailyCommissions: { MON: 0, TUE: 0, WED: 0, THU: 0, FRI: 0, SAT: 0, SUN: 0 }
     };
 
     const mockToken = 'mock_aff_token_' + Date.now();
@@ -142,3 +146,160 @@ export function subscribeAffiliateAuth(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
+
+/**
+ * Get current affiliate stats with clean 0 defaults
+ */
+/**
+ * Fetch live affiliate stats from PostgreSQL database
+ */
+export async function fetchAffiliateStats() {
+  try {
+    const token =
+      localStorage.getItem(TOKEN_KEY) ||
+      localStorage.getItem('mshoppy_customer_token') ||
+      localStorage.getItem('mshoppy_token') ||
+      localStorage.getItem('firebase_token') ||
+      localStorage.getItem('token');
+
+    let resolvedUserId = '';
+    let resolvedEmail = '';
+    let resolvedPhone = '';
+
+    for (const key of ['mshoppy_customer_user', 'user', 'mshoppy_affiliate_user', 'mshoppy_reseller_user']) {
+      try {
+        const u = JSON.parse(localStorage.getItem(key) || '{}');
+        if (!resolvedUserId && u?.id && !u.id.startsWith('affiliate_')) resolvedUserId = u.id;
+        if (!resolvedUserId && u?.uid) resolvedUserId = u.uid;
+        if (!resolvedEmail && u?.email) resolvedEmail = u.email;
+        if (!resolvedPhone && u?.phone) resolvedPhone = u.phone;
+      } catch (_) {}
+    }
+
+    const app = getAffiliateApp();
+    if (!resolvedUserId && app?.userId) resolvedUserId = app.userId;
+    if (!resolvedEmail && app?.email) resolvedEmail = app.email;
+    if (!resolvedPhone && app?.phone) resolvedPhone = app.phone;
+
+    const queryTarget = resolvedUserId || resolvedEmail || resolvedPhone || (getStoredAffiliate()?.user?.id || '');
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    if (queryTarget) headers['x-user-id'] = queryTarget;
+
+    const query = queryTarget ? '?userId=' + encodeURIComponent(queryTarget) : '';
+    const res = await fetch(API_BASE_URL + '/auth/affiliate-stats' + query, { headers });
+    const data = await res.json();
+    if (data && data.success && data.stats) {
+      const dbStats = {
+        ...data.stats,
+        totalCommission: Number(data.stats.totalCommission || 0),
+        clicks: Number(data.stats.clicks || 0),
+        convertedOrders: Number(data.stats.convertedOrders || 0),
+        recentOrders: Array.isArray(data.stats.recentOrders) ? data.stats.recentOrders : []
+      };
+      notifyListeners();
+      return dbStats;
+    }
+  } catch (err) {
+    console.warn('Could not fetch live affiliate stats from API:', err.message);
+  }
+  return getAffiliateStats();
+}
+
+export function getAffiliateStats() {
+  try {
+    const statsStr = localStorage.getItem(STATS_KEY);
+    if (statsStr) return JSON.parse(statsStr);
+  } catch (e) { }
+  return {
+    totalCommission: 0,
+    pendingCommission: 0,
+    withdrawnAmount: 0,
+    clicks: 0,
+    convertedOrders: 0,
+    conversionRate: '0%',
+    recentOrders: [],
+    dailyCommissions: { MON: 0, TUE: 0, WED: 0, THU: 0, FRI: 0, SAT: 0, SUN: 0 }
+  };
+}
+
+/**
+ * Record link visit / click for an affiliate referral code
+ */
+export function recordAffiliateClick(referralCode) {
+  if (!referralCode) return;
+  try {
+    const stats = getAffiliateStats();
+    stats.clicks = (stats.clicks || 0) + 1;
+    if (stats.convertedOrders && stats.clicks) {
+      stats.conversionRate = ((stats.convertedOrders / stats.clicks) * 100).toFixed(1) + '%';
+    }
+    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+    notifyListeners();
+  } catch (e) { }
+}
+
+/**
+ * Record a converted customer order and credit profit margin to the affiliate
+ */
+export function recordAffiliateOrder({ referralCode, orderTotal, orderId, marginAmount }) {
+  if (!orderTotal || orderTotal <= 0) return null;
+  // Use custom margin set by affiliate if provided, otherwise default reasonable margin
+  const earnedMargin = (marginAmount && Number(marginAmount) > 0)
+    ? Number(marginAmount)
+    : Math.round(Number(orderTotal) * 0.10);
+  const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const currentDay = DAYS[new Date().getDay()];
+
+  try {
+    const stats = getAffiliateStats();
+    if (!stats.dailyCommissions) {
+      stats.dailyCommissions = { MON: 0, TUE: 0, WED: 0, THU: 0, FRI: 0, SAT: 0, SUN: 0 };
+    }
+    if (!Array.isArray(stats.recentOrders)) {
+      stats.recentOrders = [];
+    }
+
+    stats.totalCommission = (stats.totalCommission || 0) + earnedMargin;
+    stats.convertedOrders = (stats.convertedOrders || 0) + 1;
+    stats.dailyCommissions[currentDay] = (stats.dailyCommissions[currentDay] || 0) + earnedMargin;
+    stats.clicks = Math.max(stats.clicks || 0, stats.convertedOrders);
+    stats.conversionRate = ((stats.convertedOrders / stats.clicks) * 100).toFixed(1) + '%';
+
+    stats.recentOrders.unshift({
+      id: orderId || 'ORD-' + Math.floor(100000 + Math.random() * 900000),
+      title: `Affiliate Profit Margin (Order #${(orderId || '').slice(-6) || 'Ref'})`,
+      orderTotal: Number(orderTotal),
+      commission: earnedMargin,
+      time: 'Just now',
+      day: currentDay,
+      timestamp: Date.now()
+    });
+
+    if (stats.recentOrders.length > 20) {
+      stats.recentOrders = stats.recentOrders.slice(0, 20);
+    }
+
+    // Real Earnings Notification
+    try {
+      addNotification({
+        title: 'Affiliate Profit Margin Credited! 💰',
+        message: `₹${Number(earnedMargin).toLocaleString('en-IN')} custom profit margin credited to your wallet for Order #${(orderId || '').slice(-6) || 'Ref'} via referral.`,
+        category: 'Earnings',
+        icon: 'payments',
+        iconBg: 'bg-emerald-50 text-emerald-600',
+        actionPath: '/user-dashboard1?tab=affiliate',
+        actionText: 'View Wallet & Stats',
+        data: { commission: earnedMargin, orderId }
+      });
+    } catch (err) { }
+
+    notifyListeners();
+    return { commission: earnedMargin, stats };
+  } catch (e) {
+    console.error('Error recording affiliate order:', e);
+    return null;
+  }
+}
+

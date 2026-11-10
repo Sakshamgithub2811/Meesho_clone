@@ -3,7 +3,7 @@ import DataTable from '../../common/DataTable';
 import OrderStatusBadge from './OrderStatusBadge';
 import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
 import { Button } from '../../ui/button';
-import { Eye, ShoppingCart, Calendar } from 'lucide-react';
+import { Eye, ShoppingCart, Calendar, Truck } from 'lucide-react';
 
 export default function OrdersTable({
   orders = [],
@@ -23,7 +23,7 @@ export default function OrdersTable({
           <div>
             <span
               onClick={() => onOpenOrder(order)}
-              className="font-mono text-xs font-bold text-[#b7004d] hover:underline cursor-pointer block"
+              className="font-mono text-xs font-bold text-gray-900 hover:text-[#b7004d] cursor-pointer block"
             >
               #{order.id.slice(0, 8)}...
             </span>
@@ -36,62 +36,57 @@ export default function OrdersTable({
       }
     },
     {
-      header: 'Customer',
+      header: 'Customer Details',
       render: (order) => {
         const customerName = order.user?.fullName || order.shippingAddress?.name || 'Customer';
-        const customerEmail = order.user?.email || 'No email';
+        const phone = order.user?.phone || order.shippingAddress?.phone || 'No phone';
         return (
-          <div className="flex items-center gap-2.5">
-            <Avatar className="h-8 w-8 bg-pink-100 text-[#b7004d] text-xs font-bold shrink-0">
-              {order.user?.avatarUrl ? (
-                <AvatarImage src={order.user.avatarUrl} alt={customerName} />
-              ) : (
-                <AvatarFallback>{customerName.charAt(0).toUpperCase()}</AvatarFallback>
-              )}
-            </Avatar>
-            <div>
-              <p className="font-bold text-gray-900 text-xs">{customerName}</p>
-              <p className="text-[11px] text-gray-400 truncate max-w-[130px]">{customerEmail}</p>
-            </div>
+          <div>
+            <span className="font-bold text-xs text-gray-900 block truncate max-w-[140px]">
+              {customerName}
+            </span>
+            <span className="text-[11px] text-gray-400 block font-mono">
+              {phone}
+            </span>
           </div>
         );
       }
     },
     {
-      header: 'Items',
+      header: 'Purchased Items',
       render: (order) => {
         const items = order.items || [];
-        const count = items.reduce((acc, it) => acc + (it.quantity || 1), 0);
-        const firstItem = items[0]?.product;
+        const firstItem = items[0] || {};
+        const product = firstItem.product || {};
+        const count = items.length;
+
         return (
           <div className="flex items-center gap-2">
-            {firstItem?.images?.[0] ? (
-              <img
-                src={firstItem.images[0]}
-                alt={firstItem.title}
-                className="w-8 h-8 rounded object-cover bg-gray-100 border border-gray-200 shrink-0"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
-                <ShoppingCart className="w-3.5 h-3.5" />
-              </div>
-            )}
-            <div>
-              <p className="text-xs font-semibold text-gray-800">
-                {count} {count === 1 ? 'item' : 'items'}
-              </p>
-              <p className="text-[10px] text-gray-400 truncate max-w-[140px]">
-                {firstItem?.title || 'Multiple items'}
-              </p>
+            <Avatar className="h-8 w-8 rounded-lg border border-gray-200 bg-gray-50 shrink-0">
+              {product.images?.[0] ? (
+                <AvatarImage src={product.images[0]} alt={product.title} className="object-cover" />
+              ) : (
+                <AvatarFallback className="text-[10px] bg-pink-50 text-[#b7004d] font-bold">
+                  {product.title ? product.title.charAt(0) : 'P'}
+                </AvatarFallback>
+              )}
+            </Avatar>
+            <div className="min-w-0 max-w-[160px]">
+              <span className="text-xs font-semibold text-gray-800 truncate block">
+                {product.title || 'Product Item'}
+              </span>
+              <span className="text-[10px] text-gray-400 block">
+                {count > 1 ? `+${count - 1} other item${count > 2 ? 's' : ''}` : 'Single product'}
+              </span>
             </div>
           </div>
         );
       }
     },
     {
-      header: 'Total Amount',
+      header: 'Amount',
       render: (order) => (
-        <span className="font-bold text-gray-900 text-xs">
+        <span className="font-bold text-xs text-gray-900">
           {formatCurrency ? formatCurrency(order.totalAmount) : `₹${order.totalAmount}`}
         </span>
       )
@@ -116,8 +111,26 @@ export default function OrdersTable({
       )
     },
     {
-      header: 'Status',
-      render: (order) => <OrderStatusBadge status={order.orderStatus} />
+      header: 'Status & Logistics',
+      render: (order) => {
+        const addr = order.shippingAddress || {};
+        const courier = addr.courier || addr.courierPartner;
+        const awb = addr.awb || addr.trackingNumber;
+
+        return (
+          <div className="space-y-1">
+            <OrderStatusBadge status={order.orderStatus} />
+            {courier && awb && (
+              <div className="flex items-center gap-1 text-[10px] text-gray-500 font-medium">
+                <Truck className="w-3 h-3 text-blue-600 shrink-0" />
+                <span className="truncate max-w-[120px]" title={`${courier} (${awb})`}>
+                  {courier.split(' ')[0]}: <span className="font-mono font-bold text-gray-700">{awb}</span>
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      }
     },
     {
       header: 'Action',
@@ -143,7 +156,6 @@ export default function OrdersTable({
       data={orders}
       loading={loading}
       loadingMessage="Loading customer orders..."
-      emptyTitle="No orders found"
       emptyMessage="No customer transactions match your selected search or status filters."
       emptyIcon={ShoppingCart}
     />

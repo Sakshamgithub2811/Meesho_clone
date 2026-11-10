@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 import {
   getProducts,
@@ -12,6 +12,7 @@ import {
 
 export default function SearchResults({ onNavigate, onBack }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { categorySlug } = useParams();
   const navigate = useNavigate();
   const handleNav = (target) => {
     if (onNavigate) onNavigate(target);
@@ -26,6 +27,15 @@ export default function SearchResults({ onNavigate, onBack }) {
   const [dbCategories, setDbCategories] = useState([]);
   const [wishlist, setWishlist] = useState(new Set());
   const [cartCount, setCartCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const sentinelRef = useRef(null);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
+  const loadingRef = useRef(true);
+  const loadingMoreRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -38,23 +48,40 @@ export default function SearchResults({ onNavigate, onBack }) {
 
   useEffect(() => {
     const q = searchParams.get('q');
+    const cat = searchParams.get('category') || categorySlug;
     if (q !== null) {
       setSearchQuery(q);
     }
-  }, [searchParams]);
+    if (cat) {
+      setActiveFilter(cat);
+    }
+  }, [searchParams, categorySlug]);
+
+  const effectiveCategory = activeFilter !== 'All' ? activeFilter : (categorySlug || '');
 
   // Load products from database matching query & filters
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
       setLoading(true);
+      loadingRef.current = true;
+      setLoadingMore(false);
+      loadingMoreRef.current = false;
+      setPage(1);
+      setHasMore(true);
+      pageRef.current = 1;
+      hasMoreRef.current = true;
+
       try {
-        const [cats, prods, cart, wish] = await Promise.all([
+        const [cats, prodsRes, cart, wish] = await Promise.all([
           getCategories(),
           getProducts({
             search: searchQuery,
-            category: activeFilter === 'All' ? '' : activeFilter,
-            sort: selectedSort
+            category: effectiveCategory,
+            sort: selectedSort,
+            page: 1,
+            limit: 24,
+            withMeta: true
           }),
           getCart(),
           getWishlist()
@@ -62,20 +89,103 @@ export default function SearchResults({ onNavigate, onBack }) {
 
         if (isMounted) {
           if (cats) setDbCategories(cats);
-          if (prods) setProducts(prods);
+          if (prodsRes) {
+            setProducts(prodsRes.products || []);
+            setTotalProducts(prodsRes.total || 0);
+            setHasMore(prodsRes.hasMore);
+            hasMoreRef.current = prodsRes.hasMore;
+          }
           if (cart?.totalItems !== undefined) setCartCount(cart.totalItems);
           if (wish) setWishlist(new Set(wish.map(w => w.productId)));
         }
       } catch (e) {
         console.error('Failed to load search results:', e);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
       }
     }
 
     loadData();
     return () => { isMounted = false; };
+  }, [searchQuery, effectiveCategory, selectedSort]);
+
+  // Infinite Scroll Handler
+  const loadMoreProducts = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+
+    const nextPage = pageRef.current + 1;
+    try {
+      const res = await getProducts({
+        search: searchQuery,
+        category: effectiveCategory,
+        sort: selectedSort,
+        page: nextPage,
+        limit: 24,
+        withMeta: true
+      });
+
+      if (res.products && res.products.length > 0) {
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newItems = res.products.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newItems];
+        });
+        setPage(nextPage);
+        pageRef.current = nextPage;
+        setHasMore(res.hasMore);
+        hasMoreRef.current = res.hasMore;
+        setTotalProducts(res.total || 0);
+      } else {
+        setHasMore(false);
+        hasMoreRef.current = false;
+      }
+    } catch (err) {
+      console.error('Error loading more search products:', err);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
   }, [searchQuery, activeFilter, selectedSort]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    let observer = null;
+
+    if (sentinel) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) {
+            loadMoreProducts();
+          }
+        },
+        { rootMargin: '450px' }
+      );
+      observer.observe(sentinel);
+    }
+
+    const handleWindowScroll = () => {
+      if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+      const scrollY = window.scrollY || window.pageYOffset;
+      const visibleHeight = window.innerHeight;
+      const totalHeight = document.documentElement.scrollHeight;
+
+      if (totalHeight - (scrollY + visibleHeight) < 600) {
+        loadMoreProducts();
+      }
+    };
+
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('scroll', handleWindowScroll);
+    };
+  }, [loadMoreProducts]);
 
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
@@ -110,7 +220,7 @@ export default function SearchResults({ onNavigate, onBack }) {
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     try {
-      await addToCart(product.id, 1, product.sizes?.[0] || 'Free Size');
+      await addToCart(product.id, 1, product.sizes?.[0] || 'Free Size', product);
       setCartCount(c => c + 1);
       triggerToast(`Added "${product.title.slice(0, 20)}..." to Cart! 🛒`);
     } catch (err) {
@@ -215,7 +325,7 @@ export default function SearchResults({ onNavigate, onBack }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-4 flex justify-between items-center">
           <h2 className="font-extrabold text-sm sm:text-base text-slate-900">
-            {searchQuery ? `Results for "${searchQuery}"` : 'All Products'} ({products.length})
+            {searchQuery ? `Results for "${searchQuery}"` : (effectiveCategory ? effectiveCategory.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All Products')} ({totalProducts || products.length})
           </h2>
         </div>
 
@@ -242,6 +352,7 @@ export default function SearchResults({ onNavigate, onBack }) {
             </button>
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {products.map((p) => {
               const isFav = wishlist.has(p.id);
@@ -311,10 +422,21 @@ export default function SearchResults({ onNavigate, onBack }) {
               );
             })}
           </div>
+
+          {/* Sentinel and loader */}
+          <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[80px]">
+            {loadingMore && (
+              <div className="flex items-center gap-3 px-6 py-3 bg-white rounded-full shadow-lg border border-slate-200 text-xs font-extrabold text-[#b90041] animate-pulse">
+                <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
+                <span>Loading more results...</span>
+              </div>
+            )}
+          </div>
+          </>
         )}
       </main>
 
-      <AppBottomNav activeNav="search" onNavigate={handleNav} />
+      <AppBottomNav activeNav="categories" onNavigate={handleNav} role="customer" homePath="/user-home" />
     </div>
   );
 }

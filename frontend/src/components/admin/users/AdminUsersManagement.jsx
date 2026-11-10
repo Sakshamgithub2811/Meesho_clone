@@ -1,11 +1,14 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import FilterBar from '../../common/FilterBar';
 import UserTable from './UserTable';
+import EditUserModal from './EditUserModal';
 
 const ROLES = [
   { id: 'ALL', label: 'All Roles' },
@@ -20,7 +23,7 @@ const ROLES = [
 /**
  * AdminUsersManagement Component
  * Main coordinator for user management, orchestrating
- * UserFilterBar and UserTable.
+ * UserFilterBar, UserTable, and EditUserModal.
  */
 export default function AdminUsersManagement() {
   const currentUser = useSelector((state) => state.user?.currentUser);
@@ -32,6 +35,11 @@ export default function AdminUsersManagement() {
   const [selectedRole, setSelectedRole] = useState('ALL');
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
+  // Edit Modal State
+  const [editingUser, setEditingUser] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSavingUser, setIsSavingUser] = useState(false);
+
   // 1. Fetch Users from Backend
   const fetchUsers = async (isManual = false) => {
     try {
@@ -39,12 +47,13 @@ export default function AdminUsersManagement() {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const params = {};
       if (searchTerm.trim()) params.search = searchTerm.trim();
       if (selectedRole !== 'ALL') params.role = selectedRole;
 
-      const response = await axios.get('http://localhost:5000/api/v1/admin-users', {
+      const response = await axios.get(`${API_V1_BASE}/admin-users`, {
         headers: { Authorization: `Bearer ${token}` },
         params
       });
@@ -69,7 +78,9 @@ export default function AdminUsersManagement() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    if (auth.currentUser || currentUser?.id) {
+      fetchUsers();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchUsers();
@@ -85,14 +96,62 @@ export default function AdminUsersManagement() {
     return () => clearTimeout(delayDebounce);
   }, [searchTerm]);
 
-  // 2. Change User Role
+  // 2. Open Edit User Modal
+  const handleOpenEdit = (user) => {
+    setEditingUser(user);
+    setIsEditModalOpen(true);
+  };
+
+  // 3. Save User Profile & Password
+  const handleSaveUser = async (formData) => {
+    if (!editingUser) return;
+    try {
+      setIsSavingUser(true);
+      const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
+
+      const response = await axios.put(
+        `${API_V1_BASE}/admin-users/${editingUser.id}`,
+        formData,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        const updated = response.data.user;
+        setUsers((prev) =>
+          prev.map((u) => (u.id === editingUser.id ? { ...u, ...updated } : u))
+        );
+        toast.success("User Updated", {
+          description: `Account details for ${updated.fullName || updated.email} have been saved.`
+        });
+        setIsEditModalOpen(false);
+        setEditingUser(null);
+      } else {
+        toast.error("Failed to update user", {
+          description: response.data.error || "Could not save user changes."
+        });
+      }
+    } catch (err) {
+      console.error("Save User Error:", err);
+      toast.error("Update Failed", {
+        description: err.response?.data?.error || "Failed to update user details."
+      });
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
+
+  // 4. Change User Role
   const handleRoleChange = async (userId, newRole) => {
     try {
       setActionLoadingId(userId);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const response = await axios.put(
-        `http://localhost:5000/api/v1/admin-users/${userId}/role`,
+        `${API_V1_BASE}/admin-users/${userId}/role`,
         { role: newRole },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -115,7 +174,47 @@ export default function AdminUsersManagement() {
     }
   };
 
-  // 3. Delete User
+  // 5. Toggle User Active / Deactivate Status
+  const handleToggleStatus = async (userId, newStatus, userName) => {
+    const actionLabel = newStatus ? 'activate' : 'deactivate';
+    if (!window.confirm(`Are you sure you want to ${actionLabel} account for "${userName}"?`)) {
+      return;
+    }
+
+    try {
+      setActionLoadingId(userId);
+      const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
+
+      const response = await axios.put(
+        `${API_V1_BASE}/admin-users/${userId}/status`,
+        { isActive: newStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, isActive: newStatus } : u))
+        );
+        toast.success(newStatus ? "Account Activated" : "Account Deactivated", {
+          description: `User "${userName}" has been ${newStatus ? 'activated' : 'deactivated'}.`
+        });
+      } else {
+        toast.error("Status Update Failed", {
+          description: response.data.error || "Failed to update user status."
+        });
+      }
+    } catch (err) {
+      console.error("Toggle Status Error:", err);
+      toast.error("Action Failed", {
+        description: err.response?.data?.error || `Could not ${actionLabel} user account.`
+      });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // 6. Delete User
   const handleDeleteUser = async (userId, userName) => {
     if (!window.confirm(`Are you sure you want to delete user "${userName}"?`)) {
       return;
@@ -124,9 +223,10 @@ export default function AdminUsersManagement() {
     try {
       setActionLoadingId(userId);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const response = await axios.delete(
-        `http://localhost:5000/api/v1/admin-users/${userId}`,
+        `${API_V1_BASE}/admin-users/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -146,6 +246,24 @@ export default function AdminUsersManagement() {
     }
   };
 
+  // ── 5. EXPORT USERS TO CSV ──────────────────────────────────────────
+  const handleExportUsers = () => {
+    exportToCsv({
+      data: users,
+      filename: `users_directory_${selectedRole.toLowerCase()}`,
+      columns: [
+        { key: 'id', label: 'User ID' },
+        { key: 'fullName', label: 'Full Name' },
+        { key: 'email', label: 'Email Address' },
+        { key: 'phone', label: 'Phone Number' },
+        { key: 'role', label: 'Role' },
+        { key: 'isActive', label: 'Status', formatter: (val) => (val !== false ? 'ACTIVE' : 'BLOCKED') },
+        { key: '_count.orders', label: 'Total Orders Placed' },
+        { key: 'createdAt', label: 'Joined Date', formatter: (val) => val ? new Date(val).toLocaleDateString('en-IN') : '—' }
+      ]
+    });
+  };
+
   return (
     <div className="space-y-6 mt-4">
       {/* ── COMMON SEARCH & ROLE FILTER BAR ─────────────────── */}
@@ -160,6 +278,8 @@ export default function AdminUsersManagement() {
         searchPlaceholder="Search by name, email, or phone..."
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
+        onExport={handleExportUsers}
+        exportLabel="Export Users"
       />
 
       {/* ── USERS DATA TABLE ─────────────────────────────────── */}
@@ -170,7 +290,22 @@ export default function AdminUsersManagement() {
         actionLoadingId={actionLoadingId}
         onRoleChange={handleRoleChange}
         onDeleteUser={handleDeleteUser}
+        onEditUser={handleOpenEdit}
+        onToggleStatus={handleToggleStatus}
+      />
+
+      {/* ── EDIT USER MODAL (NAME, EMAIL, PHONE, ROLE, PASSWORD, STATUS) */}
+      <EditUserModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingUser(null);
+        }}
+        onSave={handleSaveUser}
+        user={editingUser}
+        isSaving={isSavingUser}
       />
     </div>
   );
 }
+

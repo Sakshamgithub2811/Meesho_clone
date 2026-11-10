@@ -13,11 +13,16 @@ import AdminFinanceManagement from '../../components/admin/finance/AdminFinanceM
 import AdminAnalyticsManagement from '../../components/admin/analytics/AdminAnalyticsManagement';
 import AdminSupportManagement from '../../components/admin/support/AdminSupportManagement';
 import AdminCategoriesManagement from '../../components/admin/categories/AdminCategoriesManagement';
+import AdminCouponsManagement from '../../components/admin/coupons/AdminCouponsManagement';
+import AdminBannersManagement from '../../components/admin/banners/AdminBannersManagement';
+import AdminCmsManagement from '../../components/admin/cms/AdminCmsManagement';
+import AdminSeoManagement from '../../components/admin/seo/AdminSeoManagement';
+import AdminReviewsManagement from '../../components/admin/reviews/AdminReviewsManagement';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   LayoutDashboard, ShieldCheck, Truck, Users,
   Package, ShoppingCart, RotateCcw, LineChart,
-  Wallet, Banknote, Store, Headphones, Layers
+  Wallet, Banknote, Store, Headphones, Layers, Ticket, Image, FileText, Globe, Star
 } from 'lucide-react';
 // Yeh raha aapka MASTER MENU (with Sub-menus)
 const ADMIN_MENU = [
@@ -34,6 +39,11 @@ const ADMIN_MENU = [
   },
   { id: 'products', label: 'Products ', icon: Package },
   { id: 'categories', label: 'Categories ', icon: Layers },
+  { id: 'reviews', label: 'Reviews & Ratings ⭐', icon: Star },
+  { id: 'coupons', label: 'Coupons 🎟️', icon: Ticket },
+  { id: 'banners', label: 'Banners 🎨', icon: Image },
+  { id: 'cms', label: 'CMS Pages 📄', icon: FileText },
+  { id: 'seo', label: 'SEO & Sitemap 🌐', icon: Globe },
   { id: 'orders', label: 'Orders', icon: ShoppingCart },
   { id: 'returns', label: 'Returns & Refunds ', icon: RotateCcw },
   { id: 'sellers', label: 'Sellers ', icon: Store },
@@ -72,6 +82,16 @@ export default function AdminWebPanel() {
         return { title: "Product Catalog & Moderation", subtitle: "Inspect supplier listings, manage inventory, and monitor stock levels" };
       case 'categories':
         return { title: "Category Master & Taxonomies", subtitle: "Organize catalog hierarchies, manage category slugs, and link products" };
+      case 'reviews':
+        return { title: "Customer Reviews & Moderation Hub", subtitle: "Inspect buyer feedback, moderate customer unboxing photos, and manage ratings" };
+      case 'coupons':
+        return { title: "Coupons & Promotional Codes", subtitle: "Configure promotional discounts, validate campaigns, and track customer redemptions" };
+      case 'banners':
+        return { title: "Homepage Banners & Carousels", subtitle: "Curate interactive hero sliders, seasonal promotional banners, and campaign redirects" };
+      case 'cms':
+        return { title: "CMS & Legal Policy Pages", subtitle: "Manage Privacy Policy, Terms, Return policies, and custom storefront pages with SEO tags" };
+      case 'seo':
+        return { title: "Technical SEO & Sitemap Manager", subtitle: "Live search engine indexing, robots.txt directives, and sitemaps.org protocol" };
       case 'orders':
         return { title: "Manage Orders", subtitle: "Track, fulfill, and monitor customer orders" };
       case 'returns':
@@ -139,6 +159,26 @@ export default function AdminWebPanel() {
 
       {activeTab === 'categories' && (
         <AdminCategoriesManagement />
+      )}
+
+      {activeTab === 'reviews' && (
+        <AdminReviewsManagement />
+      )}
+
+      {activeTab === 'coupons' && (
+        <AdminCouponsManagement />
+      )}
+
+      {activeTab === 'banners' && (
+        <AdminBannersManagement />
+      )}
+
+      {activeTab === 'cms' && (
+        <AdminCmsManagement />
+      )}
+
+      {activeTab === 'seo' && (
+        <AdminSeoManagement />
       )}
 
       {activeTab === 'orders' && (

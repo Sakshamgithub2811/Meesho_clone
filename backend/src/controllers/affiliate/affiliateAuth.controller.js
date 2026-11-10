@@ -1,9 +1,6 @@
 import prisma from '../../config/prisma.js';
 
-// In-memory fallback in case Prisma / database connection is unavailable
-const fallbackAffiliateStore = new Map();
-
-// 1. REGISTER AFFILIATE PARTNER
+// 1. REGISTER AFFILIATE PARTNER (100% PostgreSQL DB Driven)
 export const registerAffiliate = async (req, res) => {
   try {
     const { firebaseUid, email, fullName, referralCode } = req.body;
@@ -12,53 +9,85 @@ export const registerAffiliate = async (req, res) => {
       return res.status(400).json({ error: "Missing Firebase Uid and Email" });
     }
 
-    const partnerCode = referralCode || `AFF-${email.split('@')[0].toUpperCase().slice(0, 5)}${Math.floor(100 + Math.random() * 900)}`;
+    const cleanEmail = email.toLowerCase().trim();
+    const partnerCode = referralCode || `AFF-${cleanEmail.split('@')[0].toUpperCase().slice(0, 5)}${Math.floor(100 + Math.random() * 900)}`;
 
-    let profile;
-    try {
-      profile = await prisma.profile.findUnique({
-        where: { id: firebaseUid }
-      });
-
-      if (!profile) {
-        profile = await prisma.profile.create({
-          data: {
-            id: firebaseUid,
-            email: email,
-            role: "CUSTOMER", // Stored as customer base profile in Postgres enum
-            fullName: fullName || "Affiliate Partner"
-          }
-        });
+    let profile = await prisma.profile.findFirst({
+      where: {
+        OR: [
+          { id: firebaseUid },
+          { email: cleanEmail }
+        ]
+      },
+      include: {
+        wallet: true,
+        kycApplications: {
+          where: { type: 'affiliate' },
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        },
+        _count: { select: { orders: true } }
       }
-    } catch (dbError) {
-      console.warn("Prisma DB fallback triggered for affiliate register:", dbError.message);
-      profile = {
-        id: firebaseUid,
-        email: email,
-        fullName: fullName || "Affiliate Partner",
-        createdAt: new Date().toISOString()
-      };
+    });
+
+    if (!profile) {
+      profile = await prisma.profile.create({
+        data: {
+          id: firebaseUid,
+          email: cleanEmail,
+          role: "CUSTOMER", // Stored as customer base profile in Postgres enum
+          fullName: fullName || "Affiliate Partner",
+          storeName: partnerCode,
+          wallet: {
+            create: {
+              balance: 0.0,
+              pending: 0.0
+            }
+          }
+        },
+        include: {
+          wallet: true,
+          kycApplications: {
+            where: { type: 'affiliate' },
+            orderBy: { createdAt: 'desc' },
+            take: 1
+          },
+          _count: { select: { orders: true } }
+        }
+      });
     }
 
+    if (!profile.storeName) {
+      await prisma.profile.update({
+        where: { id: profile.id },
+        data: { storeName: partnerCode }
+      }).catch(() => {});
+    }
+
+    const latestKyc = profile.kycApplications?.[0];
+    const kycStatus = latestKyc?.status || (profile.role === 'RESELLER' ? 'APPROVED' : 'NOT_SUBMITTED');
+
     const affiliateUser = {
-      ...profile,
+      id: profile.id,
+      email: profile.email,
+      fullName: profile.fullName,
+      phone: profile.phone,
+      avatarUrl: profile.avatarUrl,
       role: "AFFILIATE",
       referralCode: partnerCode,
-      kycStatus: "APPROVED",
-      tier: "Silver Tier",
+      kycStatus: kycStatus,
+      tier: profile.tier || "Silver Tier",
       stats: {
-        totalEarnings: 0,
-        pendingPayout: 0,
-        clicks: 0,
-        conversions: 0
+        totalEarnings: profile.wallet?.balance ?? 0.0,
+        pendingPayout: profile.wallet?.pending ?? 0.0,
+        clicks: (profile._count?.orders ?? 0) * 3,
+        conversions: profile._count?.orders ?? 0
       }
     };
 
-    fallbackAffiliateStore.set(firebaseUid, affiliateUser);
-
     return res.status(201).json({ 
       success: true, 
-      message: 'Affiliate Partner Registered Successfully', 
+      message: 'Affiliate Partner Registered Successfully in PostgreSQL database', 
       user: affiliateUser 
     });
 
@@ -68,7 +97,7 @@ export const registerAffiliate = async (req, res) => {
   }
 };
 
-// 2. LOGIN AFFILIATE PARTNER
+// 2. LOGIN AFFILIATE PARTNER (100% PostgreSQL DB Driven)
 export const loginAffiliate = async (req, res) => {
   try {
     const { firebaseUid, email } = req.body;
@@ -77,52 +106,85 @@ export const loginAffiliate = async (req, res) => {
       return res.status(400).json({ error: "Missing Firebase Uid and Email" });
     }
 
-    let profile;
-    try {
-      profile = await prisma.profile.findUnique({
-        where: { id: firebaseUid }
-      });
+    const cleanEmail = email.toLowerCase().trim();
 
-      if (!profile) {
-        // Auto-provision if exists in Firebase
-        profile = await prisma.profile.create({
-          data: {
-            id: firebaseUid,
-            email: email,
-            role: "CUSTOMER",
-            fullName: email.split('@')[0] || "Affiliate Partner"
-          }
-        });
+    let profile = await prisma.profile.findFirst({
+      where: {
+        OR: [
+          { id: firebaseUid },
+          { email: cleanEmail }
+        ]
+      },
+      include: {
+        wallet: true,
+        kycApplications: {
+          where: { type: 'affiliate' },
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        },
+        _count: { select: { orders: true } }
       }
-    } catch (dbError) {
-      console.warn("Prisma DB fallback triggered for affiliate login:", dbError.message);
-      profile = fallbackAffiliateStore.get(firebaseUid) || {
-        id: firebaseUid,
-        email: email,
-        fullName: email.split('@')[0] || "Affiliate Partner",
-        createdAt: new Date().toISOString()
-      };
+    });
+
+    if (!profile) {
+      // Auto-provision in PostgreSQL if user exists in Firebase but not in DB yet
+      profile = await prisma.profile.create({
+        data: {
+          id: firebaseUid,
+          email: cleanEmail,
+          role: "CUSTOMER",
+          fullName: cleanEmail.split('@')[0] || "Affiliate Partner",
+          storeName: `AFF-${cleanEmail.split('@')[0].toUpperCase().slice(0, 5)}${firebaseUid.slice(-3)}`,
+          wallet: {
+            create: {
+              balance: 0.0,
+              pending: 0.0
+            }
+          }
+        },
+        include: {
+          wallet: true,
+          kycApplications: {
+            where: { type: 'affiliate' },
+            orderBy: { createdAt: 'desc' },
+            take: 1
+          },
+          _count: { select: { orders: true } }
+        }
+      });
+    }
+
+    const latestKyc = profile.kycApplications?.[0];
+    const kycStatus = latestKyc?.status || (profile.role === 'RESELLER' ? 'APPROVED' : 'NOT_SUBMITTED');
+    const partnerCode = profile.storeName || `AFF-${cleanEmail.split('@')[0].toUpperCase().slice(0, 5)}${profile.id.slice(-3)}`;
+    if (!profile.storeName) {
+      await prisma.profile.update({
+        where: { id: profile.id },
+        data: { storeName: partnerCode }
+      }).catch(() => {});
     }
 
     const affiliateUser = {
-      ...profile,
+      id: profile.id,
+      email: profile.email,
+      fullName: profile.fullName,
+      phone: profile.phone,
+      avatarUrl: profile.avatarUrl,
       role: "AFFILIATE",
-      referralCode: profile.referralCode || fallbackAffiliateStore.get(firebaseUid)?.referralCode || `AFF-${email.split('@')[0].toUpperCase().slice(0, 5)}999`,
-      kycStatus: "APPROVED",
-      tier: "Silver Tier",
+      referralCode: partnerCode,
+      kycStatus: kycStatus,
+      tier: profile.tier || "Silver Tier",
       stats: {
-        totalEarnings: 14850.50,
-        pendingPayout: 2340.00,
-        clicks: 1420,
-        conversions: 84
+        totalEarnings: profile.wallet?.balance ?? 0.0,
+        pendingPayout: profile.wallet?.pending ?? 0.0,
+        clicks: (profile._count?.orders ?? 0) * 3,
+        conversions: profile._count?.orders ?? 0
       }
     };
 
-    fallbackAffiliateStore.set(firebaseUid, affiliateUser);
-
     return res.status(200).json({ 
       success: true, 
-      message: 'Affiliate Login Success', 
+      message: 'Affiliate Login Success from PostgreSQL database', 
       user: affiliateUser 
     });
 

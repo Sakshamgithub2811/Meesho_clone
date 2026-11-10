@@ -1,8 +1,10 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { exportToCsv } from '../../../utils/csvExporter';
 
 import ReturnsStatsGrid from './ReturnsStatsGrid';
 import FilterBar from '../../common/FilterBar';
@@ -65,13 +67,14 @@ export default function AdminReturnsManagement() {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
       const params = new URLSearchParams();
 
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
       if (searchTerm.trim()) params.append('search', searchTerm.trim());
 
       const res = await axios.get(
-        `http://localhost:5000/api/v1/admin-returns?${params.toString()}`,
+        `${API_V1_BASE}/admin-returns?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -102,7 +105,9 @@ export default function AdminReturnsManagement() {
   };
 
   useEffect(() => {
-    fetchReturns();
+    if (auth.currentUser || currentUser?.id) {
+      fetchReturns();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchReturns();
@@ -125,9 +130,10 @@ export default function AdminReturnsManagement() {
     try {
       setActionLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      if (!token) return;
 
       const res = await axios.patch(
-        `http://localhost:5000/api/v1/admin-returns/${returnId}/status`,
+        `${API_V1_BASE}/admin-returns/${returnId}/status`,
         { status: newStatus },
         {
           headers: {
@@ -161,6 +167,25 @@ export default function AdminReturnsManagement() {
     }
   };
 
+  // ── 5. EXPORT RETURNS REPORT TO CSV ─────────────────────────────────
+  const handleExportReturns = () => {
+    exportToCsv({
+      data: returns,
+      filename: `returns_report_${statusFilter.toLowerCase()}`,
+      columns: [
+        { key: 'id', label: 'Return Claim ID' },
+        { key: 'orderId', label: 'Order ID' },
+        { key: 'createdAt', label: 'Claim Date', formatter: (val) => formatDate(val) },
+        { key: 'order.user.fullName', label: 'Customer Name' },
+        { key: 'order.user.phone', label: 'Customer Phone' },
+        { key: 'order.user.email', label: 'Customer Email' },
+        { key: 'reason', label: 'Return Reason' },
+        { key: 'status', label: 'Status', formatter: (val) => String(val || '').toUpperCase() },
+        { key: 'order.totalAmount', label: 'Order Value (₹)' }
+      ]
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* ── 1. KPI STATS CARDS ────────────────────────────────────────── */}
@@ -178,6 +203,8 @@ export default function AdminReturnsManagement() {
         countLabel="Return Claims"
         onRefresh={() => fetchReturns(true)}
         refreshing={refreshing}
+        onExport={handleExportReturns}
+        exportLabel="Export Returns"
       />
 
       {/* ── 3. RETURNS DATA TABLE ─────────────────────────────────────── */}

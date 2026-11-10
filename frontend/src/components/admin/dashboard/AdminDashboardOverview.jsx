@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../../utils/firebase';
@@ -35,7 +36,11 @@ export default function AdminDashboardOverview({ onNavigateTab }) {
       else setLoading(true);
 
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
-      const res = await axios.get('http://localhost:5000/api/v1/admin-dashboard/stats', {
+      if (!token) {
+        // Firebase auth still initializing; wait for onAuthStateChanged
+        return;
+      }
+      const res = await axios.get(`${API_V1_BASE}/admin-dashboard/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -43,7 +48,7 @@ export default function AdminDashboardOverview({ onNavigateTab }) {
         setStats(res.data.stats);
         if (isManual) {
           toast.success("Dashboard Refreshed", {
-            description: "Real-time analytics database se sync ho gaya!"
+            description: "Real-time analytics synchronized with database!"
           });
         }
       }
@@ -59,7 +64,9 @@ export default function AdminDashboardOverview({ onNavigateTab }) {
   };
 
   useEffect(() => {
-    fetchStats();
+    if (auth.currentUser || currentUser?.id) {
+      fetchStats();
+    }
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchStats();

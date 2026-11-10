@@ -1,3 +1,4 @@
+import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../../utils/firebase';
@@ -43,7 +44,7 @@ export default function UserProfile({
       try {
         setLoading(true);
         const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
-        const res = await axios.get('http://localhost:5000/api/v1/admin-profile/me', {
+        const res = await axios.get(`${API_V1_BASE}/admin-profile/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.data.success && res.data.profile) {
@@ -70,7 +71,7 @@ export default function UserProfile({
       setLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
       const response = await axios.put(
-        'http://localhost:5000/api/v1/admin-profile/update',
+        `${API_V1_BASE}/admin-profile/update`,
         {
           fullName: formData.name,
           phone: formData.phone,
@@ -85,16 +86,16 @@ export default function UserProfile({
         setIsEditing(false);
         const savedAddress = response.data.profile?.addresses?.[0]?.addressLine || formData.address;
         setFormData((prev) => ({ ...prev, address: savedAddress }));
-        // Redux store ko naye data ke sath update karna taaki header mein bhi naam badal jaye
+        // Update Redux store with latest profile data
         dispatch(loginSuccess({ ...currentUser, ...response.data.profile, address: savedAddress }));
         toast.success("Profile Updated", {
-          description: "Aapki details database mein save ho gayi hain!"
+          description: "Your profile details have been saved successfully!"
         });
       }
     } catch (err) {
       console.error(err);
       toast.error("Update Failed", {
-        description: err.response?.data?.error || "Profile save nahi ho payi."
+        description: err.response?.data?.error || "Failed to save profile. Please try again."
       });
     } finally {
       setLoading(false);
@@ -103,29 +104,29 @@ export default function UserProfile({
   
   const handleChangePassword = async () => {
     if (passData.new !== passData.confirm) {
-      return toast.error("Error", { description: "New password aur confirm password match nahi kar rahe!" });
+      return toast.error("Error", { description: "New password and confirm password do not match!" });
     }
     if (passData.new.length < 6) {
-      return toast.error("Error", { description: "Password kam se kam 6 characters ka hona chahiye." });
+      return toast.error("Error", { description: "Password must be at least 6 characters long." });
     }
     try {
       setLoading(true);
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
       const response = await axios.post(
-        'http://localhost:5000/api/v1/admin-profile/change-password',
+        `${API_V1_BASE}/admin-profile/change-password`,
         { newPassword: passData.new },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data.success) {
         setPassData({ current: '', new: '', confirm: '' });
         toast.success("Password Changed", {
-          description: "Aapka naya password safely update ho gaya hai!"
+          description: "Your password has been updated securely!"
         });
       }
     } catch (err) {
       console.error(err);
       toast.error("Failed", {
-        description: err.response?.data?.error || "Password change nahi ho paya."
+        description: err.response?.data?.error || "Could not update password. Please check your credentials."
       });
     } finally {
       setLoading(false);
@@ -137,13 +138,13 @@ export default function UserProfile({
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        return toast.error("File Too Large", { description: "Photo size 2MB se kam honi chahiye." });
+        return toast.error("File Too Large", { description: "Photo size must be less than 2MB." });
       }
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData((prev) => ({ ...prev, avatarUrl: reader.result }));
         toast.success("Photo Selected", {
-          description: "New photo select ho gayi! 'Save Changes' par click karein."
+          description: "New photo selected! Click 'Save Changes' to update profile."
         });
       };
       reader.readAsDataURL(file);
