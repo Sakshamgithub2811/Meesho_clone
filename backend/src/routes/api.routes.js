@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import healthRoutes from './health.routes.js';
-import supplierRoutes from './supplier.routes.js';
-import supplierAuthRoutes from './supplierAuth.routes.js';
+import supplierRoutes from './supplier/supplier.routes.js';
+import supplierAuthRoutes from './supplier/supplierAuth.routes.js';
 import adminAuthRoutes from './admin/adminAuth.routes.js';
 import adminProfileRoutes from './admin/adminProfile.routes.js';
 import adminUsersRoutes from './admin/adminUsers.routes.js';

@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../utils/firebase';
+import { useDispatch } from 'react-redux';
+import { loginSuccess } from '../../redux/userSlice';
 import supplierApiService from '../../services/supplierApiService';
 
 export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
 
   // Detect active tab from prop or URL
   const initialTab = defaultTab || (location?.pathname?.includes('register') ? 'register' : 'login');
@@ -54,10 +59,11 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Handle Login via Email & Password
+  // Handle Login via Firebase Auth + Database Sync
   const handleEmailLogin = async (e) => {
     e?.preventDefault();
-    if (!email.trim()) {
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
       setErrorMessage('Please enter your supplier email');
       return;
     }
@@ -69,22 +75,37 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const res = await supplierApiService.loginWithPassword(email.trim(), password);
-      setSuccessMessage(`Welcome back, ${res.supplier?.name || 'Supplier'}! Redirecting...`);
+      // 1. Authenticate with Firebase Auth (matching adminLogin pattern)
+      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      const firebaseUser = userCredential.user;
+      const idToken = await firebaseUser.getIdToken();
+
+      // 2. Fetch/Verify Supplier Profile from Database
+      const res = await supplierApiService.loginSupplier({
+        firebaseUid: firebaseUser.uid,
+        email: firebaseUser.email,
+      });
+
+      // 3. Save Session & Sync Redux Store
+      supplierApiService.saveAuthSession(idToken || firebaseUser.uid, res.user);
+      dispatch(loginSuccess(res.user));
+
+      setSuccessMessage(`Welcome back, ${res.user?.fullName || res.user?.storeName || 'Supplier'}! Redirecting...`);
       setTimeout(() => {
         handleNav('/seller-web-dashboard1');
       }, 700);
     } catch (err) {
-      setErrorMessage(err.message || 'Invalid credentials. Please verify and try again.');
+      console.error('Supplier login error:', err);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setErrorMessage('Invalid Email or Password. Please verify your credentials.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setErrorMessage('Too many failed attempts. Please try again after a few minutes.');
+      } else {
+        setErrorMessage(err.message || 'Login failed. Please check your credentials and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fillDemoLogin = () => {
-    setEmail('supplier@globalexports.com');
-    setPassword('Password@123');
-    setErrorMessage('');
   };
 
   // ==========================================
@@ -113,7 +134,7 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
     setErrorMessage('');
   };
 
-  // Minimal Registration Submission (Full Name, Phone, Email, Password)
+  // Registration Submission (Firebase Auth + Database Profile Creation)
   const handleRegisterSubmit = async (e) => {
     e?.preventDefault();
 
@@ -142,36 +163,42 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const payload = {
-        fullName: regData.fullName.trim(),
-        name: regData.fullName.trim(),
-        phone: cleanPhone,
-        email: regData.email.trim().toLowerCase(),
-        password: regData.password,
-        storeName: `${regData.fullName.trim()}'s Store`,
-      };
+      const cleanEmail = regData.email.trim().toLowerCase();
 
-      await supplierApiService.registerSupplier(payload);
+      // 1. Create User in Firebase Auth (matching adminLogin pattern)
+      const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, regData.password);
+      const firebaseUser = userCredential.user;
+      const idToken = await firebaseUser.getIdToken();
+
+      // 2. Create Supplier Profile in Database (POST /supplier/auth/register)
+      const res = await supplierApiService.registerSupplier({
+        firebaseUid: firebaseUser.uid,
+        email: firebaseUser.email,
+        fullName: regData.fullName.trim(),
+        storeName: `${regData.fullName.trim()}'s Store`,
+        phone: cleanPhone,
+      });
+
+      // 3. Save Session & Sync Redux Store
+      supplierApiService.saveAuthSession(idToken || firebaseUser.uid, res.user);
+      dispatch(loginSuccess(res.user));
+
       setSuccessMessage('🎉 Congratulations! Your supplier account has been registered successfully. Redirecting...');
       setTimeout(() => {
         handleNav('/seller-web-dashboard1');
       }, 1000);
     } catch (err) {
-      setErrorMessage(err.message || 'Registration failed. Please check your details and try again.');
+      console.error('Supplier registration error:', err);
+      if (err.code === 'auth/email-already-in-use') {
+        setErrorMessage('This email is already registered. Please login instead.');
+      } else if (err.code === 'auth/weak-password') {
+        setErrorMessage('Password is too weak. Please use at least 6 characters.');
+      } else {
+        setErrorMessage(err.message || 'Registration failed. Please check your details and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fillDemoRegister = () => {
-    const randomDigits = Math.floor(100000 + Math.random() * 900000);
-    setRegData({
-      fullName: 'Rahul Sharma',
-      phone: `9811${randomDigits}`,
-      email: `rahul_${randomDigits}@test.com`,
-      password: 'Password@123',
-    });
-    setErrorMessage('');
   };
 
   return (
@@ -338,15 +365,6 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
                 )}
               </button>
 
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={fillDemoLogin}
-                  className="text-xs text-slate-400 hover:text-[#9e003f] font-medium transition cursor-pointer underline decoration-dotted"
-                >
-                  ⚡ Auto-fill demo credentials
-                </button>
-              </div>
             </form>
           )}
 
@@ -460,16 +478,6 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
                 )}
               </button>
 
-              {/* Auto-fill demo link */}
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={fillDemoRegister}
-                  className="text-xs text-slate-400 hover:text-[#9e003f] font-medium transition cursor-pointer underline decoration-dotted"
-                >
-                  ⚡ Auto-fill demo details
-                </button>
-              </div>
             </form>
           )}
 

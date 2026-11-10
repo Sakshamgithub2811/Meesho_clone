@@ -28,8 +28,14 @@ export function getCurrentSupplier() {
 
 export function saveAuthSession(token, supplier) {
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    if (supplier) localStorage.setItem(SUPPLIER_KEY, JSON.stringify(supplier));
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem('supplierToken', token);
+    }
+    if (supplier) {
+      localStorage.setItem(SUPPLIER_KEY, JSON.stringify(supplier));
+      localStorage.setItem('supplier', JSON.stringify(supplier));
+    }
   } catch (err) {
     console.error('Failed to save session to localStorage:', err);
   }
@@ -39,6 +45,8 @@ export function clearAuthSession() {
   try {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(SUPPLIER_KEY);
+    localStorage.removeItem('supplierToken');
+    localStorage.removeItem('supplier');
   } catch (err) {
     console.error('Failed to clear session from localStorage:', err);
   }
@@ -114,28 +122,44 @@ export async function verifyOtp(phone, otp, name = '') {
   return data;
 }
 
-// Email/ID + Password Login
-export async function loginWithPassword(identifier, password) {
+// Login Supplier (Firebase UID Based)
+export async function loginSupplier({ firebaseUid, email }) {
   const data = await request('/supplier/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ identifier, password }),
+    body: JSON.stringify({ firebaseUid, email }),
   });
 
-  if (data.token && data.supplier) {
-    saveAuthSession(data.token, data.supplier);
+  if (data.user) {
+    saveAuthSession(firebaseUid, data.user);
   }
   return data;
 }
 
-// Register New Supplier
+// Email/ID + Password Login (Firebase wrapper for backward compatibility)
+export async function loginWithPassword(identifier, password) {
+  // If identifier is an object containing firebaseUid, forward to loginSupplier
+  if (typeof identifier === 'object' && identifier?.firebaseUid) {
+    return loginSupplier(identifier);
+  }
+  return loginSupplier({ firebaseUid: identifier, email: identifier });
+}
+
+// Register New Supplier (Firebase UID Based)
 export async function registerSupplier(supplierData) {
+  const { firebaseUid, email, fullName, storeName, phone, name } = supplierData;
   const data = await request('/supplier/auth/register', {
     method: 'POST',
-    body: JSON.stringify(supplierData),
+    body: JSON.stringify({
+      firebaseUid,
+      email,
+      fullName: fullName || name || 'Supplier Partner',
+      storeName: storeName || `${fullName || name || 'Supplier'}'s Store`,
+      phone: phone || null,
+    }),
   });
 
-  if (data.token && data.supplier) {
-    saveAuthSession(data.token, data.supplier);
+  if (data.user) {
+    saveAuthSession(firebaseUid, data.user);
   }
   return data;
 }
@@ -295,6 +319,18 @@ export async function updateOrderStatus(orderId, orderStatus) {
   return data.data;
 }
 
+// Get Settlements & Payouts (Finance)
+export async function fetchSupplierSettlements() {
+  const data = await request('/supplier/finance-settlements');
+  return data.data;
+}
+
+// Get Supplier Analytics & Performance
+export async function fetchSupplierAnalytics() {
+  const data = await request('/supplier/analytics');
+  return data.data;
+}
+
 export default {
   getAuthToken,
   getCurrentSupplier,
@@ -302,6 +338,7 @@ export default {
   clearAuthSession,
   sendOtp,
   verifyOtp,
+  loginSupplier,
   loginWithPassword,
   registerSupplier,
   logoutSupplier,
@@ -320,4 +357,6 @@ export default {
   createCategory,
   fetchSupplierOrders,
   updateOrderStatus,
+  fetchSupplierSettlements,
+  fetchSupplierAnalytics,
 };

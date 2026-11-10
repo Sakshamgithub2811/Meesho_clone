@@ -67,14 +67,7 @@ import SwiftRoute from './pages/delivery & driver logistics/swiftroute';
 import DriverReversePickup from './pages/delivery & driver logistics/driver_reverse_pickup';
 
 // Supplier Hub Pages
-import SupplierDashboard2 from './pages/supplier/supplier_dashboard2';
-import SupplierDashboard1 from './pages/supplier/supplier_dashboard1';
-import SupplierInventoryManagement from './pages/supplier/supplier_inventory_management';
-import SupplierOrdersList from './pages/supplier/supplier_orders_list';
-import SupplierProfile from './pages/supplier/supplier_profile';
-import AddNewProductSupplier from './pages/supplier/add_new_product_supplier';
 import AddCategorySupplier from './pages/supplier/add_category_supplier';
-import SellerWebDashboard from './pages/supplier/seller_web_dashboard';
 import SellerWebDashboard1 from './pages/supplier/seller-web-dashboard1';
 import SellerInventory1 from './pages/supplier/SellerInventory1';
 import SellerOrders1 from './pages/supplier/SellerOrders1';
@@ -83,6 +76,8 @@ import SellerReturns1 from './pages/supplier/SellerReturns1';
 import SellerAddProduct1 from './pages/supplier/SellerAddProduct1';
 import SellerProfile1 from './pages/supplier/SellerProfile1';
 import SellerKyc1 from './pages/supplier/SellerKyc1';
+import SellerSettlements1 from './pages/supplier/SellerSettlements1';
+import SellerAnalytics1 from './pages/supplier/SellerAnalytics1';
 import SupplierReturnsRTO from './pages/supplier/SupplierReturnsRTO';
 import SupplierRotLedger from './pages/supplier/SupplierRotLedger';
 import CustomerOrderSupplierFulfilment from './pages/supplier/CustomerOrderSupplierFulfilment';
@@ -190,11 +185,13 @@ const screenCatalog = [
   { path: '/seller-web-dashboard1', name: 'Seller Web Dashboard (Live)', icon: '💻', group: 'Supplier' },
   { path: '/supplier-inventory1', name: 'Supplier Inventory (Live)', icon: '📦', group: 'Supplier' },
   { path: '/supplier-orders1', name: 'Supplier Orders (Live)', icon: '📑', group: 'Supplier' },
+  { path: '/supplier-settlements1', name: 'Settlements & Payouts (Live)', icon: '💳', group: 'Supplier' },
   { path: '/supplier-dropship1', name: 'Dropship Fulfillment (Live)', icon: '🚚', group: 'Supplier' },
   { path: '/supplier-returns1', name: 'Returns & RTO Hub (Live)', icon: '🔄', group: 'Supplier' },
   { path: '/supplier-add-product1', name: 'Add Product (Live)', icon: '➕', group: 'Supplier' },
-  { path: '/supplier-profile1', name: 'Supplier Profile (Live)', icon: '👤', group: 'Supplier' },
   { path: '/supplier-kyc1', name: 'Supplier KYC Hub (Live)', icon: '🛡️', group: 'Supplier' },
+  { path: '/supplier-analytics1', name: 'Sales Analytics (Live)', icon: '📊', group: 'Supplier' },
+  { path: '/supplier-profile1', name: 'Supplier Profile (Live)', icon: '👤', group: 'Supplier' },
   { path: '/seller-dashboard', name: 'Seller Web Dashboard', icon: '💻', group: 'Supplier' },
   { path: '/supplier-returns', name: 'Returns, RTO & Claims Hub', icon: '🔄', group: 'Supplier' },
   { path: '/supplier-rot-ledger', name: 'Supplier ROT & Freight Ledger', icon: '🧾', group: 'Supplier' },
@@ -1022,46 +1019,60 @@ function AppRoutes() {
         <Route
           path="/supplier-dashboard-2"
           element={
-            <SupplierDashboard2
-              onAddNewProduct={() => handleNav('/add-product')}
-              onViewInventory={() => handleNav('/supplier-inventory')}
-              onViewAllOrders={() => handleNav('/supplier-orders')}
-              onNavChange={(tabId) => handleNav(tabId)}
+            <SellerWebDashboard1
+              onNavigate={handleNav}
+              onBack={handleBack}
             />
           }
         />
         <Route
           path="/supplier-dashboard-1"
           element={
-            <SupplierDashboard1
+            <SellerWebDashboard1
               onNavigate={handleNav}
-              onShipNow={() => handleNav('/supplier-orders')}
-              onClaimCredit={() => handleNav('/admin-panel')}
+              onBack={handleBack}
             />
           }
         />
         <Route
           path="/supplier-inventory"
-          element={<SupplierInventoryManagement onNavigate={handleNav} onAddProduct={() => handleNav('/add-product')} />}
+          element={
+            <SellerInventory1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
         />
-        <Route path="/supplier-orders" element={<SupplierOrdersList onBack={handleBack} onNavigate={handleNav} />} />
+        <Route
+          path="/supplier-orders"
+          element={
+            <SellerOrders1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
         <Route
           path="/add-product"
           element={
-            <AddNewProductSupplier
+            <SellerAddProduct1
+              onNavigate={handleNav}
               onBack={handleBack}
-              onPublish={() => handleNav('/supplier-inventory')}
-              onSaveDraft={() => handleNav('/supplier-inventory')}
             />
           }
         />
         <Route
           path="/add-category"
-          element={<AddCategorySupplier onBack={handleBack} onSaveCategory={() => handleNav('/supplier-inventory')} />}
+          element={<AddCategorySupplier onBack={handleBack} onSaveCategory={() => handleNav('/supplier-inventory1')} />}
         />
         <Route
           path="/supplier-profile"
-          element={<SupplierProfile onBack={handleBack} onNavigate={handleNav} onLogout={() => handleNav('/')} />}
+          element={
+            <SellerProfile1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
         />
         <Route
           path="/seller-web-dashboard1"
@@ -1208,35 +1219,65 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/seller-dashboard"
+          path="/supplier-settlements1"
           element={
-            <SellerWebDashboard
+            <SellerSettlements1
               onNavigate={handleNav}
               onBack={handleBack}
-              onViewProducts={() => handleNav('/supplier-inventory')}
-              onViewOrders={() => handleNav('/supplier-orders')}
+            />
+          }
+        />
+        <Route
+          path="/seller-settlements1"
+          element={
+            <SellerSettlements1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/supplier-analytics1"
+          element={
+            <SellerAnalytics1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/seller-analytics1"
+          element={
+            <SellerAnalytics1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/seller-dashboard"
+          element={
+            <SellerWebDashboard1
+              onNavigate={handleNav}
+              onBack={handleBack}
             />
           }
         />
         <Route
           path="/sellers"
           element={
-            <SellerWebDashboard
+            <SellerWebDashboard1
               onNavigate={handleNav}
               onBack={handleBack}
-              onViewProducts={() => handleNav('/supplier-inventory')}
-              onViewOrders={() => handleNav('/supplier-orders')}
             />
           }
         />
         <Route
           path="/seller"
           element={
-            <SellerWebDashboard
+            <SellerWebDashboard1
               onNavigate={handleNav}
               onBack={handleBack}
-              onViewProducts={() => handleNav('/supplier-inventory')}
-              onViewOrders={() => handleNav('/supplier-orders')}
             />
           }
         />
