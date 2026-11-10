@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 import {
   getCart,
@@ -10,13 +10,24 @@ import {
   getRazorpayConfig,
   createRazorpayOrder,
   verifyRazorpayPayment,
-  clearCart
+  clearCart,
+  getProductById
 } from '../../services/ecommerceService';
 import { recordAffiliateOrder } from '../../services/affiliateAuthService';
 import { addNotification } from '../../services/notificationService';
 
 export default function CheckoutPayment({ onNavigate, onBack }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlMode = searchParams.get('mode');
+  const urlProductId = searchParams.get('productId');
+  const urlSize = searchParams.get('size');
+  const isBuyNow = (urlMode === 'buynow') || (typeof window !== 'undefined' && localStorage.getItem('mshoppy_checkout_mode') === 'buynow');
+
+  const addressQuery = isBuyNow
+    ? `?mode=buynow${urlProductId ? `&productId=${urlProductId}` : ''}${urlSize ? `&size=${encodeURIComponent(urlSize)}` : ''}`
+    : '';
+
   const handleNav = (target) => {
     if (onNavigate) onNavigate(target);
     else navigate(target.startsWith('/') ? target : `/${target}`);
@@ -74,22 +85,44 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
           getActiveCoupons()
         ]);
 
-        const checkoutMode = localStorage.getItem('mshoppy_checkout_mode');
         let items = [];
 
-        if (checkoutMode === 'buynow') {
+        if (isBuyNow) {
+          // 1. Try to read from localStorage buynow item
           try {
             const buynow = JSON.parse(localStorage.getItem('mshoppy_buynow_item') || 'null');
-            if (buynow) {
+            if (buynow && buynow.product) {
               items = [buynow];
             }
           } catch (e) {}
-        }
 
-        // Only fall back to cart items if not in Buy Now mode
-        if (items.length === 0) {
+          // 2. Fallback to fetching product directly by ID from URL
+          if (items.length === 0 && urlProductId) {
+            try {
+              const p = await getProductById(urlProductId);
+              if (p) {
+                const freshBuynow = {
+                  id: 'buynow_' + p.id,
+                  productId: p.id,
+                  quantity: 1,
+                  size: urlSize || 'Free Size',
+                  product: p
+                };
+                items = [freshBuynow];
+                localStorage.setItem('mshoppy_buynow_item', JSON.stringify(freshBuynow));
+                localStorage.setItem('mshoppy_checkout_mode', 'buynow');
+              }
+            } catch (err) {
+              console.warn('Failed to fetch buy-now product by ID:', err);
+            }
+          }
+
+          // Crucial: In Buy Now mode, we NEVER load cart items!
+        } else {
+          // Standard Cart Checkout mode: load all items from cart
           items = (cartRes?.items && cartRes.items.length > 0) ? cartRes.items : [];
         }
+
         setCartItems(items);
 
         if (coupsRes && coupsRes.length > 0) {
@@ -137,7 +170,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
       }
     }
     init();
-  }, []);
+  }, [urlMode, urlProductId, urlSize]);
 
   // Dynamic Affiliate Margin Support (e.g. ₹849 + ₹150 = ₹999)
   const affiliateMargin = Number(localStorage.getItem('mshoppy_affiliate_margin') || 0);
@@ -277,8 +310,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
 
       if (res?.success && res.data) {
         setConfirmedOrder({ ...res.data, referralCode });
-        const checkoutMode = localStorage.getItem('mshoppy_checkout_mode');
-        if (checkoutMode === 'buynow') {
+        if (isBuyNow) {
           localStorage.removeItem('mshoppy_buynow_item');
           localStorage.removeItem('mshoppy_checkout_mode');
         } else {
@@ -415,8 +447,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                   }
 
                   setConfirmedOrder({ ...verifyRes.data, referralCode });
-                  const checkoutMode = localStorage.getItem('mshoppy_checkout_mode');
-                  if (checkoutMode === 'buynow') {
+                  if (isBuyNow) {
                     localStorage.removeItem('mshoppy_buynow_item');
                     localStorage.removeItem('mshoppy_checkout_mode');
                   } else {
@@ -477,7 +508,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
     }
     if (!address) {
       triggerToast('Please select a delivery address');
-      handleNav('/address');
+      handleNav(`/address${addressQuery}`);
       return;
     }
 
@@ -490,8 +521,6 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
     // 2. Online Payment (UPI / Card / Netbanking) -> Official Razorpay Sandbox Checkout
     handleRazorpayPayment();
   };
-
-  const isBuyNow = typeof window !== 'undefined' && localStorage.getItem('mshoppy_checkout_mode') === 'buynow';
 
   return (
     <div className="bg-[#f8f9fb] text-[#191c1e] font-sans antialiased min-h-screen pb-36 selection:bg-pink-100 selection:text-pink-600">
@@ -508,7 +537,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
         <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16 max-w-7xl mx-auto w-full">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => (onBack ? onBack() : handleNav('/address'))}
+              onClick={() => (onBack ? onBack() : handleNav(`/address${addressQuery}`))}
               className="p-2 rounded-full hover:bg-slate-100 active:scale-95 text-[#FF3F6C] cursor-pointer transition-colors"
               title="Back"
             >
@@ -537,7 +566,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
             </span>
             <span>─────</span>
             <span
-              onClick={() => handleNav('/address')}
+              onClick={() => handleNav(`/address${addressQuery}`)}
               className="text-[#008644] font-extrabold flex items-center gap-1 cursor-pointer hover:underline"
             >
               <span className="w-5 h-5 rounded-full bg-[#008644] text-white flex items-center justify-center text-[10px]">
@@ -579,7 +608,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                     Delivering To
                   </h2>
                   <button
-                    onClick={() => handleNav('/address')}
+                    onClick={() => handleNav(`/address${addressQuery}`)}
                     className="text-[#FF3F6C] font-bold text-xs px-3 py-1 rounded-full bg-pink-50 hover:bg-pink-100 transition-colors cursor-pointer"
                   >
                     Change Address
