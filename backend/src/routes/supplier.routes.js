@@ -13,6 +13,8 @@ import {
   getSupplierAnalytics,
   downloadOrderInvoice,
   downloadShippingLabel,
+  getSupplierReturns,
+  updateReturnStatus,
 } from '../controllers/supplier/supplier.controller.js';
 import {
   getSupplierProfile,
@@ -62,5 +64,9 @@ router.get('/orders', getSupplierOrders);
 router.patch('/orders/:id/status', updateOrderStatus);
 router.get('/orders/:id/invoice', downloadOrderInvoice);
 router.get('/orders/:id/shipping-label', downloadShippingLabel);
+
+// Returns & RTO Hub
+router.get('/returns', getSupplierReturns);
+router.patch('/returns/:id/status', updateReturnStatus);
 
 export default router;

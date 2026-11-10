@@ -257,42 +257,6 @@ export default function SellerKyc1({ onNavigate }) {
     }
   };
 
-  // Quick Demo Autofill
-  const handleAutofillDemo = () => {
-    setFormData({
-      businessName: 'Shree Balaji Textile Mills Pvt Ltd',
-      tradeName: 'Balaji Fashion Hub',
-      businessType: 'Private Limited Company',
-      businessAddress: 'Plot 42, GIDC Textile Park, Ring Road',
-      city: 'Surat',
-      state: 'Gujarat',
-      pincode: '395002',
-
-      gstin: '24AAACB1234F1Z8',
-      gstCertificate: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600',
-      panNumber: 'AAACB1234F',
-      panName: 'Shree Balaji Textile Mills',
-      panImage: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600',
-      aadhaarNumber: '9876 5432 1098',
-      aadhaarName: 'Ramesh Patel',
-      aadhaarFrontImage: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600',
-
-      bankName: 'HDFC Bank',
-      accountNumber: '50200012345678',
-      confirmAccountNumber: '50200012345678',
-      ifsc: 'HDFC0000128',
-      accountHolder: 'Shree Balaji Textile Mills Pvt Ltd',
-      upiId: 'balajitex@hdfcbank',
-      chequeImage: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600',
-
-      warehouseAddress: 'Balaji Logistics Hub, Shed #8, GIDC Industrial Estate',
-      warehousePincode: '395002',
-      warehouseContactPerson: 'Mahesh Sharma (Dispatch Head)',
-      warehousePhone: '9876543210',
-    });
-    toast.success('Sample verified company details autofilled!');
-  };
-
   // Submit KYC Application
   const handleSubmitKyc = async (e) => {
     e.preventDefault();
@@ -473,13 +437,6 @@ export default function SellerKyc1({ onNavigate }) {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleAutofillDemo}
-              className="text-xs font-bold text-[#b7004d] hover:underline cursor-pointer shrink-0"
-            >
-              Load Demo Details ➔
-            </button>
           </div>
         )}
 

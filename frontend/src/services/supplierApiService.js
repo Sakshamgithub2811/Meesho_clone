@@ -343,6 +343,19 @@ export function downloadShippingLabel(orderId) {
   window.open(url, '_blank');
 }
 
+export async function fetchSupplierReturns() {
+  const data = await request('/supplier/returns');
+  return data.data;
+}
+
+export async function updateReturnStatus(id, status) {
+  const data = await request(`/supplier/returns/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+  return data;
+}
+
 export default {
   getAuthToken,
   getCurrentSupplier,
@@ -373,4 +386,6 @@ export default {
   fetchSupplierAnalytics,
   downloadOrderInvoice,
   downloadShippingLabel,
+  fetchSupplierReturns,
+  updateReturnStatus,
 };

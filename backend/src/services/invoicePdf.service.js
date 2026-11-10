@@ -246,3 +246,4 @@ export function generateOrderPdf(order, supplier = {}, mode = 'invoice') {
   doc.end();
   return doc;
 }
+

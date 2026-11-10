@@ -912,3 +912,199 @@ export const downloadShippingLabel = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * 13. Get Supplier Returns & RTO Hub Data
+ * GET /api/supplier/returns
+ */
+export const getSupplierReturns = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    // 1. Fetch order items for this supplier
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        product: { supplierId },
+      },
+      include: {
+        product: true,
+        order: {
+          include: {
+            user: {
+              select: { id: true, fullName: true, email: true, phone: true },
+            },
+            returnRequest: true,
+          },
+        },
+      },
+      orderBy: {
+        order: { createdAt: 'desc' },
+      },
+    });
+
+    const totalOrdersCount = orderItems.length;
+
+    // Filter to return-related items
+    const returnItems = orderItems.filter((item) => {
+      const ord = item.order;
+      if (!ord) return false;
+      const status = (ord.orderStatus || '').toUpperCase();
+      return (
+        ord.returnRequest !== null ||
+        status.includes('RETURN') ||
+        status === 'CANCELLED' ||
+        status.includes('RTO')
+      );
+    });
+
+    // Normalize and enrich each return entry
+    const returns = returnItems.map((item) => {
+      const ord = item.order;
+      const retReq = ord.returnRequest;
+      const isCancelled = (ord.orderStatus || '').toUpperCase() === 'CANCELLED';
+
+      let rtoStatus = 'REQUESTED';
+      if (retReq?.status) {
+        rtoStatus = retReq.status.toUpperCase();
+      } else if (ord.orderStatus === 'RETURNED' || ord.orderStatus === 'RTO_DELIVERED') {
+        rtoStatus = 'REFUNDED';
+      } else if (isCancelled) {
+        rtoStatus = 'CANCELLED';
+      }
+
+      let parsedShipping = {};
+      if (typeof ord.shippingAddress === 'string') {
+        try {
+          parsedShipping = JSON.parse(ord.shippingAddress);
+        } catch (_) {}
+      } else if (ord.shippingAddress) {
+        parsedShipping = ord.shippingAddress;
+      }
+
+      return {
+        id: retReq?.id || `ret_${ord.id}`,
+        returnRequestId: retReq?.id || null,
+        orderId: ord.id,
+        orderStatus: ord.orderStatus,
+        rtoStatus,
+        reason: retReq?.reason || (isCancelled ? 'Order cancelled before delivery' : 'Customer return requested'),
+        images: retReq?.images || [],
+        createdAt: retReq?.createdAt || ord.updatedAt || ord.createdAt,
+        totalAmount: (item.price || 0) * (item.quantity || 1),
+        product: {
+          id: item.product?.id,
+          title: item.product?.title || 'E-Commerce Item',
+          price: item.price || 0,
+          quantity: item.quantity || 1,
+          image: Array.isArray(item.product?.images) ? item.product.images[0] : null,
+          category: item.product?.categorySlug,
+        },
+        customer: {
+          name: parsedShipping.fullName || parsedShipping.name || ord.user?.name || 'Customer',
+          phone: parsedShipping.phone || ord.user?.phone || 'N/A',
+          city: parsedShipping.city || 'N/A',
+          state: parsedShipping.state || 'N/A',
+        },
+        awb: parsedShipping.awb || `RTO${ord.id.slice(0, 8).toUpperCase()}`,
+        courier: parsedShipping.courier || 'Delhivery Surface Reverse',
+      };
+    });
+
+    const pendingCount = returns.filter((r) => ['REQUESTED', 'APPROVED'].includes(r.rtoStatus)).length;
+    const completedCount = returns.filter((r) => ['PICKED_UP', 'REFUNDED'].includes(r.rtoStatus)).length;
+    const returnRate = totalOrdersCount > 0 ? Math.round((returns.length / totalOrdersCount) * 100) : 0;
+    const returnLossAmount = returns.reduce((acc, r) => acc + (r.totalAmount || 0), 0);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        stats: {
+          totalReturns: returns.length,
+          pendingAction: pendingCount,
+          completedReturns: completedCount,
+          returnRate: `${returnRate}%`,
+          returnLossAmount,
+        },
+        returns,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 14. Update Return / RTO Status
+ * PATCH /api/supplier/returns/:id/status
+ */
+export const updateReturnStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ success: false, message: 'Status is required' });
+    }
+
+    // Try finding ReturnRequest by id or orderId
+    let returnReq = await prisma.returnRequest.findUnique({
+      where: { id },
+    }).catch(() => null);
+
+    if (!returnReq) {
+      returnReq = await prisma.returnRequest.findUnique({
+        where: { orderId: id },
+      }).catch(() => null);
+    }
+
+    if (returnReq) {
+      const updated = await prisma.returnRequest.update({
+        where: { id: returnReq.id },
+        data: { status: status.toLowerCase() },
+      });
+
+      // Also update order status if appropriate
+      if (['refunded', 'approved', 'rejected'].includes(status.toLowerCase())) {
+        const orderStatusMap = {
+          approved: 'RETURN_APPROVED',
+          refunded: 'RETURNED',
+          rejected: 'RETURN_REJECTED',
+        };
+        await prisma.order.update({
+          where: { id: returnReq.orderId },
+          data: { orderStatus: orderStatusMap[status.toLowerCase()] || 'RETURNED' },
+        }).catch(() => null);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Return request status updated to ${status}`,
+        data: updated,
+      });
+    }
+
+    // Fallback: update Order directly if ReturnRequest record doesn't exist
+    const order = await prisma.order.findUnique({ where: { id } }).catch(() => null);
+    if (order) {
+      const updatedOrder = await prisma.order.update({
+        where: { id },
+        data: { orderStatus: status.toUpperCase() },
+      });
+      return res.status(200).json({
+        success: true,
+        message: `Order return status updated to ${status}`,
+        data: updatedOrder,
+      });
+    }
+
+    return res.status(404).json({ success: false, message: 'Return record not found' });
+  } catch (error) {
+    next(error);
+  }
+};
