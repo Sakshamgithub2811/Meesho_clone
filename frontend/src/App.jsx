@@ -74,7 +74,6 @@ import SupplierOrdersList from './pages/supplier/supplier_orders_list';
 import SupplierProfile from './pages/supplier/supplier_profile';
 import AddNewProductSupplier from './pages/supplier/add_new_product_supplier';
 import AddCategorySupplier from './pages/supplier/add_category_supplier';
-import SellerWebDashboard from './pages/supplier/seller_web_dashboard';
 import SellerWebDashboard1 from './pages/supplier/seller-web-dashboard1';
 import SellerInventory1 from './pages/supplier/SellerInventory1';
 import SellerOrders1 from './pages/supplier/SellerOrders1';
@@ -1250,33 +1249,27 @@ function AppRoutes() {
         <Route
           path="/seller-dashboard"
           element={
-            <SellerWebDashboard
+            <SellerWebDashboard1
               onNavigate={handleNav}
               onBack={handleBack}
-              onViewProducts={() => handleNav('/supplier-inventory')}
-              onViewOrders={() => handleNav('/supplier-orders')}
             />
           }
         />
         <Route
           path="/sellers"
           element={
-            <SellerWebDashboard
+            <SellerWebDashboard1
               onNavigate={handleNav}
               onBack={handleBack}
-              onViewProducts={() => handleNav('/supplier-inventory')}
-              onViewOrders={() => handleNav('/supplier-orders')}
             />
           }
         />
         <Route
           path="/seller"
           element={
-            <SellerWebDashboard
+            <SellerWebDashboard1
               onNavigate={handleNav}
               onBack={handleBack}
-              onViewProducts={() => handleNav('/supplier-inventory')}
-              onViewOrders={() => handleNav('/supplier-orders')}
             />
           }
         />
