@@ -29,7 +29,9 @@ import {
   ShoppingBag,
   ArrowUpRight,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Banknote,
+  LineChart
 } from 'lucide-react';
 
 import { SUPPLIER_MENU } from './supplierNavConfig';
@@ -497,7 +499,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             {[
               {
                 title: 'Add Product',
@@ -521,6 +523,13 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
                 path: '/supplier-orders1',
               },
               {
+                title: 'Payouts',
+                desc: 'Bank & UTR ledger',
+                icon: Banknote,
+                color: 'text-emerald-700 bg-emerald-50 border-emerald-100',
+                path: '/supplier-settlements1',
+              },
+              {
                 title: 'Dropship Portal',
                 desc: 'Wholesale partner orders',
                 icon: Truck,
@@ -533,6 +542,13 @@ export default function SellerWebDashboard1({ onNavigate, onBack }) {
                 icon: RotateCcw,
                 color: 'text-rose-600 bg-rose-50 border-rose-100',
                 path: '/supplier-returns1',
+              },
+              {
+                title: 'Analytics',
+                desc: 'Revenue & velocity',
+                icon: LineChart,
+                color: 'text-cyan-700 bg-cyan-50 border-cyan-100',
+                path: '/supplier-analytics1',
               },
               {
                 title: 'KYC & Profile',
