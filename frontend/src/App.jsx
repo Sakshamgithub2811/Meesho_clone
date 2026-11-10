@@ -67,12 +67,6 @@ import SwiftRoute from './pages/delivery & driver logistics/swiftroute';
 import DriverReversePickup from './pages/delivery & driver logistics/driver_reverse_pickup';
 
 // Supplier Hub Pages
-import SupplierDashboard2 from './pages/supplier/supplier_dashboard2';
-import SupplierDashboard1 from './pages/supplier/supplier_dashboard1';
-import SupplierInventoryManagement from './pages/supplier/supplier_inventory_management';
-import SupplierOrdersList from './pages/supplier/supplier_orders_list';
-import SupplierProfile from './pages/supplier/supplier_profile';
-import AddNewProductSupplier from './pages/supplier/add_new_product_supplier';
 import AddCategorySupplier from './pages/supplier/add_category_supplier';
 import SellerWebDashboard1 from './pages/supplier/seller-web-dashboard1';
 import SellerInventory1 from './pages/supplier/SellerInventory1';
@@ -1025,46 +1019,60 @@ function AppRoutes() {
         <Route
           path="/supplier-dashboard-2"
           element={
-            <SupplierDashboard2
-              onAddNewProduct={() => handleNav('/add-product')}
-              onViewInventory={() => handleNav('/supplier-inventory')}
-              onViewAllOrders={() => handleNav('/supplier-orders')}
-              onNavChange={(tabId) => handleNav(tabId)}
+            <SellerWebDashboard1
+              onNavigate={handleNav}
+              onBack={handleBack}
             />
           }
         />
         <Route
           path="/supplier-dashboard-1"
           element={
-            <SupplierDashboard1
+            <SellerWebDashboard1
               onNavigate={handleNav}
-              onShipNow={() => handleNav('/supplier-orders')}
-              onClaimCredit={() => handleNav('/admin-panel')}
+              onBack={handleBack}
             />
           }
         />
         <Route
           path="/supplier-inventory"
-          element={<SupplierInventoryManagement onNavigate={handleNav} onAddProduct={() => handleNav('/add-product')} />}
+          element={
+            <SellerInventory1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
         />
-        <Route path="/supplier-orders" element={<SupplierOrdersList onBack={handleBack} onNavigate={handleNav} />} />
+        <Route
+          path="/supplier-orders"
+          element={
+            <SellerOrders1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
         <Route
           path="/add-product"
           element={
-            <AddNewProductSupplier
+            <SellerAddProduct1
+              onNavigate={handleNav}
               onBack={handleBack}
-              onPublish={() => handleNav('/supplier-inventory')}
-              onSaveDraft={() => handleNav('/supplier-inventory')}
             />
           }
         />
         <Route
           path="/add-category"
-          element={<AddCategorySupplier onBack={handleBack} onSaveCategory={() => handleNav('/supplier-inventory')} />}
+          element={<AddCategorySupplier onBack={handleBack} onSaveCategory={() => handleNav('/supplier-inventory1')} />}
         />
         <Route
           path="/supplier-profile"
-          element={<SupplierProfile onBack={handleBack} onNavigate={handleNav} onLogout={() => handleNav('/')} />}
+          element={
+            <SellerProfile1
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
         />
         <Route
           path="/seller-web-dashboard1"
