@@ -365,8 +365,39 @@ export const addProduct = async (req, res, next) => {
  */
 export const updateProduct = async (req, res, next) => {
   try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
     const { id } = req.params;
+
+    // Security Check: Verify product exists and belongs to this supplier
+    const existing = await prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    // Prevent cross-supplier modification
+    if (existing.supplierId && existing.supplierId !== supplierId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to modify another supplier\'s product',
+      });
+    }
+
     const updateData = { ...req.body };
+    delete updateData.id;
+    delete updateData.supplierId; // Cannot transfer ownership
 
     // Format numbers
     if (updateData.price) updateData.price = parseFloat(updateData.price);
@@ -413,10 +444,39 @@ export const updateProduct = async (req, res, next) => {
 /**
  * 5. Delete Product
  * DELETE /api/supplier/products/:id
+ * P0 Security Fix: Enforce strict supplierId ownership check
  */
 export const deleteProduct = async (req, res, next) => {
   try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
     const { id } = req.params;
+
+    // Security Check: Verify product exists
+    const existing = await prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    // Security Check: Enforce supplier ownership (Prevent cross-supplier deletion)
+    if (existing.supplierId && existing.supplierId !== supplierId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to delete another supplier\'s product',
+      });
+    }
 
     await prisma.product.delete({
       where: { id },
@@ -937,14 +997,14 @@ export const getSupplierReturns = async (req, res, next) => {
         order: {
           include: {
             user: {
-              select: { id: true, fullName: true, email: true, phone: true },
+              select: { id: true, name: true, email: true, phone: true },
             },
             returnRequest: true,
           },
         },
       },
       orderBy: {
-        order: { createdAt: 'desc' },
+        createdAt: 'desc',
       },
     });
 
