@@ -1,0 +1,13 @@
+[
+  {
+    "id": "log_seed_1",
+    "adminEmail": "admin@meesho.com",
+    "adminName": "Saksham (Super Admin)",
+    "action": "SYSTEM_INITIALIZATION",
+    "targetType": "SYSTEM",
+    "targetId": "SYS-ROOT",
+    "details": "Platform security engine and RBAC access control initialized.",
+    "ipAddress": "127.0.0.1",
+    "timestamp": "2026-11-10T15:30:00.000Z"
+  }
+]

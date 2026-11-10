@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. GET ALL PRODUCTS FOR ADMIN (With Category Filter, Stock Filter, Search & KPI Stats)
@@ -304,6 +305,16 @@ export const bulkUpdateProductStatus = async (req, res) => {
       });
       resultMessage = `Successfully deleted ${deleteResult.count} products from catalog!`;
     }
+
+    // Record Audit Log (Task 9 integration)
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: `BULK_PRODUCT_${action}`,
+      targetType: 'PRODUCT',
+      targetId: `${productIds.length}_PRODUCTS`,
+      details: resultMessage
+    });
 
     return res.status(200).json({
       success: true,

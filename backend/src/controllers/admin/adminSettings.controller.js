@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -127,6 +128,16 @@ export const updatePlatformSettings = async (req, res) => {
 
     // Atomic write to disk
     fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(updatedSettings, null, 2), 'utf-8');
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'PLATFORM_SETTINGS_UPDATED',
+      targetType: 'SETTINGS',
+      targetId: 'BUSINESS_CONFIG',
+      details: `Commission: ${updatedSettings.commissionRate}%, Free Delivery: ₹${updatedSettings.freeShippingThreshold}, COD: ${updatedSettings.codEnabled ? 'ON' : 'OFF'}`
+    });
 
     return res.status(200).json({
       success: true,

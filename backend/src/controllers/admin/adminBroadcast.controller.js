@@ -1,6 +1,7 @@
 import prisma from '../../config/prisma.js';
 import { getApps } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
+import { logAdminAction } from '../../utils/auditLogger.js';
 
 /**
  * 1. SEND BROADCAST TO USERS (DATABASE BATCH INSERT + FCM PUSH)
@@ -81,6 +82,16 @@ export const sendBroadcast = async (req, res) => {
         fcmNote = pushErr.message;
       }
     }
+
+    // Audit log
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'BROADCAST_DISPATCHED',
+      targetType: 'MARKETING',
+      targetId: audience,
+      details: `Dispatched "${title.trim()}" to ${targetUsers.length} ${audience} users (FCM Push: ${fcmSuccess ? 'Active' : 'Off'})`
+    });
 
     return res.status(200).json({
       success: true,
