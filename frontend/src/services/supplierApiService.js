@@ -327,6 +327,15 @@ export async function fetchSupplierSettlements() {
   return data.data;
 }
 
+// Request Escrow / Settled Payout Withdrawal to Registered Bank Account
+export async function requestSupplierPayout(amount, notes = '') {
+  const data = await request('/supplier/finance-settlements/withdraw', {
+    method: 'POST',
+    body: JSON.stringify({ amount, notes }),
+  });
+  return data;
+}
+
 // Get Supplier Analytics & Performance
 export async function fetchSupplierAnalytics() {
   const data = await request('/supplier/analytics');
@@ -385,6 +394,7 @@ export default {
   fetchSupplierOrders,
   updateOrderStatus,
   fetchSupplierSettlements,
+  requestSupplierPayout,
   fetchSupplierAnalytics,
   downloadOrderInvoice,
   downloadShippingLabel,

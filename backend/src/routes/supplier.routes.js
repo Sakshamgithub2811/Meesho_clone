@@ -10,6 +10,7 @@ import {
   getSupplierOrders,
   updateOrderStatus,
   getSupplierSettlements,
+  requestSupplierPayout,
   getSupplierAnalytics,
   downloadOrderInvoice,
   downloadShippingLabel,
@@ -47,6 +48,8 @@ router.post('/kyc', submitSupplierKyc);
 // Dashboard & Analytics
 router.get('/dashboard-stats', getDashboardStats);
 router.get('/finance-settlements', getSupplierSettlements);
+router.post('/finance-settlements/withdraw', requestSupplierPayout);
+router.post('/request-payout', requestSupplierPayout);
 router.get('/analytics', getSupplierAnalytics);
 
 // Products / Catalog
