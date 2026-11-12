@@ -154,7 +154,8 @@ export const createOrder = async (req, res) => {
               productId: item.productId,
               quantity: item.quantity,
               price: item.price,
-              size: item.size
+              size: item.size,
+              itemStatus: 'ORDERED'
             }))
           }
         },
@@ -391,6 +392,12 @@ export const cancelOrder = async (req, res) => {
         }
       }
     });
+
+    // Mark all items as CANCELLED
+    await prisma.orderItem.updateMany({
+      where: { orderId: id },
+      data: { itemStatus: 'CANCELLED' }
+    }).catch(() => {});
 
     // If order was PAID (online/wallet), automatically refund to User's Wallet!
     if (existing.paymentStatus === 'PAID') {

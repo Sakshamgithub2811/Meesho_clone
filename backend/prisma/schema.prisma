@@ -97,6 +97,7 @@ model Profile {
   storeIntegrations StoreIntegration[]
   webhookLogs     WebhookLog[]
   marginConfig    DropshipperMarginConfig?
+  fcmDevices      FcmDevice[]
 
   // Soft Delete Fields
   isDeleted Boolean   @default(false) @map("is_deleted")
@@ -245,14 +246,15 @@ model Order {
 // ── 8. Order Items ─────────────────────────────────────────────
 
 model OrderItem {
-  id        String  @id @default(uuid())
-  orderId   String  @map("order_id")
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String  @map("product_id")
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  quantity  Int
-  price     Float
-  size      String?
+  id         String      @id @default(uuid())
+  orderId    String      @map("order_id")
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String      @map("product_id")
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity   Int
+  price      Float
+  size       String?
+  itemStatus OrderStatus @default(ORDERED) @map("item_status")
 
   @@map("order_items")
 }
@@ -533,4 +535,19 @@ model CmsPage {
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
   @@map("cms_pages")
+}
+
+// ── 23. FCM Devices ────────────────────────────────────────────
+
+model FcmDevice {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  user       Profile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String    @unique
+  deviceType String?   @map("device_type")
+  userAgent  String?   @map("user_agent")
+  lastSeen   DateTime? @map("last_seen")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("fcm_devices")
 }

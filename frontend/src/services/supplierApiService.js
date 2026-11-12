@@ -310,11 +310,13 @@ export async function fetchSupplierOrders() {
   return data.data || [];
 }
 
-// Update Order Status
-export async function updateOrderStatus(orderId, orderStatus) {
+// Update Order Status (supports optional item-level targeting)
+export async function updateOrderStatus(orderId, orderStatus, orderItemId = null) {
+  const payload = { orderStatus };
+  if (orderItemId) payload.orderItemId = orderItemId;
   const data = await request(`/supplier/orders/${orderId}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ orderStatus }),
+    body: JSON.stringify(payload),
   });
   return data.data;
 }
