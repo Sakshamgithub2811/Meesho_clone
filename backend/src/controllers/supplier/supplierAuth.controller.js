@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import prisma from '../../config/prisma.js';
 
 // Helper to format supplier response safely
 const formatSupplierResponse = (user) => {

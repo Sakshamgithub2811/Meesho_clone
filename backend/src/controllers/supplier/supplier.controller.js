@@ -6,6 +6,7 @@ import slugify from 'slugify';
 import { dispatchDeliveryOtpEmail } from '../order.controller.js';
 import { getUploadDir } from '../../middlewares/upload.middleware.js';
 import { uploadFileToSupabase } from '../../services/supabaseStorage.service.js';
+import { generateOrderPdf } from '../../services/invoicePdf.service.js';
 
 // Helper to persist uploaded files to Supabase Storage or fallback to local/tmp URL
 const uploadFileToStorage = async (file, baseUrl) => {
@@ -78,14 +79,14 @@ export const getDashboardStats = async (req, res, next) => {
       });
     }
 
-    // Total products for this supplier
+    // Total active (non-deleted) products for this supplier
     const totalProducts = await prisma.product.count({
-      where: { supplierId },
+      where: { supplierId, isDeleted: false },
     }).catch(() => 0);
 
-    // Low stock products (< 10)
+    // Low stock active products (< 10)
     const lowStockCount = await prisma.product.count({
-      where: { supplierId, stock: { lt: 10 } },
+      where: { supplierId, isDeleted: false, stock: { lt: 10 } },
     }).catch(() => 0);
 
     // Fetch supplier order items
@@ -142,7 +143,7 @@ export const getSupplierProducts = async (req, res, next) => {
     }
     const { search, category, page = 1, limit = 20 } = req.query;
 
-    const where = {};
+    const where = { isDeleted: false };
     if (supplierId && supplierId !== 'all') {
       where.supplierId = supplierId;
     }
@@ -364,8 +365,39 @@ export const addProduct = async (req, res, next) => {
  */
 export const updateProduct = async (req, res, next) => {
   try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
     const { id } = req.params;
+
+    // Security Check: Verify product exists and belongs to this supplier
+    const existing = await prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    // Prevent cross-supplier modification
+    if (existing.supplierId && existing.supplierId !== supplierId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to modify another supplier\'s product',
+      });
+    }
+
     const updateData = { ...req.body };
+    delete updateData.id;
+    delete updateData.supplierId; // Cannot transfer ownership
 
     // Format numbers
     if (updateData.price) updateData.price = parseFloat(updateData.price);
@@ -412,18 +444,73 @@ export const updateProduct = async (req, res, next) => {
 /**
  * 5. Delete Product
  * DELETE /api/supplier/products/:id
+ * P0 Security Fix: Enforce strict supplierId ownership check
  */
 export const deleteProduct = async (req, res, next) => {
   try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
     const { id } = req.params;
 
-    await prisma.product.delete({
+    // Security Check: Verify product exists
+    const existing = await prisma.product.findUnique({
       where: { id },
+    });
+
+    if (!existing || existing.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    // Security Check: Enforce supplier ownership (Prevent cross-supplier deletion)
+    if (existing.supplierId && existing.supplierId !== supplierId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to delete another supplier\'s product',
+      });
+    }
+
+    const deletionResult = await prisma.$transaction(async (tx) => {
+      // Clean Cart & Wishlist references first to prevent PostgreSQL P2003 FK crashes
+      await Promise.all([
+        tx.cartItem.deleteMany({ where: { productId: id } }),
+        tx.wishlistItem.deleteMany({ where: { productId: id } }),
+      ]);
+
+      // Preserve historical customer orders by soft-deleting if order items reference this product
+      const orderItemCount = await tx.orderItem.count({ where: { productId: id } });
+      if (orderItemCount > 0) {
+        await tx.product.update({
+          where: { id },
+          data: {
+            isDeleted: true,
+            isActive: false,
+            deletedAt: new Date(),
+          },
+        });
+        return { softDeleted: true };
+      }
+
+      // Clean remaining review relations before hard delete
+      await tx.review.deleteMany({ where: { productId: id } });
+      await tx.product.delete({ where: { id } });
+      return { softDeleted: false };
     });
 
     return res.status(200).json({
       success: true,
-      message: 'Product deleted successfully!',
+      message: deletionResult.softDeleted
+        ? 'Product archived from catalog (existing orders preserved)!'
+        : 'Product deleted successfully!',
+      softDeleted: deletionResult.softDeleted,
     });
   } catch (error) {
     next(error);
@@ -522,6 +609,14 @@ export const getSupplierOrders = async (req, res, next) => {
  */
 export const updateOrderStatus = async (req, res, next) => {
   try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
     const { id } = req.params;
     const { orderStatus } = req.body;
 
@@ -540,6 +635,33 @@ export const updateOrderStatus = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}`,
+      });
+    }
+
+    // Verify order exists and contains items for this supplier (Prevent cross-supplier order tampering)
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            product: { select: { supplierId: true } },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const hasSupplierProduct = order.items.some(
+      (item) => item.product?.supplierId === supplierId
+    );
+
+    if (!hasSupplierProduct) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to modify status for another supplier\'s order',
       });
     }
 
@@ -713,7 +835,7 @@ export const getSupplierAnalytics = async (req, res, next) => {
 
     const [products, orderItems] = await Promise.all([
       prisma.product.findMany({
-        where: { supplierId },
+        where: { supplierId, isDeleted: false },
         select: { id: true, title: true, price: true, stock: true, categorySlug: true, images: true },
       }),
       prisma.orderItem.findMany({
@@ -827,6 +949,308 @@ export const getSupplierAnalytics = async (req, res, next) => {
         topProducts,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 11. Download Tax Invoice PDF
+ * GET /api/supplier/orders/:id/invoice
+ */
+export const downloadOrderInvoice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
+    }
+
+    // Verify supplier ownership of this order
+    const hasSupplierProduct = order.items.some(
+      (item) => item.product?.supplierId === supplierId
+    );
+
+    if (!hasSupplierProduct) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to download another supplier\'s shipping label',
+      });
+    }
+
+    let supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Invoice-${order.id.slice(0, 8).toUpperCase()}.pdf"`);
+
+    const pdfDoc = generateOrderPdf(order, supplierProfile, 'invoice');
+    pdfDoc.pipe(res);
+  } catch (error) {
+    console.error('Error generating invoice PDF:', error);
+    next(error);
+  }
+};
+
+/**
+ * 12. Download 4x6 Shipping Label PDF
+ * GET /api/supplier/orders/:id/shipping-label
+ */
+export const downloadShippingLabel = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
+    }
+
+    // Verify supplier ownership of this order
+    const hasSupplierProduct = order.items.some(
+      (item) => item.product?.supplierId === supplierId
+    );
+
+    if (!hasSupplierProduct) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to download another supplier\'s shipping label',
+      });
+    }
+
+    let supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="ShippingLabel-${order.id.slice(0, 8).toUpperCase()}.pdf"`);
+
+    const pdfDoc = generateOrderPdf(order, supplierProfile, 'label');
+    pdfDoc.pipe(res);
+  } catch (error) {
+    console.error('Error generating shipping label PDF:', error);
+    next(error);
+  }
+};
+
+/**
+ * 13. Get Supplier Returns & RTO Hub Data
+ * GET /api/supplier/returns
+ */
+export const getSupplierReturns = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    // 1. Fetch order items for this supplier
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        product: { supplierId },
+      },
+      include: {
+        product: true,
+        order: {
+          include: {
+            user: {
+              select: { id: true, fullName: true, email: true, phone: true },
+            },
+            returnRequest: true,
+          },
+        },
+      },
+      orderBy: {
+        order: { createdAt: 'desc' },
+      },
+    });
+
+    const totalOrdersCount = orderItems.length;
+
+    // Filter to return-related items
+    const returnItems = orderItems.filter((item) => {
+      const ord = item.order;
+      if (!ord) return false;
+      const status = (ord.orderStatus || '').toUpperCase();
+      return (
+        ord.returnRequest !== null ||
+        status.includes('RETURN') ||
+        status === 'CANCELLED' ||
+        status.includes('RTO')
+      );
+    });
+
+    // Normalize and enrich each return entry
+    const returns = returnItems.map((item) => {
+      const ord = item.order;
+      const retReq = ord.returnRequest;
+      const isCancelled = (ord.orderStatus || '').toUpperCase() === 'CANCELLED';
+
+      let rtoStatus = 'REQUESTED';
+      if (retReq?.status) {
+        rtoStatus = retReq.status.toUpperCase();
+      } else if (ord.orderStatus === 'RETURNED' || ord.orderStatus === 'RTO_DELIVERED') {
+        rtoStatus = 'REFUNDED';
+      } else if (isCancelled) {
+        rtoStatus = 'CANCELLED';
+      }
+
+      let parsedShipping = {};
+      if (typeof ord.shippingAddress === 'string') {
+        try {
+          parsedShipping = JSON.parse(ord.shippingAddress);
+        } catch (_) {}
+      } else if (ord.shippingAddress) {
+        parsedShipping = ord.shippingAddress;
+      }
+
+      return {
+        id: retReq?.id || `ret_${ord.id}`,
+        returnRequestId: retReq?.id || null,
+        orderId: ord.id,
+        orderStatus: ord.orderStatus,
+        rtoStatus,
+        reason: retReq?.reason || (isCancelled ? 'Order cancelled before delivery' : 'Customer return requested'),
+        images: retReq?.images || [],
+        createdAt: retReq?.createdAt || ord.updatedAt || ord.createdAt,
+        totalAmount: (item.price || 0) * (item.quantity || 1),
+        product: {
+          id: item.product?.id,
+          title: item.product?.title || 'E-Commerce Item',
+          price: item.price || 0,
+          quantity: item.quantity || 1,
+          image: Array.isArray(item.product?.images) ? item.product.images[0] : null,
+          category: item.product?.categorySlug,
+        },
+        customer: {
+          name: parsedShipping.fullName || parsedShipping.name || ord.user?.name || 'Customer',
+          phone: parsedShipping.phone || ord.user?.phone || 'N/A',
+          city: parsedShipping.city || 'N/A',
+          state: parsedShipping.state || 'N/A',
+        },
+        awb: parsedShipping.awb || `RTO${ord.id.slice(0, 8).toUpperCase()}`,
+        courier: parsedShipping.courier || 'Delhivery Surface Reverse',
+      };
+    });
+
+    const pendingCount = returns.filter((r) => ['REQUESTED', 'APPROVED'].includes(r.rtoStatus)).length;
+    const completedCount = returns.filter((r) => ['PICKED_UP', 'REFUNDED'].includes(r.rtoStatus)).length;
+    const returnRate = totalOrdersCount > 0 ? Math.round((returns.length / totalOrdersCount) * 100) : 0;
+    const returnLossAmount = returns.reduce((acc, r) => acc + (r.totalAmount || 0), 0);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        stats: {
+          totalReturns: returns.length,
+          pendingAction: pendingCount,
+          completedReturns: completedCount,
+          returnRate: `${returnRate}%`,
+          returnLossAmount,
+        },
+        returns,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 14. Update Return / RTO Status
+ * PATCH /api/supplier/returns/:id/status
+ */
+export const updateReturnStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ success: false, message: 'Status is required' });
+    }
+
+    // Try finding ReturnRequest by id or orderId
+    let returnReq = await prisma.returnRequest.findUnique({
+      where: { id },
+    }).catch(() => null);
+
+    if (!returnReq) {
+      returnReq = await prisma.returnRequest.findUnique({
+        where: { orderId: id },
+      }).catch(() => null);
+    }
+
+    if (returnReq) {
+      const updated = await prisma.returnRequest.update({
+        where: { id: returnReq.id },
+        data: { status: status.toLowerCase() },
+      });
+
+      // Also update order status if appropriate
+      if (['refunded', 'approved', 'rejected'].includes(status.toLowerCase())) {
+        const orderStatusMap = {
+          approved: 'RETURN_APPROVED',
+          refunded: 'RETURNED',
+          rejected: 'RETURN_REJECTED',
+        };
+        await prisma.order.update({
+          where: { id: returnReq.orderId },
+          data: { orderStatus: orderStatusMap[status.toLowerCase()] || 'RETURNED' },
+        }).catch(() => null);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Return request status updated to ${status}`,
+        data: updated,
+      });
+    }
+
+    // Fallback: update Order directly if ReturnRequest record doesn't exist
+    const order = await prisma.order.findUnique({ where: { id } }).catch(() => null);
+    if (order) {
+      const updatedOrder = await prisma.order.update({
+        where: { id },
+        data: { orderStatus: status.toUpperCase() },
+      });
+      return res.status(200).json({
+        success: true,
+        message: `Order return status updated to ${status}`,
+        data: updatedOrder,
+      });
+    }
+
+    return res.status(404).json({ success: false, message: 'Return record not found' });
   } catch (error) {
     next(error);
   }

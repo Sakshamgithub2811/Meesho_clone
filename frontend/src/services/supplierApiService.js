@@ -331,6 +331,31 @@ export async function fetchSupplierAnalytics() {
   return data.data;
 }
 
+export function downloadOrderInvoice(orderId) {
+  const token = getAuthToken();
+  const url = `${API_BASE_URL}/supplier/orders/${orderId}/invoice${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  window.open(url, '_blank');
+}
+
+export function downloadShippingLabel(orderId) {
+  const token = getAuthToken();
+  const url = `${API_BASE_URL}/supplier/orders/${orderId}/shipping-label${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  window.open(url, '_blank');
+}
+
+export async function fetchSupplierReturns() {
+  const data = await request('/supplier/returns');
+  return data.data;
+}
+
+export async function updateReturnStatus(id, status) {
+  const data = await request(`/supplier/returns/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+  return data;
+}
+
 export default {
   getAuthToken,
   getCurrentSupplier,
@@ -359,4 +384,8 @@ export default {
   updateOrderStatus,
   fetchSupplierSettlements,
   fetchSupplierAnalytics,
+  downloadOrderInvoice,
+  downloadShippingLabel,
+  fetchSupplierReturns,
+  updateReturnStatus,
 };
