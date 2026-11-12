@@ -79,14 +79,14 @@ export const getDashboardStats = async (req, res, next) => {
       });
     }
 
-    // Total products for this supplier
+    // Total active (non-deleted) products for this supplier
     const totalProducts = await prisma.product.count({
-      where: { supplierId },
+      where: { supplierId, isDeleted: false },
     }).catch(() => 0);
 
-    // Low stock products (< 10)
+    // Low stock active products (< 10)
     const lowStockCount = await prisma.product.count({
-      where: { supplierId, stock: { lt: 10 } },
+      where: { supplierId, isDeleted: false, stock: { lt: 10 } },
     }).catch(() => 0);
 
     // Fetch supplier order items
@@ -143,7 +143,7 @@ export const getSupplierProducts = async (req, res, next) => {
     }
     const { search, category, page = 1, limit = 20 } = req.query;
 
-    const where = {};
+    const where = { isDeleted: false };
     if (supplierId && supplierId !== 'all') {
       where.supplierId = supplierId;
     }
@@ -463,7 +463,7 @@ export const deleteProduct = async (req, res, next) => {
       where: { id },
     });
 
-    if (!existing) {
+    if (!existing || existing.isDeleted) {
       return res.status(404).json({
         success: false,
         message: 'Product not found',
@@ -478,13 +478,39 @@ export const deleteProduct = async (req, res, next) => {
       });
     }
 
-    await prisma.product.delete({
-      where: { id },
+    const deletionResult = await prisma.$transaction(async (tx) => {
+      // Clean Cart & Wishlist references first to prevent PostgreSQL P2003 FK crashes
+      await Promise.all([
+        tx.cartItem.deleteMany({ where: { productId: id } }),
+        tx.wishlistItem.deleteMany({ where: { productId: id } }),
+      ]);
+
+      // Preserve historical customer orders by soft-deleting if order items reference this product
+      const orderItemCount = await tx.orderItem.count({ where: { productId: id } });
+      if (orderItemCount > 0) {
+        await tx.product.update({
+          where: { id },
+          data: {
+            isDeleted: true,
+            isActive: false,
+            deletedAt: new Date(),
+          },
+        });
+        return { softDeleted: true };
+      }
+
+      // Clean remaining review relations before hard delete
+      await tx.review.deleteMany({ where: { productId: id } });
+      await tx.product.delete({ where: { id } });
+      return { softDeleted: false };
     });
 
     return res.status(200).json({
       success: true,
-      message: 'Product deleted successfully!',
+      message: deletionResult.softDeleted
+        ? 'Product archived from catalog (existing orders preserved)!'
+        : 'Product deleted successfully!',
+      softDeleted: deletionResult.softDeleted,
     });
   } catch (error) {
     next(error);
@@ -809,7 +835,7 @@ export const getSupplierAnalytics = async (req, res, next) => {
 
     const [products, orderItems] = await Promise.all([
       prisma.product.findMany({
-        where: { supplierId },
+        where: { supplierId, isDeleted: false },
         select: { id: true, title: true, price: true, stock: true, categorySlug: true, images: true },
       }),
       prisma.orderItem.findMany({
