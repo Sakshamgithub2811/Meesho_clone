@@ -230,13 +230,14 @@ export const updateKycStatus = async (req, res) => {
     }
 
     // Record Audit Log (Task 9 integration)
+    const reasonText = adminNotes || req.body?.rejectionReason || '';
     await logAdminAction({
       adminEmail: req.user?.email || 'admin@meesho.com',
       adminName: req.user?.fullName || 'Super Admin',
       action: `KYC_${normalizedStatus}`,
       targetType: 'KYC',
       targetId: id,
-      details: `${normalizedStatus} KYC application for ${existing.user?.fullName || existing.type} (Type: ${existing.type})${rejectionReason ? ` - Reason: ${rejectionReason}` : ''}`
+      details: `${normalizedStatus} KYC application for ${existing.user?.fullName || existing.type} (Type: ${existing.type})${reasonText ? ` - Notes: ${reasonText}` : ''}`
     });
 
     return res.status(200).json({
