@@ -119,18 +119,47 @@ export default function SellerOrders1({ onNavigate }) {
     }
   };
 
-  // Update real order status via API
-  const handleStatusChange = async (orderId, newStatus) => {
+  // Update real order status via API (supports per-item or order-level update)
+  const handleStatusChange = async (orderId, newStatus, orderItemId = null) => {
     setIsUpdatingStatus(true);
     try {
-      await supplierApiService.updateOrderStatus(orderId, newStatus);
+      const updated = await supplierApiService.updateOrderStatus(orderId, newStatus, orderItemId);
       setOrders((prev) =>
-        prev.map((ord) => (ord.id === orderId ? { ...ord, orderStatus: newStatus } : ord))
+        prev.map((ord) => {
+          if (ord.id !== orderId) return ord;
+          const updatedItems = (ord.items || []).map((it) => {
+            if (!orderItemId || it.id === orderItemId) {
+              return { ...it, itemStatus: newStatus };
+            }
+            return it;
+          });
+          return {
+            ...ord,
+            orderStatus: updated?.orderStatus || newStatus,
+            items: updatedItems,
+          };
+        })
       );
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev) => ({ ...prev, orderStatus: newStatus }));
+        setSelectedOrder((prev) => {
+          const updatedItems = (prev.items || []).map((it) => {
+            if (!orderItemId || it.id === orderItemId) {
+              return { ...it, itemStatus: newStatus };
+            }
+            return it;
+          });
+          return {
+            ...prev,
+            orderStatus: updated?.orderStatus || newStatus,
+            items: updatedItems,
+          };
+        });
       }
-      toast.success(`Order #${orderId.slice(-6)} status updated to ${newStatus}`);
+      toast.success(
+        orderItemId
+          ? `Item status updated to ${newStatus}`
+          : `Order #${orderId.slice(-6).toUpperCase()} status updated to ${newStatus}`
+      );
     } catch (err) {
       console.error('Failed to update status:', err);
       toast.error(err.message || 'Failed to update order status');
@@ -500,27 +529,54 @@ export default function SellerOrders1({ onNavigate }) {
                   )}
                 </div>
 
-                {/* Items in Order */}
+                {/* Items in Order (with Per-Item Status Control) */}
                 <div>
                   <h4 className="font-bold text-slate-900 mb-2">Ordered Catalog Items</h4>
-                  <div className="space-y-2">
-                    {(selectedOrder.items || []).map((item, idx) => (
-                      <div key={item.id || idx} className="p-3 rounded-xl border border-slate-100 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-800 truncate">{item.product?.title || item.productTitle || 'Product'}</p>
-                          <p className="text-[11px] text-slate-400">Qty: {item.quantity || 1} • Unit: ₹{Number(item.price || 0).toLocaleString('en-IN')}</p>
+                  <div className="space-y-2.5">
+                    {(selectedOrder.items || []).map((item, idx) => {
+                      const iStatus = (item.itemStatus || selectedOrder.orderStatus || 'ORDERED').toUpperCase();
+                      return (
+                        <div key={item.id || idx} className="p-3 rounded-xl border border-slate-200 bg-white space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-800 truncate">{item.product?.title || item.productTitle || 'Product'}</p>
+                              <p className="text-[11px] text-slate-400">
+                                Qty: {item.quantity || 1} • Unit: ₹{Number(item.price || 0).toLocaleString('en-IN')}
+                              </p>
+                            </div>
+                            <span className="font-black text-slate-900 text-sm shrink-0">
+                              ₹{Number((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                              Item Stage: {iStatus}
+                            </span>
+                            {item.id && (
+                              <select
+                                value={iStatus}
+                                onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value, item.id)}
+                                disabled={isUpdatingStatus}
+                                className="h-7 px-2 rounded-lg border border-slate-200 bg-slate-50 font-bold text-slate-700 text-[11px]"
+                              >
+                                <option value="ORDERED">ORDERED</option>
+                                <option value="CONFIRMED">CONFIRMED</option>
+                                <option value="SHIPPED">SHIPPED</option>
+                                <option value="OUT_FOR_DELIVERY">OUT_FOR_DELIVERY</option>
+                                <option value="DELIVERED">DELIVERED</option>
+                                <option value="CANCELLED">CANCELLED</option>
+                              </select>
+                            )}
+                          </div>
                         </div>
-                        <span className="font-black text-slate-900 text-sm shrink-0">
-                          ₹{Number((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Status Update Dropdown */}
+                {/* Batch Status Update Dropdown (All Supplier Items in this Order) */}
                 <div className="p-4 rounded-2xl border border-indigo-100 bg-indigo-50/40">
-                  <label className="font-bold text-slate-800 block mb-1.5">Update Dispatch Status</label>
+                  <label className="font-bold text-slate-800 block mb-1.5">Update All Your Items in Order</label>
                   <div className="flex gap-2">
                     <select
                       value={selectedOrder.orderStatus || selectedOrder.status || 'ORDERED'}
@@ -531,6 +587,7 @@ export default function SellerOrders1({ onNavigate }) {
                       <option value="ORDERED">ORDERED (New)</option>
                       <option value="CONFIRMED">CONFIRMED</option>
                       <option value="SHIPPED">SHIPPED</option>
+                      <option value="OUT_FOR_DELIVERY">OUT FOR DELIVERY</option>
                       <option value="DELIVERED">DELIVERED</option>
                       <option value="CANCELLED">CANCELLED</option>
                     </select>

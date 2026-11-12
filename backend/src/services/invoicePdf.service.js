@@ -50,7 +50,10 @@ export function generateOrderPdf(order, supplier = {}, mode = 'invoice') {
   const courierName = shipping.courier || shipping.courierPartner || 'Delhivery Express';
   const awbNumber = shipping.awb || shipping.trackingNumber || `DEL${order.id.slice(0, 10).toUpperCase()}`;
   const isCod = (order.paymentMethod || 'COD').toUpperCase() === 'COD';
-  const totalAmount = Number(order.totalAmount || 0);
+  const scopedItemsTotal = Array.isArray(order.items) && order.items.length > 0
+    ? order.items.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 1)), 0)
+    : Number(order.totalAmount || 0);
+  const totalAmount = scopedItemsTotal;
 
   // Calculations for 5% GST
   const taxableAmount = Math.round((totalAmount / 1.05) * 100) / 100;

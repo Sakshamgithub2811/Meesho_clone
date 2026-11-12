@@ -65,6 +65,28 @@ const saveBase64Image = async (base64Str, baseUrl) => {
   }
 };
 
+// Helper: Derive aggregated status from a list of OrderItem rows
+export const deriveAggregateOrderStatus = (items = []) => {
+  if (!items || items.length === 0) return 'ORDERED';
+  const statuses = items.map((i) => (i.itemStatus || 'ORDERED').toUpperCase());
+
+  if (statuses.every((s) => s === 'CANCELLED')) return 'CANCELLED';
+  if (statuses.every((s) => s === 'REFUNDED')) return 'REFUNDED';
+  if (statuses.every((s) => s === 'RETURNED')) return 'RETURNED';
+
+  const active = statuses.filter((s) => s !== 'CANCELLED');
+  if (active.length === 0) return 'CANCELLED';
+
+  if (active.every((s) => s === 'DELIVERED')) return 'DELIVERED';
+  if (active.some((s) => s === 'RETURN_REQUESTED')) return 'RETURN_REQUESTED';
+  if (active.some((s) => s === 'RETURNED')) return 'RETURNED';
+  if (active.some((s) => s === 'OUT_FOR_DELIVERY')) return 'OUT_FOR_DELIVERY';
+  if (active.some((s) => ['SHIPPED', 'DELIVERED'].includes(s))) return 'SHIPPED';
+  if (active.some((s) => s === 'CONFIRMED')) return 'CONFIRMED';
+
+  return 'ORDERED';
+};
+
 /**
  * 1. Get Supplier Dashboard Statistics
  * GET /api/supplier/dashboard-stats
@@ -103,13 +125,14 @@ export const getDashboardStats = async (req, res, next) => {
     const totalOrders = orderItems.length;
     const totalRevenue = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
-    // Recent 5 orders
+    // Recent 5 orders with supplier-specific item status
     const recentOrders = orderItems.slice(-5).map((item) => ({
       orderId: item.orderId,
+      orderItemId: item.id,
       productTitle: item.product?.title,
       quantity: item.quantity,
       price: item.price,
-      status: item.order?.orderStatus,
+      status: item.itemStatus || item.order?.orderStatus || 'ORDERED',
       createdAt: item.order?.createdAt,
     }));
 
@@ -562,7 +585,7 @@ export const addCategory = async (req, res, next) => {
 };
 
 /**
- * 7. Get Supplier Orders
+ * 7. Get Supplier Orders (Multi-Vendor Isolated)
  * GET /api/supplier/orders
  */
 export const getSupplierOrders = async (req, res, next) => {
@@ -585,6 +608,7 @@ export const getSupplierOrders = async (req, res, next) => {
       },
       include: {
         items: {
+          where: { product: { supplierId } }, // Isolate: only return THIS supplier's items
           include: { product: true },
         },
         user: {
@@ -594,9 +618,25 @@ export const getSupplierOrders = async (req, res, next) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Scope orderStatus and totalAmount strictly to this supplier's items to avoid multi-vendor collision
+    const scopedOrders = orders.map((ord) => {
+      const supplierTotal = ord.items.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
+        0
+      );
+      const supplierOrderStatus = deriveAggregateOrderStatus(ord.items);
+      return {
+        ...ord,
+        parentOrderStatus: ord.orderStatus,
+        parentTotalAmount: ord.totalAmount,
+        orderStatus: supplierOrderStatus,
+        totalAmount: Math.round(supplierTotal * 100) / 100,
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: orders,
+      data: scopedOrders,
     });
   } catch (error) {
     next(error);
@@ -604,7 +644,7 @@ export const getSupplierOrders = async (req, res, next) => {
 };
 
 /**
- * 8. Update Order Status
+ * 8. Update Order Status (Per-Item + Parent Order Aggregation)
  * PATCH /api/supplier/orders/:id/status
  */
 export const updateOrderStatus = async (req, res, next) => {
@@ -618,7 +658,8 @@ export const updateOrderStatus = async (req, res, next) => {
     }
 
     const { id } = req.params;
-    const { orderStatus } = req.body;
+    const { orderItemId } = req.body;
+    const targetStatus = (req.body.orderStatus || req.body.status || '').toUpperCase();
 
     const allowedStatuses = [
       'ORDERED',
@@ -629,16 +670,17 @@ export const updateOrderStatus = async (req, res, next) => {
       'CANCELLED',
       'RETURN_REQUESTED',
       'RETURNED',
+      'REFUNDED',
     ];
 
-    if (!allowedStatuses.includes(orderStatus)) {
+    if (!allowedStatuses.includes(targetStatus)) {
       return res.status(400).json({
         success: false,
         message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}`,
       });
     }
 
-    // Verify order exists and contains items for this supplier (Prevent cross-supplier order tampering)
+    // Verify order exists and contains items for this supplier
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
@@ -654,32 +696,87 @@ export const updateOrderStatus = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    const hasSupplierProduct = order.items.some(
+    const supplierItems = order.items.filter(
       (item) => item.product?.supplierId === supplierId
     );
 
-    if (!hasSupplierProduct) {
+    if (supplierItems.length === 0) {
       return res.status(403).json({
         success: false,
-        error: 'Forbidden: You do not have permission to modify status for another supplier\'s order',
+        error: "Forbidden: You do not have permission to modify status for another supplier's order",
       });
     }
 
-    const updatedOrder = await prisma.order.update({
-      where: { id },
-      data: { orderStatus },
+    if (orderItemId) {
+      const ownsTargetItem = supplierItems.some((it) => it.id === orderItemId);
+      if (!ownsTargetItem) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden: Target order item does not belong to your store',
+        });
+      }
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Update ONLY the target item (or all items belonging to this supplier in this order)
+      if (orderItemId) {
+        await tx.orderItem.update({
+          where: { id: orderItemId },
+          data: { itemStatus: targetStatus },
+        });
+      } else {
+        const supplierItemIds = supplierItems.map((it) => it.id);
+        await tx.orderItem.updateMany({
+          where: { id: { in: supplierItemIds } },
+          data: { itemStatus: targetStatus },
+        });
+      }
+
+      // 2. Re-read ALL items in the order (across all suppliers) to derive parent status cleanly
+      const allOrderItems = await tx.orderItem.findMany({
+        where: { orderId: id },
+        include: { product: true },
+      });
+
+      const derivedParentStatus = deriveAggregateOrderStatus(allOrderItems);
+
+      const updatedParentOrder = await tx.order.update({
+        where: { id },
+        data: {
+          orderStatus: derivedParentStatus,
+          ...(derivedParentStatus === 'DELIVERED' ? { paymentStatus: 'PAID' } : {}),
+        },
+      });
+
+      const scopedItems = allOrderItems.filter(
+        (it) => it.product?.supplierId === supplierId
+      );
+      const supplierOrderStatus = deriveAggregateOrderStatus(scopedItems);
+      const supplierTotal = scopedItems.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
+        0
+      );
+
+      return {
+        ...updatedParentOrder,
+        parentOrderStatus: derivedParentStatus,
+        parentTotalAmount: updatedParentOrder.totalAmount,
+        orderStatus: supplierOrderStatus,
+        totalAmount: Math.round(supplierTotal * 100) / 100,
+        items: scopedItems,
+      };
     });
 
-    if (orderStatus === 'OUT_FOR_DELIVERY') {
+    if (targetStatus === 'OUT_FOR_DELIVERY') {
       dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' })
-        .then((result) => console.log(`🚚 [Supplier Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${result.sentTo}`))
+        .then((resOtp) => console.log(`🚚 [Supplier Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${resOtp.sentTo}`))
         .catch((err) => console.error(`⚠️ [Supplier Order ${id}] OTP email failed:`, err.message));
     }
 
     return res.status(200).json({
       success: true,
-      message: `Order status updated to ${orderStatus}`,
-      data: updatedOrder,
+      message: `Item status updated to ${targetStatus} (Parent order: ${result.parentOrderStatus})`,
+      data: result,
     });
   } catch (error) {
     next(error);
@@ -742,10 +839,10 @@ export const getSupplierSettlements = async (req, res, next) => {
       const tds = Math.round(itemTotal * 0.01 * 100) / 100;
       totalDeductions += tds;
 
-      const orderStatus = (item.order?.orderStatus || '').toUpperCase();
-      if (['DELIVERED', 'COMPLETED'].includes(orderStatus)) {
+      const itemStatus = (item.itemStatus || item.order?.orderStatus || '').toUpperCase();
+      if (['DELIVERED', 'COMPLETED'].includes(itemStatus)) {
         settledAmount += (itemTotal - tds);
-      } else if (['SHIPPED', 'CONFIRMED', 'OUT_FOR_DELIVERY', 'ORDERED'].includes(orderStatus)) {
+      } else if (['SHIPPED', 'CONFIRMED', 'OUT_FOR_DELIVERY', 'ORDERED'].includes(itemStatus)) {
         escrowBalance += (itemTotal - tds);
       }
     });
@@ -759,10 +856,10 @@ export const getSupplierSettlements = async (req, res, next) => {
       year: 'numeric',
     });
 
-    // 4. Generate Settlement Ledger strictly based on database orders
+    // 4. Generate Settlement Ledger strictly based on database order items
     const settlements = [];
     if (orderItems.length > 0) {
-      const deliveredItems = orderItems.filter((i) => i.order?.orderStatus === 'DELIVERED');
+      const deliveredItems = orderItems.filter((i) => (i.itemStatus || i.order?.orderStatus) === 'DELIVERED');
       if (deliveredItems.length > 0) {
         const batchGross = deliveredItems.reduce((acc, i) => acc + ((i.price || 0) * (i.quantity || 1)), 0);
         const batchTds = Math.round(batchGross * 0.01 * 100) / 100;
@@ -781,7 +878,7 @@ export const getSupplierSettlements = async (req, res, next) => {
       }
 
       if (escrowBalance > 0) {
-        const pendingItems = orderItems.filter((i) => i.order?.orderStatus !== 'DELIVERED');
+        const pendingItems = orderItems.filter((i) => ['SHIPPED', 'CONFIRMED', 'OUT_FOR_DELIVERY', 'ORDERED'].includes(i.itemStatus || i.order?.orderStatus));
         settlements.push({
           id: `STL-PENDING-${now.getFullYear()}${now.getMonth() + 1}`,
           date: nextPayoutDateStr,
@@ -848,10 +945,10 @@ export const getSupplierAnalytics = async (req, res, next) => {
     ]);
 
     const totalOrdersCount = orderItems.length;
-    const deliveredCount = orderItems.filter((i) => i.order?.orderStatus === 'DELIVERED').length;
-    const shippedCount = orderItems.filter((i) => ['SHIPPED', 'OUT_FOR_DELIVERY'].includes(i.order?.orderStatus)).length;
-    const pendingCount = orderItems.filter((i) => ['ORDERED', 'CONFIRMED'].includes(i.order?.orderStatus)).length;
-    const returnCount = orderItems.filter((i) => ['CANCELLED', 'RETURN_REQUESTED', 'RETURNED'].includes(i.order?.orderStatus)).length;
+    const deliveredCount = orderItems.filter((i) => (i.itemStatus || i.order?.orderStatus) === 'DELIVERED').length;
+    const shippedCount = orderItems.filter((i) => ['SHIPPED', 'OUT_FOR_DELIVERY'].includes(i.itemStatus || i.order?.orderStatus)).length;
+    const pendingCount = orderItems.filter((i) => ['ORDERED', 'CONFIRMED'].includes(i.itemStatus || i.order?.orderStatus)).length;
+    const returnCount = orderItems.filter((i) => ['CANCELLED', 'RETURN_REQUESTED', 'RETURNED', 'REFUNDED'].includes(i.itemStatus || i.order?.orderStatus)).length;
 
     const totalSales = orderItems.reduce((acc, i) => acc + ((i.price || 0) * (i.quantity || 1)), 0);
     const avgOrderValue = totalOrdersCount > 0 ? Math.round(totalSales / totalOrdersCount) : 0;
@@ -961,10 +1058,16 @@ export const getSupplierAnalytics = async (req, res, next) => {
 export const downloadOrderInvoice = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
+    }
+
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
         items: {
+          where: { product: { supplierId } }, // Only this supplier's items on their invoice
           include: {
             product: true,
           },
@@ -977,20 +1080,11 @@ export const downloadOrderInvoice = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    const supplierId = req.supplierId || req.user?.id;
-    if (!supplierId) {
-      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
-    }
-
     // Verify supplier ownership of this order
-    const hasSupplierProduct = order.items.some(
-      (item) => item.product?.supplierId === supplierId
-    );
-
-    if (!hasSupplierProduct) {
+    if (!order.items || order.items.length === 0) {
       return res.status(403).json({
         success: false,
-        error: 'Forbidden: You do not have permission to download another supplier\'s shipping label',
+        error: 'Forbidden: You do not have permission to download another supplier\'s invoice',
       });
     }
 
@@ -1014,10 +1108,16 @@ export const downloadOrderInvoice = async (req, res, next) => {
 export const downloadShippingLabel = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
+    }
+
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
         items: {
+          where: { product: { supplierId } }, // Only this supplier's items on their shipping label
           include: {
             product: true,
           },
@@ -1030,17 +1130,8 @@ export const downloadShippingLabel = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    const supplierId = req.supplierId || req.user?.id;
-    if (!supplierId) {
-      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
-    }
-
     // Verify supplier ownership of this order
-    const hasSupplierProduct = order.items.some(
-      (item) => item.product?.supplierId === supplierId
-    );
-
-    if (!hasSupplierProduct) {
+    if (!order.items || order.items.length === 0) {
       return res.status(403).json({
         success: false,
         error: 'Forbidden: You do not have permission to download another supplier\'s shipping label',
@@ -1097,16 +1188,17 @@ export const getSupplierReturns = async (req, res, next) => {
 
     const totalOrdersCount = orderItems.length;
 
-    // Filter to return-related items
+    // Filter to return-related items (checking per-item status first)
     const returnItems = orderItems.filter((item) => {
       const ord = item.order;
       if (!ord) return false;
-      const status = (ord.orderStatus || '').toUpperCase();
+      const status = (item.itemStatus || ord.orderStatus || '').toUpperCase();
       return (
         ord.returnRequest !== null ||
         status.includes('RETURN') ||
         status === 'CANCELLED' ||
-        status.includes('RTO')
+        status.includes('RTO') ||
+        status === 'REFUNDED'
       );
     });
 
@@ -1114,12 +1206,13 @@ export const getSupplierReturns = async (req, res, next) => {
     const returns = returnItems.map((item) => {
       const ord = item.order;
       const retReq = ord.returnRequest;
-      const isCancelled = (ord.orderStatus || '').toUpperCase() === 'CANCELLED';
+      const itemStatus = (item.itemStatus || ord.orderStatus || '').toUpperCase();
+      const isCancelled = itemStatus === 'CANCELLED';
 
       let rtoStatus = 'REQUESTED';
       if (retReq?.status) {
         rtoStatus = retReq.status.toUpperCase();
-      } else if (ord.orderStatus === 'RETURNED' || ord.orderStatus === 'RTO_DELIVERED') {
+      } else if (itemStatus === 'RETURNED' || itemStatus === 'REFUNDED' || itemStatus === 'RTO_DELIVERED') {
         rtoStatus = 'REFUNDED';
       } else if (isCancelled) {
         rtoStatus = 'CANCELLED';
@@ -1135,10 +1228,11 @@ export const getSupplierReturns = async (req, res, next) => {
       }
 
       return {
-        id: retReq?.id || `ret_${ord.id}`,
+        id: retReq?.id || `ret_${item.id}`,
+        orderItemId: item.id,
         returnRequestId: retReq?.id || null,
         orderId: ord.id,
-        orderStatus: ord.orderStatus,
+        orderStatus: itemStatus,
         rtoStatus,
         reason: retReq?.reason || (isCancelled ? 'Order cancelled before delivery' : 'Customer return requested'),
         images: retReq?.images || [],
