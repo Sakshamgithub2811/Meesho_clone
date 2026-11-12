@@ -214,6 +214,19 @@ export const addProduct = async (req, res, next) => {
         error: 'Unauthorized: Supplier session missing',
       });
     }
+
+    // Verify supplier profile exists
+    const supplierProfile = await prisma.profile.findUnique({
+      where: { id: supplierId },
+      select: { id: true, storeName: true, fullName: true },
+    });
+    if (!supplierProfile) {
+      return res.status(401).json({
+        success: false,
+        message: 'Supplier profile not found or session invalid',
+      });
+    }
+
     const {
       title,
       description,
@@ -225,13 +238,21 @@ export const addProduct = async (req, res, next) => {
       sizes,
       stock,
       isFreeDelivery,
-      supplierName = 'Verified Supplier',
+      supplierName = supplierProfile.storeName || supplierProfile.fullName || 'Verified Supplier',
     } = req.body;
 
     if (!title || !price) {
       return res.status(400).json({
         success: false,
         message: 'Product title and price are required!',
+      });
+    }
+
+    const priceNum = parseFloat(price);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid positive product price is required!',
       });
     }
 
@@ -315,45 +336,28 @@ export const addProduct = async (req, res, next) => {
       }
     }
 
-    let newProduct;
-    try {
-      newProduct = await prisma.product.create({
-        data: {
-          title,
-          description: description || '',
-          price: parseFloat(price),
-          originalPrice: originalPrice ? parseFloat(originalPrice) : null,
-          discountPercentage: discountPercentage ? parseInt(discountPercentage, 10) : 0,
-          categorySlug: finalCategorySlug,
-          images: imageUrls,
-          sizes: parsedSizes,
-          stock: stock ? parseInt(stock, 10) : 50,
-          isFreeDelivery: isFreeDelivery === 'false' ? false : Boolean(isFreeDelivery),
-          supplierName,
-          supplierId,
-        },
-      });
-    } catch (dbErr) {
-      console.warn('Prisma create product fallback:', dbErr.message);
-      // Fallback object to ensure seamless operation
-      const fallbackId = `prod_${Date.now()}`;
-      newProduct = {
-        id: fallbackId,
-        title,
-        description: description || '',
-        price: parseFloat(price),
+    // Authoritative Database Persistence (Strict - NO FAKE FALLBACKS)
+    const newProduct = await prisma.product.create({
+      data: {
+        title: title.trim(),
+        description: (description || '').trim(),
+        price: priceNum,
         originalPrice: originalPrice ? parseFloat(originalPrice) : null,
+        discountPercentage: discountPercentage ? parseInt(discountPercentage, 10) : 0,
         categorySlug: finalCategorySlug,
         images: imageUrls,
         sizes: parsedSizes,
-        stock: stock ? parseInt(stock, 10) : 50,
+        stock: stock !== undefined && stock !== null && stock !== '' ? parseInt(stock, 10) : 50,
+        isFreeDelivery: isFreeDelivery === 'false' ? false : Boolean(isFreeDelivery),
         supplierName,
         supplierId,
-        createdAt: new Date().toISOString(),
-      };
-    }
+      },
+      include: {
+        category: true,
+      },
+    });
 
-    // Also sync to Supabase
+    // Also sync to Supabase if available
     try {
       if (supabase && newProduct) {
         await supabase.from('products').insert([
@@ -374,11 +378,16 @@ export const addProduct = async (req, res, next) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Product created and synced successfully!',
+      message: 'Product created and published successfully to database!',
       data: newProduct,
     });
   } catch (error) {
-    next(error);
+    console.error('Error in addProduct:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to publish product to database',
+      error: error.message,
+    });
   }
 };
 
