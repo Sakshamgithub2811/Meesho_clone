@@ -856,6 +856,27 @@ export const getSupplierSettlements = async (req, res, next) => {
       }
     });
 
+    // 4. Fetch supplier wallet and past withdrawal transactions
+    let wallet = await prisma.wallet.findUnique({
+      where: { userId: supplierId },
+      include: {
+        transactions: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!wallet) {
+      wallet = await prisma.wallet.create({
+        data: { userId: supplierId, balance: 0, pending: 0 },
+        include: { transactions: true },
+      }).catch(() => null);
+    }
+
+    const withdrawalTxns = (wallet?.transactions || []).filter((t) => t.type === 'debit');
+    const totalWithdrawn = withdrawalTxns.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const availableWithdrawable = Math.max(0, Math.round(((settledAmount + escrowBalance) - totalWithdrawn) * 100) / 100);
+
     const now = new Date();
     const daysUntilNextPayout = ((2 - now.getDay() + 7) % 7) || 7;
     const nextPayoutDate = new Date(now.getTime() + daysUntilNextPayout * 24 * 60 * 60 * 1000);
@@ -865,8 +886,29 @@ export const getSupplierSettlements = async (req, res, next) => {
       year: 'numeric',
     });
 
-    // 4. Generate Settlement Ledger strictly based on database order items
+    // 5. Generate Settlement Ledger strictly based on database order items and withdrawal transactions
     const settlements = [];
+
+    // Add withdrawal payout requests
+    withdrawalTxns.forEach((t) => {
+      const isPaid = (Date.now() - new Date(t.createdAt).getTime()) > 24 * 60 * 60 * 1000;
+      const utrMatch = t.description?.match(/UTR:\s*([A-Za-z0-9]+)/i);
+      const utrNumber = utrMatch ? utrMatch[1] : `CMS${t.id.slice(0, 9).toUpperCase()}IMPS`;
+      settlements.push({
+        id: `PAYOUT-${t.id.slice(0, 8).toUpperCase()}`,
+        date: new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        ordersCount: 1,
+        grossAmount: t.amount,
+        commissionRate: '0%',
+        tdsAmount: 0,
+        netAmount: t.amount,
+        status: isPaid ? 'PAID' : 'PROCESSING',
+        utrNumber,
+        bankName: profile?.bankDetails?.bankName || 'Registered Bank Account',
+        type: 'MANUAL_WITHDRAWAL',
+      });
+    });
+
     if (orderItems.length > 0) {
       const deliveredItems = orderItems.filter((i) => (i.itemStatus || i.order?.orderStatus) === 'DELIVERED');
       if (deliveredItems.length > 0) {
@@ -883,6 +925,7 @@ export const getSupplierSettlements = async (req, res, next) => {
           status: 'PAID',
           utrNumber: `CMS${Date.now().toString().slice(-9)}NEFT`,
           bankName: profile?.bankDetails?.bankName || 'Registered Bank Account',
+          type: 'AUTOMATED_BATCH',
         });
       }
 
@@ -899,6 +942,7 @@ export const getSupplierSettlements = async (req, res, next) => {
           status: 'PROCESSING',
           utrNumber: 'Awaiting Bank Settlement Cycle',
           bankName: profile?.bankDetails?.bankName || 'Registered Bank Account',
+          type: 'ESCROW_TRANSIT',
         });
       }
     }
@@ -908,7 +952,9 @@ export const getSupplierSettlements = async (req, res, next) => {
       data: {
         lifetimeSettled: Math.round(settledAmount * 100) / 100,
         escrowBalance: Math.round(escrowBalance * 100) / 100,
-        nextPayoutAmount: Math.round(escrowBalance * 100) / 100,
+        nextPayoutAmount: availableWithdrawable,
+        availableWithdrawable,
+        totalWithdrawn: Math.round(totalWithdrawn * 100) / 100,
         nextPayoutDate: nextPayoutDateStr,
         totalRevenue: Math.round(grossRevenue * 100) / 100,
         totalDeductions: Math.round(totalDeductions * 100) / 100,
@@ -1355,6 +1401,169 @@ export const updateReturnStatus = async (req, res, next) => {
 
     return res.status(404).json({ success: false, message: 'Return record not found' });
   } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 15. Request Supplier Payout / Escrow Withdrawal
+ * POST /api/supplier/finance-settlements/withdraw
+ * POST /api/supplier/request-payout
+ */
+export const requestSupplierPayout = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    // 1. Fetch Profile and verified Bank Details
+    const profile = await prisma.profile.findUnique({
+      where: { id: supplierId },
+      select: {
+        id: true,
+        fullName: true,
+        storeName: true,
+        bankDetails: true,
+      },
+    });
+
+    if (!profile) {
+      return res.status(404).json({ success: false, message: 'Supplier profile not found' });
+    }
+
+    const bank = profile.bankDetails;
+    if (!bank || !bank.accountNumber || !bank.ifsc) {
+      return res.status(400).json({
+        success: false,
+        message: 'No verified bank account found. Please register your Bank Account Number & IFSC before requesting a payout.',
+      });
+    }
+
+    const { amount, payoutType = 'ON_DEMAND', notes } = req.body;
+    const numAmount = parseFloat(amount);
+
+    if (!numAmount || isNaN(numAmount) || numAmount < 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Minimum payout withdrawal amount is ₹100.00',
+      });
+    }
+
+    // 2. Fetch order items to calculate live real balance
+    const orderItems = await prisma.orderItem.findMany({
+      where: { product: { supplierId } },
+      include: { order: true },
+    });
+
+    let settledAmount = 0;
+    let escrowBalance = 0;
+
+    orderItems.forEach((item) => {
+      const itemTotal = (item.price || 0) * (item.quantity || 1);
+      const tds = Math.round(itemTotal * 0.01 * 100) / 100;
+      const net = itemTotal - tds;
+
+      const itemStatus = (item.itemStatus || item.order?.orderStatus || '').toUpperCase();
+      if (['DELIVERED', 'COMPLETED'].includes(itemStatus)) {
+        settledAmount += net;
+      } else if (['SHIPPED', 'CONFIRMED', 'OUT_FOR_DELIVERY', 'ORDERED'].includes(itemStatus)) {
+        escrowBalance += net;
+      }
+    });
+
+    // 3. Fetch past withdrawal transactions
+    let wallet = await prisma.wallet.findUnique({
+      where: { userId: supplierId },
+      include: { transactions: true },
+    });
+
+    if (!wallet) {
+      wallet = await prisma.wallet.create({
+        data: { userId: supplierId, balance: 0, pending: 0 },
+        include: { transactions: true },
+      });
+    }
+
+    const pastWithdrawals = (wallet.transactions || [])
+      .filter((t) => t.type === 'debit')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const maxEligible = Math.max(0, Math.round(((settledAmount + escrowBalance) - pastWithdrawals) * 100) / 100);
+
+    if (numAmount > maxEligible) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient balance for payout. Available: ₹${maxEligible.toLocaleString('en-IN')}, Requested: ₹${numAmount.toLocaleString('en-IN')}`,
+        availableBalance: maxEligible,
+      });
+    }
+
+    // 4. Atomic transaction to create payout withdrawal record
+    const utrRef = `CMS${Date.now().toString().slice(-8)}IMPS`;
+    const maskedAcc = `•••• ${String(bank.accountNumber).slice(-4)}`;
+    const destinationStr = `${bank.bankName || 'Bank Account'} (${maskedAcc}, IFSC: ${bank.ifsc})`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Create debit record in WalletTransaction
+      const txn = await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: numAmount,
+          type: 'debit',
+          description: `Payout Request to ${destinationStr} | UTR: ${utrRef} | Type: ${payoutType}`,
+        },
+      });
+
+      // Update wallet pending / balance counters
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          pending: { increment: numAmount },
+        },
+      });
+
+      // Create notification for supplier
+      await tx.notification.create({
+        data: {
+          userId: supplierId,
+          title: 'Payout Withdrawal Initiated! 🏦',
+          body: `Your payout request of ₹${numAmount.toLocaleString('en-IN')} has been initiated to ${destinationStr}. Reference: ${utrRef}`,
+          type: 'earning',
+          data: {
+            txnId: txn.id,
+            amount: numAmount,
+            utr: utrRef,
+            bank: destinationStr,
+          },
+        },
+      }).catch(() => {});
+
+      return txn;
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Payout request of ₹${numAmount.toLocaleString('en-IN')} initiated successfully to ${destinationStr}!`,
+      data: {
+        payoutId: result.id,
+        amount: numAmount,
+        utrNumber: utrRef,
+        bankDetails: {
+          bankName: bank.bankName,
+          accountNumber: maskedAcc,
+          ifsc: bank.ifsc,
+          beneficiaryName: bank.beneficiaryName || profile.fullName,
+        },
+        status: 'PROCESSING',
+        date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      },
+    });
+  } catch (error) {
+    console.error('Error requesting supplier payout:', error);
     next(error);
   }
 };

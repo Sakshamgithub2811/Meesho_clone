@@ -21,7 +21,9 @@ import {
   AlertCircle,
   Copy,
   Receipt,
-  FileText
+  FileText,
+  X,
+  Wallet
 } from 'lucide-react';
 
 export default function SellerSettlements1({ onNavigate }) {
@@ -39,6 +41,9 @@ export default function SellerSettlements1({ onNavigate }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
 
   const loadSettlementsData = useCallback(async (isRefresh = false) => {
     try {
@@ -108,6 +113,51 @@ export default function SellerSettlements1({ onNavigate }) {
     }
   };
 
+  const bank = financeData?.bankDetails || profile?.bankDetails || {};
+  const maskedAcc = bank?.accountNumber
+    ? `•••• ${String(bank.accountNumber).slice(-4)}`
+    : 'Not Registered';
+
+  const maxAvailable = Number(
+    financeData?.availableWithdrawable ??
+    financeData?.nextPayoutAmount ??
+    financeData?.escrowBalance ??
+    0
+  );
+
+  const handleWithdrawSubmit = async (e) => {
+    e.preventDefault();
+    const amt = parseFloat(withdrawAmount);
+    if (!amt || isNaN(amt) || amt < 100) {
+      toast.error('Minimum withdrawal amount is ₹100');
+      return;
+    }
+
+    if (!bank?.accountNumber || !bank?.ifsc) {
+      toast.error('Please register your Bank Account details first in Profile settings.');
+      return;
+    }
+
+    if (amt > maxAvailable) {
+      toast.error(`Requested amount exceeds available balance (₹${maxAvailable.toLocaleString('en-IN')})`);
+      return;
+    }
+
+    setIsSubmittingWithdraw(true);
+    try {
+      const res = await supplierApiService.requestSupplierPayout(amt);
+      toast.success(res?.message || `🎉 Payout request of ₹${amt.toLocaleString('en-IN')} submitted successfully!`);
+      setShowWithdrawModal(false);
+      setWithdrawAmount('');
+      await loadSettlementsData(true);
+    } catch (err) {
+      console.error('Payout request error:', err);
+      toast.error(err.message || 'Failed to submit payout request');
+    } finally {
+      setIsSubmittingWithdraw(false);
+    }
+  };
+
   const supplierDisplayName =
     profile?.storeName || profile?.fullName || profile?.name || 'Verified Supplier';
 
@@ -128,11 +178,6 @@ export default function SellerSettlements1({ onNavigate }) {
       item.bankName?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
-
-  const bank = financeData?.bankDetails || profile?.bankDetails || {};
-  const maskedAcc = bank?.accountNumber
-    ? `•••• ${String(bank.accountNumber).slice(-4)}`
-    : 'Not Registered';
 
   return (
     <DashboardLayout
@@ -167,6 +212,18 @@ export default function SellerSettlements1({ onNavigate }) {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
+                onClick={() => {
+                  setWithdrawAmount(maxAvailable > 0 ? String(Math.floor(maxAvailable)) : '');
+                  setShowWithdrawModal(true);
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white text-[#b7004d] hover:bg-pink-50 text-xs font-black transition shadow-lg shadow-pink-950/30 cursor-pointer active:scale-95"
+              >
+                <ArrowUpRight className="w-4 h-4 text-[#b7004d]" />
+                <span>Withdraw to Bank</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => loadSettlementsData(true)}
                 disabled={refreshing}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/20 text-white text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
@@ -183,78 +240,121 @@ export default function SellerSettlements1({ onNavigate }) {
         {/* ======================================================== */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Lifetime Settled */}
-          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Lifetime Settled</span>
-              <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                ₹
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Lifetime Settled</span>
+                <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  ₹
+                </div>
+              </div>
+              <div className="text-2xl font-black text-slate-900">
+                ₹{Number(financeData?.lifetimeSettled || 0).toLocaleString('en-IN')}
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-[11px]">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold">
+                  0% Platform Fee
+                </span>
+                <span className="text-slate-400">Paid to Bank</span>
               </div>
             </div>
-            <div className="text-2xl font-black text-slate-900">
-              ₹{Number(financeData?.lifetimeSettled || 0).toLocaleString('en-IN')}
-            </div>
-            <div className="mt-2 flex items-center gap-2 text-[11px]">
-              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold">
-                0% Platform Fee
-              </span>
-              <span className="text-slate-400">Paid to Bank</span>
-            </div>
+            {Number(financeData?.totalWithdrawn || 0) > 0 && (
+              <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex justify-between">
+                <span>Total Withdrawn:</span>
+                <span className="font-bold text-slate-700">₹{Number(financeData.totalWithdrawn).toLocaleString('en-IN')}</span>
+              </div>
+            )}
           </div>
 
-          {/* Card 2: Next Payout Amount */}
-          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Upcoming Settlement</span>
-              <div className="w-9 h-9 rounded-2xl bg-pink-50 text-[#b7004d] flex items-center justify-center">
-                <Clock className="w-4 h-4" />
+          {/* Card 2: Available for Payout */}
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Available for Payout</span>
+                <div className="w-9 h-9 rounded-2xl bg-pink-50 text-[#b7004d] flex items-center justify-center">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-[#b7004d]">
+                ₹{Number(financeData?.availableWithdrawable ?? financeData?.nextPayoutAmount ?? 0).toLocaleString('en-IN')}
+              </div>
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500">
+                <span>Cycle:</span>
+                <span className="font-bold text-slate-800">{financeData?.nextPayoutDate || 'Instant / T+2'}</span>
               </div>
             </div>
-            <div className="text-2xl font-black text-[#b7004d]">
-              ₹{Number(financeData?.nextPayoutAmount || 0).toLocaleString('en-IN')}
-            </div>
-            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500">
-              <span>Date:</span>
-              <span className="font-bold text-slate-800">{financeData?.nextPayoutDate || 'Next Tuesday'}</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setWithdrawAmount(String(Math.floor(maxAvailable)));
+                setShowWithdrawModal(true);
+              }}
+              className="mt-3.5 w-full py-2 px-3 rounded-xl bg-[#b7004d]/10 hover:bg-[#b7004d]/20 text-[#b7004d] text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer border border-pink-200 active:scale-95"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" />
+              <span>Request Direct Payout</span>
+            </button>
           </div>
 
           {/* Card 3: Escrow In-Transit */}
-          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Escrow In-Transit</span>
-              <div className="w-9 h-9 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Receipt className="w-4 h-4" />
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Escrow In-Transit</span>
+                <div className="w-9 h-9 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Receipt className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-slate-900">
+                ₹{Number(financeData?.escrowBalance || 0).toLocaleString('en-IN')}
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-[11px]">
+                <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold">
+                  Dispatched Orders
+                </span>
+                <span className="text-slate-400">Release on Delivery</span>
               </div>
             </div>
-            <div className="text-2xl font-black text-slate-900">
-              ₹{Number(financeData?.escrowBalance || 0).toLocaleString('en-IN')}
-            </div>
-            <div className="mt-2 flex items-center gap-2 text-[11px]">
-              <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold">
-                Dispatched Orders
-              </span>
-              <span className="text-slate-400">Release on Delivery</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setWithdrawAmount(String(Math.floor(maxAvailable)));
+                setShowWithdrawModal(true);
+              }}
+              className="mt-3.5 w-full py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer border border-amber-300/40 active:scale-95"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5 text-amber-700" />
+              <span>Withdraw Escrow Balance</span>
+            </button>
           </div>
 
           {/* Card 4: Verified Bank Details */}
-          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Settlement Account</span>
-              <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <Building className="w-4 h-4" />
+          <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Settlement Account</span>
+                <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Building className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-sm font-black text-slate-900 truncate">
+                {bank?.bankName || 'Verified Bank Account'}
+              </div>
+              <div className="mt-1 text-xs font-mono text-slate-600">
+                {maskedAcc} {bank?.ifsc ? `• ${bank.ifsc}` : ''}
+              </div>
+              <div className="mt-2 flex items-center gap-1 text-[11px] text-emerald-600 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Penny-Drop Verified</span>
               </div>
             </div>
-            <div className="text-sm font-black text-slate-900 truncate">
-              {bank?.bankName || 'Verified Bank Account'}
-            </div>
-            <div className="mt-1 text-xs font-mono text-slate-600">
-              {maskedAcc} {bank?.ifsc ? `• ${bank.ifsc}` : ''}
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-[11px] text-emerald-600 font-semibold">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Penny-Drop Verified</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleNav('/supplier-profile1')}
+              className="mt-3 text-left text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition"
+            >
+              Change Bank ➔
+            </button>
           </div>
         </div>
 
@@ -414,6 +514,156 @@ export default function SellerSettlements1({ onNavigate }) {
           </button>
         </div>
       </div>
+
+      {/* Payout Withdrawal Modal */}
+      {showWithdrawModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-pink-50 text-[#b7004d] flex items-center justify-center font-bold">
+                  <ArrowUpRight className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Request Bank Payout</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">Direct Transfer to Settlement Account</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWithdrawModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleWithdrawSubmit} className="space-y-4 pt-4">
+              {/* Balances Summary */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Available Balance</span>
+                  <span className="text-lg font-black text-slate-900">
+                    ₹{Number(maxAvailable).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-amber-50/60 border border-amber-100">
+                  <span className="text-[10px] uppercase font-bold text-amber-700 block">Escrow In-Transit</span>
+                  <span className="text-lg font-black text-amber-900">
+                    ₹{Number(financeData?.escrowBalance || 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Destination Bank Account Card */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1.5">
+                    <Building className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Destination Bank</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                    Verified
+                  </span>
+                </div>
+                <p className="text-xs font-black text-slate-800">{bank?.bankName || 'Registered Bank Account'}</p>
+                <p className="text-[11px] font-mono text-slate-600">
+                  A/C: {maskedAcc} {bank?.ifsc ? `• IFSC: ${bank.ifsc}` : ''}
+                </p>
+                {bank?.beneficiaryName && (
+                  <p className="text-[10px] text-slate-500">Beneficiary: {bank.beneficiaryName}</p>
+                )}
+              </div>
+
+              {/* Amount Input */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">Withdrawal Amount (₹)</label>
+                  <span className="text-[10px] text-slate-400 font-medium">Min: ₹100</span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">₹</span>
+                  <input
+                    type="number"
+                    min="100"
+                    max={maxAvailable > 0 ? maxAvailable : 100}
+                    step="1"
+                    placeholder="Enter amount (min ₹100)"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    required
+                    className="w-full pl-8 pr-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-black text-slate-900 focus:outline-hidden focus:border-[#b7004d]"
+                  />
+                </div>
+
+                {/* Quick Select Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {[500, 1000, 2000, 5000].map((amt) => {
+                    if (amt > maxAvailable) return null;
+                    return (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setWithdrawAmount(String(amt))}
+                        className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition cursor-pointer"
+                      >
+                        ₹{amt.toLocaleString('en-IN')}
+                      </button>
+                    );
+                  })}
+                  {maxAvailable >= 100 && (
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawAmount(String(Math.floor(maxAvailable)))}
+                      className="px-2.5 py-1 rounded-xl bg-pink-100 hover:bg-pink-200 text-[#b7004d] text-[10px] font-bold transition cursor-pointer"
+                    >
+                      Max (₹{Math.floor(maxAvailable).toLocaleString('en-IN')})
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Fee Notice */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-500 space-y-0.5">
+                <div className="flex items-center gap-1.5 text-slate-700 font-bold">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>0% Commission • Statutory 1% TDS u/s 194-O</span>
+                </div>
+                <p>Funds will be credited via IMPS/NEFT within 24 to 48 banking hours.</p>
+              </div>
+
+              {/* Submit CTA */}
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowWithdrawModal(false)}
+                  disabled={isSubmittingWithdraw}
+                  className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingWithdraw || !withdrawAmount || Number(withdrawAmount) < 100 || Number(withdrawAmount) > maxAvailable}
+                  className="flex-1 py-2.5 rounded-2xl bg-[#b7004d] hover:bg-[#92003d] disabled:opacity-50 text-white text-xs font-black transition flex items-center justify-center gap-2 shadow-md shadow-pink-900/20 cursor-pointer"
+                >
+                  {isSubmittingWithdraw ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowUpRight className="w-4 h-4" />
+                      <span>Confirm Transfer</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <LogoutConfirmDialog
         isOpen={showLogoutConfirm}
