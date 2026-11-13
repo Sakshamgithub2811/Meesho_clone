@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
@@ -24,9 +24,20 @@ import {
   MapPin,
   Calendar,
   AlertCircle,
-  Printer
+  Printer,
+  Volume2,
+  VolumeX,
+  Radio,
+  Sparkles,
+  BellRing
 } from 'lucide-react';
 import OrderPrintSlipModal from '../../components/admin/orders/OrderPrintSlipModal';
+import {
+  playOrderChime,
+  playTestChime,
+  isSoundAlertEnabled,
+  setSoundAlertEnabled
+} from '../../utils/orderSoundChime';
 
 const STATUS_OPTIONS = [
   { id: 'ALL', label: 'All Orders' },
@@ -58,11 +69,19 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
   const [printOrder, setPrintOrder] = useState(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // Load real orders from backend
-  const loadOrders = useCallback(async (isRefresh = false) => {
+  // Real-Time Radar & Sound Chime Alert States
+  const [soundEnabled, setSoundEnabled] = useState(isSoundAlertEnabled);
+  const [radarActive, setRadarActive] = useState(true);
+  const [lastRadarPing, setLastRadarPing] = useState(null);
+  const [newlyArrivedIds, setNewlyArrivedIds] = useState(new Set());
+  const knownOrderIdsRef = useRef(new Set());
+  const isFirstLoadRef = useRef(true);
+
+  // Load real orders from backend (supports manual refresh & silent radar polling)
+  const loadOrders = useCallback(async (isRefresh = false, isSilentRadar = false) => {
     try {
       if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+      else if (!isSilentRadar) setLoading(true);
 
       const [ordersRes, profRes] = await Promise.allSettled([
         supplierApiService.fetchSupplierOrders(),
@@ -74,14 +93,57 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
           ordersRes.value.data ||
           ordersRes.value.orders ||
           (Array.isArray(ordersRes.value) ? ordersRes.value : []);
+
+        // Check for new incoming orders during radar ping
+        if (isFirstLoadRef.current) {
+          ordData.forEach((o) => knownOrderIdsRef.current.add(o.id));
+          isFirstLoadRef.current = false;
+        } else {
+          const freshIncoming = ordData.filter(
+            (o) => !knownOrderIdsRef.current.has(o.id)
+          );
+
+          if (freshIncoming.length > 0) {
+            // Play Real-Time Melodic Order Chime
+            playOrderChime();
+
+            // Track newly arrived IDs to highlight in table
+            setNewlyArrivedIds((prev) => {
+              const next = new Set(prev);
+              freshIncoming.forEach((o) => next.add(o.id));
+              return next;
+            });
+
+            // Prominent Toast Notification
+            const topOrder = freshIncoming[0];
+            const displayId = String(topOrder.id).slice(-8).toUpperCase();
+            const orderAmt = Number(topOrder.totalAmount || 0).toLocaleString('en-IN');
+            toast.success(
+              `🔔 New Order Received! #${displayId} (₹${orderAmt})`,
+              {
+                duration: 9000,
+                description: `${freshIncoming.length > 1 ? `+${freshIncoming.length - 1} more order(s). ` : ''}Fulfill promptly to maintain high seller rating.`,
+                action: {
+                  label: 'View Order',
+                  onClick: () => setSelectedOrder(topOrder),
+                },
+              }
+            );
+
+            // Add to known IDs
+            freshIncoming.forEach((o) => knownOrderIdsRef.current.add(o.id));
+          }
+        }
+
         setOrders(ordData);
-      } else {
+        setLastRadarPing(new Date());
+      } else if (!isSilentRadar) {
         setOrders([]);
       }
 
       if (profRes.status === 'fulfilled' && profRes.value) {
         setProfile(profRes.value);
-      } else {
+      } else if (!isSilentRadar) {
         setProfile(getCurrentSupplier());
       }
 
@@ -89,10 +151,12 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
         toast.success('Live supplier orders updated');
       }
     } catch (err) {
-      console.error('Error loading orders:', err);
-      toast.error('Failed to load orders from server');
+      if (!isSilentRadar) {
+        console.error('Error loading orders:', err);
+        toast.error('Failed to load orders from server');
+      }
     } finally {
-      setLoading(false);
+      if (!isSilentRadar) setLoading(false);
       setRefreshing(false);
     }
   }, []);
@@ -100,6 +164,40 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
+
+  // Real-Time Background Radar Polling (Every 15 seconds)
+  useEffect(() => {
+    if (!radarActive) return;
+
+    const interval = setInterval(() => {
+      loadOrders(false, true); // silent radar ping
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [radarActive, loadOrders]);
+
+  const toggleSoundAlert = () => {
+    const nextState = !soundEnabled;
+    setSoundEnabled(nextState);
+    setSoundAlertEnabled(nextState);
+    if (nextState) {
+      playTestChime();
+      toast.success('🔔 Order Sound Chime Enabled! Test chime played.');
+    } else {
+      toast.info('🔕 Order Sound Chime Muted');
+    }
+  };
+
+  const toggleRadar = () => {
+    const nextState = !radarActive;
+    setRadarActive(nextState);
+    if (nextState) {
+      toast.success('📡 Live Order Radar Activated (15s auto-check)');
+      loadOrders(false, true);
+    } else {
+      toast.info('⏸️ Live Order Radar Paused');
+    }
+  };
 
   const handleTabChange = (tabId) => {
     if (onNavigateTab) return onNavigateTab(tabId);
@@ -201,7 +299,7 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
   const mainContent = (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold tracking-wide uppercase mb-1">
               <ShoppingCart className="w-3.5 h-3.5" />
@@ -215,15 +313,74 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => loadOrders(true)}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span>Sync Orders</span>
-          </button>
+          {/* Real-time Order Radar & Sound Chime Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Live Radar Status & Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleRadar}
+              className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition active:scale-95 cursor-pointer ${
+                radarActive
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+              }`}
+              title={
+                radarActive
+                  ? `Live Radar Active: Polling every 15s ${lastRadarPing ? `(Last ping: ${lastRadarPing.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})` : ''}`
+                  : 'Radar Paused (Click to resume)'
+              }
+            >
+              <span className="relative flex h-2.5 w-2.5">
+                {radarActive && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span
+                  className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                    radarActive ? 'bg-emerald-500' : 'bg-slate-400'
+                  }`}
+                ></span>
+              </span>
+              <Radio className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{radarActive ? 'Live Radar (15s)' : 'Radar Paused'}</span>
+              <span className="sm:hidden">{radarActive ? 'Radar' : 'Off'}</span>
+            </button>
+
+            {/* Sound Chime Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleSoundAlert}
+              className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition active:scale-95 cursor-pointer ${
+                soundEnabled
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'
+              }`}
+              title={
+                soundEnabled
+                  ? 'Sound Chime is ON: Melodic bell rings on incoming orders (Click to test/mute)'
+                  : 'Sound Chime is MUTED (Click to enable)'
+              }
+            >
+              {soundEnabled ? (
+                <Volume2 className="w-4 h-4 text-indigo-600 animate-pulse" />
+              ) : (
+                <VolumeX className="w-4 h-4 text-slate-400" />
+              )}
+              <span className="hidden sm:inline">{soundEnabled ? 'Chime ON' : 'Chime Off'}</span>
+              <span className="sm:hidden">{soundEnabled ? 'Sound' : 'Muted'}</span>
+            </button>
+
+            {/* Manual Sync Button */}
+            <button
+              type="button"
+              onClick={() => loadOrders(true)}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
+              title="Manually synchronize orders immediately"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Sync Orders</span>
+            </button>
+          </div>
         </div>
 
         {/* Real Order Metric Counters */}
@@ -373,9 +530,17 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
                     return (
                       <tr key={ord.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="py-4 px-5">
-                          <span className="font-mono font-bold text-slate-900 block text-xs">
-                            #{String(ord.id).slice(-8).toUpperCase()}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-bold text-slate-900 block text-xs">
+                              #{String(ord.id).slice(-8).toUpperCase()}
+                            </span>
+                            {newlyArrivedIds.has(ord.id) && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500 text-white text-[9px] font-black uppercase tracking-wider animate-pulse shadow-xs">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                <span>NEW</span>
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[11px] text-slate-400 font-medium">
                             {ord.createdAt ? new Date(ord.createdAt).toLocaleDateString('en-IN') : 'Recent'}
                           </span>

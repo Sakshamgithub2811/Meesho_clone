@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
@@ -6,6 +6,7 @@ import supplierApiService, { clearAuthSession, getCurrentSupplier, fetchSupplier
 import { auth } from '../../utils/firebase';
 import { signOut } from 'firebase/auth';
 import { toast } from 'sonner';
+import { playOrderChime } from '../../utils/orderSoundChime';
 
 import { SUPPLIER_MENU } from './supplierNavConfig';
 
@@ -159,6 +160,57 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  // Radar tracking in Master Hub
+  const knownOrderIdsRef = useRef(new Set());
+  const isFirstLoadRef = useRef(true);
+
+  // Background radar for incoming orders (every 20s) when not on orders tab
+  useEffect(() => {
+    const radarInterval = setInterval(async () => {
+      // If currently on orders tab, SellerOrders1 handles its own real-time radar
+      if (activeTab === 'orders') return;
+
+      try {
+        const res = await supplierApiService.fetchSupplierOrders({ limit: 10 });
+        const list = Array.isArray(res?.orders)
+          ? res.orders
+          : Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res)
+          ? res
+          : [];
+
+        if (isFirstLoadRef.current) {
+          list.forEach((o) => knownOrderIdsRef.current.add(o.id));
+          isFirstLoadRef.current = false;
+        } else {
+          const fresh = list.filter((o) => !knownOrderIdsRef.current.has(o.id));
+          if (fresh.length > 0) {
+            fresh.forEach((o) => knownOrderIdsRef.current.add(o.id));
+            setOrders(list);
+            playOrderChime();
+            const topOrd = fresh[0];
+            const displayId = String(topOrd.id).slice(-8).toUpperCase();
+            const orderAmt = Number(topOrd.totalAmount || 0).toLocaleString('en-IN');
+            toast.success(
+              `🔔 New Order Received! #${displayId} (₹${orderAmt})`,
+              {
+                duration: 9000,
+                description: `${fresh.length > 1 ? `+${fresh.length - 1} more order(s). ` : ''}Click to open Orders & Dispatch.`,
+                action: {
+                  label: 'View in Orders',
+                  onClick: () => handleTabChange('orders'),
+                },
+              }
+            );
+          }
+        }
+      } catch (_) {}
+    }, 20000);
+
+    return () => clearInterval(radarInterval);
+  }, [activeTab, handleTabChange]);
 
   // Safe Logout Handler
   const performLogout = async () => {
