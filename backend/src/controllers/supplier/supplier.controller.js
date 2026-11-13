@@ -215,15 +215,50 @@ export const addProduct = async (req, res, next) => {
       });
     }
 
-    // Verify supplier profile exists
+    // Verify supplier profile exists and retrieve compliance credentials
     const supplierProfile = await prisma.profile.findUnique({
       where: { id: supplierId },
-      select: { id: true, storeName: true, fullName: true },
+      select: {
+        id: true,
+        storeName: true,
+        fullName: true,
+        gstin: true,
+        pan: true,
+        bankDetails: true,
+        role: true,
+      },
     });
     if (!supplierProfile) {
       return res.status(401).json({
         success: false,
         message: 'Supplier profile not found or session invalid',
+      });
+    }
+
+    // KYC Compliance Gate: Supplier must have approved KYC application or verified business credentials
+    const kycApplication = await prisma.kYCApplication.findFirst({
+      where: {
+        userId: supplierId,
+        type: 'supplier',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const isKycApproved = kycApplication?.status === 'APPROVED';
+    const hasVerifiedTaxProfile = Boolean(supplierProfile.gstin && supplierProfile.bankDetails);
+
+    if (!isKycApproved && !hasVerifiedTaxProfile) {
+      const kycStatus = kycApplication?.status || 'NOT_SUBMITTED';
+      return res.status(403).json({
+        success: false,
+        error: 'KYC_REQUIRED',
+        kycStatus,
+        message:
+          kycStatus === 'PENDING' || kycStatus === 'UNDER_REVIEW'
+            ? 'KYC Verification Pending: Your business KYC is under review by compliance. You can publish live listings once approved.'
+            : kycStatus === 'REJECTED'
+            ? 'KYC Verification Rejected: Please update and re-submit your business documents in KYC Hub to publish listings.'
+            : 'KYC Verification Required: You must complete business KYC verification (GSTIN, PAN & Bank Details) before publishing live products.',
       });
     }
 
@@ -431,25 +466,55 @@ export const updateProduct = async (req, res, next) => {
     delete updateData.id;
     delete updateData.supplierId; // Cannot transfer ownership
 
-    // Format numbers
-    if (updateData.price) updateData.price = parseFloat(updateData.price);
-    if (updateData.originalPrice) updateData.originalPrice = parseFloat(updateData.originalPrice);
-    if (updateData.stock) updateData.stock = parseInt(updateData.stock, 10);
-    if (updateData.discountPercentage) updateData.discountPercentage = parseInt(updateData.discountPercentage, 10);
+    const hostBaseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // Handle newly uploaded image files via Multer (uploadProductMedia)
+    let uploadedUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const storedUrl = await uploadFileToStorage(file, hostBaseUrl);
+        if (storedUrl) uploadedUrls.push(storedUrl);
+      }
+    }
+
+    // Process images in request body (JSON array, comma-separated string, or existing URLs)
+    let bodyImages = [];
     if (updateData.images) {
-      if (typeof updateData.images === 'string') {
+      let rawImgs = updateData.images;
+      if (typeof rawImgs === 'string') {
         try {
-          updateData.images = JSON.parse(updateData.images);
+          rawImgs = JSON.parse(rawImgs);
         } catch {
-          updateData.images = updateData.images.split(',').map((s) => s.trim());
+          rawImgs = rawImgs.split(',').map((s) => s.trim());
         }
       }
-      if (!Array.isArray(updateData.images)) {
-        updateData.images = [updateData.images];
+      if (Array.isArray(rawImgs)) {
+        bodyImages = rawImgs;
+      } else if (typeof rawImgs === 'string' && rawImgs.trim()) {
+        bodyImages = [rawImgs.trim()];
       }
-      const hostBaseUrl = `${req.protocol}://${req.get('host')}`;
-      updateData.images = (await Promise.all(
-        updateData.images.map(async (u) => {
+    }
+
+    // Support optional existingImages field
+    if (updateData.existingImages) {
+      let existImgs = updateData.existingImages;
+      if (typeof existImgs === 'string') {
+        try {
+          existImgs = JSON.parse(existImgs);
+        } catch {
+          existImgs = existImgs.split(',').map((s) => s.trim());
+        }
+      }
+      if (Array.isArray(existImgs)) {
+        bodyImages = [...bodyImages, ...existImgs];
+      }
+      delete updateData.existingImages;
+    }
+
+    // Convert any base64 data URLs in body images to persistent cloud files
+    if (bodyImages.length > 0) {
+      bodyImages = (await Promise.all(
+        bodyImages.map(async (u) => {
           if (typeof u === 'string' && u.startsWith('data:image/')) {
             return await saveBase64Image(u, hostBaseUrl);
           }
@@ -457,6 +522,59 @@ export const updateProduct = async (req, res, next) => {
         })
       )).filter(Boolean);
     }
+
+    // Combine uploaded files and body images
+    const replaceImages = updateData.replaceImages === 'true' || updateData.replaceImages === true;
+    delete updateData.replaceImages;
+
+    if (uploadedUrls.length > 0 || bodyImages.length > 0) {
+      if (replaceImages) {
+        updateData.images = uploadedUrls.length > 0 ? uploadedUrls : bodyImages;
+      } else {
+        const baseImages = bodyImages.length > 0 ? bodyImages : (existing.images || []);
+        updateData.images = Array.from(new Set([...baseImages, ...uploadedUrls])).filter(Boolean);
+      }
+    }
+
+    // Format numbers
+    if (updateData.price !== undefined) updateData.price = parseFloat(updateData.price);
+    if (updateData.originalPrice !== undefined) updateData.originalPrice = parseFloat(updateData.originalPrice);
+    if (updateData.stock !== undefined) updateData.stock = parseInt(updateData.stock, 10);
+    if (updateData.discountPercentage !== undefined) updateData.discountPercentage = parseInt(updateData.discountPercentage, 10);
+
+    // Format arrays/booleans if parsed from multipart/form-data
+    if (updateData.sizes && typeof updateData.sizes === 'string') {
+      try {
+        updateData.sizes = JSON.parse(updateData.sizes);
+      } catch {
+        updateData.sizes = updateData.sizes.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    if (updateData.colors && typeof updateData.colors === 'string') {
+      try {
+        updateData.colors = JSON.parse(updateData.colors);
+      } catch {
+        updateData.colors = updateData.colors.split(',').map((c) => c.trim()).filter(Boolean);
+      }
+    }
+    if (typeof updateData.isFreeDelivery === 'string') {
+      updateData.isFreeDelivery = updateData.isFreeDelivery === 'true';
+    }
+
+    if (updateData.categoryName && !updateData.categorySlug) {
+      updateData.categorySlug = slugify(updateData.categoryName, { lower: true, strict: true });
+    }
+    if (updateData.categorySlug) {
+      await prisma.category.upsert({
+        where: { slug: updateData.categorySlug },
+        update: {},
+        create: {
+          name: updateData.categoryName || updateData.categorySlug.replace(/-/g, ' ').toUpperCase(),
+          slug: updateData.categorySlug,
+        },
+      });
+    }
+    delete updateData.categoryName;
 
     const updated = await prisma.product.update({
       where: { id },
@@ -543,6 +661,170 @@ export const deleteProduct = async (req, res, next) => {
         ? 'Product archived from catalog (existing orders preserved)!'
         : 'Product deleted successfully!',
       softDeleted: deletionResult.softDeleted,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 5b. Bulk Update Products (Stock & Price Batch Update)
+ * PATCH /api/supplier/products/bulk
+ */
+export const bulkUpdateProducts = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    const { productIds, action, stockValue, stockMode, priceValue, priceMode } = req.body;
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'productIds array is required and cannot be empty',
+      });
+    }
+
+    // Verify products belong to this supplier
+    const targetProducts = await prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        supplierId,
+        isDeleted: false,
+      },
+    });
+
+    if (targetProducts.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No matching products found for this supplier',
+      });
+    }
+
+    const updatedResults = await prisma.$transaction(async (tx) => {
+      const updates = [];
+
+      for (const prod of targetProducts) {
+        let newStock = prod.stock;
+        let newPrice = prod.price;
+
+        // Stock Updates
+        if (action === 'STOCK' || stockMode) {
+          if (stockMode === 'OUT_OF_STOCK') {
+            newStock = 0;
+          } else if (stockMode === 'SET' && stockValue !== undefined && stockValue !== null && stockValue !== '') {
+            newStock = Math.max(0, parseInt(stockValue, 10));
+          } else if (stockMode === 'ADD' && stockValue !== undefined && stockValue !== null && stockValue !== '') {
+            newStock = Math.max(0, prod.stock + parseInt(stockValue, 10));
+          }
+        }
+
+        // Price Updates
+        if (action === 'PRICE' || priceMode) {
+          if (priceMode === 'SET' && priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            newPrice = Math.max(1, parseFloat(priceValue));
+          } else if (priceMode === 'PERCENT_DISCOUNT' && priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            const pct = Math.min(99, Math.max(1, parseFloat(priceValue)));
+            newPrice = Math.max(1, Math.round(prod.price * (1 - pct / 100)));
+          } else if (priceMode === 'FLAT_DISCOUNT' && priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            const flat = parseFloat(priceValue);
+            newPrice = Math.max(1, Math.round(prod.price - flat));
+          }
+        }
+
+        // Apply update to product
+        const updated = await tx.product.update({
+          where: { id: prod.id },
+          data: {
+            stock: newStock,
+            price: newPrice,
+          },
+        });
+        updates.push(updated);
+      }
+
+      return updates;
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully bulk updated ${updatedResults.length} product(s)!`,
+      count: updatedResults.length,
+      data: updatedResults,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 5c. Bulk Delete Products
+ * POST /api/supplier/products/bulk-delete or DELETE /api/supplier/products/bulk
+ */
+export const bulkDeleteProducts = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    const { productIds } = req.body;
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'productIds array is required and cannot be empty',
+      });
+    }
+
+    // Verify products belong to this supplier
+    const targetProducts = await prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        supplierId,
+        isDeleted: false,
+      },
+      select: { id: true },
+    });
+
+    const validIds = targetProducts.map((p) => p.id);
+    if (validIds.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No matching products found for this supplier',
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Clean cart and wishlist references to prevent foreign key errors
+      await Promise.all([
+        tx.cartItem.deleteMany({ where: { productId: { in: validIds } } }),
+        tx.wishlistItem.deleteMany({ where: { productId: { in: validIds } } }),
+      ]);
+
+      // Soft delete all target products
+      await tx.product.updateMany({
+        where: { id: { in: validIds } },
+        data: {
+          isDeleted: true,
+          isActive: false,
+          deletedAt: new Date(),
+        },
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${validIds.length} product(s)!`,
+      count: validIds.length,
+      deletedIds: validIds,
     });
   } catch (error) {
     next(error);
@@ -1282,6 +1564,17 @@ export const getSupplierReturns = async (req, res, next) => {
         parsedShipping = ord.shippingAddress;
       }
 
+      let proofImages = [];
+      if (Array.isArray(retReq?.images)) {
+        proofImages = retReq.images;
+      } else if (typeof retReq?.images === 'string') {
+        try {
+          proofImages = JSON.parse(retReq.images);
+        } catch (_) {
+          proofImages = retReq.images.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+      }
+
       return {
         id: retReq?.id || `ret_${item.id}`,
         orderItemId: item.id,
@@ -1290,7 +1583,11 @@ export const getSupplierReturns = async (req, res, next) => {
         orderStatus: itemStatus,
         rtoStatus,
         reason: retReq?.reason || (isCancelled ? 'Order cancelled before delivery' : 'Customer return requested'),
-        images: retReq?.images || [],
+        customerReason: retReq?.reason || (isCancelled ? 'Order cancelled by customer before delivery' : 'Customer doorstep return initiated'),
+        images: proofImages,
+        proofImages: proofImages,
+        hasCustomerProof: proofImages.length > 0,
+        claimType: retReq ? 'CUSTOMER_RETURN' : (isCancelled ? 'COURIER_CANCELLED' : 'COURIER_RTO'),
         createdAt: retReq?.createdAt || ord.updatedAt || ord.createdAt,
         totalAmount: (item.price || 0) * (item.quantity || 1),
         product: {
@@ -1342,60 +1639,106 @@ export const getSupplierReturns = async (req, res, next) => {
 export const updateReturnStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, disputeReason } = req.body;
 
     if (!status) {
       return res.status(400).json({ success: false, message: 'Status is required' });
     }
 
+    const cleanId = typeof id === 'string' && id.startsWith('ret_') ? id.replace('ret_', '') : id;
+
     // Try finding ReturnRequest by id or orderId
     let returnReq = await prisma.returnRequest.findUnique({
-      where: { id },
+      where: { id: cleanId },
     }).catch(() => null);
 
     if (!returnReq) {
       returnReq = await prisma.returnRequest.findUnique({
-        where: { orderId: id },
+        where: { orderId: cleanId },
       }).catch(() => null);
     }
 
+    // Check if cleanId is an orderItemId
+    let orderItemId = null;
+    if (!returnReq) {
+      const item = await prisma.orderItem.findUnique({
+        where: { id: cleanId },
+        include: { order: { include: { returnRequest: true } } },
+      }).catch(() => null);
+      if (item) {
+        orderItemId = item.id;
+        returnReq = item.order?.returnRequest;
+      }
+    }
+
+    const normalizedStatus = status.toLowerCase();
+
     if (returnReq) {
+      const updateData = { status: normalizedStatus };
+      if (disputeReason && typeof disputeReason === 'string' && disputeReason.trim()) {
+        updateData.reason = `${returnReq.reason} | [Supplier Dispute]: ${disputeReason.trim()}`;
+      }
+
       const updated = await prisma.returnRequest.update({
         where: { id: returnReq.id },
-        data: { status: status.toLowerCase() },
+        data: updateData,
       });
 
-      // Also update order status if appropriate
-      if (['refunded', 'approved', 'rejected'].includes(status.toLowerCase())) {
-        const orderStatusMap = {
-          approved: 'RETURN_APPROVED',
-          refunded: 'RETURNED',
-          rejected: 'RETURN_REJECTED',
-        };
-        await prisma.order.update({
-          where: { id: returnReq.orderId },
-          data: { orderStatus: orderStatusMap[status.toLowerCase()] || 'RETURNED' },
-        }).catch(() => null);
-      }
+      // Update OrderItem itemStatus and aggregate Order status
+      const itemStatusMap = {
+        approved: 'RETURN_APPROVED',
+        refunded: 'RETURNED',
+        rejected: 'RETURN_REJECTED',
+        disputed: 'DISPUTED',
+      };
+      const newItemStatus = itemStatusMap[normalizedStatus] || 'RETURNED';
+
+      await prisma.orderItem.updateMany({
+        where: { orderId: returnReq.orderId },
+        data: { itemStatus: newItemStatus },
+      }).catch(() => null);
+
+      await prisma.order.update({
+        where: { id: returnReq.orderId },
+        data: { orderStatus: newItemStatus },
+      }).catch(() => null);
 
       return res.status(200).json({
         success: true,
-        message: `Return request status updated to ${status}`,
+        message: `Return claim status updated to ${status}`,
         data: updated,
       });
     }
 
     // Fallback: update Order directly if ReturnRequest record doesn't exist
-    const order = await prisma.order.findUnique({ where: { id } }).catch(() => null);
+    const order = await prisma.order.findUnique({ where: { id: cleanId } }).catch(() => null);
     if (order) {
+      const newStatus = status.toUpperCase();
       const updatedOrder = await prisma.order.update({
-        where: { id },
-        data: { orderStatus: status.toUpperCase() },
+        where: { id: order.id },
+        data: { orderStatus: newStatus },
       });
+      await prisma.orderItem.updateMany({
+        where: { orderId: order.id },
+        data: { itemStatus: newStatus },
+      }).catch(() => null);
+
       return res.status(200).json({
         success: true,
         message: `Order return status updated to ${status}`,
         data: updatedOrder,
+      });
+    }
+
+    if (orderItemId) {
+      await prisma.orderItem.update({
+        where: { id: orderItemId },
+        data: { itemStatus: status.toUpperCase() },
+      }).catch(() => null);
+
+      return res.status(200).json({
+        success: true,
+        message: `Return item status updated to ${status}`,
       });
     }
 

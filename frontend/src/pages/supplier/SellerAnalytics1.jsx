@@ -25,7 +25,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-export default function SellerAnalytics1({ onNavigate }) {
+export default function SellerAnalytics1({ onNavigate, embedded = false, onNavigateTab }) {
   const navigate = useNavigate();
 
   const handleNav = useCallback((path) => {
@@ -96,6 +96,7 @@ export default function SellerAnalytics1({ onNavigate }) {
   }, [loadAnalyticsData]);
 
   const handleTabChange = (tabId) => {
+    if (onNavigateTab) return onNavigateTab(tabId);
     const item = SUPPLIER_MENU.find((m) => m.id === tabId);
     if (item?.path) handleNav(item.path);
   };
@@ -123,16 +124,8 @@ export default function SellerAnalytics1({ onNavigate }) {
 
   const maxRevenue = Math.max(...trends.map((t) => t.revenue || 0), 1000);
 
-  return (
-    <DashboardLayout
-      menuItems={SUPPLIER_MENU}
-      activeTab="analytics"
-      onTabChange={handleTabChange}
-      roleName="SUPPLIER"
-      userName={supplierDisplayName}
-      onLogout={() => setShowLogoutConfirm(true)}
-    >
-      <div className="space-y-6 max-w-7xl mx-auto pb-12">
+  const mainContent = (
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
         {/* ======================================================== */}
         {/* 1. TOP HERO BANNER */}
         {/* ======================================================== */}
@@ -418,6 +411,22 @@ export default function SellerAnalytics1({ onNavigate }) {
           </div>
         </div>
       </div>
+  );
+
+  if (embedded) {
+    return mainContent;
+  }
+
+  return (
+    <DashboardLayout
+      menuItems={SUPPLIER_MENU}
+      activeTab="analytics"
+      onTabChange={handleTabChange}
+      roleName="SUPPLIER"
+      userName={supplierDisplayName}
+      onLogout={() => setShowLogoutConfirm(true)}
+    >
+      {mainContent}
 
       <LogoutConfirmDialog
         isOpen={showLogoutConfirm}

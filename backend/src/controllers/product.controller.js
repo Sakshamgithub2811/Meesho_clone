@@ -338,9 +338,44 @@ export const updateProduct = async (req, res) => {
     if (originalPrice !== undefined) data.originalPrice = parseFloat(originalPrice);
     if (discountPercentage !== undefined) data.discountPercentage = parseInt(discountPercentage, 10);
     if (stock !== undefined) data.stock = parseInt(stock, 10);
-    if (Array.isArray(sizes)) data.sizes = sizes;
-    if (Array.isArray(colors)) data.colors = colors;
-    if (Array.isArray(images)) data.images = images;
+
+    // Arrays parsing from JSON or multipart form-data
+    if (sizes !== undefined) {
+      if (typeof sizes === 'string') {
+        try { data.sizes = JSON.parse(sizes); } catch { data.sizes = sizes.split(',').map((s) => s.trim()).filter(Boolean); }
+      } else if (Array.isArray(sizes)) {
+        data.sizes = sizes;
+      }
+    }
+
+    if (colors !== undefined) {
+      if (typeof colors === 'string') {
+        try { data.colors = JSON.parse(colors); } catch { data.colors = colors.split(',').map((c) => c.trim()).filter(Boolean); }
+      } else if (Array.isArray(colors)) {
+        data.colors = colors;
+      }
+    }
+
+    // Handle uploaded files + images array
+    let resolvedImages = [];
+    if (images !== undefined) {
+      if (typeof images === 'string') {
+        try { resolvedImages = JSON.parse(images); } catch { resolvedImages = images.split(',').map((s) => s.trim()).filter(Boolean); }
+      } else if (Array.isArray(images)) {
+        resolvedImages = images;
+      }
+    }
+
+    if (req.files && req.files.length > 0) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const newUrls = req.files.map((f) => `${baseUrl}/uploads/${f.filename}`);
+      resolvedImages = [...resolvedImages, ...newUrls];
+    }
+
+    if (resolvedImages.length > 0 || (images !== undefined && Array.isArray(images))) {
+      data.images = resolvedImages;
+    }
+
     if (supplierName !== undefined) data.supplierName = supplierName;
 
     const updated = await prisma.product.update({

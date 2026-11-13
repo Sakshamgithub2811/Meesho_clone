@@ -273,11 +273,23 @@ export async function createSupplierProduct(payload) {
   return data.data;
 }
 
-// Update Product
+// Update Product (Supports FormData with uploaded images or standard JSON)
 export async function updateSupplierProduct(productId, updateData) {
+  let body;
+  let headers = {};
+
+  if (updateData instanceof FormData) {
+    body = updateData;
+    // Let browser set multipart boundary
+  } else {
+    body = JSON.stringify(updateData);
+    headers['Content-Type'] = 'application/json';
+  }
+
   const data = await request(`/supplier/products/${productId}`, {
     method: 'PUT',
-    body: JSON.stringify(updateData),
+    headers,
+    body,
   });
   return data.data;
 }
@@ -287,6 +299,26 @@ export async function deleteSupplierProduct(productId) {
   return request(`/supplier/products/${productId}`, {
     method: 'DELETE',
   });
+}
+
+// Bulk Update Products (Stock or Price)
+export async function bulkUpdateSupplierProducts(payload) {
+  const data = await request('/supplier/products/bulk', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return data;
+}
+
+// Bulk Delete Products
+export async function bulkDeleteSupplierProducts(productIds) {
+  const data = await request('/supplier/products/bulk-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productIds }),
+  });
+  return data;
 }
 
 // Get Categories
@@ -359,10 +391,10 @@ export async function fetchSupplierReturns() {
   return data.data;
 }
 
-export async function updateReturnStatus(id, status) {
+export async function updateReturnStatus(id, status, extra = {}) {
   const data = await request(`/supplier/returns/${id}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...extra }),
   });
   return data;
 }
@@ -389,6 +421,8 @@ export default {
   createSupplierProduct,
   updateSupplierProduct,
   deleteSupplierProduct,
+  bulkUpdateSupplierProducts,
+  bulkDeleteSupplierProducts,
   fetchCategories,
   createCategory,
   fetchSupplierOrders,
