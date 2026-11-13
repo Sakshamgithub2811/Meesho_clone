@@ -239,7 +239,7 @@ export default function UserLogin() {
 
   // Screen 1: Registration Form
   const registerForm = (
-    <form onSubmit={handleRegister} className="space-y-3">
+    <form onSubmit={handleRegister} className="space-y-2.5">
       <div className="space-y-1 text-left">
         <Label htmlFor="user-register-name" className="text-xs font-bold text-slate-700">Full Name</Label>
         <Input
@@ -249,7 +249,7 @@ export default function UserLogin() {
           value={registerName}
           onChange={(e) => setRegisterName(e.target.value)}
           required
-          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-10 px-3.5 text-xs sm:text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
       <div className="space-y-1 text-left">
@@ -261,7 +261,7 @@ export default function UserLogin() {
           value={registerEmail}
           onChange={(e) => setRegisterEmail(e.target.value)}
           required
-          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-10 px-3.5 text-xs sm:text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
       <div className="space-y-1 text-left">
@@ -273,11 +273,11 @@ export default function UserLogin() {
           value={registerPassword}
           onChange={(e) => setRegisterPassword(e.target.value)}
           required
-          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-10 px-3.5 text-xs sm:text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
       {(error || googleError) && !loading && !googleLoading && (
-        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">
+        <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{error || googleError}</span>
         </div>
@@ -285,7 +285,7 @@ export default function UserLogin() {
       <Button
         type="submit"
         disabled={loading || googleLoading}
-        className="w-full h-11 bg-gradient-to-r from-[#b7004d] to-[#d6005c] hover:opacity-95 text-white rounded-xl font-bold shadow-md shadow-[#b7004d]/20 cursor-pointer transition-all active:scale-[0.99] text-sm"
+        className="w-full h-10.5 bg-gradient-to-r from-[#b7004d] to-[#d6005c] hover:opacity-95 text-white rounded-xl font-bold shadow-md shadow-[#b7004d]/20 cursor-pointer transition-all active:scale-[0.99] text-xs sm:text-sm"
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -306,17 +306,17 @@ export default function UserLogin() {
       <button
         type="button"
         onClick={() => navigate(redirectParam || '/user-home')}
-        className="w-full h-10.5 mt-2 flex items-center justify-center gap-2 px-4 rounded-xl border border-pink-200/80 hover:border-[#b7004d]/40 bg-pink-50/40 hover:bg-pink-100/60 text-[#4a2135] hover:text-[#b7004d] font-bold text-sm transition-all shadow-2xs cursor-pointer active:scale-[0.99]"
+        className="w-full h-10 mt-1.5 flex items-center justify-center gap-2 px-4 rounded-xl border border-pink-200/80 hover:border-[#b7004d]/40 bg-pink-50/40 hover:bg-pink-100/60 text-[#4a2135] hover:text-[#b7004d] font-bold text-xs sm:text-sm transition-all shadow-2xs cursor-pointer active:scale-[0.99]"
       >
         <span>Continue as Guest</span>
-        <ArrowRight className="w-4 h-4 text-[#b7004d]" />
+        <ArrowRight className="w-3.5 h-3.5 text-[#b7004d]" />
       </button>
     </form>
   );
 
   // Screen 2: Login Form
   const loginForm = (
-    <form onSubmit={handleLogin} className="space-y-3">
+    <form onSubmit={handleLogin} className="space-y-2.5">
       <div className="space-y-1 text-left">
         <Label htmlFor="user-login-email" className="text-xs font-bold text-slate-700">Email Address</Label>
         <Input
@@ -326,7 +326,7 @@ export default function UserLogin() {
           value={loginEmail}
           onChange={(e) => setLoginEmail(e.target.value)}
           required
-          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-10 px-3.5 text-xs sm:text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
       <div className="space-y-1 text-left">
@@ -347,11 +347,11 @@ export default function UserLogin() {
           value={loginPassword}
           onChange={(e) => setLoginPassword(e.target.value)}
           required
-          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-10 px-3.5 text-xs sm:text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
       {(error || googleError) && !loading && !googleLoading && (
-        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">
+        <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{error || googleError}</span>
         </div>
@@ -359,7 +359,7 @@ export default function UserLogin() {
       <Button
         type="submit"
         disabled={loading || googleLoading}
-        className="w-full h-11 bg-gradient-to-r from-[#b7004d] to-[#d6005c] hover:opacity-95 text-white rounded-xl font-bold shadow-md shadow-[#b7004d]/20 cursor-pointer transition-all active:scale-[0.99] text-sm"
+        className="w-full h-10.5 bg-gradient-to-r from-[#b7004d] to-[#d6005c] hover:opacity-95 text-white rounded-xl font-bold shadow-md shadow-[#b7004d]/20 cursor-pointer transition-all active:scale-[0.99] text-xs sm:text-sm"
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -380,10 +380,10 @@ export default function UserLogin() {
       <button
         type="button"
         onClick={() => navigate(redirectParam || '/user-home')}
-        className="w-full h-10.5 mt-2 flex items-center justify-center gap-2 px-4 rounded-xl border border-pink-200/80 hover:border-[#b7004d]/40 bg-pink-50/40 hover:bg-pink-100/60 text-[#4a2135] hover:text-[#b7004d] font-bold text-sm transition-all shadow-2xs cursor-pointer active:scale-[0.99]"
+        className="w-full h-10 mt-1.5 flex items-center justify-center gap-2 px-4 rounded-xl border border-pink-200/80 hover:border-[#b7004d]/40 bg-pink-50/40 hover:bg-pink-100/60 text-[#4a2135] hover:text-[#b7004d] font-bold text-xs sm:text-sm transition-all shadow-2xs cursor-pointer active:scale-[0.99]"
       >
         <span>Continue as Guest</span>
-        <ArrowRight className="w-4 h-4 text-[#b7004d]" />
+        <ArrowRight className="w-3.5 h-3.5 text-[#b7004d]" />
       </button>
     </form>
   );

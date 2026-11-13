@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 export default function GoogleAuthButton({ onClick, isLoading, label = "Continue with Google" }) {
   return (
     <div className="w-full">
-      <div className="relative my-2.5">
+      <div className="relative my-2">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-[#e8d2dc]/60" />
         </div>
-        <div className="relative flex justify-center text-[11px] uppercase">
-          <span className="bg-white px-3 text-[#7d4d62] font-bold tracking-wider">
+        <div className="relative flex justify-center text-[10px] sm:text-[11px] uppercase">
+          <span className="bg-white px-2.5 text-[#7d4d62] font-bold tracking-wider">
             Or continue with
           </span>
         </div>
@@ -20,7 +20,7 @@ export default function GoogleAuthButton({ onClick, isLoading, label = "Continue
         variant="outline"
         disabled={isLoading}
         onClick={onClick}
-        className="w-full h-11 rounded-xl border border-[#e8d2dc] bg-white hover:bg-[#fff4f6] text-[#4a2135] font-bold text-sm shadow-xs hover:border-[#b7004d]/40 flex items-center justify-center gap-3 cursor-pointer transition-all active:scale-[0.99]"
+        className="w-full h-10 rounded-xl border border-[#e8d2dc] bg-white hover:bg-[#fff4f6] text-[#4a2135] font-bold text-xs sm:text-sm shadow-xs hover:border-[#b7004d]/40 flex items-center justify-center gap-2.5 cursor-pointer transition-all active:scale-[0.99]"
       >
         {isLoading ? (
           <div className="flex items-center gap-2">
