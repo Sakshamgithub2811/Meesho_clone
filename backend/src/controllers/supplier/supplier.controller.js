@@ -215,15 +215,50 @@ export const addProduct = async (req, res, next) => {
       });
     }
 
-    // Verify supplier profile exists
+    // Verify supplier profile exists and retrieve compliance credentials
     const supplierProfile = await prisma.profile.findUnique({
       where: { id: supplierId },
-      select: { id: true, storeName: true, fullName: true },
+      select: {
+        id: true,
+        storeName: true,
+        fullName: true,
+        gstin: true,
+        pan: true,
+        bankDetails: true,
+        role: true,
+      },
     });
     if (!supplierProfile) {
       return res.status(401).json({
         success: false,
         message: 'Supplier profile not found or session invalid',
+      });
+    }
+
+    // KYC Compliance Gate: Supplier must have approved KYC application or verified business credentials
+    const kycApplication = await prisma.kYCApplication.findFirst({
+      where: {
+        userId: supplierId,
+        type: 'supplier',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const isKycApproved = kycApplication?.status === 'APPROVED';
+    const hasVerifiedTaxProfile = Boolean(supplierProfile.gstin && supplierProfile.bankDetails);
+
+    if (!isKycApproved && !hasVerifiedTaxProfile) {
+      const kycStatus = kycApplication?.status || 'NOT_SUBMITTED';
+      return res.status(403).json({
+        success: false,
+        error: 'KYC_REQUIRED',
+        kycStatus,
+        message:
+          kycStatus === 'PENDING' || kycStatus === 'UNDER_REVIEW'
+            ? 'KYC Verification Pending: Your business KYC is under review by compliance. You can publish live listings once approved.'
+            : kycStatus === 'REJECTED'
+            ? 'KYC Verification Rejected: Please update and re-submit your business documents in KYC Hub to publish listings.'
+            : 'KYC Verification Required: You must complete business KYC verification (GSTIN, PAN & Bank Details) before publishing live products.',
       });
     }
 

@@ -27,7 +27,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  Info
+  Info,
+  ShieldCheck,
+  ShieldAlert,
+  Lock
 } from 'lucide-react';
 
 // Client-side image compressor: Resizes device images to max 1280px & 0.75 JPEG quality (~90-150KB)
@@ -84,6 +87,8 @@ export default function SellerAddProduct1({ onNavigate }) {
 
   const [categories, setCategories] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [kycData, setKycData] = useState(null);
+  const [isKycLoading, setIsKycLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -103,13 +108,14 @@ export default function SellerAddProduct1({ onNavigate }) {
   const [images, setImages] = useState(['']);
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
 
-  // Fetch real categories and profile
+  // Fetch real categories, profile, and KYC compliance status
   useEffect(() => {
     const init = async () => {
       try {
-        const [cats, prof] = await Promise.allSettled([
+        const [cats, prof, kyc] = await Promise.allSettled([
           supplierApiService.fetchCategories(),
           supplierApiService.fetchSupplierProfile(),
+          supplierApiService.fetchSupplierKyc(),
         ]);
 
         if (cats.status === 'fulfilled' && cats.value) {
@@ -125,8 +131,14 @@ export default function SellerAddProduct1({ onNavigate }) {
         } else {
           setProfile(getCurrentSupplier());
         }
+
+        if (kyc.status === 'fulfilled' && kyc.value) {
+          setKycData(kyc.value);
+        }
       } catch (err) {
         console.warn('Initialization notice:', err);
+      } finally {
+        setIsKycLoading(false);
       }
     };
     init();
@@ -257,8 +269,21 @@ export default function SellerAddProduct1({ onNavigate }) {
   const validImages = images.map((u) => u.trim()).filter(Boolean);
   const currentPreviewImage = validImages[activePreviewIndex] || validImages[0] || '';
 
+  const isKycVerified = Boolean(
+    kycData?.isVerified ||
+    kycData?.kyc?.status === 'APPROVED' ||
+    (profile?.gstin && profile?.bankDetails)
+  );
+  const kycStatus = kycData?.kyc?.status || (isKycVerified ? 'APPROVED' : 'NOT_SUBMITTED');
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!isKycVerified) {
+      toast.error('KYC Verification Required: You must complete business verification before publishing listings.');
+      handleNav('/supplier-kyc1');
+      return;
+    }
 
     if (!formData.title.trim()) {
       toast.error('Please enter a product title');
@@ -367,6 +392,46 @@ export default function SellerAddProduct1({ onNavigate }) {
             <span>Back to Inventory</span>
           </button>
         </div>
+
+        {/* Compliance KYC Gating Banner */}
+        {!isKycLoading && !isKycVerified && (
+          <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-amber-100/90 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                <ShieldAlert className="w-6 h-6 text-amber-600" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-200/80 text-amber-900">
+                    Compliance Lock
+                  </span>
+                  <span className="text-xs font-bold text-amber-900">
+                    Status: {kycStatus === 'PENDING' ? 'Under Review ⏳' : kycStatus === 'REJECTED' ? 'Rejected ❌' : 'Not Submitted ⚠️'}
+                  </span>
+                </div>
+                <h3 className="text-sm font-black text-slate-900">
+                  Business KYC Verification Required to Publish Products
+                </h3>
+                <p className="text-xs text-slate-600 max-w-xl leading-relaxed">
+                  {kycStatus === 'PENDING' || kycStatus === 'UNDER_REVIEW'
+                    ? 'Your KYC application is currently under review by our compliance team. Live catalog publishing will be unlocked upon approval.'
+                    : kycStatus === 'REJECTED'
+                    ? 'Your previous KYC verification was rejected. Please re-submit valid business documents in KYC Hub to unlock product publishing.'
+                    : 'To comply with Indian E-Commerce Marketplace Regulations (GST Sec 9(5) & 194-O), suppliers must verify GSTIN, PAN and Bank Details before listing products.'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleNav('/supplier-kyc1')}
+              className="px-5 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition shrink-0 shadow-md shadow-amber-600/20 cursor-pointer flex items-center gap-2 active:scale-95"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Complete KYC Now ➔</span>
+            </button>
+          </div>
+        )}
 
         {/* 2-Column Form Layout with Real-Time Preview */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -651,14 +716,28 @@ export default function SellerAddProduct1({ onNavigate }) {
 
             {/* Submit Button */}
             <div className="pt-2">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#d82a62] to-[#eb3678] hover:opacity-95 text-white font-black text-sm shadow-lg shadow-pink-600/25 transition-all active:scale-98 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                <PlusCircle className="w-5 h-5" />
-                <span>{isSubmitting ? 'Publishing Listing...' : `Publish Product to Catalog (${validImages.length} Image${validImages.length === 1 ? '' : 's'})`}</span>
-              </button>
+              {!isKycLoading && !isKycVerified ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.error('Complete business KYC verification first to unlock product publishing.');
+                    handleNav('/supplier-kyc1');
+                  }}
+                  className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm border border-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98"
+                >
+                  <Lock className="w-4 h-4 text-amber-600" />
+                  <span>Listing Locked: Complete Business KYC to Publish ➔</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#d82a62] to-[#eb3678] hover:opacity-95 text-white font-black text-sm shadow-lg shadow-pink-600/25 transition-all active:scale-98 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <PlusCircle className="w-5 h-5" />
+                  <span>{isSubmitting ? 'Publishing Listing...' : `Publish Product to Catalog (${validImages.length} Image${validImages.length === 1 ? '' : 's'})`}</span>
+                </button>
+              )}
             </div>
           </form>
 
