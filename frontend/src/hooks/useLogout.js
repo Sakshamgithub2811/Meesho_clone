@@ -1,22 +1,36 @@
 import { auth } from '../utils/firebase';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { logout } from '../redux/userSlice';
 // import { toast } from 'sonner';
 
 export const useLogout = (redirectPath = '/') => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const handleLogout = async () => {
     try {
-      // 1. Firebase se bahar aana
+      // 1. Firebase se sign out
       await signOut(auth);
 
-      // 2. Selective auth session cleanup (sirf auth tokens hatana, pura storage wipe na karna)
+      // 2. Redux state reset (purges currentUser and isAuthenticated)
+      try {
+        dispatch(logout());
+      } catch (_) {}
+
+      // 3. Complete auth session & user cache cleanup
       const authKeysToRemove = [
         'token',
         'user',
+        'persist:root',
         'mshoppy_customer_token',
         'mshoppy_customer_user',
+        'mshoppy_user_orders',
+        'mshoppy_user_addresses',
+        'mshoppy_wishlist',
+        'mshoppy_selected_address',
+        'mshoppy_user_pincode',
         'mshoppy_affiliate_token',
         'mshoppy_affiliate_user',
         'mshoppy_reseller_token',

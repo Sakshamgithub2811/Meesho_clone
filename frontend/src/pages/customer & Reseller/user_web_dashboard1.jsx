@@ -1,7 +1,8 @@
 import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { logout } from '../../redux/userSlice';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useLogout } from '../../hooks/useLogout';
 import { toast } from 'sonner';
@@ -130,8 +131,17 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   }, [location.search]);
 
   // Real Authentication & User State (No dummy fallback credentials)
+  const dispatch = useDispatch();
   const reduxUser = useSelector((state) => state.user?.currentUser);
   const [customerUser, setCustomerUser] = useState(() => getStoredCustomer()?.user || reduxUser || null);
+
+  // If not authenticated, protect account dashboard and redirect to login
+  useEffect(() => {
+    const isAuthed = Boolean(customerUser || getStoredCustomer()?.user || reduxUser);
+    if (!isAuthed) {
+      navigate('/user/login?redirect=' + encodeURIComponent(location.pathname + location.search));
+    }
+  }, [customerUser, reduxUser, navigate, location.pathname, location.search]);
 
   // Affiliate Program Session - strictly verify that stored KYC belongs to the current logged-in customer
   const [affiliateApp, setAffiliateApp] = useState(() => {
@@ -237,7 +247,14 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   // Logout Handler (Clears Firebase, Redux & LocalStorage)
   const firebaseLogout = useLogout('/user/login');
   const handleLogout = () => {
+    try {
+      dispatch(logout());
+    } catch (_) {}
     logoutCustomer();
+    setCustomerUser(null);
+    setRealOrders([]);
+    setSavedAddresses([]);
+    setWishlistItems([]);
     firebaseLogout();
   };
 

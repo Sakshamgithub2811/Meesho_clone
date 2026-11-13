@@ -367,6 +367,17 @@ export default function UserLogin() {
         isLoading={googleLoading}
         label="Continue with Google"
       />
+
+      <div className="pt-2 text-center">
+        <button
+          type="button"
+          onClick={() => navigate(redirectParam || '/user-home')}
+          className="text-xs font-bold text-slate-500 hover:text-[#b7004d] hover:underline transition-colors cursor-pointer inline-flex items-center gap-1.5 py-1.5 px-3 rounded-full hover:bg-pink-50/60"
+        >
+          <span>Continue as Guest / Skip to Shopping</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </form>
   );
 
