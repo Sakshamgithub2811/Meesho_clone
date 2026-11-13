@@ -45,6 +45,15 @@ export function getAuthHeaders() {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+  try {
+    const rawUser = localStorage.getItem('mshoppy_customer_user') || localStorage.getItem('user');
+    if (rawUser) {
+      const u = JSON.parse(rawUser);
+      if (u?.email && !u.email.endsWith('@customer.meesho')) {
+        headers['x-user-email'] = u.email;
+      }
+    }
+  } catch (e) {}
   return headers;
 }
 
@@ -505,13 +514,31 @@ export async function getOrderById(id) {
   }
 }
 
-export async function createOrder({ items, shippingAddress, paymentMethod, totalAmount, couponCode, referralCode }) {
+export async function createOrder({ items, shippingAddress, paymentMethod, totalAmount, couponCode, referralCode, customerEmail }) {
   try {
     const savedRef = referralCode || (typeof window !== 'undefined' ? localStorage.getItem('mshoppy_referral_code') : undefined) || undefined;
+    let emailToSend = customerEmail;
+    if (!emailToSend && typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('mshoppy_customer_user') || localStorage.getItem('user');
+        if (raw) {
+          const u = JSON.parse(raw);
+          if (u?.email && !u.email.endsWith('@customer.meesho')) emailToSend = u.email;
+        }
+      } catch (e) {}
+    }
     const res = await fetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ items, shippingAddress, paymentMethod, totalAmount, couponCode, referralCode: savedRef }),
+      body: JSON.stringify({
+        items,
+        shippingAddress,
+        paymentMethod,
+        totalAmount,
+        couponCode,
+        referralCode: savedRef,
+        customerEmail: emailToSend
+      }),
     });
     return await res.json();
   } catch (error) {

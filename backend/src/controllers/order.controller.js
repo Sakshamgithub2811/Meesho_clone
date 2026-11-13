@@ -1,6 +1,7 @@
 import prisma from '../config/prisma.js';
 import transporter from '../config/emailTransporter.js';
 import { calculateCouponDiscount } from './coupon.controller.js';
+import { sendOrderConfirmationEmail } from '../utils/emailTemplates.js';
 
 const getUserId = (req) => {
   return req.user?.id || req.headers['x-user-id'] || req.query.userId || 'guest_customer';
@@ -57,6 +58,8 @@ export const createOrder = async (req, res) => {
 
     let parsedShippingAddress = typeof shippingAddress === 'string' ? JSON.parse(shippingAddress) : shippingAddress;
 
+    const incomingEmail = (req.body.customerEmail || req.headers['x-user-email'] || req.user?.email || parsedShippingAddress?.email || '').trim();
+
     if (parsedShippingAddress) {
       const name = (parsedShippingAddress.name || parsedShippingAddress.fullName || '').trim();
       const phone = (parsedShippingAddress.phone || parsedShippingAddress.mobileNumber || '').trim();
@@ -67,13 +70,19 @@ export const createOrder = async (req, res) => {
         name: name || 'Valued Customer',
         phone,
         details,
-        pincode
+        pincode,
+        ...(incomingEmail && incomingEmail.includes('@') ? { email: incomingEmail } : {})
       };
 
-      if (name) {
+      const profileUpdates = {};
+      if (name) profileUpdates.fullName = name;
+      if (incomingEmail && incomingEmail.includes('@') && !incomingEmail.endsWith('@customer.meesho')) {
+        profileUpdates.email = incomingEmail.toLowerCase();
+      }
+      if (Object.keys(profileUpdates).length > 0) {
         await prisma.profile.update({
           where: { id: userId },
-          data: { fullName: name }
+          data: profileUpdates
         }).catch(() => {});
       }
     }
@@ -261,6 +270,18 @@ export const createOrder = async (req, res) => {
         console.warn('Affiliate commission credit note:', affiliateErr.message);
       }
     }
+
+    // 6. Asynchronously dispatch branded Order Confirmation Email to the customer
+    const recipientEmail = incomingEmail || (typeof parsedShippingAddress === 'object' ? parsedShippingAddress?.email : null);
+    const recipientName = (typeof parsedShippingAddress === 'object' ? parsedShippingAddress?.name : null) || 'Valued Customer';
+
+    sendOrderConfirmationEmail({
+      order,
+      email: recipientEmail || undefined,
+      name: recipientName || undefined
+    }).catch((emailErr) => {
+      console.warn('⚠️ Order confirmation email non-fatal notice:', emailErr.message);
+    });
 
     return res.status(201).json({
       success: true,
@@ -491,6 +512,13 @@ export const updateOrderStatus = async (req, res) => {
         }
       }
     });
+
+    // Auto-dispatch confirmation email if status is updated to CONFIRMED
+    if (upperStatus === 'CONFIRMED') {
+      sendOrderConfirmationEmail({ order: updated }).catch((err) => {
+        console.warn(`⚠️ [Order ${id}] CONFIRMED status email dispatch notice:`, err.message);
+      });
+    }
 
     // Auto-dispatch delivery OTP email as soon as marked OUT_FOR_DELIVERY
     if (upperStatus === 'OUT_FOR_DELIVERY') {

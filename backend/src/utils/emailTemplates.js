@@ -378,3 +378,249 @@ export const sendLoginOtpEmail = async ({ email, name, otp }) => {
   }
 };
 
+/**
+ * Generate high-conversion, professional Meesho/MShoppy Order Confirmation HTML Email
+ */
+export const getOrderConfirmationEmailHtml = ({ order, name, trackingUrl }) => {
+  const safeName = name && name.trim() ? name.trim() : 'Valued Customer';
+  const orderId = order?.id || 'ORD-' + Date.now();
+  const shortId = orderId.slice(0, 10).toUpperCase();
+  const totalAmount = Number(order?.totalAmount || 0).toLocaleString('en-IN');
+  const paymentMethod = order?.paymentMethod || 'COD';
+  const paymentStatus = order?.paymentStatus || (paymentMethod === 'COD' ? 'Pay on Delivery' : 'PAID');
+
+  let address = order?.shippingAddress;
+  if (typeof address === 'string') {
+    try { address = JSON.parse(address); } catch (e) {}
+  }
+  const addressDetails = address?.details || `${address?.addressLine || ''}, ${address?.city || ''}, ${address?.state || ''}`.replace(/^[\s,]+|[\s,]+$/g, '');
+  const recipientName = address?.name || safeName;
+  const phone = address?.phone || '';
+  const pincode = address?.pincode || '';
+
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const itemsHtml = items.map((it) => {
+    const product = it.product || {};
+    const title = product.title || 'Item in Order';
+    const image = product.images?.[0] || product.image || 'https://images.meesho.com/images/products/placeholder.png';
+    const price = Number(it.price || product.price || 0).toLocaleString('en-IN');
+    const qty = it.quantity || 1;
+    const size = it.size || 'Free Size';
+
+    return `
+      <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9; vertical-align: top; width: 64px;">
+          <img src="${image}" alt="${title}" style="width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #ffe2e8;" onerror="this.style.display='none'"/>
+        </td>
+        <td style="padding: 12px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
+          <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.4; margin-bottom: 4px;">
+            ${title}
+          </div>
+          <div style="font-size: 12px; color: #64748b;">
+            Size: <strong style="color: #334155;">${size}</strong> &bull; Qty: <strong style="color: #334155;">${qty}</strong>
+          </div>
+        </td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9; vertical-align: top; text-align: right; white-space: nowrap;">
+          <div style="font-size: 14px; font-weight: 800; color: #9f0038;">
+            ₹${price}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const orderDate = new Date().toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const appUrl = trackingUrl || process.env.FRONTEND_URL || 'https://meesho-clone-nu.vercel.app/user-dashboard1?tab=orders';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Confirmed - #${shortId}</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #fff4f6;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body style="background-color: #fff4f6; margin: 0; padding: 20px 10px;">
+  <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(183, 0, 77, 0.08); border: 1px solid #ffe2e8;">
+    
+    <!-- Header Banner -->
+    <div style="background: linear-gradient(135deg, #9f0038 0%, #b7004d 50%, #ff527b 100%); padding: 32px 24px; text-align: center; color: #ffffff;">
+      <div style="display: inline-block; background: rgba(255, 255, 255, 0.2); padding: 5px 16px; border-radius: 50px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; border: 1px solid rgba(255, 255, 255, 0.3);">
+        Order Placed Successfully
+      </div>
+      <h1 style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -0.5px;">MSHOPPY</h1>
+      <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.95; font-weight: 600;">
+        Thank you for shopping with us! 🎉
+      </p>
+    </div>
+
+    <!-- Main Content -->
+    <div style="padding: 28px 24px; color: #334155;">
+      
+      <!-- Greeting & Overview Card -->
+      <div style="background: #fdf2f4; border: 1px solid #fbcfe8; border-radius: 14px; padding: 18px 20px; margin-bottom: 24px;">
+        <h2 style="font-size: 18px; font-weight: 800; color: #0f172a; margin: 0 0 6px 0;">
+          Hello ${safeName}, 👋
+        </h2>
+        <p style="font-size: 13.5px; color: #475569; margin: 0; line-height: 1.5;">
+          Your order has been confirmed and is being processed by our verified suppliers. Here are your order details:
+        </p>
+      </div>
+
+      <!-- Order Meta Info -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px;">
+        <tr>
+          <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Order ID:</td>
+          <td style="padding: 6px 0; text-align: right; font-weight: 800; color: #0f172a; font-family: monospace;">#${shortId}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Order Date:</td>
+          <td style="padding: 6px 0; text-align: right; font-weight: 700; color: #334155;">${orderDate}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Payment Mode:</td>
+          <td style="padding: 6px 0; text-align: right; font-weight: 800; color: ${paymentMethod === 'COD' ? '#d97706' : '#16a34a'};">
+            ${paymentMethod} (${paymentStatus})
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Estimated Delivery:</td>
+          <td style="padding: 6px 0; text-align: right; font-weight: 700; color: #b7004d;">3 - 5 Business Days</td>
+        </tr>
+      </table>
+
+      <!-- Items Section -->
+      <div style="border-top: 1px solid #f1f5f9; padding-top: 20px; margin-bottom: 20px;">
+        <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+          Items in this order (${items.length})
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+          ${itemsHtml}
+        </table>
+      </div>
+
+      <!-- Total Amount Card -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
+        <table style="width: 100%; font-size: 13.5px;">
+          <tr>
+            <td style="color: #64748b; font-weight: 600; padding: 4px 0;">Delivery Fee:</td>
+            <td style="text-align: right; color: #16a34a; font-weight: 800; padding: 4px 0;">FREE</td>
+          </tr>
+          <tr>
+            <td style="color: #0f172a; font-weight: 800; font-size: 16px; padding-top: 8px; border-top: 1px dashed #cbd5e1;">Total Payable:</td>
+            <td style="text-align: right; color: #9f0038; font-weight: 900; font-size: 18px; padding-top: 8px; border-top: 1px dashed #cbd5e1;">₹${totalAmount}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Shipping Address -->
+      <div style="background: #ffffff; border: 1px solid #f1f5f9; border-radius: 12px; padding: 16px 20px; margin-bottom: 28px;">
+        <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 6px;">
+          📍 Delivery Address
+        </div>
+        <div style="font-size: 14px; font-weight: 800; color: #0f172a;">${recipientName} ${phone ? `• ${phone}` : ''}</div>
+        <div style="font-size: 13px; color: #475569; margin-top: 4px; line-height: 1.4;">
+          ${addressDetails} ${pincode ? `- ${pincode}` : ''}
+        </div>
+      </div>
+
+      <!-- Track Button CTA -->
+      <div style="text-align: center; margin-bottom: 20px;">
+        <a href="${appUrl}" style="display: inline-block; background: linear-gradient(135deg, #b7004d 0%, #ff527b 100%); color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 50px; font-size: 14px; font-weight: 800; letter-spacing: 0.3px; box-shadow: 0 6px 18px rgba(183, 0, 77, 0.35);">
+          Track Your Order &rarr;
+        </a>
+      </div>
+
+      <p style="font-size: 11.5px; color: #94a3b8; text-align: center; line-height: 1.5; margin: 0;">
+        You will receive another update when your order is packed and dispatched.
+      </p>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #fafafa; padding: 18px 24px; text-align: center; border-top: 1px solid #f1f5f9; font-size: 11px; color: #94a3b8;">
+      <p style="margin: 0 0 4px 0; font-weight: 600;">© 2026 MShoppy Internet Commerce. All rights reserved.</p>
+      <p style="margin: 0;">Need help? Reply to this email or visit our Help Center.</p>
+    </div>
+
+  </div>
+</body>
+</html>`;
+};
+
+/**
+ * Send branded Order Confirmation email via configured SMTP
+ */
+export const sendOrderConfirmationEmail = async ({ order, email, name }) => {
+  try {
+    let targetEmail = email;
+    let targetName = name;
+
+    if (!targetEmail) {
+      targetEmail = order?.user?.email;
+      if ((!targetEmail || targetEmail.endsWith('@customer.meesho')) && order?.shippingAddress) {
+        try {
+          const addr = typeof order.shippingAddress === 'string'
+            ? JSON.parse(order.shippingAddress)
+            : order.shippingAddress;
+          if (addr?.email && !addr.email.endsWith('@customer.meesho')) targetEmail = addr.email;
+          if (addr?.name && !targetName) targetName = addr.name;
+        } catch (e) {}
+      }
+    }
+
+    if (targetEmail && targetEmail.includes('@customer.meesho')) {
+      const match = targetEmail.match(/customer_(.+)@customer\.meesho/);
+      if (match && match[1]?.endsWith('_gmail_com')) {
+        targetEmail = match[1].replace(/_gmail_com$/, '@gmail.com');
+      }
+    }
+
+    if (!targetEmail || targetEmail.endsWith('@customer.meesho')) {
+      targetEmail = process.env.SMTP_USER;
+    }
+
+    if (!targetEmail) {
+      console.warn(`[Order Confirmation Email] No valid recipient email found for Order #${order?.id}`);
+      return { success: false, message: 'No recipient email available' };
+    }
+
+    const html = getOrderConfirmationEmailHtml({
+      order,
+      name: targetName || order?.user?.fullName || 'Valued Customer',
+    });
+
+    const shortId = (order?.id || '').slice(0, 10).toUpperCase();
+    const sender = process.env.EMAIL_FROM || `"MShoppy Orders" <${process.env.SMTP_USER || 'orders@mshoppy.com'}>`;
+
+    const info = await transporter.sendMail({
+      from: sender,
+      to: targetEmail,
+      subject: `🎉 Order Confirmed! Your MShoppy Order #${shortId} is Placed`,
+      html,
+    });
+
+    console.log(`✅ Order confirmation email sent to ${targetEmail} for Order #${order?.id} (Message ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId, sentTo: targetEmail };
+  } catch (err) {
+    console.error('❌ Error sending order confirmation email:', err.message);
+    return { success: false, error: err.message };
+  }
+};
+
+

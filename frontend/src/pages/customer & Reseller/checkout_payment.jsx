@@ -266,6 +266,16 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
     setPlacingOrder(true);
     try {
       const referralCode = localStorage.getItem('mshoppy_referral_code');
+
+      let userEmail = null;
+      try {
+        const rawUser = localStorage.getItem('mshoppy_customer_user');
+        if (rawUser) {
+          const u = JSON.parse(rawUser);
+          if (u?.email && !u.email.endsWith('@customer.meesho')) userEmail = u.email;
+        }
+      } catch (e) {}
+
       const orderPayload = {
         items: cartItems.map(item => ({
           productId: item.productId,
@@ -276,7 +286,8 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
         shippingAddress: address,
         paymentMethod: paymentMethodToSave.toUpperCase(),
         totalAmount: finalAmount,
-        referralCode: referralCode || undefined
+        referralCode: referralCode || undefined,
+        customerEmail: userEmail || address?.email || undefined
       };
 
       const res = await createOrder(orderPayload);
