@@ -403,7 +403,11 @@ export const getOrderConfirmationEmailHtml = ({ order, name, trackingUrl }) => {
   const itemsHtml = items.map((it) => {
     const product = it.product || {};
     const title = product.title || 'Item in Order';
-    const image = product.images?.[0] || product.image || 'https://images.meesho.com/images/products/placeholder.png';
+    let rawImage = (Array.isArray(product.images) && product.images[0]) || product.image || 'https://images.meesho.com/images/products/placeholder.png';
+    let image = typeof rawImage === 'string' ? rawImage.trim() : 'https://images.meesho.com/images/products/placeholder.png';
+    // Ensure email-safe JPEG image formats (Google Image Proxy rejects WebP with .jpg extensions)
+    image = image.replace(/f_webp,?/g, '').replace(/([?&])(?:format|fm)=webp/gi, '$1fm=jpg');
+
     const price = Number(it.price || product.price || 0).toLocaleString('en-IN');
     const qty = it.quantity || 1;
     const size = it.size || 'Free Size';
@@ -411,7 +415,7 @@ export const getOrderConfirmationEmailHtml = ({ order, name, trackingUrl }) => {
     return `
       <tr>
         <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9; vertical-align: top; width: 64px;">
-          <img src="${image}" alt="${title}" style="width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #ffe2e8;" onerror="this.style.display='none'"/>
+          <img src="${image}" alt="${title}" width="56" height="56" border="0" style="display: block; width: 56px; height: 56px; max-width: 56px; max-height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #ffe2e8; outline: none; text-decoration: none;"/>
         </td>
         <td style="padding: 12px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
           <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.4; margin-bottom: 4px;">
