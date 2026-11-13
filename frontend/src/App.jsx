@@ -1314,7 +1314,13 @@ function AppRoutes() {
         />
         <Route
           path="/supplier-returns"
-          element={<SupplierReturnsRTO onNavigate={handleNav} onBack={handleBack} />}
+          element={
+            <SellerWebDashboard1
+              initialTab="returns"
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
         />
         <Route
           path="/supplier-rot-ledger"

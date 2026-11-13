@@ -1400,6 +1400,17 @@ export const getSupplierReturns = async (req, res, next) => {
         parsedShipping = ord.shippingAddress;
       }
 
+      let proofImages = [];
+      if (Array.isArray(retReq?.images)) {
+        proofImages = retReq.images;
+      } else if (typeof retReq?.images === 'string') {
+        try {
+          proofImages = JSON.parse(retReq.images);
+        } catch (_) {
+          proofImages = retReq.images.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+      }
+
       return {
         id: retReq?.id || `ret_${item.id}`,
         orderItemId: item.id,
@@ -1408,7 +1419,11 @@ export const getSupplierReturns = async (req, res, next) => {
         orderStatus: itemStatus,
         rtoStatus,
         reason: retReq?.reason || (isCancelled ? 'Order cancelled before delivery' : 'Customer return requested'),
-        images: retReq?.images || [],
+        customerReason: retReq?.reason || (isCancelled ? 'Order cancelled by customer before delivery' : 'Customer doorstep return initiated'),
+        images: proofImages,
+        proofImages: proofImages,
+        hasCustomerProof: proofImages.length > 0,
+        claimType: retReq ? 'CUSTOMER_RETURN' : (isCancelled ? 'COURIER_CANCELLED' : 'COURIER_RTO'),
         createdAt: retReq?.createdAt || ord.updatedAt || ord.createdAt,
         totalAmount: (item.price || 0) * (item.quantity || 1),
         product: {
@@ -1460,60 +1475,106 @@ export const getSupplierReturns = async (req, res, next) => {
 export const updateReturnStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, disputeReason } = req.body;
 
     if (!status) {
       return res.status(400).json({ success: false, message: 'Status is required' });
     }
 
+    const cleanId = typeof id === 'string' && id.startsWith('ret_') ? id.replace('ret_', '') : id;
+
     // Try finding ReturnRequest by id or orderId
     let returnReq = await prisma.returnRequest.findUnique({
-      where: { id },
+      where: { id: cleanId },
     }).catch(() => null);
 
     if (!returnReq) {
       returnReq = await prisma.returnRequest.findUnique({
-        where: { orderId: id },
+        where: { orderId: cleanId },
       }).catch(() => null);
     }
 
+    // Check if cleanId is an orderItemId
+    let orderItemId = null;
+    if (!returnReq) {
+      const item = await prisma.orderItem.findUnique({
+        where: { id: cleanId },
+        include: { order: { include: { returnRequest: true } } },
+      }).catch(() => null);
+      if (item) {
+        orderItemId = item.id;
+        returnReq = item.order?.returnRequest;
+      }
+    }
+
+    const normalizedStatus = status.toLowerCase();
+
     if (returnReq) {
+      const updateData = { status: normalizedStatus };
+      if (disputeReason && typeof disputeReason === 'string' && disputeReason.trim()) {
+        updateData.reason = `${returnReq.reason} | [Supplier Dispute]: ${disputeReason.trim()}`;
+      }
+
       const updated = await prisma.returnRequest.update({
         where: { id: returnReq.id },
-        data: { status: status.toLowerCase() },
+        data: updateData,
       });
 
-      // Also update order status if appropriate
-      if (['refunded', 'approved', 'rejected'].includes(status.toLowerCase())) {
-        const orderStatusMap = {
-          approved: 'RETURN_APPROVED',
-          refunded: 'RETURNED',
-          rejected: 'RETURN_REJECTED',
-        };
-        await prisma.order.update({
-          where: { id: returnReq.orderId },
-          data: { orderStatus: orderStatusMap[status.toLowerCase()] || 'RETURNED' },
-        }).catch(() => null);
-      }
+      // Update OrderItem itemStatus and aggregate Order status
+      const itemStatusMap = {
+        approved: 'RETURN_APPROVED',
+        refunded: 'RETURNED',
+        rejected: 'RETURN_REJECTED',
+        disputed: 'DISPUTED',
+      };
+      const newItemStatus = itemStatusMap[normalizedStatus] || 'RETURNED';
+
+      await prisma.orderItem.updateMany({
+        where: { orderId: returnReq.orderId },
+        data: { itemStatus: newItemStatus },
+      }).catch(() => null);
+
+      await prisma.order.update({
+        where: { id: returnReq.orderId },
+        data: { orderStatus: newItemStatus },
+      }).catch(() => null);
 
       return res.status(200).json({
         success: true,
-        message: `Return request status updated to ${status}`,
+        message: `Return claim status updated to ${status}`,
         data: updated,
       });
     }
 
     // Fallback: update Order directly if ReturnRequest record doesn't exist
-    const order = await prisma.order.findUnique({ where: { id } }).catch(() => null);
+    const order = await prisma.order.findUnique({ where: { id: cleanId } }).catch(() => null);
     if (order) {
+      const newStatus = status.toUpperCase();
       const updatedOrder = await prisma.order.update({
-        where: { id },
-        data: { orderStatus: status.toUpperCase() },
+        where: { id: order.id },
+        data: { orderStatus: newStatus },
       });
+      await prisma.orderItem.updateMany({
+        where: { orderId: order.id },
+        data: { itemStatus: newStatus },
+      }).catch(() => null);
+
       return res.status(200).json({
         success: true,
         message: `Order return status updated to ${status}`,
         data: updatedOrder,
+      });
+    }
+
+    if (orderItemId) {
+      await prisma.orderItem.update({
+        where: { id: orderItemId },
+        data: { itemStatus: status.toUpperCase() },
+      }).catch(() => null);
+
+      return res.status(200).json({
+        success: true,
+        message: `Return item status updated to ${status}`,
       });
     }
 

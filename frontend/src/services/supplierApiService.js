@@ -371,10 +371,10 @@ export async function fetchSupplierReturns() {
   return data.data;
 }
 
-export async function updateReturnStatus(id, status) {
+export async function updateReturnStatus(id, status, extra = {}) {
   const data = await request(`/supplier/returns/${id}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...extra }),
   });
   return data;
 }
