@@ -24,8 +24,10 @@ import {
   X,
   ExternalLink,
   UploadCloud,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Download
 } from 'lucide-react';
+import { exportInventoryToCsv } from '../../utils/csvExport';
 
 export default function SellerInventory1({ onNavigate, embedded = false, onNavigateTab }) {
   const navigate = useNavigate();
@@ -254,6 +256,16 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
 
   const supplierDisplayName = profile?.storeName || profile?.fullName || profile?.name || 'Verified Supplier';
 
+  const handleExportInventory = () => {
+    const listToExport = filteredProducts.length > 0 ? filteredProducts : products;
+    if (listToExport.length === 0) {
+      toast.error('No products available in catalog to export');
+      return;
+    }
+    const count = exportInventoryToCsv(listToExport, supplierDisplayName);
+    toast.success(`Exported ${count} inventory item(s) to CSV spreadsheet!`);
+  };
+
   const mainContent = (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Header Title & Actions */}
@@ -271,11 +283,22 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            {/* Export CSV Button */}
+            <button
+              type="button"
+              onClick={handleExportInventory}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition active:scale-95 cursor-pointer"
+              title="Download full catalog stock and pricing report in CSV / Excel format"
+            >
+              <Download className="w-4 h-4 text-[#b7004d]" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </button>
+
             <button
               type="button"
               onClick={() => handleNav('/supplier-add-product1')}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#d82a62] to-[#eb3678] text-white hover:opacity-95 font-bold text-sm shadow-md shadow-pink-600/20 transition-all active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#d82a62] to-[#eb3678] text-white hover:opacity-95 font-bold text-xs shadow-md shadow-pink-600/20 transition-all active:scale-95 cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Add New Product</span>

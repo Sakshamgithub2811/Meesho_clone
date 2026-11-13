@@ -27,8 +27,10 @@ import {
   Image as ImageIcon,
   User,
   MapPin,
-  Truck
+  Truck,
+  Download
 } from 'lucide-react';
+import { exportReturnsToCsv } from '../../utils/csvExport';
 
 export default function SellerReturns1({ onNavigate, embedded = false, onNavigateTab }) {
   const navigate = useNavigate();
@@ -186,6 +188,16 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
 
   const supplierDisplayName = profile?.storeName || profile?.fullName || profile?.name || 'Verified Supplier';
 
+  const handleExportReturns = () => {
+    const listToExport = filteredReturns.length > 0 ? filteredReturns : returnOrders;
+    if (listToExport.length === 0) {
+      toast.error('No return or RTO claims to export');
+      return;
+    }
+    const count = exportReturnsToCsv(listToExport);
+    toast.success(`Exported ${count} return & RTO claim(s) to CSV spreadsheet!`);
+  };
+
   const mainContent = (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
         {/* Header */}
@@ -203,14 +215,27 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => loadReturnsData(true)}
-            disabled={refreshing}
-            className="p-2.5 rounded-2xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition active:scale-95 cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2.5">
+            {/* Export CSV Button */}
+            <button
+              type="button"
+              onClick={handleExportReturns}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition active:scale-95 cursor-pointer"
+              title="Download reverse logistics and claim ledger in CSV / Excel format"
+            >
+              <Download className="w-4 h-4 text-rose-600" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => loadReturnsData(true)}
+              disabled={refreshing}
+              className="p-2.5 rounded-2xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* 4 Metric Cards */}

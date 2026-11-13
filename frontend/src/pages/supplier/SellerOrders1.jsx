@@ -29,7 +29,9 @@ import {
   VolumeX,
   Radio,
   Sparkles,
-  BellRing
+  BellRing,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import OrderPrintSlipModal from '../../components/admin/orders/OrderPrintSlipModal';
 import {
@@ -38,6 +40,7 @@ import {
   isSoundAlertEnabled,
   setSoundAlertEnabled
 } from '../../utils/orderSoundChime';
+import { exportOrdersToCsv } from '../../utils/csvExport';
 
 const STATUS_OPTIONS = [
   { id: 'ALL', label: 'All Orders' },
@@ -197,6 +200,16 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
     } else {
       toast.info('⏸️ Live Order Radar Paused');
     }
+  };
+
+  const handleExportOrders = () => {
+    const listToExport = filteredOrders.length > 0 ? filteredOrders : orders;
+    if (listToExport.length === 0) {
+      toast.error('No orders available to export');
+      return;
+    }
+    const count = exportOrdersToCsv(listToExport, supplierDisplayName);
+    toast.success(`Exported ${count} order(s) to CSV spreadsheet!`);
   };
 
   const handleTabChange = (tabId) => {
@@ -367,6 +380,17 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
               )}
               <span className="hidden sm:inline">{soundEnabled ? 'Chime ON' : 'Chime Off'}</span>
               <span className="sm:hidden">{soundEnabled ? 'Sound' : 'Muted'}</span>
+            </button>
+
+            {/* Export CSV Button */}
+            <button
+              type="button"
+              onClick={handleExportOrders}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition active:scale-95 cursor-pointer"
+              title="Download orders report in CSV / Excel spreadsheet format for GST and CA accounting"
+            >
+              <Download className="w-4 h-4 text-indigo-600" />
+              <span className="hidden sm:inline">Export CSV</span>
             </button>
 
             {/* Manual Sync Button */}

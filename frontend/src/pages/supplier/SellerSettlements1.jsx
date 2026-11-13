@@ -25,6 +25,7 @@ import {
   X,
   Wallet
 } from 'lucide-react';
+import { exportSettlementsToCsv } from '../../utils/csvExport';
 
 export default function SellerSettlements1({ onNavigate, embedded = false, onNavigateTab }) {
   const navigate = useNavigate();
@@ -180,6 +181,18 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
     return matchesFilter && matchesSearch;
   });
 
+  const handleExportSettlements = () => {
+    const listToExport = filteredSettlements.length > 0 ? filteredSettlements : settlementsList;
+    const summary = {
+      walletBalance: maxAvailable,
+      bankAccount: bankDetails
+        ? `${bankDetails.bankName || 'Bank'} (A/C: ...${String(bankDetails.accountNumber || '').slice(-4)})`
+        : 'Verified Bank Account',
+    };
+    const count = exportSettlementsToCsv(listToExport, summary);
+    toast.success(`Exported ${count} settlement record(s) to CSV spreadsheet!`);
+  };
+
   const mainContent = (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
         {/* ======================================================== */}
@@ -203,6 +216,16 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleExportSettlements}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/20 text-white text-xs font-bold transition shadow-sm cursor-pointer active:scale-95"
+                title="Download financial statement in CSV / Excel format for tax audit"
+              >
+                <Download className="w-4 h-4 text-pink-200" />
+                <span>Export Statement</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
