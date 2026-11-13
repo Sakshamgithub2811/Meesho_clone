@@ -1,6 +1,7 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import prisma from '../config/prisma.js';
+import { sendOrderConfirmationEmail } from '../utils/emailTemplates.js';
 
 const getUserId = (req) => {
   return req.user?.id || req.headers['x-user-id'] || req.query.userId || 'guest_customer';
@@ -154,12 +155,28 @@ export const verifyRazorpayPayment = async (req, res) => {
     const {
       items = [],
       shippingAddress,
-      totalAmount
+      totalAmount,
+      customerEmail
     } = orderPayload || {};
 
-    const parsedAddress = typeof shippingAddress === 'string'
+    let parsedAddress = typeof shippingAddress === 'string'
       ? JSON.parse(shippingAddress)
-      : shippingAddress;
+      : (shippingAddress || {});
+
+    const incomingEmail = (customerEmail || req.headers['x-user-email'] || req.user?.email || parsedAddress?.email || '').trim();
+
+    if (parsedAddress && typeof parsedAddress === 'object') {
+      if (incomingEmail && incomingEmail.includes('@') && !incomingEmail.endsWith('@customer.meesho')) {
+        parsedAddress.email = incomingEmail;
+      }
+    }
+
+    if (incomingEmail && incomingEmail.includes('@') && !incomingEmail.endsWith('@customer.meesho')) {
+      await prisma.profile.update({
+        where: { id: userId },
+        data: { email: incomingEmail.toLowerCase() }
+      }).catch(() => {});
+    }
 
     // Verify product IDs and calculate verified total
     const productIds = items.map(it => it.productId).filter(Boolean);
@@ -222,7 +239,8 @@ export const verifyRazorpayPayment = async (req, res) => {
             include: {
               product: true
             }
-          }
+          },
+          user: true
         }
       });
 
@@ -233,6 +251,31 @@ export const verifyRazorpayPayment = async (req, res) => {
 
       return newOrder;
     });
+
+    // 4. Send branded Order Confirmation Email to the customer
+    let recipientEmail = incomingEmail;
+    if (!recipientEmail || recipientEmail.endsWith('@customer.meesho')) {
+      recipientEmail = createdOrder?.user?.email || (typeof parsedAddress === 'object' ? parsedAddress?.email : null);
+    }
+    const recipientName = (typeof parsedAddress === 'object' ? parsedAddress?.name : null) || createdOrder?.user?.fullName || 'Valued Customer';
+
+    const origin = req.headers['origin'] || req.headers['referer'] || '';
+    const clientBase = (origin.includes('vercel.app') || !origin.includes('localhost'))
+      ? 'https://meesho-clone-nu.vercel.app'
+      : (origin ? origin.replace(/\/+$/, '') : 'https://meesho-clone-nu.vercel.app');
+    const trackingUrl = `${clientBase}/user-dashboard1?tab=orders${createdOrder?.id ? `&orderId=${createdOrder.id}` : ''}`;
+
+    try {
+      const emailResult = await sendOrderConfirmationEmail({
+        order: createdOrder,
+        email: recipientEmail || undefined,
+        name: recipientName || undefined,
+        trackingUrl
+      });
+      console.log('📧 Razorpay order confirmation email outcome:', emailResult);
+    } catch (emailErr) {
+      console.warn('⚠️ Razorpay order confirmation email non-fatal notice:', emailErr.message);
+    }
 
     return res.status(200).json({
       success: true,

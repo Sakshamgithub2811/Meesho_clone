@@ -287,15 +287,12 @@ export const createOrder = async (req, res) => {
 
     // 6. Await dispatch of branded Order Confirmation Email so Vercel Serverless doesn't terminate before SMTP completes
     try {
-      const emailResult = await Promise.race([
-        sendOrderConfirmationEmail({
-          order,
-          email: recipientEmail || undefined,
-          name: recipientName || undefined,
-          trackingUrl
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Email dispatch timeout (9s)')), 9000))
-      ]);
+      const emailResult = await sendOrderConfirmationEmail({
+        order,
+        email: recipientEmail || undefined,
+        name: recipientName || undefined,
+        trackingUrl
+      });
       console.log('📧 Order confirmation dispatch outcome:', emailResult);
     } catch (emailErr) {
       console.warn('⚠️ Order confirmation email non-fatal notice:', emailErr.message);
