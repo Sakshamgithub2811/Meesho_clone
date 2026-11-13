@@ -438,7 +438,15 @@ export const getOrderConfirmationEmailHtml = ({ order, name, trackingUrl }) => {
     minute: '2-digit'
   });
 
-  const appUrl = trackingUrl || process.env.FRONTEND_URL || 'https://meesho-clone-nu.vercel.app/user-dashboard1?tab=orders';
+  // Construct precise live tracking URL
+  let appUrl = trackingUrl;
+  if (!appUrl) {
+    const rawFrontend = process.env.FRONTEND_URL || '';
+    const base = (rawFrontend && !rawFrontend.includes('localhost'))
+      ? rawFrontend.replace(/\/+$/, '')
+      : 'https://meesho-clone-nu.vercel.app';
+    appUrl = `${base}/user-dashboard1?tab=orders${order?.id ? `&orderId=${order.id}` : ''}`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -567,7 +575,7 @@ export const getOrderConfirmationEmailHtml = ({ order, name, trackingUrl }) => {
 /**
  * Send branded Order Confirmation email via configured SMTP
  */
-export const sendOrderConfirmationEmail = async ({ order, email, name }) => {
+export const sendOrderConfirmationEmail = async ({ order, email, name, trackingUrl }) => {
   try {
     let targetEmail = email;
     let targetName = name;
@@ -622,6 +630,7 @@ export const sendOrderConfirmationEmail = async ({ order, email, name }) => {
     const html = getOrderConfirmationEmailHtml({
       order,
       name: targetName || order?.user?.fullName || 'Valued Customer',
+      trackingUrl,
     });
 
     const shortId = (order?.id || '').slice(0, 10).toUpperCase();

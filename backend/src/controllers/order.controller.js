@@ -279,10 +279,17 @@ export const createOrder = async (req, res) => {
     }
     const recipientName = (typeof parsedShippingAddress === 'object' ? parsedShippingAddress?.name : null) || order?.user?.fullName || 'Valued Customer';
 
+    const origin = req.headers['origin'] || req.headers['referer'] || '';
+    const clientBase = (origin.includes('vercel.app') || !origin.includes('localhost'))
+      ? 'https://meesho-clone-nu.vercel.app'
+      : (origin ? origin.replace(/\/+$/, '') : 'https://meesho-clone-nu.vercel.app');
+    const trackingUrl = `${clientBase}/user-dashboard1?tab=orders${order?.id ? `&orderId=${order.id}` : ''}`;
+
     sendOrderConfirmationEmail({
       order,
       email: recipientEmail || undefined,
-      name: recipientName || undefined
+      name: recipientName || undefined,
+      trackingUrl
     }).catch((emailErr) => {
       console.warn('⚠️ Order confirmation email non-fatal notice:', emailErr.message);
     });
@@ -519,7 +526,12 @@ export const updateOrderStatus = async (req, res) => {
 
     // Auto-dispatch confirmation email if status is updated to CONFIRMED
     if (upperStatus === 'CONFIRMED') {
-      sendOrderConfirmationEmail({ order: updated }).catch((err) => {
+      const origin = req.headers['origin'] || req.headers['referer'] || '';
+      const clientBase = (origin.includes('vercel.app') || !origin.includes('localhost'))
+        ? 'https://meesho-clone-nu.vercel.app'
+        : (origin ? origin.replace(/\/+$/, '') : 'https://meesho-clone-nu.vercel.app');
+      const trackingUrl = `${clientBase}/user-dashboard1?tab=orders${updated?.id ? `&orderId=${updated.id}` : ''}`;
+      sendOrderConfirmationEmail({ order: updated, trackingUrl }).catch((err) => {
         console.warn(`⚠️ [Order ${id}] CONFIRMED status email dispatch notice:`, err.message);
       });
     }
