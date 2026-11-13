@@ -285,14 +285,20 @@ export const createOrder = async (req, res) => {
       : (origin ? origin.replace(/\/+$/, '') : 'https://meesho-clone-nu.vercel.app');
     const trackingUrl = `${clientBase}/user-dashboard1?tab=orders${order?.id ? `&orderId=${order.id}` : ''}`;
 
-    sendOrderConfirmationEmail({
-      order,
-      email: recipientEmail || undefined,
-      name: recipientName || undefined,
-      trackingUrl
-    }).catch((emailErr) => {
+    // 6. Await dispatch of branded Order Confirmation Email so Vercel Serverless doesn't terminate before SMTP completes
+    try {
+      await Promise.race([
+        sendOrderConfirmationEmail({
+          order,
+          email: recipientEmail || undefined,
+          name: recipientName || undefined,
+          trackingUrl
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Email dispatch timeout (6s)')), 6000))
+      ]);
+    } catch (emailErr) {
       console.warn('⚠️ Order confirmation email non-fatal notice:', emailErr.message);
-    });
+    }
 
     return res.status(201).json({
       success: true,
@@ -531,9 +537,14 @@ export const updateOrderStatus = async (req, res) => {
         ? 'https://meesho-clone-nu.vercel.app'
         : (origin ? origin.replace(/\/+$/, '') : 'https://meesho-clone-nu.vercel.app');
       const trackingUrl = `${clientBase}/user-dashboard1?tab=orders${updated?.id ? `&orderId=${updated.id}` : ''}`;
-      sendOrderConfirmationEmail({ order: updated, trackingUrl }).catch((err) => {
+      try {
+        await Promise.race([
+          sendOrderConfirmationEmail({ order: updated, trackingUrl }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Email dispatch timeout (6s)')), 6000))
+        ]);
+      } catch (err) {
         console.warn(`⚠️ [Order ${id}] CONFIRMED status email dispatch notice:`, err.message);
-      });
+      }
     }
 
     // Auto-dispatch delivery OTP email as soon as marked OUT_FOR_DELIVERY
