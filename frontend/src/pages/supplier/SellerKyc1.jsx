@@ -70,7 +70,7 @@ const compressDocImage = (file) => {
   });
 };
 
-export default function SellerKyc1({ onNavigate }) {
+export default function SellerKyc1({ onNavigate, embedded = false, onNavigateTab }) {
   const navigate = useNavigate();
 
   const handleNav = useCallback((path) => {
@@ -206,6 +206,7 @@ export default function SellerKyc1({ onNavigate }) {
   }, [loadKyc]);
 
   const handleTabChange = (tabId) => {
+    if (onNavigateTab) return onNavigateTab(tabId);
     const item = SUPPLIER_MENU.find((m) => m.id === tabId);
     if (item?.path) handleNav(item.path);
   };
@@ -299,16 +300,8 @@ export default function SellerKyc1({ onNavigate }) {
   const isRejected = kycStatus === 'REJECTED';
   const isNotSubmitted = !kycData;
 
-  return (
-    <DashboardLayout
-      menuItems={SUPPLIER_MENU}
-      activeTab="kyc"
-      onTabChange={handleTabChange}
-      roleName="SUPPLIER"
-      userName={supplierDisplayName}
-      onLogout={() => setShowLogoutConfirm(true)}
-    >
-      <div className="space-y-6 max-w-5xl mx-auto pb-16">
+  const mainContent = (
+    <div className="space-y-6 max-w-5xl mx-auto pb-16">
         
         {/* Top Header Card */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
@@ -1055,8 +1048,6 @@ export default function SellerKyc1({ onNavigate }) {
 
         </form>
 
-      </div>
-
       {/* Document Zoom / Preview Modal */}
       {previewDoc && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1090,6 +1081,23 @@ export default function SellerKyc1({ onNavigate }) {
           </div>
         </div>
       )}
+    </div>
+  );
+
+  if (embedded) {
+    return mainContent;
+  }
+
+  return (
+    <DashboardLayout
+      menuItems={SUPPLIER_MENU}
+      activeTab="kyc"
+      onTabChange={handleTabChange}
+      roleName="SUPPLIER"
+      userName={supplierDisplayName}
+      onLogout={() => setShowLogoutConfirm(true)}
+    >
+      {mainContent}
 
       <LogoutConfirmDialog
         isOpen={showLogoutConfirm}

@@ -26,7 +26,7 @@ import {
   Wallet
 } from 'lucide-react';
 
-export default function SellerSettlements1({ onNavigate }) {
+export default function SellerSettlements1({ onNavigate, embedded = false, onNavigateTab }) {
   const navigate = useNavigate();
 
   const handleNav = useCallback((path) => {
@@ -96,6 +96,7 @@ export default function SellerSettlements1({ onNavigate }) {
   }, [loadSettlementsData]);
 
   const handleTabChange = (tabId) => {
+    if (onNavigateTab) return onNavigateTab(tabId);
     const item = SUPPLIER_MENU.find((m) => m.id === tabId);
     if (item?.path) handleNav(item.path);
   };
@@ -179,16 +180,8 @@ export default function SellerSettlements1({ onNavigate }) {
     return matchesFilter && matchesSearch;
   });
 
-  return (
-    <DashboardLayout
-      menuItems={SUPPLIER_MENU}
-      activeTab="finance"
-      onTabChange={handleTabChange}
-      roleName="SUPPLIER"
-      userName={supplierDisplayName}
-      onLogout={() => setShowLogoutConfirm(true)}
-    >
-      <div className="space-y-6 max-w-7xl mx-auto pb-12">
+  const mainContent = (
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
         {/* ======================================================== */}
         {/* 1. TOP HEADER BANNER */}
         {/* ======================================================== */}
@@ -513,7 +506,6 @@ export default function SellerSettlements1({ onNavigate }) {
             Update Bank Details ➔
           </button>
         </div>
-      </div>
 
       {/* Payout Withdrawal Modal */}
       {showWithdrawModal && (
@@ -664,6 +656,23 @@ export default function SellerSettlements1({ onNavigate }) {
           </div>
         </div>
       )}
+    </div>
+  );
+
+  if (embedded) {
+    return mainContent;
+  }
+
+  return (
+    <DashboardLayout
+      menuItems={SUPPLIER_MENU}
+      activeTab="finance"
+      onTabChange={handleTabChange}
+      roleName="SUPPLIER"
+      userName={supplierDisplayName}
+      onLogout={() => setShowLogoutConfirm(true)}
+    >
+      {mainContent}
 
       <LogoutConfirmDialog
         isOpen={showLogoutConfirm}

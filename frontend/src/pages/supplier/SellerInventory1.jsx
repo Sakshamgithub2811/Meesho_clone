@@ -27,7 +27,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 
-export default function SellerInventory1({ onNavigate }) {
+export default function SellerInventory1({ onNavigate, embedded = false, onNavigateTab }) {
   const navigate = useNavigate();
 
   const handleNav = useCallback((path) => {
@@ -100,6 +100,7 @@ export default function SellerInventory1({ onNavigate }) {
 
   // Handle Menu Navigation
   const handleTabChange = (tabId) => {
+    if (onNavigateTab) return onNavigateTab(tabId);
     const item = SUPPLIER_MENU.find((m) => m.id === tabId);
     if (item?.path) handleNav(item.path);
   };
@@ -253,17 +254,9 @@ export default function SellerInventory1({ onNavigate }) {
 
   const supplierDisplayName = profile?.storeName || profile?.fullName || profile?.name || 'Verified Supplier';
 
-  return (
-    <DashboardLayout
-      menuItems={SUPPLIER_MENU}
-      activeTab="inventory"
-      onTabChange={handleTabChange}
-      roleName="SUPPLIER"
-      userName={supplierDisplayName}
-      onLogout={() => setShowLogoutConfirm(true)}
-    >
-      <div className="space-y-6 max-w-7xl mx-auto pb-12">
-        {/* Header Title & Actions */}
+  const mainContent = (
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Header Title & Actions */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-50 text-[#b7004d] text-xs font-bold tracking-wide uppercase mb-1">
@@ -727,6 +720,22 @@ export default function SellerInventory1({ onNavigate }) {
           </div>
         )}
       </div>
+  );
+
+  if (embedded) {
+    return mainContent;
+  }
+
+  return (
+    <DashboardLayout
+      menuItems={SUPPLIER_MENU}
+      activeTab="inventory"
+      onTabChange={handleTabChange}
+      roleName="SUPPLIER"
+      userName={supplierDisplayName}
+      onLogout={() => setShowLogoutConfirm(true)}
+    >
+      {mainContent}
 
       <LogoutConfirmDialog
         isOpen={showLogoutConfirm}
