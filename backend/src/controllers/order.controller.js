@@ -173,7 +173,8 @@ export const createOrder = async (req, res) => {
             include: {
               product: true
             }
-          }
+          },
+          user: true
         }
       });
 
@@ -272,8 +273,11 @@ export const createOrder = async (req, res) => {
     }
 
     // 6. Asynchronously dispatch branded Order Confirmation Email to the customer
-    const recipientEmail = incomingEmail || (typeof parsedShippingAddress === 'object' ? parsedShippingAddress?.email : null);
-    const recipientName = (typeof parsedShippingAddress === 'object' ? parsedShippingAddress?.name : null) || 'Valued Customer';
+    let recipientEmail = incomingEmail;
+    if (!recipientEmail || recipientEmail.endsWith('@customer.meesho')) {
+      recipientEmail = order?.user?.email || (typeof parsedShippingAddress === 'object' ? parsedShippingAddress?.email : null);
+    }
+    const recipientName = (typeof parsedShippingAddress === 'object' ? parsedShippingAddress?.name : null) || order?.user?.fullName || 'Valued Customer';
 
     sendOrderConfirmationEmail({
       order,

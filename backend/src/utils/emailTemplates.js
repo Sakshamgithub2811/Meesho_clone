@@ -1,4 +1,5 @@
 import transporter from '../config/emailTransporter.js';
+import prisma from '../config/prisma.js';
 
 /**
  * Generate high-conversion, professional Meesho-themed HTML email template
@@ -571,19 +572,41 @@ export const sendOrderConfirmationEmail = async ({ order, email, name }) => {
     let targetEmail = email;
     let targetName = name;
 
-    if (!targetEmail) {
+    // 1. Check passed email or order.user.email
+    if (!targetEmail || targetEmail.endsWith('@customer.meesho')) {
       targetEmail = order?.user?.email;
-      if ((!targetEmail || targetEmail.endsWith('@customer.meesho')) && order?.shippingAddress) {
-        try {
-          const addr = typeof order.shippingAddress === 'string'
-            ? JSON.parse(order.shippingAddress)
-            : order.shippingAddress;
-          if (addr?.email && !addr.email.endsWith('@customer.meesho')) targetEmail = addr.email;
-          if (addr?.name && !targetName) targetName = addr.name;
-        } catch (e) {}
+    }
+
+    // 2. Check shippingAddress
+    if ((!targetEmail || targetEmail.endsWith('@customer.meesho')) && order?.shippingAddress) {
+      try {
+        const addr = typeof order.shippingAddress === 'string'
+          ? JSON.parse(order.shippingAddress)
+          : order.shippingAddress;
+        if (addr?.email && !addr.email.endsWith('@customer.meesho')) targetEmail = addr.email;
+        if (addr?.name && !targetName) targetName = addr.name;
+      } catch (e) {}
+    }
+
+    // 3. Fallback to querying profile directly from database using order.userId
+    if ((!targetEmail || targetEmail.endsWith('@customer.meesho')) && order?.userId) {
+      try {
+        const profile = await prisma.profile.findUnique({
+          where: { id: order.userId },
+          select: { email: true, fullName: true }
+        });
+        if (profile?.email && !profile.email.endsWith('@customer.meesho')) {
+          targetEmail = profile.email;
+        }
+        if (profile?.fullName && !targetName) {
+          targetName = profile.fullName;
+        }
+      } catch (e) {
+        console.warn('Error retrieving profile for order email:', e.message);
       }
     }
 
+    // 4. Decode if email was encoded in dummy customer_..._gmail_com format
     if (targetEmail && targetEmail.includes('@customer.meesho')) {
       const match = targetEmail.match(/customer_(.+)@customer\.meesho/);
       if (match && match[1]?.endsWith('_gmail_com')) {
@@ -592,11 +615,7 @@ export const sendOrderConfirmationEmail = async ({ order, email, name }) => {
     }
 
     if (!targetEmail || targetEmail.endsWith('@customer.meesho')) {
-      targetEmail = process.env.SMTP_USER;
-    }
-
-    if (!targetEmail) {
-      console.warn(`[Order Confirmation Email] No valid recipient email found for Order #${order?.id}`);
+      console.warn(`[Order Confirmation Email] Skipping: No real customer email available for Order #${order?.id} (userId: ${order?.userId})`);
       return { success: false, message: 'No recipient email available' };
     }
 
