@@ -239,8 +239,8 @@ export default function UserLogin() {
 
   // Screen 1: Registration Form
   const registerForm = (
-    <form onSubmit={handleRegister} className="space-y-4">
-      <div className="space-y-1.5 text-left">
+    <form onSubmit={handleRegister} className="space-y-3">
+      <div className="space-y-1 text-left">
         <Label htmlFor="user-register-name" className="text-xs font-bold text-slate-700">Full Name</Label>
         <Input
           id="user-register-name"
@@ -249,10 +249,10 @@ export default function UserLogin() {
           value={registerName}
           onChange={(e) => setRegisterName(e.target.value)}
           required
-          className="h-12 px-4 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
-      <div className="space-y-1.5 text-left">
+      <div className="space-y-1 text-left">
         <Label htmlFor="user-register-email" className="text-xs font-bold text-slate-700">Email Address</Label>
         <Input
           id="user-register-email"
@@ -261,10 +261,10 @@ export default function UserLogin() {
           value={registerEmail}
           onChange={(e) => setRegisterEmail(e.target.value)}
           required
-          className="h-12 px-4 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
-      <div className="space-y-1.5 text-left">
+      <div className="space-y-1 text-left">
         <Label htmlFor="user-register-password" className="text-xs font-bold text-slate-700">Password</Label>
         <Input
           id="user-register-password"
@@ -273,11 +273,11 @@ export default function UserLogin() {
           value={registerPassword}
           onChange={(e) => setRegisterPassword(e.target.value)}
           required
-          className="h-12 px-4 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
       {(error || googleError) && !loading && !googleLoading && (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">
+        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{error || googleError}</span>
         </div>
@@ -285,7 +285,7 @@ export default function UserLogin() {
       <Button
         type="submit"
         disabled={loading || googleLoading}
-        className="w-full bg-[#b7004d] hover:bg-[#9f0038] text-white rounded-xl py-6 font-bold shadow-md shadow-[#b7004d]/20 cursor-pointer transition-all active:scale-[0.99]"
+        className="w-full bg-[#b7004d] hover:bg-[#9f0038] text-white rounded-xl py-5 font-bold shadow-md shadow-[#b7004d]/20 cursor-pointer transition-all active:scale-[0.99] text-sm"
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -303,16 +303,16 @@ export default function UserLogin() {
         label="Sign up with Google"
       />
 
-      <div className="relative flex items-center justify-center my-3">
+      <div className="relative flex items-center justify-center my-2">
         <div className="border-t border-slate-200 w-full" />
-        <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">or</span>
+        <span className="bg-white px-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">or</span>
         <div className="border-t border-slate-200 w-full" />
       </div>
 
       <button
         type="button"
         onClick={() => navigate(redirectParam || '/user-home')}
-        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-[#b7004d]/40 bg-slate-50 hover:bg-pink-50/60 text-slate-800 hover:text-[#b7004d] font-bold text-sm transition-all shadow-xs cursor-pointer active:scale-[0.99]"
+        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-200 hover:border-[#b7004d]/40 bg-slate-50 hover:bg-pink-50/60 text-slate-700 hover:text-[#b7004d] font-bold text-xs sm:text-sm transition-all shadow-2xs cursor-pointer active:scale-[0.99]"
       >
         <span>Continue as Guest</span>
         <ArrowRight className="w-4 h-4 text-[#b7004d]" />
@@ -322,8 +322,8 @@ export default function UserLogin() {
 
   // Screen 2: Login Form
   const loginForm = (
-    <form onSubmit={handleLogin} className="space-y-4">
-      <div className="space-y-1.5 text-left">
+    <form onSubmit={handleLogin} className="space-y-3">
+      <div className="space-y-1 text-left">
         <Label htmlFor="user-login-email" className="text-xs font-bold text-slate-700">Email Address</Label>
         <Input
           id="user-login-email"
@@ -332,10 +332,10 @@ export default function UserLogin() {
           value={loginEmail}
           onChange={(e) => setLoginEmail(e.target.value)}
           required
-          className="h-12 px-4 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
-      <div className="space-y-1.5 text-left">
+      <div className="space-y-1 text-left">
         <div className="flex items-center justify-between">
           <Label htmlFor="user-login-password" className="text-xs font-bold text-slate-700">Password</Label>
           <button
@@ -353,11 +353,11 @@ export default function UserLogin() {
           value={loginPassword}
           onChange={(e) => setLoginPassword(e.target.value)}
           required
-          className="h-12 px-4 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          className="h-11 px-3.5 text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
         />
       </div>
       {(error || googleError) && !loading && !googleLoading && (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">
+        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{error || googleError}</span>
         </div>
@@ -365,7 +365,7 @@ export default function UserLogin() {
       <Button
         type="submit"
         disabled={loading || googleLoading}
-        className="w-full bg-[#b7004d] hover:bg-[#9f0038] text-white rounded-xl py-6 font-bold shadow-md shadow-[#b7004d]/20 cursor-pointer transition-all active:scale-[0.99]"
+        className="w-full bg-[#b7004d] hover:bg-[#9f0038] text-white rounded-xl py-5 font-bold shadow-md shadow-[#b7004d]/20 cursor-pointer transition-all active:scale-[0.99] text-sm"
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -383,16 +383,16 @@ export default function UserLogin() {
         label="Continue with Google"
       />
 
-      <div className="relative flex items-center justify-center my-3">
+      <div className="relative flex items-center justify-center my-2">
         <div className="border-t border-slate-200 w-full" />
-        <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">or</span>
+        <span className="bg-white px-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">or</span>
         <div className="border-t border-slate-200 w-full" />
       </div>
 
       <button
         type="button"
         onClick={() => navigate(redirectParam || '/user-home')}
-        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-[#b7004d]/40 bg-slate-50 hover:bg-pink-50/60 text-slate-800 hover:text-[#b7004d] font-bold text-sm transition-all shadow-xs cursor-pointer active:scale-[0.99]"
+        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-200 hover:border-[#b7004d]/40 bg-slate-50 hover:bg-pink-50/60 text-slate-700 hover:text-[#b7004d] font-bold text-xs sm:text-sm transition-all shadow-2xs cursor-pointer active:scale-[0.99]"
       >
         <span>Continue as Guest</span>
         <ArrowRight className="w-4 h-4 text-[#b7004d]" />

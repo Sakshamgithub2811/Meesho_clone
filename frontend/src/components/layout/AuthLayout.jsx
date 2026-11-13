@@ -14,10 +14,10 @@ export default function AuthLayout({
   const tabsProps = activeTab ? { value: activeTab, onValueChange: onTabChange } : { defaultValue: "login" };
 
   return (
-    <div className="bg-[#fff4f6] text-[#4a2135] h-screen w-full overflow-hidden relative font-sans">
-      {/* 1. Background Graphic & Floating Logo (Fixed) */}
-      <div className="absolute top-0 left-0 w-full h-[353px] overflow-hidden [clip-path:ellipse(110%_100%_at_50%_0%)] bg-[#ff7293]/20 z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#fff4f6]/90 z-10" />
+    <div className="min-h-screen w-full relative bg-[#fff4f6] text-[#4a2135] font-sans flex flex-col items-center justify-center py-6 sm:py-10 px-4 overflow-y-auto">
+      {/* 1. Background Graphic Banner (Fixed clip-path, non-interfering) */}
+      <div className="absolute top-0 left-0 w-full h-[360px] pointer-events-none overflow-hidden [clip-path:ellipse(110%_100%_at_50%_0%)] bg-[#ff7293]/20 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#fff4f6]/60 to-[#fff4f6] z-10" />
         <img
           className="w-full h-full object-cover mix-blend-multiply opacity-80"
           alt=""
@@ -27,67 +27,66 @@ export default function AuthLayout({
             e.currentTarget.style.display = 'none';
           }}
         />
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-20">
-          <div className="bg-white/80 backdrop-blur-[20px] px-6 py-2 rounded-full border border-white/40 shadow-[0_12px_40px_rgba(74,33,53,0.06)] flex items-center gap-2.5">
-            <span className="text-[#b7004d] font-black tracking-tighter text-xl">
-              MSHOPPY <span className="uppercase text-[#ff7293] text-sm">{roleName}</span>
-            </span>
-          </div>
+      </div>
+
+      {/* 2. Brand Floating Badge (Positioned directly above card in natural flow) */}
+      <div className="relative z-10 mb-3.5 shrink-0">
+        <div className="bg-white/90 backdrop-blur-[20px] px-5 py-1.5 rounded-full border border-white/60 shadow-[0_8px_30px_rgba(74,33,53,0.08)] flex items-center gap-2">
+          <span className="text-[#b7004d] font-black tracking-tighter text-lg sm:text-xl">
+            MSHOPPY <span className="uppercase text-[#ff7293] text-xs sm:text-sm font-extrabold">{roleName}</span>
+          </span>
         </div>
       </div>
 
-      {/* 2. Scrollable Content Card Area */}
-      <main className="relative z-20 min-h-screen w-full overflow-y-auto flex flex-col items-center justify-center px-4 py-4 sm:px-6">
-        <div className="w-full max-w-md shrink-0 flex flex-col items-center my-auto pt-8 pb-4">
-          <Card className="w-full shadow-2xl border-white/50 bg-white/95 backdrop-blur-sm rounded-[2rem]">
-            <CardHeader className="text-center pt-7 pb-4">
-              <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#4a2135]">
-                {title}
-              </CardTitle>
-              {subtitle && (
-                <CardDescription className="text-[#7d4d62] font-medium opacity-80 mt-1.5 text-xs sm:text-sm">
-                  {subtitle}
-                </CardDescription>
-              )}
-            </CardHeader>
+      {/* 3. Authentication Card Container (Guaranteed full clearance with zero clipping) */}
+      <div className="relative z-10 w-full max-w-md shrink-0 flex flex-col items-center">
+        <Card className="w-full shadow-2xl border-white/60 bg-white/95 backdrop-blur-sm rounded-[2rem] overflow-hidden">
+          <CardHeader className="text-center pt-6 pb-2.5 px-6 sm:px-8">
+            <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#4a2135]">
+              {title}
+            </CardTitle>
+            {subtitle && (
+              <CardDescription className="text-[#7d4d62] font-medium opacity-80 mt-1 text-xs sm:text-sm">
+                {subtitle}
+              </CardDescription>
+            )}
+          </CardHeader>
 
-            <CardContent className="pb-7 px-5 sm:px-7">
-              {/* Agar registerContent bheja hai toh Tabs dikhayenge */}
-              {registerContent ? (
-                <Tabs {...tabsProps} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-6 rounded-full bg-[#ffecf1] p-1.5 min-h-[54px] items-center">
-                    <TabsTrigger
-                      value="login"
-                      className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all cursor-pointer"
-                    >
-                      Login
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="register"
-                      className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all cursor-pointer"
-                    >
-                      Register
-                    </TabsTrigger>
-                  </TabsList>
+          <CardContent className="pb-6 px-5 sm:px-8">
+            {/* If registerContent provided, show Login / Register Tabs */}
+            {registerContent ? (
+              <Tabs {...tabsProps} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4 rounded-full bg-[#ffecf1] p-1 min-h-[46px] items-center">
+                  <TabsTrigger
+                    value="login"
+                    className="rounded-full py-2 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                  >
+                    Login
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="register"
+                    className="rounded-full py-2 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                  >
+                    Register
+                  </TabsTrigger>
+                </TabsList>
 
-                  {/* Login Form ki jagah */}
-                  <TabsContent value="login" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
-                    {loginContent}
-                  </TabsContent>
+                {/* Login Tab Content */}
+                <TabsContent value="login" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
+                  {loginContent}
+                </TabsContent>
 
-                  {/* Register Form ki jagah */}
-                  <TabsContent value="register" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
-                    {registerContent}
-                  </TabsContent>
-                </Tabs>
-              ) : (
-                /* Agar register nahi chahiye, toh bas login content dikhao */
-                loginContent
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+                {/* Register Tab Content */}
+                <TabsContent value="register" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
+                  {registerContent}
+                </TabsContent>
+              </Tabs>
+            ) : (
+              loginContent
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
