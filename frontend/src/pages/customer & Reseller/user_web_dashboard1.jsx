@@ -2568,7 +2568,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       <div className="space-y-3 cursor-pointer" onClick={() => setSelectedTrackingOrder(order)}>
                         {(order.items || []).map((item, idx) => {
                           const p = item.product || {};
-                          const img = p.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=200';
+                          const img = (Array.isArray(p.images) && p.images[0]) || p.image || 'https://images.meesho.com/images/products/placeholder.png';
                           return (
                             <div key={idx} className="flex items-center gap-3.5">
                               <img
@@ -2696,7 +2696,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 {wishlistItems.map((item) => {
                   const prod = item.product || item;
                   const prodId = item.productId || item.id;
-                  const img = prod.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400';
+                  const img = (Array.isArray(prod?.images) && prod.images[0]) || prod?.image || 'https://images.meesho.com/images/products/placeholder.png';
                   const title = prod.title || 'Product';
                   const price = prod.price ? `₹${prod.price}` : '₹0';
 
