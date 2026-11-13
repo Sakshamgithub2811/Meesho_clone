@@ -34,6 +34,14 @@ export default function AuthLayout({
             </span>
           </div>
         </div>
+
+        <a
+          href="/user-home"
+          className="absolute top-8 right-4 sm:right-8 z-30 bg-white/90 hover:bg-white text-slate-700 hover:text-[#b7004d] font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-full border border-white/60 shadow-md backdrop-blur-md flex items-center gap-1.5 transition-all cursor-pointer"
+        >
+          <span>Skip to Shopping</span>
+          <span>➔</span>
+        </a>
       </div>
 
       {/* 2. Scrollable Content Card Area */}

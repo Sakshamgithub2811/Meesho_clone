@@ -302,6 +302,21 @@ export default function UserLogin() {
         isLoading={googleLoading}
         label="Sign up with Google"
       />
+
+      <div className="relative flex items-center justify-center my-3">
+        <div className="border-t border-slate-200 w-full" />
+        <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">or</span>
+        <div className="border-t border-slate-200 w-full" />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => navigate(redirectParam || '/user-home')}
+        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-[#b7004d]/40 bg-slate-50 hover:bg-pink-50/60 text-slate-800 hover:text-[#b7004d] font-bold text-sm transition-all shadow-xs cursor-pointer active:scale-[0.99]"
+      >
+        <span>🛍️ Continue as Guest (Skip)</span>
+        <ArrowRight className="w-4 h-4 text-[#b7004d]" />
+      </button>
     </form>
   );
 
@@ -368,16 +383,20 @@ export default function UserLogin() {
         label="Continue with Google"
       />
 
-      <div className="pt-2 text-center">
-        <button
-          type="button"
-          onClick={() => navigate(redirectParam || '/user-home')}
-          className="text-xs font-bold text-slate-500 hover:text-[#b7004d] hover:underline transition-colors cursor-pointer inline-flex items-center gap-1.5 py-1.5 px-3 rounded-full hover:bg-pink-50/60"
-        >
-          <span>Continue as Guest / Skip to Shopping</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
+      <div className="relative flex items-center justify-center my-3">
+        <div className="border-t border-slate-200 w-full" />
+        <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">or</span>
+        <div className="border-t border-slate-200 w-full" />
       </div>
+
+      <button
+        type="button"
+        onClick={() => navigate(redirectParam || '/user-home')}
+        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-[#b7004d]/40 bg-slate-50 hover:bg-pink-50/60 text-slate-800 hover:text-[#b7004d] font-bold text-sm transition-all shadow-xs cursor-pointer active:scale-[0.99]"
+      >
+        <span>🛍️ Continue as Guest (Skip)</span>
+        <ArrowRight className="w-4 h-4 text-[#b7004d]" />
+      </button>
     </form>
   );
 
