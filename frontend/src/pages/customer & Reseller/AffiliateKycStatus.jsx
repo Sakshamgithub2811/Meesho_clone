@@ -42,6 +42,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
 
   // Live synced affiliate app state - strictly scoped to active user
   const [app, setApp] = useState(() => getAffiliateApp());
+  const [isVerifying, setIsVerifying] = useState(true);
 
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -82,7 +83,10 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
 
         const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
         const res = await fetch(`${API_V1_BASE}/admin-kyc/affiliate-status${queryString}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (isMounted) setIsVerifying(false);
+          return;
+        }
 
         const data = await res.json();
         if (isMounted) {
@@ -110,9 +114,11 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
             setApp(null);
             clearAffiliateApp();
           }
+          setIsVerifying(false);
         }
       } catch (err) {
         console.warn('Live KYC sync network error:', err.message);
+        if (isMounted) setIsVerifying(false);
       }
     };
 
@@ -125,9 +131,9 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
   }, []);
 
   const status = app?.status || 'Under Review';
-  const isApproved = Boolean(app) && (status === 'Approved' || status === 'APPROVED');
-  const isRejected = Boolean(app) && (status === 'Rejected' || status === 'REJECTED');
-  const isUnderReview = Boolean(app) && !isApproved && !isRejected;
+  const isApproved = !isVerifying && Boolean(app) && (status === 'Approved' || status === 'APPROVED');
+  const isRejected = !isVerifying && Boolean(app) && (status === 'Rejected' || status === 'REJECTED');
+  const isUnderReview = !isVerifying && Boolean(app) && !isApproved && !isRejected;
 
   const verificationStages = app
     ? [
@@ -253,41 +259,61 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
 
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-[11px] text-slate-400 font-medium">Status:</span>
-            <span
-              className={`font-black uppercase px-3 py-1 rounded-xl text-xs flex items-center gap-1.5 ${
-                !app
-                  ? 'bg-slate-500/20 text-slate-300 border border-slate-500/40'
-                  : isApproved
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                  : isRejected
-                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-              }`}
-            >
+            {isVerifying ? (
+              <span className="font-bold text-xs px-3 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700/50 flex items-center gap-1.5 animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span>Verifying Status...</span>
+              </span>
+            ) : (
               <span
-                className={`w-2 h-2 rounded-full ${
+                className={`font-black uppercase px-3 py-1 rounded-xl text-xs flex items-center gap-1.5 ${
                   !app
-                    ? 'bg-slate-400'
+                    ? 'bg-slate-500/20 text-slate-300 border border-slate-500/40'
                     : isApproved
-                    ? 'bg-emerald-400'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                     : isRejected
-                    ? 'bg-rose-400'
-                    : 'bg-amber-400 animate-ping'
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                 }`}
-              ></span>
-              {!app
-                ? 'Not Submitted'
-                : isApproved
-                ? 'Verified & Approved'
-                : isRejected
-                ? 'Action Needed'
-                : 'Under Verification'}
-            </span>
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    !app
+                      ? 'bg-slate-400'
+                      : isApproved
+                      ? 'bg-emerald-400'
+                      : isRejected
+                      ? 'bg-rose-400'
+                      : 'bg-amber-400 animate-ping'
+                  }`}
+                ></span>
+                {!app
+                  ? 'Not Submitted'
+                  : isApproved
+                  ? 'Verified & Approved'
+                  : isRejected
+                  ? 'Action Needed'
+                  : 'Under Verification'}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Dynamic Status Hero Card */}
-        {!app ? (
+        {isVerifying ? (
+          <section className="relative overflow-hidden rounded-3xl bg-slate-900/60 p-8 sm:p-10 text-white shadow-xl border border-slate-700/50 animate-pulse">
+            <div className="flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto py-6">
+              <div className="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-slate-400 animate-spin">sync</span>
+              </div>
+              <div className="space-y-2 w-full">
+                <div className="h-6 w-52 bg-slate-800 rounded-lg mx-auto"></div>
+                <div className="h-3 w-72 bg-slate-800/80 rounded mx-auto"></div>
+                <div className="h-3 w-48 bg-slate-800/80 rounded mx-auto"></div>
+              </div>
+            </div>
+          </section>
+        ) : !app ? (
           <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#1b1226] via-[#160d20] to-[#22102e] p-8 sm:p-10 text-white shadow-2xl border border-pink-500/30 text-center space-y-6">
             <div className="w-16 h-16 rounded-3xl bg-pink-500/20 text-[#FF3F6C] flex items-center justify-center mx-auto border border-pink-500/30 shadow-lg shadow-pink-500/10">
               <span className="material-symbols-outlined text-3xl">assignment_late</span>
@@ -460,7 +486,16 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
         )}
 
         {/* 4-Stage Visual Verification Pipeline */}
-        {app && (
+        {isVerifying ? (
+          <section className="bg-[#170e22] rounded-3xl p-6 sm:p-7 border border-pink-500/20 shadow-xl space-y-5 animate-pulse">
+            <div className="h-5 w-48 bg-slate-800 rounded"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-28 bg-slate-800/40 rounded-2xl border border-white/5"></div>
+              ))}
+            </div>
+          </section>
+        ) : app ? (
           <section className="bg-[#170e22] rounded-3xl p-6 sm:p-7 border border-pink-500/20 shadow-xl space-y-5">
             <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-white/10">
               <div className="flex items-center gap-2">
@@ -536,7 +571,7 @@ export default function AffiliateKycStatus({ onNavigate, onBack }) {
               })}
             </div>
           </section>
-        )}
+        ) : null}
 
         {/* Submitted Dossier & Identity Proofs Breakdown */}
         {app && (

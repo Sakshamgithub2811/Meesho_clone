@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   getCart,
+  getLocalCart,
   addToCart as apiAddToCart,
   updateCartItem as apiUpdateCartItem,
   removeFromCart as apiRemoveFromCart,
@@ -18,6 +19,7 @@ let cachedCart = {
 };
 let isInitialFetched = false;
 let isFetchingGlobal = false;
+let pendingFetchPromise = null;
 const listeners = new Set();
 
 const notifyListeners = () => {
@@ -44,6 +46,7 @@ export function resetCartCache() {
   };
   isInitialFetched = false;
   isFetchingGlobal = false;
+  pendingFetchPromise = null;
   notifyListeners();
 }
 
@@ -56,28 +59,39 @@ export function useCart() {
   const [loading, setLoading] = useState(!isInitialFetched);
 
   const fetchCart = useCallback(async (force = false) => {
-    if (isFetchingGlobal && !force) return;
-    isFetchingGlobal = true;
-    try {
-      const data = await getCart();
-      if (data && typeof data === 'object') {
-        cachedCart = {
-          items: data.items || [],
-          totalItems: data.totalItems ?? (data.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 0),
-          subtotal: data.subtotal || 0,
-          originalSubtotal: data.originalSubtotal || 0,
-          totalDiscount: data.totalDiscount || 0,
-          deliveryFee: data.deliveryFee ?? 0,
-        };
-        isInitialFetched = true;
-        notifyListeners();
-      }
-    } catch (err) {
-      console.error('Failed to load cart:', err);
-    } finally {
-      isFetchingGlobal = false;
-      setLoading(false);
+    // If a network fetch is already in flight, return the inflight promise to prevent request floods
+    if (isFetchingGlobal) {
+      if (pendingFetchPromise) return pendingFetchPromise;
+      return;
     }
+    if (isInitialFetched && !force) return;
+
+    isFetchingGlobal = true;
+    pendingFetchPromise = (async () => {
+      try {
+        const data = await getCart();
+        if (data && typeof data === 'object') {
+          cachedCart = {
+            items: data.items || [],
+            totalItems: data.totalItems ?? (data.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 0),
+            subtotal: data.subtotal || 0,
+            originalSubtotal: data.originalSubtotal || 0,
+            totalDiscount: data.totalDiscount || 0,
+            deliveryFee: data.deliveryFee ?? 0,
+          };
+          isInitialFetched = true;
+          notifyListeners();
+        }
+      } catch (err) {
+        console.error('Failed to load cart:', err);
+      } finally {
+        isFetchingGlobal = false;
+        pendingFetchPromise = null;
+        setLoading(false);
+      }
+    })();
+
+    return pendingFetchPromise;
   }, []);
 
   useEffect(() => {
@@ -90,7 +104,14 @@ export function useCart() {
     listeners.add(handleChange);
 
     const handleLocalCartChanged = () => {
-      fetchCart(true);
+      // Synchronize in-memory cart from local storage without initiating a new API request loop
+      try {
+        const local = getLocalCart();
+        if (local && Array.isArray(local.items)) {
+          cachedCart = { ...local };
+          notifyListeners();
+        }
+      } catch (e) {}
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('mshoppy-cart-changed', handleLocalCartChanged);

@@ -128,6 +128,8 @@ export const getProducts = async (req, res) => {
       redisClient.setEx(cacheKey, 60, JSON.stringify(responsePayload)).catch(() => {});
     }
 
+    // High performance Vercel Edge caching header for sub-300ms global delivery
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     return res.status(200).json(responsePayload);
   } catch (error) {
     console.error('Error fetching products:', error);
@@ -172,6 +174,8 @@ export const getProductById = async (req, res) => {
       });
     }
 
+    // High performance Vercel Edge caching header for sub-300ms global delivery
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     return res.status(200).json({
       success: true,
       data: product

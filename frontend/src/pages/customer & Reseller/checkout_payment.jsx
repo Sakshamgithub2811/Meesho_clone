@@ -266,6 +266,21 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
     setPlacingOrder(true);
     try {
       const referralCode = localStorage.getItem('mshoppy_referral_code');
+
+      let userEmail = null;
+      try {
+        for (const key of ['mshoppy_customer_user', 'user', 'mshoppy_reseller_user', 'mshoppy_affiliate_user']) {
+          const rawUser = localStorage.getItem(key);
+          if (rawUser) {
+            const u = JSON.parse(rawUser);
+            if (u?.email && !u.email.endsWith('@customer.meesho')) {
+              userEmail = u.email;
+              break;
+            }
+          }
+        }
+      } catch (e) {}
+
       const orderPayload = {
         items: cartItems.map(item => ({
           productId: item.productId,
@@ -276,7 +291,8 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
         shippingAddress: address,
         paymentMethod: paymentMethodToSave.toUpperCase(),
         totalAmount: finalAmount,
-        referralCode: referralCode || undefined
+        referralCode: referralCode || undefined,
+        customerEmail: userEmail || address?.email || undefined
       };
 
       const res = await createOrder(orderPayload);
@@ -359,6 +375,21 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
     try {
       await ensureRazorpayLoaded();
 
+      let userEmail = null;
+      try {
+        for (const key of ['mshoppy_customer_user', 'user', 'mshoppy_reseller_user', 'mshoppy_affiliate_user']) {
+          const rawUser = localStorage.getItem(key);
+          if (rawUser) {
+            const u = JSON.parse(rawUser);
+            if (u?.email && !u.email.endsWith('@customer.meesho')) {
+              userEmail = u.email;
+              break;
+            }
+          }
+        }
+      } catch (e) {}
+      const targetCustomerEmail = userEmail || address?.email || undefined;
+
       // 1. Create order on backend via Razorpay Orders API
       let rzpRes = null;
       try {
@@ -399,7 +430,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
         prefill: {
           name: address?.name || 'Customer',
           contact: address?.phone || '',
-          email: `${(address?.name || 'customer').toLowerCase().replace(/\s+/g, '')}@example.com`
+          email: targetCustomerEmail || `${(address?.name || 'customer').toLowerCase().replace(/\s+/g, '')}@example.com`
         },
         theme: {
           color: '#FF3F6C'
@@ -424,7 +455,8 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                     })),
                     shippingAddress: address,
                     totalAmount: finalAmount,
-                    paymentMethod: 'ONLINE'
+                    paymentMethod: 'ONLINE',
+                    customerEmail: targetCustomerEmail
                   }
                 });
 

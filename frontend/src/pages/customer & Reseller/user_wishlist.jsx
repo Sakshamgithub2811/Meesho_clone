@@ -47,17 +47,37 @@ export default function UserWishlist({ onNavigate, onBack }) {
   useEffect(() => {
     loadData();
 
-    const handleDataChanged = () => {
-      loadData();
+    const handleWishlistChanged = () => {
+      try {
+        const raw = localStorage.getItem('mshoppy_wishlist');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setWishlistItems(parsed);
+        }
+      } catch (e) {}
     };
+
+    const handleCartChanged = () => {
+      try {
+        const raw = localStorage.getItem('mshoppy_local_cart');
+        if (raw) {
+          const items = JSON.parse(raw);
+          if (Array.isArray(items)) {
+            const count = items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+            setCartCount(count);
+          }
+        }
+      } catch (e) {}
+    };
+
     if (typeof window !== 'undefined') {
-      window.addEventListener('mshoppy-wishlist-changed', handleDataChanged);
-      window.addEventListener('mshoppy-cart-changed', handleDataChanged);
+      window.addEventListener('mshoppy-wishlist-changed', handleWishlistChanged);
+      window.addEventListener('mshoppy-cart-changed', handleCartChanged);
     }
     return () => {
       if (typeof window !== 'undefined') {
-        window.removeEventListener('mshoppy-wishlist-changed', handleDataChanged);
-        window.removeEventListener('mshoppy-cart-changed', handleDataChanged);
+        window.removeEventListener('mshoppy-wishlist-changed', handleWishlistChanged);
+        window.removeEventListener('mshoppy-cart-changed', handleCartChanged);
       }
     };
   }, []);

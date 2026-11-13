@@ -4,8 +4,28 @@ import { sendVerificationEmail, sendLoginOtpEmail } from '../../utils/emailTempl
 
 // In-memory fallback in case Prisma / database connection is unavailable
 const fallbackUserStore = new Map();
-// In-memory OTP store for secure email login verification
+// In-memory OTP store for secure email login verification (fallback)
 const loginOtpStore = new Map();
+
+// Ensure PostgreSQL login_otps table exists for durable multi-instance Serverless OTP storage
+let isOtpTableReady = false;
+async function ensureOtpTable() {
+  if (isOtpTableReady) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS login_otps (
+        email VARCHAR(255) PRIMARY KEY,
+        otp VARCHAR(10) NOT NULL,
+        full_name VARCHAR(255),
+        expires_at BIGINT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    isOtpTableReady = true;
+  } catch (err) {
+    console.warn("ensureOtpTable warning:", err.message);
+  }
+}
 
 // 1. REGISTER USER / CUSTOMER
 export const registerUser = async (req, res) => {
@@ -212,6 +232,20 @@ export const sendLoginOtp = async (req, res) => {
       if (user?.fullName) fullName = user.fullName;
     } catch (e) {}
 
+    // 1. Durable PostgreSQL storage (persists across all Vercel Serverless containers & cold starts)
+    await ensureOtpTable();
+    try {
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO login_otps (email, otp, full_name, expires_at)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (email) DO UPDATE
+        SET otp = EXCLUDED.otp, expires_at = EXCLUDED.expires_at, full_name = EXCLUDED.full_name, created_at = CURRENT_TIMESTAMP;
+      `, cleanEmail, otp, fullName, BigInt(expiresAt));
+    } catch (dbErr) {
+      console.warn("DB login_otps save failed, falling back to memory:", dbErr.message);
+    }
+
+    // 2. Secondary in-memory backup
     loginOtpStore.set(cleanEmail, { otp, expiresAt, fullName });
 
     const emailRes = await sendLoginOtpEmail({
@@ -243,7 +277,30 @@ export const verifyLoginOtp = async (req, res) => {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    const record = loginOtpStore.get(cleanEmail);
+    let record = null;
+
+    // 1. Fetch from durable PostgreSQL storage first (handles serverless cold starts across any container)
+    await ensureOtpTable();
+    try {
+      const rows = await prisma.$queryRawUnsafe(
+        'SELECT * FROM login_otps WHERE email = $1',
+        cleanEmail
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        record = {
+          otp: String(rows[0].otp).trim(),
+          expiresAt: Number(rows[0].expires_at),
+          fullName: rows[0].full_name
+        };
+      }
+    } catch (dbErr) {
+      console.warn("DB login_otps query failed:", dbErr.message);
+    }
+
+    // 2. Fallback to in-memory store if DB query returned nothing
+    if (!record) {
+      record = loginOtpStore.get(cleanEmail);
+    }
 
     if (!record) {
       return res.status(400).json({ 
@@ -252,6 +309,9 @@ export const verifyLoginOtp = async (req, res) => {
     }
 
     if (Date.now() > record.expiresAt) {
+      try {
+        await prisma.$executeRawUnsafe('DELETE FROM login_otps WHERE email = $1', cleanEmail);
+      } catch (_) {}
       loginOtpStore.delete(cleanEmail);
       return res.status(400).json({ 
         error: "This OTP has expired. Please request a fresh OTP code." 
@@ -264,7 +324,10 @@ export const verifyLoginOtp = async (req, res) => {
       });
     }
 
-    // OTP Verified! Clear it from store
+    // OTP Verified! Clear it from DB and memory store
+    try {
+      await prisma.$executeRawUnsafe('DELETE FROM login_otps WHERE email = $1', cleanEmail);
+    } catch (_) {}
     loginOtpStore.delete(cleanEmail);
 
     let profile;

@@ -89,11 +89,23 @@ export default function HomeUserCustomer() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedSubcat, setSelectedSubcat] = useState("All");
-  const [products, setProducts] = useState([]);
-  const [dbCategories, setDbCategories] = useState([]);
+  const [products, setProducts] = useState(() => {
+    try {
+      const cached = JSON.parse(sessionStorage.getItem('mshoppy_cached_home_prods') || localStorage.getItem('mshoppy_cached_catalog_prods') || '[]');
+      if (Array.isArray(cached) && cached.length > 0) return cached;
+    } catch (_) {}
+    return [];
+  });
+  const [dbCategories, setDbCategories] = useState(() => {
+    try {
+      const cached = JSON.parse(sessionStorage.getItem('mshoppy_cached_cats') || '[]');
+      if (Array.isArray(cached) && cached.length > 0) return cached;
+    } catch (_) {}
+    return [];
+  });
   const [favorites, setFavorites] = useState([]);
   const { cartCount } = useCart();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => products.length === 0);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(() => getUnreadCount());
 
@@ -173,8 +185,14 @@ export default function HomeUserCustomer() {
         ]);
 
         if (isMounted) {
-          if (bannersData && bannersData.length > 0) setBanners(bannersData);
-          if (catsData && catsData.length > 0) setDbCategories(catsData);
+          if (bannersData && bannersData.length > 0) {
+            setBanners(bannersData);
+            try { localStorage.setItem('mshoppy_cached_banners', JSON.stringify(bannersData)); } catch (_) {}
+          }
+          if (catsData && catsData.length > 0) {
+            setDbCategories(catsData);
+            try { sessionStorage.setItem('mshoppy_cached_cats', JSON.stringify(catsData)); } catch (_) {}
+          }
           if (wishData) setFavorites(wishData.map(w => w.productId));
         }
       } catch (err) {
@@ -189,7 +207,7 @@ export default function HomeUserCustomer() {
   useEffect(() => {
     let isMounted = true;
     async function fetchInitialProducts() {
-      setLoading(true);
+      if (products.length === 0) setLoading(true);
       setLoadingMore(false);
       setPage(1);
       setHasMore(true);
@@ -207,10 +225,19 @@ export default function HomeUserCustomer() {
         });
 
         if (isMounted) {
-          setProducts(res.products || []);
+          const loadedProds = res.products || [];
+          setProducts(loadedProds);
           setTotalProducts(res.total || 0);
           setHasMore(res.hasMore);
           hasMoreRef.current = res.hasMore;
+          if (loadedProds.length > 0) {
+            try {
+              sessionStorage.setItem('mshoppy_cached_home_prods', JSON.stringify(loadedProds));
+              if (!localStorage.getItem('mshoppy_cached_catalog_prods')) {
+                localStorage.setItem('mshoppy_cached_catalog_prods', JSON.stringify(loadedProds.slice(0, 24)));
+              }
+            } catch (_) {}
+          }
         }
       } catch (err) {
         console.error("Error loading initial products:", err);
@@ -606,7 +633,7 @@ export default function HomeUserCustomer() {
             ) : (
               <button
                 type="button"
-                onClick={() => navigate('/user-login')}
+                onClick={() => navigate('/user/login')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-[#FF3F6C] bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer active:scale-95 shrink-0"
                 title="Sign In / Register"
               >

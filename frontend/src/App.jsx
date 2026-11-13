@@ -847,6 +847,7 @@ function AppRoutes() {
         <Route path="/supplier/logout" element={<SupplierLogoutPage />} />
         <Route path="/supplier-logout" element={<SupplierLogoutPage />} />
         <Route path="/user/login" element={<UserLogin />} />
+        <Route path="/user-login" element={<Navigate to="/user/login" replace />} />
         <Route path="/affiliate/login" element={<AffiliateLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
@@ -1338,6 +1339,8 @@ function AppRoutes() {
         <Route path="/signal-core" element={<SignalCore onNavigate={handleNav} />} />
         {/* Dynamic Published CMS & Policies Route (Method 2) */}
         <Route path="/p/:slug" element={<PolicyPage />} />
+        {/* Fallback Catch-all Route to prevent blank screens on unknown paths */}
+        <Route path="*" element={<Navigate to="/user-home" replace />} />
       </Routes>
     </div>
   );
