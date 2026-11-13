@@ -85,7 +85,7 @@ export default function ShareEarnConfig() {
       const cust = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
       if (cust?.fullName) return (cust.fullName.slice(0, 5).toUpperCase() + 'AFF');
     } catch (e) {}
-    return 'SHRUTIPAFF';
+    return 'MSHOPPYAFF';
   };
 
   const referralCode = getReferralCode();

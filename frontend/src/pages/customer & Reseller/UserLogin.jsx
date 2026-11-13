@@ -245,7 +245,7 @@ export default function UserLogin() {
         <Input
           id="user-register-name"
           type="text"
-          placeholder="e.g. Shruti Paliwal"
+          placeholder="Enter your full name"
           value={registerName}
           onChange={(e) => setRegisterName(e.target.value)}
           required
