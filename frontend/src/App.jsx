@@ -847,7 +847,7 @@ function AppRoutes() {
         <Route path="/supplier/logout" element={<SupplierLogoutPage />} />
         <Route path="/supplier-logout" element={<SupplierLogoutPage />} />
         <Route path="/user/login" element={<UserLogin />} />
-        <Route path="/user-login" element={<UserLogin />} />
+        <Route path="/user-login" element={<Navigate to="/user/login" replace />} />
         <Route path="/affiliate/login" element={<AffiliateLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />

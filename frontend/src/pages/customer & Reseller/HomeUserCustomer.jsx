@@ -633,7 +633,7 @@ export default function HomeUserCustomer() {
             ) : (
               <button
                 type="button"
-                onClick={() => navigate('/user-login')}
+                onClick={() => navigate('/user/login')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-[#FF3F6C] bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer active:scale-95 shrink-0"
                 title="Sign In / Register"
               >

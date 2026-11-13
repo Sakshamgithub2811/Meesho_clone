@@ -340,7 +340,7 @@ export default function UserLogin() {
           <Label htmlFor="user-login-password" className="text-xs font-bold text-slate-700">Password</Label>
           <button
             type="button"
-            onClick={() => navigate('/forgot-password?from=/user-login')}
+            onClick={() => navigate('/forgot-password?from=/user/login')}
             className="text-xs font-bold text-[#b7004d] hover:underline cursor-pointer"
           >
             Forgot Password?
