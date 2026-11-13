@@ -46,6 +46,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
   const [currentStep, setCurrentStep] = useState(1);
 
   // Check if user already submitted KYC
+  const [isCheckingKyc, setIsCheckingKyc] = useState(true);
   const [existingSubmission, setExistingSubmission] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,6 +140,7 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
 
               if (isEditRequested) {
                 setIsEditing(true);
+                setIsCheckingKyc(false);
               } else {
                 if (onNavigate) {
                   onNavigate('/affiliate-kyc-status');
@@ -166,9 +168,11 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
             email: prev.email || prefillEmail,
             phone: prev.phone || prefillPhone,
           }));
+          setIsCheckingKyc(false);
         }
       } catch (e) {
         console.error('Error loading live KYC application from database:', e);
+        if (isMounted) setIsCheckingKyc(false);
       }
     }
     checkKycFromDb();
@@ -437,6 +441,22 @@ export default function AffiliateKYC({ onNavigate, onBack }) {
 
   // Estimated Earnings Formula (approx 12% commission)
   const estimatedCommission = Math.round(estOrders * estAvgPrice * 0.12);
+
+  if (isCheckingKyc && !isEditing) {
+    return (
+      <div className="min-h-screen bg-[#f8f9fb] flex flex-col items-center justify-center p-6 text-center font-['Inter',sans-serif]">
+        <div className="w-16 h-16 rounded-3xl bg-pink-50 border border-pink-100 flex items-center justify-center text-[#b90041] shadow-md mb-4 animate-pulse">
+          <span className="material-symbols-outlined text-3xl animate-spin">sync</span>
+        </div>
+        <h2 className="text-xl font-black text-slate-900 font-['Plus_Jakarta_Sans']">
+          Verifying KYC Profile
+        </h2>
+        <p className="text-xs text-slate-500 mt-1 max-w-sm">
+          Checking your compliance verification records with MShoppy Merchant Desk...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f8f9fb] text-slate-800 pb-28 font-['Inter',sans-serif]">
