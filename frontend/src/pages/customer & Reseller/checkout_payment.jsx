@@ -269,10 +269,15 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
 
       let userEmail = null;
       try {
-        const rawUser = localStorage.getItem('mshoppy_customer_user');
-        if (rawUser) {
-          const u = JSON.parse(rawUser);
-          if (u?.email && !u.email.endsWith('@customer.meesho')) userEmail = u.email;
+        for (const key of ['mshoppy_customer_user', 'user', 'mshoppy_reseller_user', 'mshoppy_affiliate_user']) {
+          const rawUser = localStorage.getItem(key);
+          if (rawUser) {
+            const u = JSON.parse(rawUser);
+            if (u?.email && !u.email.endsWith('@customer.meesho')) {
+              userEmail = u.email;
+              break;
+            }
+          }
         }
       } catch (e) {}
 

@@ -197,7 +197,7 @@ export const getVerificationEmailHtml = ({ name, verificationLink }) => {
 export const sendVerificationEmail = async ({ email, name, verificationLink }) => {
   try {
     const html = getVerificationEmailHtml({ name, verificationLink });
-    const sender = process.env.EMAIL_FROM || `"MShoppy Support" <${process.env.SMTP_USER || 'support@mshoppy.com'}>`;
+    const sender = process.env.EMAIL_FROM || `"MShoppy Support" <${process.env.SMTP_USER || 'pramodlodhi2003born@gmail.com'}>`;
 
     const info = await transporter.sendMail({
       from: sender,
@@ -362,7 +362,7 @@ export const getLoginOtpEmailHtml = ({ name, otp }) => {
 export const sendLoginOtpEmail = async ({ email, name, otp }) => {
   try {
     const html = getLoginOtpEmailHtml({ name, otp });
-    const sender = process.env.EMAIL_FROM || `"MShoppy Security" <${process.env.SMTP_USER || 'security@mshoppy.com'}>`;
+    const sender = process.env.EMAIL_FROM || `"MShoppy Security" <${process.env.SMTP_USER || 'pramodlodhi2003born@gmail.com'}>`;
 
     const info = await transporter.sendMail({
       from: sender,
@@ -634,7 +634,7 @@ export const sendOrderConfirmationEmail = async ({ order, email, name, trackingU
     });
 
     const shortId = (order?.id || '').slice(0, 10).toUpperCase();
-    const sender = process.env.EMAIL_FROM || `"MShoppy Orders" <${process.env.SMTP_USER || 'orders@mshoppy.com'}>`;
+    const sender = process.env.EMAIL_FROM || `"MShoppy Orders" <${process.env.SMTP_USER || 'pramodlodhi2003born@gmail.com'}>`;
 
     const info = await transporter.sendMail({
       from: sender,

@@ -520,10 +520,15 @@ export async function createOrder({ items, shippingAddress, paymentMethod, total
     let emailToSend = customerEmail;
     if (!emailToSend && typeof window !== 'undefined') {
       try {
-        const raw = localStorage.getItem('mshoppy_customer_user') || localStorage.getItem('user');
-        if (raw) {
-          const u = JSON.parse(raw);
-          if (u?.email && !u.email.endsWith('@customer.meesho')) emailToSend = u.email;
+        for (const key of ['mshoppy_customer_user', 'user', 'mshoppy_reseller_user', 'mshoppy_affiliate_user']) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const u = JSON.parse(raw);
+            if (u?.email && !u.email.endsWith('@customer.meesho')) {
+              emailToSend = u.email;
+              break;
+            }
+          }
         }
       } catch (e) {}
     }
