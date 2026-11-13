@@ -54,16 +54,16 @@ export default function AuthLayout({
             {/* If registerContent provided, show Login / Register Tabs */}
             {registerContent ? (
               <Tabs {...tabsProps} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-3 rounded-full bg-[#ffecf1] p-1 h-10 items-center">
+                <TabsList className="grid w-full grid-cols-2 mb-3 rounded-full bg-[#ffecf1] p-1 !h-10.5 items-center relative overflow-hidden">
                   <TabsTrigger
                     value="login"
-                    className="rounded-full py-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                    className="!h-full rounded-full !py-0 flex items-center justify-center font-bold text-xs sm:text-sm transition-all cursor-pointer text-[#7d4d62] hover:text-[#b7004d] data-[state=active]:!bg-gradient-to-r data-[state=active]:!from-[#b7004d] data-[state=active]:!to-[#ff7293] data-[state=active]:!text-white data-[state=active]:shadow-sm border-0 focus-visible:ring-0 after:hidden"
                   >
                     Login
                   </TabsTrigger>
                   <TabsTrigger
                     value="register"
-                    className="rounded-full py-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                    className="!h-full rounded-full !py-0 flex items-center justify-center font-bold text-xs sm:text-sm transition-all cursor-pointer text-[#7d4d62] hover:text-[#b7004d] data-[state=active]:!bg-gradient-to-r data-[state=active]:!from-[#b7004d] data-[state=active]:!to-[#ff7293] data-[state=active]:!text-white data-[state=active]:shadow-sm border-0 focus-visible:ring-0 after:hidden"
                   >
                     Register
                   </TabsTrigger>
