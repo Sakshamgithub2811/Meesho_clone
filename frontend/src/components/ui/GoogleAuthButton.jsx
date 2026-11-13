@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 export default function GoogleAuthButton({ onClick, isLoading, label = "Continue with Google" }) {
   return (
     <div className="w-full">
-      <div className="relative my-2">
+      <div className="relative my-2.5">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-[#e8d2dc]/60" />
         </div>
-        <div className="relative flex justify-center text-[10px] uppercase">
-          <span className="bg-white px-2.5 text-[#7d4d62] font-semibold tracking-wider">
+        <div className="relative flex justify-center text-[11px] uppercase">
+          <span className="bg-white px-3 text-[#7d4d62] font-bold tracking-wider">
             Or continue with
           </span>
         </div>
@@ -20,7 +20,7 @@ export default function GoogleAuthButton({ onClick, isLoading, label = "Continue
         variant="outline"
         disabled={isLoading}
         onClick={onClick}
-        className="w-full h-10 rounded-xl border border-[#e8d2dc] bg-white hover:bg-[#fff4f6] text-[#4a2135] font-bold text-xs sm:text-sm shadow-xs hover:border-[#b7004d]/40 flex items-center justify-center gap-2.5 cursor-pointer transition-all active:scale-[0.99]"
+        className="w-full h-11 rounded-xl border border-[#e8d2dc] bg-white hover:bg-[#fff4f6] text-[#4a2135] font-bold text-sm shadow-xs hover:border-[#b7004d]/40 flex items-center justify-center gap-3 cursor-pointer transition-all active:scale-[0.99]"
       >
         {isLoading ? (
           <div className="flex items-center gap-2">
@@ -29,7 +29,7 @@ export default function GoogleAuthButton({ onClick, isLoading, label = "Continue
           </div>
         ) : (
           <>
-            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+            <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
