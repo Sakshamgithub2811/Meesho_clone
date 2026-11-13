@@ -5,6 +5,8 @@ import {
   addProduct,
   updateProduct,
   deleteProduct,
+  bulkUpdateProducts,
+  bulkDeleteProducts,
   getCategories,
   addCategory,
   getSupplierOrders,
@@ -55,6 +57,9 @@ router.get('/analytics', getSupplierAnalytics);
 // Products / Catalog
 router.get('/products', getSupplierProducts);
 router.post('/products', uploadProductMedia.array('images', 8), addProduct);
+router.patch('/products/bulk', bulkUpdateProducts);
+router.post('/products/bulk-delete', bulkDeleteProducts);
+router.delete('/products/bulk', bulkDeleteProducts);
 router.put('/products/:id', uploadProductMedia.array('images', 8), updateProduct);
 router.delete('/products/:id', deleteProduct);
 

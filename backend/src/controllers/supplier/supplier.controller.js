@@ -668,6 +668,170 @@ export const deleteProduct = async (req, res, next) => {
 };
 
 /**
+ * 5b. Bulk Update Products (Stock & Price Batch Update)
+ * PATCH /api/supplier/products/bulk
+ */
+export const bulkUpdateProducts = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    const { productIds, action, stockValue, stockMode, priceValue, priceMode } = req.body;
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'productIds array is required and cannot be empty',
+      });
+    }
+
+    // Verify products belong to this supplier
+    const targetProducts = await prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        supplierId,
+        isDeleted: false,
+      },
+    });
+
+    if (targetProducts.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No matching products found for this supplier',
+      });
+    }
+
+    const updatedResults = await prisma.$transaction(async (tx) => {
+      const updates = [];
+
+      for (const prod of targetProducts) {
+        let newStock = prod.stock;
+        let newPrice = prod.price;
+
+        // Stock Updates
+        if (action === 'STOCK' || stockMode) {
+          if (stockMode === 'OUT_OF_STOCK') {
+            newStock = 0;
+          } else if (stockMode === 'SET' && stockValue !== undefined && stockValue !== null && stockValue !== '') {
+            newStock = Math.max(0, parseInt(stockValue, 10));
+          } else if (stockMode === 'ADD' && stockValue !== undefined && stockValue !== null && stockValue !== '') {
+            newStock = Math.max(0, prod.stock + parseInt(stockValue, 10));
+          }
+        }
+
+        // Price Updates
+        if (action === 'PRICE' || priceMode) {
+          if (priceMode === 'SET' && priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            newPrice = Math.max(1, parseFloat(priceValue));
+          } else if (priceMode === 'PERCENT_DISCOUNT' && priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            const pct = Math.min(99, Math.max(1, parseFloat(priceValue)));
+            newPrice = Math.max(1, Math.round(prod.price * (1 - pct / 100)));
+          } else if (priceMode === 'FLAT_DISCOUNT' && priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            const flat = parseFloat(priceValue);
+            newPrice = Math.max(1, Math.round(prod.price - flat));
+          }
+        }
+
+        // Apply update to product
+        const updated = await tx.product.update({
+          where: { id: prod.id },
+          data: {
+            stock: newStock,
+            price: newPrice,
+          },
+        });
+        updates.push(updated);
+      }
+
+      return updates;
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully bulk updated ${updatedResults.length} product(s)!`,
+      count: updatedResults.length,
+      data: updatedResults,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 5c. Bulk Delete Products
+ * POST /api/supplier/products/bulk-delete or DELETE /api/supplier/products/bulk
+ */
+export const bulkDeleteProducts = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    const { productIds } = req.body;
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'productIds array is required and cannot be empty',
+      });
+    }
+
+    // Verify products belong to this supplier
+    const targetProducts = await prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        supplierId,
+        isDeleted: false,
+      },
+      select: { id: true },
+    });
+
+    const validIds = targetProducts.map((p) => p.id);
+    if (validIds.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No matching products found for this supplier',
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Clean cart and wishlist references to prevent foreign key errors
+      await Promise.all([
+        tx.cartItem.deleteMany({ where: { productId: { in: validIds } } }),
+        tx.wishlistItem.deleteMany({ where: { productId: { in: validIds } } }),
+      ]);
+
+      // Soft delete all target products
+      await tx.product.updateMany({
+        where: { id: { in: validIds } },
+        data: {
+          isDeleted: true,
+          isActive: false,
+          deletedAt: new Date(),
+        },
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${validIds.length} product(s)!`,
+      count: validIds.length,
+      deletedIds: validIds,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * 6. Categories (List & Add)
  * GET /api/supplier/categories
  * POST /api/supplier/categories

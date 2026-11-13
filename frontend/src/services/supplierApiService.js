@@ -301,6 +301,26 @@ export async function deleteSupplierProduct(productId) {
   });
 }
 
+// Bulk Update Products (Stock or Price)
+export async function bulkUpdateSupplierProducts(payload) {
+  const data = await request('/supplier/products/bulk', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return data;
+}
+
+// Bulk Delete Products
+export async function bulkDeleteSupplierProducts(productIds) {
+  const data = await request('/supplier/products/bulk-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productIds }),
+  });
+  return data;
+}
+
 // Get Categories
 export async function fetchCategories() {
   const data = await request('/supplier/categories');
@@ -401,6 +421,8 @@ export default {
   createSupplierProduct,
   updateSupplierProduct,
   deleteSupplierProduct,
+  bulkUpdateSupplierProducts,
+  bulkDeleteSupplierProducts,
   fetchCategories,
   createCategory,
   fetchSupplierOrders,
