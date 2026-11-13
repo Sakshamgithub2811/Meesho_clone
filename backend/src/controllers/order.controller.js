@@ -294,7 +294,7 @@ export const createOrder = async (req, res) => {
           name: recipientName || undefined,
           trackingUrl
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Email dispatch timeout (15s)')), 15000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Email dispatch timeout (9s)')), 9000))
       ]);
       console.log('📧 Order confirmation dispatch outcome:', emailResult);
     } catch (emailErr) {
