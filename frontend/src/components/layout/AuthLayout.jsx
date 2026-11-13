@@ -14,9 +14,9 @@ export default function AuthLayout({
   const tabsProps = activeTab ? { value: activeTab, onValueChange: onTabChange } : { defaultValue: "login" };
 
   return (
-    <div className="min-h-screen w-full relative bg-[#fff4f6] text-[#4a2135] font-sans flex flex-col items-center justify-center py-6 sm:py-10 px-4 overflow-y-auto">
-      {/* 1. Background Graphic Banner (Fixed clip-path, non-interfering) */}
-      <div className="absolute top-0 left-0 w-full h-[360px] pointer-events-none overflow-hidden [clip-path:ellipse(110%_100%_at_50%_0%)] bg-[#ff7293]/20 z-0">
+    <div className="h-screen h-[100dvh] w-full relative bg-[#fff4f6] text-[#4a2135] font-sans flex flex-col items-center justify-center p-3 sm:p-4 overflow-hidden select-none">
+      {/* 1. Background Graphic Banner (Fixed top background) */}
+      <div className="absolute top-0 left-0 w-full h-[280px] pointer-events-none overflow-hidden [clip-path:ellipse(110%_100%_at_50%_0%)] bg-[#ff7293]/20 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#fff4f6]/60 to-[#fff4f6] z-10" />
         <img
           className="w-full h-full object-cover mix-blend-multiply opacity-80"
@@ -29,43 +29,41 @@ export default function AuthLayout({
         />
       </div>
 
-      {/* 2. Brand Floating Badge (Positioned directly above card in natural flow) */}
-      <div className="relative z-10 mb-3.5 shrink-0">
-        <div className="bg-white/90 backdrop-blur-[20px] px-5 py-1.5 rounded-full border border-white/60 shadow-[0_8px_30px_rgba(74,33,53,0.08)] flex items-center gap-2">
-          <span className="text-[#b7004d] font-black tracking-tighter text-lg sm:text-xl">
-            MSHOPPY <span className="uppercase text-[#ff7293] text-xs sm:text-sm font-extrabold">{roleName}</span>
-          </span>
-        </div>
-      </div>
-
-      {/* 3. Authentication Card Container (Guaranteed full clearance with zero clipping) */}
-      <div className="relative z-10 w-full max-w-md shrink-0 flex flex-col items-center">
-        <Card className="w-full shadow-2xl border-white/60 bg-white/95 backdrop-blur-sm rounded-[2rem] overflow-hidden">
-          <CardHeader className="text-center pt-6 pb-2.5 px-6 sm:px-8">
-            <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#4a2135]">
+      {/* 2. Authentication Card Container (100% Single-Screen Fitted, Zero Scroll) */}
+      <div className="relative z-10 w-full max-w-[420px] shrink-0 flex flex-col items-center">
+        <Card className="w-full shadow-2xl border-white/60 bg-white/95 backdrop-blur-sm rounded-[1.75rem] overflow-hidden">
+          <CardHeader className="text-center pt-4 pb-2 px-5 sm:px-6">
+            <div className="flex justify-center mb-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#ffecf1] border border-[#ffccd9] shadow-2xs">
+                <span className="text-[#b7004d] font-black tracking-tight text-[11px]">
+                  MSHOPPY <span className="uppercase text-[#ff7293] text-[9px] font-extrabold">{roleName}</span>
+                </span>
+              </div>
+            </div>
+            <CardTitle className="text-xl sm:text-2xl font-black tracking-tight text-[#4a2135]">
               {title}
             </CardTitle>
             {subtitle && (
-              <CardDescription className="text-[#7d4d62] font-medium opacity-80 mt-1 text-xs sm:text-sm">
+              <CardDescription className="text-[#7d4d62] font-medium opacity-80 text-[11px] sm:text-xs mt-0.5">
                 {subtitle}
               </CardDescription>
             )}
           </CardHeader>
 
-          <CardContent className="pb-6 px-5 sm:px-8">
+          <CardContent className="pb-4 pt-1 px-5 sm:px-6">
             {/* If registerContent provided, show Login / Register Tabs */}
             {registerContent ? (
               <Tabs {...tabsProps} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-4 rounded-full bg-[#ffecf1] p-1 min-h-[46px] items-center">
+                <TabsList className="grid w-full grid-cols-2 mb-2.5 rounded-full bg-[#ffecf1] p-0.5 h-9 items-center">
                   <TabsTrigger
                     value="login"
-                    className="rounded-full py-2 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                    className="rounded-full py-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-xs transition-all cursor-pointer"
                   >
                     Login
                   </TabsTrigger>
                   <TabsTrigger
                     value="register"
-                    className="rounded-full py-2 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                    className="rounded-full py-1.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-xs transition-all cursor-pointer"
                   >
                     Register
                   </TabsTrigger>
