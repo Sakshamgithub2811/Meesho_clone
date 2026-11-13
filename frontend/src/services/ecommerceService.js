@@ -181,7 +181,7 @@ export async function deleteProduct(productId) {
 
 
 // ── Cart Local Cache & Fallback Helpers ─────────────────────────
-function getLocalCart() {
+export function getLocalCart() {
   try {
     const raw = localStorage.getItem('mshoppy_local_cart');
     if (raw) {
@@ -213,11 +213,11 @@ function getLocalCart() {
   return { items: [], totalItems: 0, subtotal: 0, originalSubtotal: 0, totalDiscount: 0, deliveryFee: 0 };
 }
 
-function saveLocalCart(items) {
+export function saveLocalCart(items, notify = true) {
   try {
     const list = Array.isArray(items) ? items : (items?.items || []);
     localStorage.setItem('mshoppy_local_cart', JSON.stringify(list));
-    if (typeof window !== 'undefined') {
+    if (notify && typeof window !== 'undefined') {
       window.dispatchEvent(new Event('mshoppy-cart-changed'));
     }
   } catch (e) {}
@@ -232,7 +232,7 @@ export async function getCart() {
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.items)) {
-        saveLocalCart(data.items);
+        saveLocalCart(data.items, false);
         return data;
       }
     }
@@ -377,7 +377,7 @@ export async function clearCart() {
 }
 
 // ── Wishlist Local Cache & Fallback Helpers ──────────────────────
-function getLocalWishlist() {
+export function getLocalWishlist() {
   try {
     const raw = localStorage.getItem('mshoppy_wishlist');
     if (raw) {
@@ -388,11 +388,11 @@ function getLocalWishlist() {
   return [];
 }
 
-function saveLocalWishlist(items) {
+export function saveLocalWishlist(items, notify = true) {
   try {
     const list = Array.isArray(items) ? items : [];
     localStorage.setItem('mshoppy_wishlist', JSON.stringify(list));
-    if (typeof window !== 'undefined') {
+    if (notify && typeof window !== 'undefined') {
       window.dispatchEvent(new Event('mshoppy-wishlist-changed'));
     }
   } catch (e) {}
@@ -415,7 +415,7 @@ export async function getWishlist() {
           if (!mergedMap.has(key)) mergedMap.set(key, item);
         });
         const merged = Array.from(mergedMap.values());
-        saveLocalWishlist(merged);
+        saveLocalWishlist(merged, false);
         return merged;
       }
     }

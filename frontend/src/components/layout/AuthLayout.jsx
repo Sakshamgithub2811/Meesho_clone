@@ -2,14 +2,14 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default function AuthLayout({ 
-  title, 
-  subtitle, 
-  roleName = "Portal", 
-  loginContent, 
+export default function AuthLayout({
+  title,
+  subtitle,
+  roleName = "Portal",
+  loginContent,
   registerContent,
   activeTab,
-  onTabChange 
+  onTabChange
 }) {
   const tabsProps = activeTab ? { value: activeTab, onValueChange: onTabChange } : { defaultValue: "login" };
 
@@ -18,11 +18,11 @@ export default function AuthLayout({
       {/* 1. Background Graphic & Floating Logo (Fixed) */}
       <div className="absolute top-0 left-0 w-full h-[353px] overflow-hidden [clip-path:ellipse(110%_100%_at_50%_0%)] bg-[#ff7293]/20 z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#fff4f6]/90 z-10" />
-        <img 
-          className="w-full h-full object-cover mix-blend-multiply opacity-80" 
-          alt="" 
+        <img
+          className="w-full h-full object-cover mix-blend-multiply opacity-80"
+          alt=""
           role="presentation"
-          src="https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80" 
+          src="https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}
@@ -39,53 +39,53 @@ export default function AuthLayout({
       {/* 2. Scrollable Content Card Area */}
       <main className="relative z-20 min-h-screen w-full overflow-y-auto flex flex-col items-center justify-center px-4 py-4 sm:px-6">
         <div className="w-full max-w-md shrink-0 flex flex-col items-center my-auto pt-8 pb-4">
-        <Card className="w-full shadow-2xl border-white/50 bg-white/95 backdrop-blur-sm rounded-[2rem]">
-          <CardHeader className="text-center pt-7 pb-4">
-            <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#4a2135]">
-              {title}
-            </CardTitle>
-            {subtitle && (
-              <CardDescription className="text-[#7d4d62] font-medium opacity-80 mt-1.5 text-xs sm:text-sm">
-                {subtitle}
-              </CardDescription>
-            )}
-          </CardHeader> 
-          
-          <CardContent className="pb-7 px-5 sm:px-7">
-            {/* Agar registerContent bheja hai toh Tabs dikhayenge */}
-            {registerContent ? (
-              <Tabs {...tabsProps} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6 rounded-full bg-[#ffecf1] p-1.5 min-h-[54px] items-center">
-                  <TabsTrigger 
-                    value="login" 
-                    className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all cursor-pointer"
-                  >
-                    Login
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="register" 
-                    className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all cursor-pointer"
-                  >
-                    Register
-                  </TabsTrigger>
-                </TabsList>
-                
-                {/* Login Form ki jagah */}
-                <TabsContent value="login" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
-                  {loginContent}
-                </TabsContent>
-                
-                {/* Register Form ki jagah */}
-                <TabsContent value="register" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
-                  {registerContent}
-                </TabsContent>
-              </Tabs>
-            ) : (
-              /* Agar register nahi chahiye, toh bas login content dikhao */
-              loginContent
-            )}
-          </CardContent>
-        </Card>
+          <Card className="w-full shadow-2xl border-white/50 bg-white/95 backdrop-blur-sm rounded-[2rem]">
+            <CardHeader className="text-center pt-7 pb-4">
+              <CardTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#4a2135]">
+                {title}
+              </CardTitle>
+              {subtitle && (
+                <CardDescription className="text-[#7d4d62] font-medium opacity-80 mt-1.5 text-xs sm:text-sm">
+                  {subtitle}
+                </CardDescription>
+              )}
+            </CardHeader>
+
+            <CardContent className="pb-7 px-5 sm:px-7">
+              {/* Agar registerContent bheja hai toh Tabs dikhayenge */}
+              {registerContent ? (
+                <Tabs {...tabsProps} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-6 rounded-full bg-[#ffecf1] p-1.5 min-h-[54px] items-center">
+                    <TabsTrigger
+                      value="login"
+                      className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all cursor-pointer"
+                    >
+                      Login
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="register"
+                      className="rounded-full py-2.5 data-[state=active]:bg-gradient-to-br data-[state=active]:from-[#b7004d] data-[state=active]:to-[#ff7293] data-[state=active]:text-white font-bold text-sm transition-all cursor-pointer"
+                    >
+                      Register
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Login Form ki jagah */}
+                  <TabsContent value="login" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
+                    {loginContent}
+                  </TabsContent>
+
+                  {/* Register Form ki jagah */}
+                  <TabsContent value="register" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
+                    {registerContent}
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                /* Agar register nahi chahiye, toh bas login content dikhao */
+                loginContent
+              )}
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>
