@@ -466,25 +466,55 @@ export const updateProduct = async (req, res, next) => {
     delete updateData.id;
     delete updateData.supplierId; // Cannot transfer ownership
 
-    // Format numbers
-    if (updateData.price) updateData.price = parseFloat(updateData.price);
-    if (updateData.originalPrice) updateData.originalPrice = parseFloat(updateData.originalPrice);
-    if (updateData.stock) updateData.stock = parseInt(updateData.stock, 10);
-    if (updateData.discountPercentage) updateData.discountPercentage = parseInt(updateData.discountPercentage, 10);
+    const hostBaseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // Handle newly uploaded image files via Multer (uploadProductMedia)
+    let uploadedUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const storedUrl = await uploadFileToStorage(file, hostBaseUrl);
+        if (storedUrl) uploadedUrls.push(storedUrl);
+      }
+    }
+
+    // Process images in request body (JSON array, comma-separated string, or existing URLs)
+    let bodyImages = [];
     if (updateData.images) {
-      if (typeof updateData.images === 'string') {
+      let rawImgs = updateData.images;
+      if (typeof rawImgs === 'string') {
         try {
-          updateData.images = JSON.parse(updateData.images);
+          rawImgs = JSON.parse(rawImgs);
         } catch {
-          updateData.images = updateData.images.split(',').map((s) => s.trim());
+          rawImgs = rawImgs.split(',').map((s) => s.trim());
         }
       }
-      if (!Array.isArray(updateData.images)) {
-        updateData.images = [updateData.images];
+      if (Array.isArray(rawImgs)) {
+        bodyImages = rawImgs;
+      } else if (typeof rawImgs === 'string' && rawImgs.trim()) {
+        bodyImages = [rawImgs.trim()];
       }
-      const hostBaseUrl = `${req.protocol}://${req.get('host')}`;
-      updateData.images = (await Promise.all(
-        updateData.images.map(async (u) => {
+    }
+
+    // Support optional existingImages field
+    if (updateData.existingImages) {
+      let existImgs = updateData.existingImages;
+      if (typeof existImgs === 'string') {
+        try {
+          existImgs = JSON.parse(existImgs);
+        } catch {
+          existImgs = existImgs.split(',').map((s) => s.trim());
+        }
+      }
+      if (Array.isArray(existImgs)) {
+        bodyImages = [...bodyImages, ...existImgs];
+      }
+      delete updateData.existingImages;
+    }
+
+    // Convert any base64 data URLs in body images to persistent cloud files
+    if (bodyImages.length > 0) {
+      bodyImages = (await Promise.all(
+        bodyImages.map(async (u) => {
           if (typeof u === 'string' && u.startsWith('data:image/')) {
             return await saveBase64Image(u, hostBaseUrl);
           }
@@ -492,6 +522,59 @@ export const updateProduct = async (req, res, next) => {
         })
       )).filter(Boolean);
     }
+
+    // Combine uploaded files and body images
+    const replaceImages = updateData.replaceImages === 'true' || updateData.replaceImages === true;
+    delete updateData.replaceImages;
+
+    if (uploadedUrls.length > 0 || bodyImages.length > 0) {
+      if (replaceImages) {
+        updateData.images = uploadedUrls.length > 0 ? uploadedUrls : bodyImages;
+      } else {
+        const baseImages = bodyImages.length > 0 ? bodyImages : (existing.images || []);
+        updateData.images = Array.from(new Set([...baseImages, ...uploadedUrls])).filter(Boolean);
+      }
+    }
+
+    // Format numbers
+    if (updateData.price !== undefined) updateData.price = parseFloat(updateData.price);
+    if (updateData.originalPrice !== undefined) updateData.originalPrice = parseFloat(updateData.originalPrice);
+    if (updateData.stock !== undefined) updateData.stock = parseInt(updateData.stock, 10);
+    if (updateData.discountPercentage !== undefined) updateData.discountPercentage = parseInt(updateData.discountPercentage, 10);
+
+    // Format arrays/booleans if parsed from multipart/form-data
+    if (updateData.sizes && typeof updateData.sizes === 'string') {
+      try {
+        updateData.sizes = JSON.parse(updateData.sizes);
+      } catch {
+        updateData.sizes = updateData.sizes.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    if (updateData.colors && typeof updateData.colors === 'string') {
+      try {
+        updateData.colors = JSON.parse(updateData.colors);
+      } catch {
+        updateData.colors = updateData.colors.split(',').map((c) => c.trim()).filter(Boolean);
+      }
+    }
+    if (typeof updateData.isFreeDelivery === 'string') {
+      updateData.isFreeDelivery = updateData.isFreeDelivery === 'true';
+    }
+
+    if (updateData.categoryName && !updateData.categorySlug) {
+      updateData.categorySlug = slugify(updateData.categoryName, { lower: true, strict: true });
+    }
+    if (updateData.categorySlug) {
+      await prisma.category.upsert({
+        where: { slug: updateData.categorySlug },
+        update: {},
+        create: {
+          name: updateData.categoryName || updateData.categorySlug.replace(/-/g, ' ').toUpperCase(),
+          slug: updateData.categorySlug,
+        },
+      });
+    }
+    delete updateData.categoryName;
 
     const updated = await prisma.product.update({
       where: { id },

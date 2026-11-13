@@ -273,11 +273,23 @@ export async function createSupplierProduct(payload) {
   return data.data;
 }
 
-// Update Product
+// Update Product (Supports FormData with uploaded images or standard JSON)
 export async function updateSupplierProduct(productId, updateData) {
+  let body;
+  let headers = {};
+
+  if (updateData instanceof FormData) {
+    body = updateData;
+    // Let browser set multipart boundary
+  } else {
+    body = JSON.stringify(updateData);
+    headers['Content-Type'] = 'application/json';
+  }
+
   const data = await request(`/supplier/products/${productId}`, {
     method: 'PUT',
-    body: JSON.stringify(updateData),
+    headers,
+    body,
   });
   return data.data;
 }

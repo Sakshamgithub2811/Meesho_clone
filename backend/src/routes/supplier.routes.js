@@ -55,7 +55,7 @@ router.get('/analytics', getSupplierAnalytics);
 // Products / Catalog
 router.get('/products', getSupplierProducts);
 router.post('/products', uploadProductMedia.array('images', 8), addProduct);
-router.put('/products/:id', updateProduct);
+router.put('/products/:id', uploadProductMedia.array('images', 8), updateProduct);
 router.delete('/products/:id', deleteProduct);
 
 // Categories

@@ -22,7 +22,9 @@ import {
   ArrowRight,
   Filter,
   X,
-  ExternalLink
+  ExternalLink,
+  UploadCloud,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function SellerInventory1({ onNavigate }) {
@@ -43,10 +45,12 @@ export default function SellerInventory1({ onNavigate }) {
   const [profile, setProfile] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // Edit stock/price modal state
+  // Edit stock/price/image modal state
   const [editingProduct, setEditingProduct] = useState(null);
   const [editPrice, setEditPrice] = useState('');
   const [editStock, setEditStock] = useState('');
+  const [editImages, setEditImages] = useState([]);
+  const [editImagePreviews, setEditImagePreviews] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Load real data from backend
@@ -114,7 +118,38 @@ export default function SellerInventory1({ onNavigate }) {
     }
   };
 
-  // Update Product Price & Stock
+  // Image file handler for editing
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const validFiles = files.filter((f) => {
+      if (!f.type.startsWith('image/')) {
+        toast.error(`${f.name} is not a valid image file`);
+        return false;
+      }
+      if (f.size > 5 * 1024 * 1024) {
+        toast.error(`${f.name} exceeds 5MB size limit`);
+        return false;
+      }
+      return true;
+    });
+
+    setEditImages((prev) => [...prev, ...validFiles].slice(0, 8));
+    const previews = validFiles.map((f) => URL.createObjectURL(f));
+    setEditImagePreviews((prev) => [...prev, ...previews].slice(0, 8));
+  };
+
+  const removeSelectedImage = (index) => {
+    setEditImages((prev) => prev.filter((_, i) => i !== index));
+    setEditImagePreviews((prev) => {
+      const removed = prev[index];
+      if (removed) URL.revokeObjectURL(removed);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // Update Product Price, Stock & Images
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
     if (!editingProduct) return;
@@ -133,18 +168,40 @@ export default function SellerInventory1({ onNavigate }) {
 
     setIsSubmitting(true);
     try {
-      await supplierApiService.updateSupplierProduct(editingProduct.id, {
-        price: priceNum,
-        stock: stockNum,
-      });
+      let updatedProd;
+      if (editImages.length > 0) {
+        const formData = new FormData();
+        formData.append('price', priceNum);
+        formData.append('stock', stockNum);
+        editImages.forEach((imgFile) => {
+          formData.append('images', imgFile);
+        });
+        updatedProd = await supplierApiService.updateSupplierProduct(editingProduct.id, formData);
+      } else {
+        updatedProd = await supplierApiService.updateSupplierProduct(editingProduct.id, {
+          price: priceNum,
+          stock: stockNum,
+        });
+      }
 
       // Update local state directly
       setProducts((prev) =>
-        prev.map((p) => (p.id === editingProduct.id ? { ...p, price: priceNum, stock: stockNum } : p))
+        prev.map((p) =>
+          p.id === editingProduct.id
+            ? {
+                ...p,
+                price: priceNum,
+                stock: stockNum,
+                images: updatedProd?.images || p.images,
+              }
+            : p
+        )
       );
 
-      toast.success(`Updated "${editingProduct.title}" stock and price`);
+      toast.success(`Updated "${editingProduct.title}" successfully!`);
       setEditingProduct(null);
+      setEditImages([]);
+      setEditImagePreviews([]);
     } catch (err) {
       console.error('Update product error:', err);
       toast.error(err.message || 'Failed to update product details');
@@ -497,9 +554,11 @@ export default function SellerInventory1({ onNavigate }) {
                                 setEditingProduct(prod);
                                 setEditPrice(String(prod.price || ''));
                                 setEditStock(String(prod.stock || '0'));
+                                setEditImages([]);
+                                setEditImagePreviews([]);
                               }}
                               className="p-2 rounded-xl text-slate-600 hover:text-[#b7004d] hover:bg-pink-50 border border-slate-200 transition cursor-pointer"
-                              title="Edit Stock & Price"
+                              title="Edit Details & Images"
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
@@ -523,24 +582,91 @@ export default function SellerInventory1({ onNavigate }) {
           )}
         </div>
 
-        {/* Edit Stock & Price Modal */}
+        {/* Edit Stock, Price & Images Modal */}
         {editingProduct && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
+            <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">Quick Edit Inventory</h3>
                   <p className="text-xs text-slate-400 mt-0.5 truncate max-w-xs">{editingProduct.title}</p>
                 </div>
                 <button
-                  onClick={() => setEditingProduct(null)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setEditImages([]);
+                    setEditImagePreviews([]);
+                  }}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <form onSubmit={handleUpdateProduct} className="space-y-4 pt-4">
+                {/* Images Upload & Management Section */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                    Product Photos & Media
+                  </label>
+                  
+                  {/* Current Active Image Preview */}
+                  <div className="flex items-center gap-3 mb-3 p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                    <img
+                      src={editingProduct.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'}
+                      alt="Current"
+                      className="w-12 h-12 rounded-xl object-cover border border-slate-200"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-800">Current Listing Image</p>
+                      <p className="text-[11px] text-slate-400">
+                        {editingProduct.images?.length || 1} image{(editingProduct.images?.length || 1) > 1 ? 's' : ''} currently live
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Upload New Images Box */}
+                  <label className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed border-slate-200 hover:border-[#d82a62] bg-slate-50/50 hover:bg-pink-50/20 cursor-pointer transition group">
+                    <UploadCloud className="w-6 h-6 text-slate-400 group-hover:text-[#d82a62] mb-1 transition" />
+                    <span className="text-xs font-bold text-slate-700 group-hover:text-[#d82a62]">
+                      Upload New Product Photos
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">
+                      JPG, PNG, WebP up to 5MB (Max 8 images)
+                    </span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {/* Selected New Images Previews */}
+                  {editImagePreviews.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-[11px] font-bold text-slate-600 mb-1.5">
+                        New Photos to Upload ({editImagePreviews.length}):
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {editImagePreviews.map((src, idx) => (
+                          <div key={idx} className="relative group w-14 h-14 rounded-xl overflow-hidden border border-slate-200 shadow-xs">
+                            <img src={src} alt="Preview" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeSelectedImage(idx)}
+                              className="absolute top-1 right-1 p-0.5 rounded-full bg-rose-600 text-white opacity-90 hover:opacity-100 transition shadow-xs"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     Selling Price (₹ INR)
@@ -579,15 +705,19 @@ export default function SellerInventory1({ onNavigate }) {
                 <div className="flex items-center gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => setEditingProduct(null)}
-                    className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition"
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setEditImages([]);
+                      setEditImagePreviews([]);
+                    }}
+                    className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-[#d82a62] to-[#eb3678] text-white font-bold text-xs shadow-md shadow-pink-600/20 hover:opacity-95 transition disabled:opacity-50"
+                    className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-[#d82a62] to-[#eb3678] text-white font-bold text-xs shadow-md shadow-pink-600/20 hover:opacity-95 transition disabled:opacity-50 cursor-pointer"
                   >
                     {isSubmitting ? 'Saving...' : 'Save Changes'}
                   </button>
