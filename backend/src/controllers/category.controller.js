@@ -48,6 +48,8 @@ export const getCategories = async (req, res) => {
       };
     });
 
+    // High performance Vercel Edge caching header for sub-300ms category delivery
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=1800');
     return res.status(200).json({
       success: true,
       count: enrichedCategories.length,

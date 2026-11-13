@@ -172,11 +172,31 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
   const navigate = useNavigate();
   const productId = routeId || searchParams.get('id');
 
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState(() => {
+    if (!productId) return null;
+    try {
+      const memCached = sessionStorage.getItem(`mshoppy_cache_prod_${productId}`);
+      if (memCached) return JSON.parse(memCached);
+      const resProds = JSON.parse(sessionStorage.getItem('mshoppy_cached_reseller_prods') || '[]');
+      const foundRes = resProds.find(p => p.id === productId);
+      if (foundRes) return foundRes;
+      const homeProds = JSON.parse(sessionStorage.getItem('mshoppy_cached_home_prods') || '[]');
+      const foundHome = homeProds.find(p => p.id === productId);
+      if (foundHome) return foundHome;
+      const catProds = JSON.parse(localStorage.getItem('mshoppy_cached_catalog_prods') || '[]');
+      const foundCat = catProds.find(p => p.id === productId);
+      if (foundCat) return foundCat;
+    } catch (_) {}
+    return null;
+  });
+  const [loading, setLoading] = useState(() => !product);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [selectedSize, setSelectedSize] = useState('');
-  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedSize, setSelectedSize] = useState(() => {
+    return Array.isArray(product?.sizes) && product.sizes.length > 0 ? product.sizes[0] : '';
+  });
+  const [selectedColor, setSelectedColor] = useState(() => {
+    return Array.isArray(product?.colors) && product.colors.length > 0 ? product.colors[0] : '';
+  });
   const { cartCount, addItem } = useCart();
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -309,11 +329,11 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
     triggerToast(`✓ Delivery available by ${dateStr}! Free Delivery & COD active.`);
   };
 
-  // Fetch product & similar items from database
+  // Fetch product & similar items from database (Background SWR if cached)
   useEffect(() => {
     let isMounted = true;
     async function fetchProduct() {
-      setLoading(true);
+      if (!product) setLoading(true);
       try {
         let p = null;
         if (productId) {

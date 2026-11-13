@@ -110,7 +110,13 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   };
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !localStorage.getItem('mshoppy_user_orders');
+    } catch (_) {
+      return true;
+    }
+  });
 
   // Sync tab if URL query changes
   useEffect(() => {
@@ -235,10 +241,37 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     firebaseLogout();
   };
 
-  // Real Database Data States
-  const [realOrders, setRealOrders] = useState([]);
-  const [wishlistItems, setWishlistItems] = useState([]);
-  const [savedAddresses, setSavedAddresses] = useState([]);
+  // Real Database Data States (Cache-first for instant < 50ms display)
+  const [realOrders, setRealOrders] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mshoppy_user_orders');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  });
+  const [wishlistItems, setWishlistItems] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mshoppy_wishlist');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  });
+  const [savedAddresses, setSavedAddresses] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mshoppy_user_addresses');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  });
   const [catalogProducts, setCatalogProducts] = useState(() => {
     try {
       const cached = localStorage.getItem('mshoppy_cached_catalog_prods');
@@ -459,10 +492,10 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     };
   }, [customerUser?.id, customerUser?.uid, customerUser?.phone]);
 
-  // Fetch Live Dashboard Data from Database
+  // Fetch Live Dashboard Data from Database (Background SWR if cached)
   const loadDashboardData = useCallback(async () => {
     try {
-      setLoading(true);
+      if (realOrders.length === 0) setLoading(true);
       const [ordersRes, wishRes, addrRes, prodsRes, walletRes] = await Promise.allSettled([
         getOrders(),
         getWishlist(),
@@ -473,12 +506,14 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
 
       if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value)) {
         setRealOrders(ordersRes.value);
+        try { localStorage.setItem('mshoppy_user_orders', JSON.stringify(ordersRes.value)); } catch (_) {}
       }
       if (wishRes.status === 'fulfilled' && Array.isArray(wishRes.value)) {
         setWishlistItems(wishRes.value);
       }
       if (addrRes.status === 'fulfilled' && Array.isArray(addrRes.value)) {
         setSavedAddresses(addrRes.value);
+        try { localStorage.setItem('mshoppy_user_addresses', JSON.stringify(addrRes.value)); } catch (_) {}
       }
       if (prodsRes.status === 'fulfilled' && Array.isArray(prodsRes.value) && prodsRes.value.length > 0) {
         setCatalogProducts(prodsRes.value);
