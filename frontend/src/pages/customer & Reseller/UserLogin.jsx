@@ -314,7 +314,7 @@ export default function UserLogin() {
         onClick={() => navigate(redirectParam || '/user-home')}
         className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-[#b7004d]/40 bg-slate-50 hover:bg-pink-50/60 text-slate-800 hover:text-[#b7004d] font-bold text-sm transition-all shadow-xs cursor-pointer active:scale-[0.99]"
       >
-        <span>🛍️ Continue as Guest (Skip)</span>
+        <span>Continue as Guest</span>
         <ArrowRight className="w-4 h-4 text-[#b7004d]" />
       </button>
     </form>
@@ -394,7 +394,7 @@ export default function UserLogin() {
         onClick={() => navigate(redirectParam || '/user-home')}
         className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-[#b7004d]/40 bg-slate-50 hover:bg-pink-50/60 text-slate-800 hover:text-[#b7004d] font-bold text-sm transition-all shadow-xs cursor-pointer active:scale-[0.99]"
       >
-        <span>🛍️ Continue as Guest (Skip)</span>
+        <span>Continue as Guest</span>
         <ArrowRight className="w-4 h-4 text-[#b7004d]" />
       </button>
     </form>
