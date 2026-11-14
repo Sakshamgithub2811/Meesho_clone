@@ -55,9 +55,10 @@ jobs:
               git fetch origin
             fi
 
-            echo "🔀 Checking out branch: $TARGET_BRANCH"
+            echo "🔀 Checking out and syncing branch: $TARGET_BRANCH"
+            git fetch origin "$TARGET_BRANCH"
             git checkout "$TARGET_BRANCH"
-            git pull origin "$TARGET_BRANCH"
+            git reset --hard "origin/$TARGET_BRANCH"
 
             # 2. Ingest environment variables safely via base64 decoding
             echo "🔐 Writing backend/.env and frontend/.env..."
