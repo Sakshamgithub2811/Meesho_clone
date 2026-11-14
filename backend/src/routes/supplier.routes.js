@@ -18,6 +18,8 @@ import {
   downloadShippingLabel,
   getSupplierReturns,
   updateReturnStatus,
+  getSupplierReviews,
+  replyToProductReview,
 } from '../controllers/supplier/supplier.controller.js';
 import {
   getSupplierProfile,
@@ -76,5 +78,9 @@ router.get('/orders/:id/shipping-label', downloadShippingLabel);
 // Returns & RTO Hub
 router.get('/returns', getSupplierReturns);
 router.patch('/returns/:id/status', updateReturnStatus);
+
+// Product Reviews & Ratings (UGC & Feedback Hub)
+router.get('/reviews', getSupplierReviews);
+router.post('/reviews/:id/reply', replyToProductReview);
 
 export default router;

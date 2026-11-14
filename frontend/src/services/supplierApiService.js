@@ -399,6 +399,20 @@ export async function updateReturnStatus(id, status, extra = {}) {
   return data;
 }
 
+// Product Reviews & Ratings (UGC & Feedback)
+export async function fetchSupplierReviews() {
+  const data = await request('/supplier/reviews');
+  return data.data;
+}
+
+export async function replyToSupplierReview(reviewId, reply) {
+  const data = await request(`/supplier/reviews/${reviewId}/reply`, {
+    method: 'POST',
+    body: JSON.stringify({ reply }),
+  });
+  return data;
+}
+
 export default {
   getAuthToken,
   getCurrentSupplier,
@@ -434,4 +448,6 @@ export default {
   downloadShippingLabel,
   fetchSupplierReturns,
   updateReturnStatus,
+  fetchSupplierReviews,
+  replyToSupplierReview,
 };

@@ -1910,3 +1910,207 @@ export const requestSupplierPayout = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * 16. Get Supplier Product Reviews & Ratings
+ * GET /api/supplier/reviews
+ */
+export const getSupplierReviews = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    // 1. Find all product IDs for this supplier
+    const supplierProducts = await prisma.product.findMany({
+      where: {
+        supplierId,
+        isDeleted: false,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const productIds = supplierProducts.map((p) => p.id);
+
+    if (productIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          stats: {
+            totalReviews: 0,
+            avgRating: 0,
+            ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+            totalCustomerPhotos: 0,
+            pendingRepliesCount: 0,
+          },
+          reviews: [],
+        },
+      });
+    }
+
+    // 2. Fetch all reviews for these products
+    const reviews = await prisma.review.findMany({
+      where: {
+        productId: { in: productIds },
+        isHidden: false,
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            title: true,
+            images: true,
+            price: true,
+            categorySlug: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+            phone: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // 3. Compute detailed statistics
+    const ratingBreakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    let totalPhotos = 0;
+    let pendingReplies = 0;
+    let totalStars = 0;
+
+    const formattedReviews = reviews.map((r) => {
+      const rating = Math.min(5, Math.max(1, r.rating || 5));
+      ratingBreakdown[rating] = (ratingBreakdown[rating] || 0) + 1;
+      totalStars += rating;
+
+      const photoList = Array.isArray(r.images) ? r.images : [];
+      totalPhotos += photoList.length;
+
+      const hasReply = Boolean(r.adminReply && r.adminReply.trim());
+      if (!hasReply) pendingReplies += 1;
+
+      return {
+        id: r.id,
+        productId: r.productId,
+        rating,
+        title: r.title || '',
+        comment: r.comment || '',
+        images: photoList,
+        customerPhotos: photoList,
+        adminReply: r.adminReply || null,
+        hasReply,
+        status: r.status || 'APPROVED',
+        createdAt: r.createdAt,
+        product: {
+          id: r.product?.id,
+          title: r.product?.title || 'Catalog Item',
+          image: Array.isArray(r.product?.images) ? r.product.images[0] : null,
+          price: r.product?.price || 0,
+        },
+        customer: {
+          id: r.user?.id,
+          name: r.user?.fullName || 'Verified Buyer',
+          avatar: r.user?.avatarUrl || null,
+        },
+      };
+    });
+
+    const totalCount = formattedReviews.length;
+    const avgRating = totalCount > 0 ? Number((totalStars / totalCount).toFixed(1)) : 0;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        stats: {
+          totalReviews: totalCount,
+          avgRating,
+          ratingBreakdown,
+          totalCustomerPhotos: totalPhotos,
+          pendingRepliesCount: pendingReplies,
+        },
+        reviews: formattedReviews,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching supplier reviews:', error);
+    next(error);
+  }
+};
+
+/**
+ * 17. Submit or Update Official Seller Reply to a Review
+ * POST /api/supplier/reviews/:id/reply
+ */
+export const replyToProductReview = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    const { id } = req.params;
+    const { reply } = req.body;
+
+    if (!reply || typeof reply !== 'string' || !reply.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reply text is required and cannot be empty',
+      });
+    }
+
+    // Verify review exists and product belongs to this supplier
+    const review = await prisma.review.findUnique({
+      where: { id },
+      include: {
+        product: {
+          select: { supplierId: true, title: true },
+        },
+      },
+    });
+
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: 'Review not found',
+      });
+    }
+
+    if (review.product?.supplierId && review.product.supplierId !== supplierId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: You cannot reply to reviews for another supplier\'s product',
+      });
+    }
+
+    const updated = await prisma.review.update({
+      where: { id },
+      data: {
+        adminReply: reply.trim(),
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Official seller reply posted successfully!',
+      data: updated,
+    });
+  } catch (error) {
+    console.error('Error replying to review:', error);
+    next(error);
+  }
+};

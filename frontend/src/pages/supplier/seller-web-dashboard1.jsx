@@ -17,6 +17,7 @@ import SellerOrders1 from './SellerOrders1';
 import SellerSettlements1 from './SellerSettlements1';
 import SellerDropship1 from './SellerDropship1';
 import SellerReturns1 from './SellerReturns1';
+import SellerReviews1 from './SellerReviews1';
 import SellerAddProduct1 from './SellerAddProduct1';
 import SellerKyc1 from './SellerKyc1';
 import SellerAnalytics1 from './SellerAnalytics1';
@@ -288,6 +289,11 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
       {/* 6. Returns & RTO Hub Tab */}
       {activeTab === 'returns' && (
         <SellerReturns1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+      )}
+
+      {/* 6b. Customer Ratings & Reviews Tab */}
+      {activeTab === 'reviews' && (
+        <SellerReviews1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
       )}
 
       {/* 7. Add Product Tab */}
