@@ -9,76 +9,21 @@ import {
 } from '../../services/ecommerceService';
 import { useCart } from '../../hooks/useCart';
 
-// Rich icon & metadata mapping for categories
-const CATEGORY_ICONS = {
-  'women-ethnic': 'styler',
-  'women-western': 'checkroom',
-  'men': 'man',
-  'kids': 'child_care',
-  'home-kitchen': 'flatware',
-  'beauty-health': 'face',
-  'jewellery': 'diamond',
-  'footwear': 'steps',
-  'electronics': 'earbuds',
-  'default': 'sell'
-};
-
-const CATEGORY_TAGLINES = {
-  'women-ethnic': {
-    subtitle: 'Curated traditional sarees, kurtis, lehengas & festive ethnic wear',
-    bannerTitle: 'Flat 60% Off on Festive Ethnic Wear',
-    bannerTag: 'Mega Festive Drop',
-    subcategories: ['All', 'Saree', 'Kurti', 'Silk Saree', 'Anarkali']
-  },
-  'women-western': {
-    subtitle: 'Trendy streetwear, chic workwear, casual tops & denim essentials',
-    bannerTitle: 'Summer Western Runway Styles',
-    bannerTag: 'Runway Collection',
-    subcategories: ['All', 'Dress', 'Top', 'Jeans', 'Skirt']
-  },
-  'men': {
-    subtitle: 'Premium casual shirts, graphic tees, trousers & daily footwear',
-    bannerTitle: 'Trending Men Shirts & Casuals',
-    bannerTag: 'Top Trending Picks',
-    subcategories: ['All', 'Shirt', 'T-Shirt', 'Track Pants']
-  },
-  'kids': {
-    subtitle: 'Comfortable clothing, gentle fabrics, infant essentials & festive sets',
-    bannerTitle: 'Soft & Gentle Kidswear Collection',
-    bannerTag: 'Newborn to 14Y',
-    subcategories: ['All', 'Toys', 'Infant Romper', 'Boys Set']
-  },
-  'home-kitchen': {
-    subtitle: 'Modern living, bedsheets, curtains, cookware & aesthetic decor',
-    bannerTitle: 'Aesthetic Home Living & Kitchenware',
-    bannerTag: 'Home Express',
-    subcategories: ['All', 'Bedsheet', 'Wall Decor', 'Curtain', 'Cookware', 'Storage Container']
-  },
-  'beauty-health': {
-    subtitle: 'Skincare, herbal cosmetics, lip shades & daily grooming essentials',
-    bannerTitle: 'Glow Essentials & Makeup Picks',
-    bannerTag: '100% Authentic',
-    subcategories: ['All', 'Face Wash', 'Lipstick', 'Serum', 'Sunscreen', 'Perfume', 'Body Lotion', 'Kajal']
-  },
-  'jewellery': {
-    subtitle: 'Oxidised silver, bridal chokers, temple jewellery & fashion earrings',
-    bannerTitle: 'Designer Jewellery Sets & Chokers',
-    bannerTag: 'Bridal & Party',
-    subcategories: ['All', 'Necklace', 'Earrings', 'Choker', 'Rings']
-  },
-  'footwear': {
-    subtitle: 'Ethnic juttis, running sneakers, block heels & comfortable sliders',
-    bannerTitle: 'Footwear Collection: Daily to Party',
-    bannerTag: 'Comfort First',
-    subcategories: ['All', 'Flats', 'Sneakers', 'Sliders', 'Jutti', 'Loafers']
-  },
-  'electronics': {
-    subtitle: 'Wireless earbuds, smartwatches, power accessories & soundbars',
-    bannerTitle: 'Top Rated Gadgets & Audio Gear',
-    bannerTag: 'Tech Verified',
-    subcategories: ['All', 'Phone Covers', 'Earbuds', 'Smartwatch', 'Charger', 'Cable', 'Neckband']
-  }
-};
+// Dynamic category icon resolver based on semantic matching
+function getCategoryIcon(slug = '', name = '') {
+  const text = `${slug} ${name}`.toLowerCase();
+  if (text.includes('ethnic') || text.includes('saree') || text.includes('kurti')) return 'styler';
+  if (text.includes('western') || text.includes('dress') || text.includes('top') || text.includes('jeans')) return 'checkroom';
+  if (text.includes('men')) return 'man';
+  if (text.includes('kid') || text.includes('child') || text.includes('baby') || text.includes('toy')) return 'child_care';
+  if (text.includes('kitchen') || text.includes('home') || text.includes('cookware') || text.includes('decor')) return 'flatware';
+  if (text.includes('beauty') || text.includes('health') || text.includes('skin') || text.includes('makeup')) return 'face';
+  if (text.includes('jewel') || text.includes('watch') || text.includes('necklace') || text.includes('ring')) return 'diamond';
+  if (text.includes('footwear') || text.includes('shoe') || text.includes('sneaker') || text.includes('sandal')) return 'steps';
+  if (text.includes('electronic') || text.includes('gadget') || text.includes('earbud') || text.includes('phone')) return 'earbuds';
+  if (text.includes('accessori') || text.includes('bag') || text.includes('belt')) return 'shopping_bag';
+  return 'grid_view';
+}
 
 const CATEGORY_GRADIENTS = {
   'women-ethnic': 'bg-gradient-to-r from-[#831843] via-[#9d174d] to-[#be185d]',
@@ -91,20 +36,6 @@ const CATEGORY_GRADIENTS = {
   'footwear': 'bg-gradient-to-r from-[#1e1b4b] via-[#312e81] to-[#4338ca]',
   'electronics': 'bg-gradient-to-r from-[#0f172a] via-[#0c4a6e] to-[#0284c7]',
   'default': 'bg-gradient-to-r from-[#831843] via-[#be185d] to-[#db2777]'
-};
-
-// Curated high-resolution aesthetic hero banner images per category
-const CATEGORY_HERO_IMAGES = {
-  'women-ethnic': 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80',
-  'women-western': 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=80',
-  'men': 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=800&auto=format&fit=crop&q=80',
-  'kids': 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=800&auto=format&fit=crop&q=80',
-  'home-kitchen': 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=800&auto=format&fit=crop&q=80',
-  'beauty-health': 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800&auto=format&fit=crop&q=80',
-  'jewellery': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800&auto=format&fit=crop&q=80',
-  'footwear': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80',
-  'electronics': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
-  'default': 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80'
 };
 
 export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack }) {
@@ -261,31 +192,39 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
     });
   }, [products, selectedSubcat]);
 
-  const activeCategoryMeta = CATEGORY_TAGLINES[activeSlug] || {
-    subtitle: 'Explore authentic verified supplier collections at lowest wholesale prices',
-    bannerTitle: 'Mega Wholesale Collection',
-    bannerTag: 'Verified Direct',
-    subcategories: ['All', 'Trending', 'Best Sellers', 'New Arrival']
-  };
-
   const currentCategory = categories.find(c => c.slug === activeSlug) || categoryData || {
-    name: 'Category Explorer',
-    slug: activeSlug,
-    imageUrl: CATEGORY_HERO_IMAGES[activeSlug] || CATEGORY_HERO_IMAGES['default']
+    name: 'Categories',
+    slug: activeSlug
   };
 
   const bannerImage =
-    CATEGORY_HERO_IMAGES[activeSlug] ||
     currentCategory?.imageUrl ||
     (products[0]?.images && products[0].images[0]) ||
-    CATEGORY_HERO_IMAGES['default'];
+    'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80';
 
+  // 100% Dynamic Subcategories extracted directly from PostgreSQL Category & Products
   const dynamicSubcategories = useMemo(() => {
-    if (currentCategory?.subcategories && currentCategory.subcategories.length > 0) {
-      return currentCategory.subcategories;
-    }
-    return activeCategoryMeta.subcategories || ['All'];
-  }, [currentCategory, activeCategoryMeta]);
+    const fromCategory = Array.isArray(currentCategory?.subcategories) ? currentCategory.subcategories : [];
+    const fromCategoryData = Array.isArray(categoryData?.subcategories) ? categoryData.subcategories : [];
+    const fromProducts = (products || []).map(p => p.subCategory?.trim()).filter(Boolean);
+
+    const combinedSet = new Set([
+      ...fromCategory,
+      ...fromCategoryData,
+      ...fromProducts
+    ]);
+
+    const cleanList = Array.from(combinedSet).filter(s => s && s.toLowerCase() !== 'all');
+    cleanList.sort((a, b) => a.localeCompare(b));
+
+    return ['All', ...cleanList];
+  }, [currentCategory, categoryData, products]);
+
+  // 100% Dynamic Taglines and Metadata derived from the category object and live product counts
+  const categoryTitle = currentCategory?.name ? `${currentCategory.name} Collection` : 'All Categories';
+  const categoryCount = currentCategory?._count?.products || products.length || 0;
+  const categorySubtitle = currentCategory?.description || `Explore ${categoryCount > 0 ? `${categoryCount} verified wholesale styles` : 'curated collections'} direct from manufacturers`;
+  const bannerTag = categoryCount > 0 ? `${categoryCount} Styles Available` : 'Verified Direct';
 
   return (
     <div className="bg-[#f8f9fb] font-sans text-[#191c1e] h-screen max-h-screen overflow-hidden flex flex-col antialiased selection:bg-pink-100 selection:text-pink-700">
@@ -400,7 +339,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
             ) : (
               categories.map((cat) => {
                 const isActive = activeSlug === cat.slug;
-                const iconName = CATEGORY_ICONS[cat.slug] || CATEGORY_ICONS['default'];
+                const iconName = getCategoryIcon(cat.slug, cat.name);
                 const count = cat._count?.products || 0;
 
                 return (
@@ -426,6 +365,11 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
                       <span className="text-[10px] sm:text-xs leading-[13px] sm:leading-tight font-bold block break-words line-clamp-2">
                         {cat.name}
                       </span>
+                      {count > 0 && (
+                        <span className={`text-[9px] font-semibold hidden sm:block mt-0.5 ${isActive ? 'text-[#FF3F6C]' : 'text-slate-400'}`}>
+                          {count} styles
+                        </span>
+                      )}
                     </div>
                   </button>
                 );
@@ -445,7 +389,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
                 </h2>
               </div>
               <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
-                {activeCategoryMeta.subtitle}
+                {categorySubtitle}
               </p>
             </div>
             <button
@@ -469,17 +413,17 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
             <div className="relative z-10 p-4 sm:p-7 md:p-8 flex-1 max-w-[58%] sm:max-w-[62%] flex flex-col justify-center">
               <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
                 <span className="bg-white/20 backdrop-blur-md text-white text-[9px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border border-white/25 shadow-xs">
-                  {activeCategoryMeta.bannerTag}
+                  {bannerTag}
                 </span>
                 <span className="text-[10px] sm:text-xs text-white/80 font-bold hidden md:inline">
                   • Verified Direct
                 </span>
               </div>
               <h3 className="text-white font-black text-base sm:text-2xl md:text-3xl leading-tight drop-shadow-sm line-clamp-2">
-                {activeCategoryMeta.bannerTitle}
+                {categoryTitle}
               </h3>
               <p className="text-white/85 text-[11px] sm:text-xs md:text-sm mt-1 sm:mt-1.5 line-clamp-2 leading-relaxed">
-                {activeCategoryMeta.subtitle}
+                {categorySubtitle}
               </p>
               <div className="mt-3 sm:mt-4 flex items-center gap-2">
                 <span className="bg-white text-slate-900 font-extrabold text-[10px] sm:text-xs px-3 sm:px-4 py-1.5 rounded-full shadow-md group-hover:bg-pink-50 transition-colors flex items-center gap-1.5">
@@ -500,7 +444,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
                   alt={currentCategory.name}
                   className="w-full h-full object-cover object-top transition-all duration-300"
                   onError={(e) => {
-                    const fallback = (products[0]?.images && products[0].images[0]) || CATEGORY_HERO_IMAGES['default'];
+                    const fallback = (products[0]?.images && products[0].images[0]) || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80';
                     if (e.target.src !== fallback) {
                       e.target.src = fallback;
                     }
@@ -536,7 +480,9 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
               <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
                 {selectedSubcat === 'All' ? 'Available Products' : `${selectedSubcat} Styles`}
               </h3>
-              
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+              </span>
             </div>
 
             {loadingProducts ? (
