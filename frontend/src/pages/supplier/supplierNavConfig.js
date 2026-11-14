@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Banknote,
   LineChart,
+  Star,
 } from 'lucide-react';
 
 export const SUPPLIER_MENU = [
@@ -18,6 +19,7 @@ export const SUPPLIER_MENU = [
   { id: 'finance', label: 'Settlements & Payouts 💳', icon: Banknote, path: '/supplier-settlements1' },
   { id: 'dropship', label: 'Dropship Fulfilment 📦', icon: Truck, path: '/supplier-dropship1' },
   { id: 'returns', label: 'Returns & RTO Hub 🔄', icon: RotateCcw, path: '/supplier-returns1' },
+  { id: 'reviews', label: 'Ratings & Reviews ⭐', icon: Star, path: '/supplier-reviews1' },
   { id: 'add-product', label: 'Add New Product ➕', icon: PlusCircle, path: '/supplier-add-product1' },
   { id: 'kyc', label: 'Supplier KYC Hub 🛡️', icon: ShieldCheck, path: '/supplier-kyc1' },
   { id: 'analytics', label: 'Sales Analytics 📊', icon: LineChart, path: '/supplier-analytics1' },

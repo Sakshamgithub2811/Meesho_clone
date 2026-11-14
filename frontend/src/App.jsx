@@ -188,6 +188,7 @@ const screenCatalog = [
   { path: '/supplier-settlements1', name: 'Settlements & Payouts (Live)', icon: '💳', group: 'Supplier' },
   { path: '/supplier-dropship1', name: 'Dropship Fulfillment (Live)', icon: '🚚', group: 'Supplier' },
   { path: '/supplier-returns1', name: 'Returns & RTO Hub (Live)', icon: '🔄', group: 'Supplier' },
+  { path: '/supplier-reviews1', name: 'Ratings & Reviews Hub (Live)', icon: '⭐', group: 'Supplier' },
   { path: '/supplier-add-product1', name: 'Add Product (Live)', icon: '➕', group: 'Supplier' },
   { path: '/supplier-kyc1', name: 'Supplier KYC Hub (Live)', icon: '🛡️', group: 'Supplier' },
   { path: '/supplier-analytics1', name: 'Sales Analytics (Live)', icon: '📊', group: 'Supplier' },
@@ -641,6 +642,11 @@ function AppRoutes() {
       '/supplier-dropship1': '/supplier-dropship1',
       'supplier-returns1': '/supplier-returns1',
       '/supplier-returns1': '/supplier-returns1',
+      'supplier-reviews1': '/supplier-reviews1',
+      '/supplier-reviews1': '/supplier-reviews1',
+      'supplier-reviews': '/supplier-reviews1',
+      'seller-reviews1': '/supplier-reviews1',
+      '/seller-reviews1': '/supplier-reviews1',
       'supplier-add-product1': '/supplier-add-product1',
       '/supplier-add-product1': '/supplier-add-product1',
       'supplier-profile1': '/supplier-profile1',
@@ -1177,6 +1183,36 @@ function AppRoutes() {
           element={
             <SellerWebDashboard1
               initialTab="returns"
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/supplier-reviews1"
+          element={
+            <SellerWebDashboard1
+              initialTab="reviews"
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/supplier-reviews"
+          element={
+            <SellerWebDashboard1
+              initialTab="reviews"
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
+        />
+        <Route
+          path="/seller-reviews1"
+          element={
+            <SellerWebDashboard1
+              initialTab="reviews"
               onNavigate={handleNav}
               onBack={handleBack}
             />

@@ -34,8 +34,46 @@ export default function SellerProfile1({ onNavigate, embedded = false, onNavigat
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState('general'); // 'general' | 'bank' | 'gst'
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => getCurrentSupplier() || null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Reactive Supplier Profile & Session Sync (Same Window + Cross-Tab)
+  useEffect(() => {
+    const handleProfileUpdate = (event) => {
+      if (event?.detail) {
+        const updated = event.detail;
+        setProfile((prev) => ({ ...(prev || {}), ...updated }));
+      }
+    };
+
+    const handleStorageChange = (event) => {
+      if (event.key === 'meesho_supplier_user' || event.key === 'supplier') {
+        if (event.newValue) {
+          try {
+            const updated = JSON.parse(event.newValue);
+            setProfile((prev) => ({ ...(prev || {}), ...updated }));
+            setGeneralForm((prev) => ({
+              ...prev,
+              storeName: updated.storeName || prev.storeName,
+              fullName: updated.fullName || updated.name || prev.fullName,
+              phone: updated.phone || prev.phone,
+              email: updated.email || prev.email,
+            }));
+          } catch (e) {
+            console.warn('Cross-tab profile sync error in SellerProfile1:', e);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('supplier-profile-updated', handleProfileUpdate);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('supplier-profile-updated', handleProfileUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Editable Form States
   const [generalForm, setGeneralForm] = useState({
