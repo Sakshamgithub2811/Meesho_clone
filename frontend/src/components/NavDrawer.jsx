@@ -45,7 +45,6 @@ const customerNavSections = [
     items: [
       { name: "Home & Deals", path: "/user-home", icon: "home" },
       { name: "Explore All Categories", path: "/explorer", icon: "grid_view" },
-      { name: "Flash Sale Deals", path: "/flash", icon: "bolt", badge: "Hot" },
       { name: "Curated Spotlight", path: "/spotlight", icon: "auto_awesome" },
     ]
   },

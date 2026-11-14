@@ -593,27 +593,6 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
               </div>
             )}
           </div>
-
-          {/* Flash Sale Banner at Bottom */}
-          <div className="mt-8 mb-12 p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#FF3F6C] via-[#e02659] to-[#910031] text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg shadow-pink-500/10">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-pink-200">
-                Special Category Deals
-              </p>
-              <h3 className="text-base sm:text-xl font-black mt-0.5">
-                Looking for steepest discounts?
-              </h3>
-              <p className="text-xs text-white/90 mt-0.5">
-                Check today's active lightning deals and limited flash discounts.
-              </p>
-            </div>
-            <button
-              onClick={() => navigate('/flash')}
-              className="bg-white text-[#FF3F6C] hover:bg-pink-50 px-5 py-2.5 rounded-full text-xs font-black active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
-            >
-              Shop Flash Deals ⚡
-            </button>
-          </div>
         </section>
       </main>
 

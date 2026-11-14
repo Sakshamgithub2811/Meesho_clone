@@ -57,7 +57,6 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
     { id: 'women', name: 'Sarees', icon: 'checkroom', target: 'sarees' },
     { id: 'western', name: 'Western', icon: 'styler', target: 'western' },
     { id: 'spotlight', name: 'Spotlight', icon: 'auto_awesome', target: 'spotlight' },
-    { id: 'flash', name: 'Flash Deals', icon: 'bolt', target: 'flash' },
     { id: 'explorer', name: 'All Categories', icon: 'grid_view', target: 'explorer' },
     { id: 'kids', name: 'Kids', icon: 'child_care', target: 'explorer' },
     { id: 'jewelry', name: 'Jewelry', icon: 'diamond', target: 'explorer' },
@@ -214,10 +213,10 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
                     Curated ethnic wear for the festive season.
                   </p>
                   <button
-                    onClick={() => onNavigate('flash')}
+                    onClick={() => onNavigate('explorer')}
                     className="mt-5 inline-block bg-white text-[#b90041] px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-xl active:scale-95 transition-transform cursor-pointer hover:bg-pink-50"
                   >
-                    Shop Flash Sale ⚡
+                    Shop All Deals ➔
                   </button>
                 </div>
                 <div className="absolute right-0 bottom-0 h-full w-1/2 opacity-30 md:opacity-100 flex items-center justify-end pr-8 select-none text-8xl md:text-9xl">
@@ -387,18 +386,18 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
 
             {/* Weekly Mission Card */}
             <div
-              onClick={() => onNavigate('flash')}
+              onClick={() => onNavigate('explorer')}
               className="h-64 bg-[#4D41DF] rounded-3xl p-8 flex flex-col justify-between text-white overflow-hidden relative group shadow-md cursor-pointer hover:bg-[#3f34c7] transition-colors"
             >
               <div>
                 <span className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-70">
-                  Weekly Mission
+                  Catalog Explorer
                 </span>
-                <h3 className="text-2xl font-black mt-1">Flash Drop Deals ⚡</h3>
+                <h3 className="text-2xl font-black mt-1">Explore Collections 🗂️</h3>
               </div>
               <div className="relative z-10">
                 <p className="text-xs opacity-80 mb-3">
-                  Check out the limited drop sales happening now.
+                  Check out all wholesale categories direct from suppliers.
                 </p>
                 <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
                   <div className="bg-white h-full w-[60%] rounded-full"></div>

@@ -471,15 +471,15 @@ export default function HomeUserReseller() {
             onScroll={handleBannerScroll}
             className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-2 scroll-smooth"
           >
-            {/* Card 1: Flash Sale (Pink / Magenta) */}
+            {/* Card 1: Trending Deals (Pink / Magenta) */}
             <div 
-              onClick={() => navigate('/flash')}
+              onClick={() => navigate('/explorer')}
               className="min-w-[85%] md:min-w-[100%] snap-center shrink-0 cursor-pointer"
             >
               <div className="h-48 md:h-80 rounded-3xl bg-gradient-to-br from-[#b90041] to-[#df2457] relative overflow-hidden flex items-center px-8 text-white shadow-lg shadow-[#b90041]/20">
                 <div className="relative z-10 max-w-xs md:max-w-md">
                   <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-3 inline-block">
-                    Flash Sale
+                    Mega Collection
                   </span>
                   <h2 className="text-3xl md:text-5xl font-black font-headline leading-tight">
                     UP TO 80% OFF
@@ -490,7 +490,7 @@ export default function HomeUserReseller() {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate('/flash');
+                      navigate('/explorer');
                     }} 
                     className="mt-6 bg-white text-[#b90041] px-6 py-2 rounded-xl font-bold text-sm shadow-xl active:scale-95 transition-transform hover:bg-opacity-95 cursor-pointer"
                   >

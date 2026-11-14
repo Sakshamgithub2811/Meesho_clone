@@ -1037,7 +1037,6 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
       children: [
         { id: 'cat-products', label: 'All Categories 🗂️', icon: Search },
         { id: 'cat-sarees', label: 'Sarees Store 🥻', icon: Sparkles },
-        { id: 'cat-flash', label: 'Flash Sale Drops ⚡', icon: AlertTriangle },
         { id: 'cat-spotlight', label: 'Curator Spotlight 🌟', icon: Award },
       ],
     },
