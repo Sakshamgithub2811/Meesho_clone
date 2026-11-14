@@ -1,0 +1,72 @@
+name: Build & Deploy Docker Containers to VPS
+
+on:
+  push:
+    branches:
+      - master
+      - saksham
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Oracle Cloud VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            echo "🚀 ==================================================="
+            echo "🚀 Starting CI/CD Automated Deployment on VPS..."
+            echo "🚀 ==================================================="
+
+            APP_DIR="/home/ubuntu/Meesho_clone"
+            REPO_URL="https://github.com/Sakshamgithub2811/Meesho_clone-.git"
+            TARGET_BRANCH="${{ github.ref_name }}"
+
+            # 1. Clone repository if it doesn't exist, otherwise pull latest changes
+            if [ ! -d "$APP_DIR" ]; then
+              echo "📦 Project not found on VPS. Cloning fresh repository..."
+              git clone "$REPO_URL" "$APP_DIR"
+              cd "$APP_DIR"
+            else
+              echo "🔄 Existing project found. Pulling latest code..."
+              cd "$APP_DIR"
+              git fetch origin
+            fi
+
+            echo "🔀 Checking out branch: $TARGET_BRANCH"
+            git checkout "$TARGET_BRANCH"
+            git pull origin "$TARGET_BRANCH"
+
+            # 2. Safely write production environment variables from GitHub Secrets
+            echo "🔐 Ingesting backend and frontend .env files..."
+            cat << 'EOF_BACKEND' > backend/.env
+${{ secrets.BACKEND_ENV }}
+EOF_BACKEND
+
+            cat << 'EOF_FRONTEND' > frontend/.env
+${{ secrets.FRONTEND_ENV }}
+EOF_FRONTEND
+
+            # 3. Build & start Docker containers
+            echo "🐳 Building Docker containers & launching services..."
+            docker compose down --remove-orphans || true
+            docker compose up -d --build --remove-orphans
+
+            # 4. Clean up dangling images to keep VPS storage lean
+            echo "🧹 Pruning dangling docker build cache..."
+            docker image prune -f
+
+            # 5. Output active running status
+            echo "✅ Deployment finished successfully! Running containers:"
+            docker compose ps
