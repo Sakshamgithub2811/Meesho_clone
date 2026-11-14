@@ -847,6 +847,7 @@ function AppRoutes() {
         <Route path="/supplier/logout" element={<SupplierLogoutPage />} />
         <Route path="/supplier-logout" element={<SupplierLogoutPage />} />
         <Route path="/user/login" element={<UserLogin />} />
+        <Route path="/user-login" element={<Navigate to="/user/login" replace />} />
         <Route path="/affiliate/login" element={<AffiliateLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
@@ -1016,10 +1017,12 @@ function AppRoutes() {
             />
           }
         />
+        {/* Unified Supplier SPA Console (Persistent Layout - Zero Unmount / Zero Flickering) */}
         <Route
           path="/supplier-dashboard-2"
           element={
             <SellerWebDashboard1
+              initialTab="overview"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1029,6 +1032,7 @@ function AppRoutes() {
           path="/supplier-dashboard-1"
           element={
             <SellerWebDashboard1
+              initialTab="overview"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1037,7 +1041,8 @@ function AppRoutes() {
         <Route
           path="/supplier-inventory"
           element={
-            <SellerInventory1
+            <SellerWebDashboard1
+              initialTab="inventory"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1046,7 +1051,8 @@ function AppRoutes() {
         <Route
           path="/supplier-orders"
           element={
-            <SellerOrders1
+            <SellerWebDashboard1
+              initialTab="orders"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1055,7 +1061,8 @@ function AppRoutes() {
         <Route
           path="/add-product"
           element={
-            <SellerAddProduct1
+            <SellerWebDashboard1
+              initialTab="add-product"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1068,7 +1075,8 @@ function AppRoutes() {
         <Route
           path="/supplier-profile"
           element={
-            <SellerProfile1
+            <SellerWebDashboard1
+              initialTab="profile"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1078,6 +1086,7 @@ function AppRoutes() {
           path="/seller-web-dashboard1"
           element={
             <SellerWebDashboard1
+              initialTab="overview"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1087,6 +1096,7 @@ function AppRoutes() {
           path="/seller-dashboard1"
           element={
             <SellerWebDashboard1
+              initialTab="overview"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1095,7 +1105,8 @@ function AppRoutes() {
         <Route
           path="/supplier-inventory1"
           element={
-            <SellerInventory1
+            <SellerWebDashboard1
+              initialTab="inventory"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1104,7 +1115,8 @@ function AppRoutes() {
         <Route
           path="/seller-inventory1"
           element={
-            <SellerInventory1
+            <SellerWebDashboard1
+              initialTab="inventory"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1113,7 +1125,8 @@ function AppRoutes() {
         <Route
           path="/supplier-orders1"
           element={
-            <SellerOrders1
+            <SellerWebDashboard1
+              initialTab="orders"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1122,7 +1135,8 @@ function AppRoutes() {
         <Route
           path="/seller-orders1"
           element={
-            <SellerOrders1
+            <SellerWebDashboard1
+              initialTab="orders"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1131,7 +1145,8 @@ function AppRoutes() {
         <Route
           path="/supplier-dropship1"
           element={
-            <SellerDropship1
+            <SellerWebDashboard1
+              initialTab="dropship"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1140,7 +1155,8 @@ function AppRoutes() {
         <Route
           path="/seller-dropship1"
           element={
-            <SellerDropship1
+            <SellerWebDashboard1
+              initialTab="dropship"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1149,7 +1165,8 @@ function AppRoutes() {
         <Route
           path="/supplier-returns1"
           element={
-            <SellerReturns1
+            <SellerWebDashboard1
+              initialTab="returns"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1158,7 +1175,8 @@ function AppRoutes() {
         <Route
           path="/seller-returns1"
           element={
-            <SellerReturns1
+            <SellerWebDashboard1
+              initialTab="returns"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1167,7 +1185,8 @@ function AppRoutes() {
         <Route
           path="/supplier-add-product1"
           element={
-            <SellerAddProduct1
+            <SellerWebDashboard1
+              initialTab="add-product"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1176,7 +1195,8 @@ function AppRoutes() {
         <Route
           path="/seller-add-product1"
           element={
-            <SellerAddProduct1
+            <SellerWebDashboard1
+              initialTab="add-product"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1185,7 +1205,8 @@ function AppRoutes() {
         <Route
           path="/supplier-profile1"
           element={
-            <SellerProfile1
+            <SellerWebDashboard1
+              initialTab="profile"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1194,7 +1215,8 @@ function AppRoutes() {
         <Route
           path="/seller-profile1"
           element={
-            <SellerProfile1
+            <SellerWebDashboard1
+              initialTab="profile"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1203,7 +1225,8 @@ function AppRoutes() {
         <Route
           path="/supplier-kyc1"
           element={
-            <SellerKyc1
+            <SellerWebDashboard1
+              initialTab="kyc"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1212,7 +1235,8 @@ function AppRoutes() {
         <Route
           path="/seller-kyc1"
           element={
-            <SellerKyc1
+            <SellerWebDashboard1
+              initialTab="kyc"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1221,7 +1245,8 @@ function AppRoutes() {
         <Route
           path="/supplier-settlements1"
           element={
-            <SellerSettlements1
+            <SellerWebDashboard1
+              initialTab="finance"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1230,7 +1255,8 @@ function AppRoutes() {
         <Route
           path="/seller-settlements1"
           element={
-            <SellerSettlements1
+            <SellerWebDashboard1
+              initialTab="finance"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1239,7 +1265,8 @@ function AppRoutes() {
         <Route
           path="/supplier-analytics1"
           element={
-            <SellerAnalytics1
+            <SellerWebDashboard1
+              initialTab="analytics"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1248,7 +1275,8 @@ function AppRoutes() {
         <Route
           path="/seller-analytics1"
           element={
-            <SellerAnalytics1
+            <SellerWebDashboard1
+              initialTab="analytics"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1258,6 +1286,7 @@ function AppRoutes() {
           path="/seller-dashboard"
           element={
             <SellerWebDashboard1
+              initialTab="overview"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1267,6 +1296,7 @@ function AppRoutes() {
           path="/sellers"
           element={
             <SellerWebDashboard1
+              initialTab="overview"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1276,6 +1306,7 @@ function AppRoutes() {
           path="/seller"
           element={
             <SellerWebDashboard1
+              initialTab="overview"
               onNavigate={handleNav}
               onBack={handleBack}
             />
@@ -1283,7 +1314,13 @@ function AppRoutes() {
         />
         <Route
           path="/supplier-returns"
-          element={<SupplierReturnsRTO onNavigate={handleNav} onBack={handleBack} />}
+          element={
+            <SellerWebDashboard1
+              initialTab="returns"
+              onNavigate={handleNav}
+              onBack={handleBack}
+            />
+          }
         />
         <Route
           path="/supplier-rot-ledger"
@@ -1338,6 +1375,8 @@ function AppRoutes() {
         <Route path="/signal-core" element={<SignalCore onNavigate={handleNav} />} />
         {/* Dynamic Published CMS & Policies Route (Method 2) */}
         <Route path="/p/:slug" element={<PolicyPage />} />
+        {/* Fallback Catch-all Route to prevent blank screens on unknown paths */}
+        <Route path="*" element={<Navigate to="/user-home" replace />} />
       </Routes>
     </div>
   );

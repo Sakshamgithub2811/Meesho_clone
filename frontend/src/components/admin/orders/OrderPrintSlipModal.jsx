@@ -9,9 +9,11 @@ import {
   MapPin, 
   Phone, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import { Button } from '../../ui/button';
+import { downloadOrderInvoice, downloadShippingLabel } from '../../../services/supplierApiService';
 
 /**
  * Procedural SVG Barcode Generator (Clean Code128-style visualization)
@@ -95,6 +97,14 @@ export default function OrderPrintSlipModal({ order, onClose }) {
     window.print();
   };
 
+  const handleDownloadPdf = () => {
+    if (activeMode === 'invoice') {
+      downloadOrderInvoice(order.id);
+    } else {
+      downloadShippingLabel(order.id);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto print:p-0 print:bg-white animate-in fade-in duration-150">
       
@@ -136,11 +146,20 @@ export default function OrderPrintSlipModal({ order, onClose }) {
             <Button
               type="button"
               size="sm"
+              onClick={handleDownloadPdf}
+              className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-pink-400" />
+              Download PDF
+            </Button>
+            <Button
+              type="button"
+              size="sm"
               onClick={handlePrint}
               className="bg-[#b7004d] hover:bg-[#96003f] text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              Print / Save PDF
+              Print / Thermal Slip
             </Button>
             <button
               type="button"

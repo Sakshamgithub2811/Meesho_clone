@@ -70,7 +70,7 @@ const compressDocImage = (file) => {
   });
 };
 
-export default function SellerKyc1({ onNavigate }) {
+export default function SellerKyc1({ onNavigate, embedded = false, onNavigateTab }) {
   const navigate = useNavigate();
 
   const handleNav = useCallback((path) => {
@@ -206,6 +206,7 @@ export default function SellerKyc1({ onNavigate }) {
   }, [loadKyc]);
 
   const handleTabChange = (tabId) => {
+    if (onNavigateTab) return onNavigateTab(tabId);
     const item = SUPPLIER_MENU.find((m) => m.id === tabId);
     if (item?.path) handleNav(item.path);
   };
@@ -257,42 +258,6 @@ export default function SellerKyc1({ onNavigate }) {
     }
   };
 
-  // Quick Demo Autofill
-  const handleAutofillDemo = () => {
-    setFormData({
-      businessName: 'Shree Balaji Textile Mills Pvt Ltd',
-      tradeName: 'Balaji Fashion Hub',
-      businessType: 'Private Limited Company',
-      businessAddress: 'Plot 42, GIDC Textile Park, Ring Road',
-      city: 'Surat',
-      state: 'Gujarat',
-      pincode: '395002',
-
-      gstin: '24AAACB1234F1Z8',
-      gstCertificate: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600',
-      panNumber: 'AAACB1234F',
-      panName: 'Shree Balaji Textile Mills',
-      panImage: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600',
-      aadhaarNumber: '9876 5432 1098',
-      aadhaarName: 'Ramesh Patel',
-      aadhaarFrontImage: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600',
-
-      bankName: 'HDFC Bank',
-      accountNumber: '50200012345678',
-      confirmAccountNumber: '50200012345678',
-      ifsc: 'HDFC0000128',
-      accountHolder: 'Shree Balaji Textile Mills Pvt Ltd',
-      upiId: 'balajitex@hdfcbank',
-      chequeImage: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600',
-
-      warehouseAddress: 'Balaji Logistics Hub, Shed #8, GIDC Industrial Estate',
-      warehousePincode: '395002',
-      warehouseContactPerson: 'Mahesh Sharma (Dispatch Head)',
-      warehousePhone: '9876543210',
-    });
-    toast.success('Sample verified company details autofilled!');
-  };
-
   // Submit KYC Application
   const handleSubmitKyc = async (e) => {
     e.preventDefault();
@@ -335,16 +300,8 @@ export default function SellerKyc1({ onNavigate }) {
   const isRejected = kycStatus === 'REJECTED';
   const isNotSubmitted = !kycData;
 
-  return (
-    <DashboardLayout
-      menuItems={SUPPLIER_MENU}
-      activeTab="kyc"
-      onTabChange={handleTabChange}
-      roleName="SUPPLIER"
-      userName={supplierDisplayName}
-      onLogout={() => setShowLogoutConfirm(true)}
-    >
-      <div className="space-y-6 max-w-5xl mx-auto pb-16">
+  const mainContent = (
+    <div className="space-y-6 max-w-5xl mx-auto pb-16">
         
         {/* Top Header Card */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
@@ -473,13 +430,6 @@ export default function SellerKyc1({ onNavigate }) {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleAutofillDemo}
-              className="text-xs font-bold text-[#b7004d] hover:underline cursor-pointer shrink-0"
-            >
-              Load Demo Details ➔
-            </button>
           </div>
         )}
 
@@ -1098,8 +1048,6 @@ export default function SellerKyc1({ onNavigate }) {
 
         </form>
 
-      </div>
-
       {/* Document Zoom / Preview Modal */}
       {previewDoc && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1133,6 +1081,23 @@ export default function SellerKyc1({ onNavigate }) {
           </div>
         </div>
       )}
+    </div>
+  );
+
+  if (embedded) {
+    return mainContent;
+  }
+
+  return (
+    <DashboardLayout
+      menuItems={SUPPLIER_MENU}
+      activeTab="kyc"
+      onTabChange={handleTabChange}
+      roleName="SUPPLIER"
+      userName={supplierDisplayName}
+      onLogout={() => setShowLogoutConfirm(true)}
+    >
+      {mainContent}
 
       <LogoutConfirmDialog
         isOpen={showLogoutConfirm}

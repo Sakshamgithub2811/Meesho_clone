@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import prisma from '../../config/prisma.js';
 
 // 1. REGISTER SUPPLIER (Firebase UID Based)
 export const registerSupplier = async (req, res) => {

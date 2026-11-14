@@ -42,6 +42,8 @@ export const verifySupplier = async (req, res, next) => {
       token = authHeader.split(' ')[1];
     } else if (req.headers['x-access-token']) {
       token = req.headers['x-access-token'];
+    } else if (req.query?.token) {
+      token = req.query.token;
     }
 
     if (!token) {

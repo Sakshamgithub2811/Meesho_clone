@@ -6,6 +6,7 @@ import slugify from 'slugify';
 import { dispatchDeliveryOtpEmail } from '../order.controller.js';
 import { getUploadDir } from '../../middlewares/upload.middleware.js';
 import { uploadFileToSupabase } from '../../services/supabaseStorage.service.js';
+import { generateOrderPdf } from '../../services/invoicePdf.service.js';
 
 // Helper to persist uploaded files to Supabase Storage or fallback to local/tmp URL
 const uploadFileToStorage = async (file, baseUrl) => {
@@ -64,6 +65,28 @@ const saveBase64Image = async (base64Str, baseUrl) => {
   }
 };
 
+// Helper: Derive aggregated status from a list of OrderItem rows
+export const deriveAggregateOrderStatus = (items = []) => {
+  if (!items || items.length === 0) return 'ORDERED';
+  const statuses = items.map((i) => (i.itemStatus || 'ORDERED').toUpperCase());
+
+  if (statuses.every((s) => s === 'CANCELLED')) return 'CANCELLED';
+  if (statuses.every((s) => s === 'REFUNDED')) return 'REFUNDED';
+  if (statuses.every((s) => s === 'RETURNED')) return 'RETURNED';
+
+  const active = statuses.filter((s) => s !== 'CANCELLED');
+  if (active.length === 0) return 'CANCELLED';
+
+  if (active.every((s) => s === 'DELIVERED')) return 'DELIVERED';
+  if (active.some((s) => s === 'RETURN_REQUESTED')) return 'RETURN_REQUESTED';
+  if (active.some((s) => s === 'RETURNED')) return 'RETURNED';
+  if (active.some((s) => s === 'OUT_FOR_DELIVERY')) return 'OUT_FOR_DELIVERY';
+  if (active.some((s) => ['SHIPPED', 'DELIVERED'].includes(s))) return 'SHIPPED';
+  if (active.some((s) => s === 'CONFIRMED')) return 'CONFIRMED';
+
+  return 'ORDERED';
+};
+
 /**
  * 1. Get Supplier Dashboard Statistics
  * GET /api/supplier/dashboard-stats
@@ -78,14 +101,14 @@ export const getDashboardStats = async (req, res, next) => {
       });
     }
 
-    // Total products for this supplier
+    // Total active (non-deleted) products for this supplier
     const totalProducts = await prisma.product.count({
-      where: { supplierId },
+      where: { supplierId, isDeleted: false },
     }).catch(() => 0);
 
-    // Low stock products (< 10)
+    // Low stock active products (< 10)
     const lowStockCount = await prisma.product.count({
-      where: { supplierId, stock: { lt: 10 } },
+      where: { supplierId, isDeleted: false, stock: { lt: 10 } },
     }).catch(() => 0);
 
     // Fetch supplier order items
@@ -102,13 +125,14 @@ export const getDashboardStats = async (req, res, next) => {
     const totalOrders = orderItems.length;
     const totalRevenue = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
-    // Recent 5 orders
+    // Recent 5 orders with supplier-specific item status
     const recentOrders = orderItems.slice(-5).map((item) => ({
       orderId: item.orderId,
+      orderItemId: item.id,
       productTitle: item.product?.title,
       quantity: item.quantity,
       price: item.price,
-      status: item.order?.orderStatus,
+      status: item.itemStatus || item.order?.orderStatus || 'ORDERED',
       createdAt: item.order?.createdAt,
     }));
 
@@ -142,7 +166,7 @@ export const getSupplierProducts = async (req, res, next) => {
     }
     const { search, category, page = 1, limit = 20 } = req.query;
 
-    const where = {};
+    const where = { isDeleted: false };
     if (supplierId && supplierId !== 'all') {
       where.supplierId = supplierId;
     }
@@ -190,6 +214,54 @@ export const addProduct = async (req, res, next) => {
         error: 'Unauthorized: Supplier session missing',
       });
     }
+
+    // Verify supplier profile exists and retrieve compliance credentials
+    const supplierProfile = await prisma.profile.findUnique({
+      where: { id: supplierId },
+      select: {
+        id: true,
+        storeName: true,
+        fullName: true,
+        gstin: true,
+        pan: true,
+        bankDetails: true,
+        role: true,
+      },
+    });
+    if (!supplierProfile) {
+      return res.status(401).json({
+        success: false,
+        message: 'Supplier profile not found or session invalid',
+      });
+    }
+
+    // KYC Compliance Gate: Supplier must have approved KYC application or verified business credentials
+    const kycApplication = await prisma.kYCApplication.findFirst({
+      where: {
+        userId: supplierId,
+        type: 'supplier',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const isKycApproved = kycApplication?.status === 'APPROVED';
+    const hasVerifiedTaxProfile = Boolean(supplierProfile.gstin && supplierProfile.bankDetails);
+
+    if (!isKycApproved && !hasVerifiedTaxProfile) {
+      const kycStatus = kycApplication?.status || 'NOT_SUBMITTED';
+      return res.status(403).json({
+        success: false,
+        error: 'KYC_REQUIRED',
+        kycStatus,
+        message:
+          kycStatus === 'PENDING' || kycStatus === 'UNDER_REVIEW'
+            ? 'KYC Verification Pending: Your business KYC is under review by compliance. You can publish live listings once approved.'
+            : kycStatus === 'REJECTED'
+            ? 'KYC Verification Rejected: Please update and re-submit your business documents in KYC Hub to publish listings.'
+            : 'KYC Verification Required: You must complete business KYC verification (GSTIN, PAN & Bank Details) before publishing live products.',
+      });
+    }
+
     const {
       title,
       description,
@@ -201,13 +273,21 @@ export const addProduct = async (req, res, next) => {
       sizes,
       stock,
       isFreeDelivery,
-      supplierName = 'Verified Supplier',
+      supplierName = supplierProfile.storeName || supplierProfile.fullName || 'Verified Supplier',
     } = req.body;
 
     if (!title || !price) {
       return res.status(400).json({
         success: false,
         message: 'Product title and price are required!',
+      });
+    }
+
+    const priceNum = parseFloat(price);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid positive product price is required!',
       });
     }
 
@@ -291,45 +371,28 @@ export const addProduct = async (req, res, next) => {
       }
     }
 
-    let newProduct;
-    try {
-      newProduct = await prisma.product.create({
-        data: {
-          title,
-          description: description || '',
-          price: parseFloat(price),
-          originalPrice: originalPrice ? parseFloat(originalPrice) : null,
-          discountPercentage: discountPercentage ? parseInt(discountPercentage, 10) : 0,
-          categorySlug: finalCategorySlug,
-          images: imageUrls,
-          sizes: parsedSizes,
-          stock: stock ? parseInt(stock, 10) : 50,
-          isFreeDelivery: isFreeDelivery === 'false' ? false : Boolean(isFreeDelivery),
-          supplierName,
-          supplierId,
-        },
-      });
-    } catch (dbErr) {
-      console.warn('Prisma create product fallback:', dbErr.message);
-      // Fallback object to ensure seamless operation
-      const fallbackId = `prod_${Date.now()}`;
-      newProduct = {
-        id: fallbackId,
-        title,
-        description: description || '',
-        price: parseFloat(price),
+    // Authoritative Database Persistence (Strict - NO FAKE FALLBACKS)
+    const newProduct = await prisma.product.create({
+      data: {
+        title: title.trim(),
+        description: (description || '').trim(),
+        price: priceNum,
         originalPrice: originalPrice ? parseFloat(originalPrice) : null,
+        discountPercentage: discountPercentage ? parseInt(discountPercentage, 10) : 0,
         categorySlug: finalCategorySlug,
         images: imageUrls,
         sizes: parsedSizes,
-        stock: stock ? parseInt(stock, 10) : 50,
+        stock: stock !== undefined && stock !== null && stock !== '' ? parseInt(stock, 10) : 50,
+        isFreeDelivery: isFreeDelivery === 'false' ? false : Boolean(isFreeDelivery),
         supplierName,
         supplierId,
-        createdAt: new Date().toISOString(),
-      };
-    }
+      },
+      include: {
+        category: true,
+      },
+    });
 
-    // Also sync to Supabase
+    // Also sync to Supabase if available
     try {
       if (supabase && newProduct) {
         await supabase.from('products').insert([
@@ -350,11 +413,16 @@ export const addProduct = async (req, res, next) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Product created and synced successfully!',
+      message: 'Product created and published successfully to database!',
       data: newProduct,
     });
   } catch (error) {
-    next(error);
+    console.error('Error in addProduct:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to publish product to database',
+      error: error.message,
+    });
   }
 };
 
@@ -364,28 +432,89 @@ export const addProduct = async (req, res, next) => {
  */
 export const updateProduct = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const updateData = { ...req.body };
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
 
-    // Format numbers
-    if (updateData.price) updateData.price = parseFloat(updateData.price);
-    if (updateData.originalPrice) updateData.originalPrice = parseFloat(updateData.originalPrice);
-    if (updateData.stock) updateData.stock = parseInt(updateData.stock, 10);
-    if (updateData.discountPercentage) updateData.discountPercentage = parseInt(updateData.discountPercentage, 10);
+    const { id } = req.params;
+
+    // Security Check: Verify product exists and belongs to this supplier
+    const existing = await prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    // Prevent cross-supplier modification
+    if (existing.supplierId && existing.supplierId !== supplierId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to modify another supplier\'s product',
+      });
+    }
+
+    const updateData = { ...req.body };
+    delete updateData.id;
+    delete updateData.supplierId; // Cannot transfer ownership
+
+    const hostBaseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // Handle newly uploaded image files via Multer (uploadProductMedia)
+    let uploadedUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const storedUrl = await uploadFileToStorage(file, hostBaseUrl);
+        if (storedUrl) uploadedUrls.push(storedUrl);
+      }
+    }
+
+    // Process images in request body (JSON array, comma-separated string, or existing URLs)
+    let bodyImages = [];
     if (updateData.images) {
-      if (typeof updateData.images === 'string') {
+      let rawImgs = updateData.images;
+      if (typeof rawImgs === 'string') {
         try {
-          updateData.images = JSON.parse(updateData.images);
+          rawImgs = JSON.parse(rawImgs);
         } catch {
-          updateData.images = updateData.images.split(',').map((s) => s.trim());
+          rawImgs = rawImgs.split(',').map((s) => s.trim());
         }
       }
-      if (!Array.isArray(updateData.images)) {
-        updateData.images = [updateData.images];
+      if (Array.isArray(rawImgs)) {
+        bodyImages = rawImgs;
+      } else if (typeof rawImgs === 'string' && rawImgs.trim()) {
+        bodyImages = [rawImgs.trim()];
       }
-      const hostBaseUrl = `${req.protocol}://${req.get('host')}`;
-      updateData.images = (await Promise.all(
-        updateData.images.map(async (u) => {
+    }
+
+    // Support optional existingImages field
+    if (updateData.existingImages) {
+      let existImgs = updateData.existingImages;
+      if (typeof existImgs === 'string') {
+        try {
+          existImgs = JSON.parse(existImgs);
+        } catch {
+          existImgs = existImgs.split(',').map((s) => s.trim());
+        }
+      }
+      if (Array.isArray(existImgs)) {
+        bodyImages = [...bodyImages, ...existImgs];
+      }
+      delete updateData.existingImages;
+    }
+
+    // Convert any base64 data URLs in body images to persistent cloud files
+    if (bodyImages.length > 0) {
+      bodyImages = (await Promise.all(
+        bodyImages.map(async (u) => {
           if (typeof u === 'string' && u.startsWith('data:image/')) {
             return await saveBase64Image(u, hostBaseUrl);
           }
@@ -393,6 +522,59 @@ export const updateProduct = async (req, res, next) => {
         })
       )).filter(Boolean);
     }
+
+    // Combine uploaded files and body images
+    const replaceImages = updateData.replaceImages === 'true' || updateData.replaceImages === true;
+    delete updateData.replaceImages;
+
+    if (uploadedUrls.length > 0 || bodyImages.length > 0) {
+      if (replaceImages) {
+        updateData.images = uploadedUrls.length > 0 ? uploadedUrls : bodyImages;
+      } else {
+        const baseImages = bodyImages.length > 0 ? bodyImages : (existing.images || []);
+        updateData.images = Array.from(new Set([...baseImages, ...uploadedUrls])).filter(Boolean);
+      }
+    }
+
+    // Format numbers
+    if (updateData.price !== undefined) updateData.price = parseFloat(updateData.price);
+    if (updateData.originalPrice !== undefined) updateData.originalPrice = parseFloat(updateData.originalPrice);
+    if (updateData.stock !== undefined) updateData.stock = parseInt(updateData.stock, 10);
+    if (updateData.discountPercentage !== undefined) updateData.discountPercentage = parseInt(updateData.discountPercentage, 10);
+
+    // Format arrays/booleans if parsed from multipart/form-data
+    if (updateData.sizes && typeof updateData.sizes === 'string') {
+      try {
+        updateData.sizes = JSON.parse(updateData.sizes);
+      } catch {
+        updateData.sizes = updateData.sizes.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    if (updateData.colors && typeof updateData.colors === 'string') {
+      try {
+        updateData.colors = JSON.parse(updateData.colors);
+      } catch {
+        updateData.colors = updateData.colors.split(',').map((c) => c.trim()).filter(Boolean);
+      }
+    }
+    if (typeof updateData.isFreeDelivery === 'string') {
+      updateData.isFreeDelivery = updateData.isFreeDelivery === 'true';
+    }
+
+    if (updateData.categoryName && !updateData.categorySlug) {
+      updateData.categorySlug = slugify(updateData.categoryName, { lower: true, strict: true });
+    }
+    if (updateData.categorySlug) {
+      await prisma.category.upsert({
+        where: { slug: updateData.categorySlug },
+        update: {},
+        create: {
+          name: updateData.categoryName || updateData.categorySlug.replace(/-/g, ' ').toUpperCase(),
+          slug: updateData.categorySlug,
+        },
+      });
+    }
+    delete updateData.categoryName;
 
     const updated = await prisma.product.update({
       where: { id },
@@ -412,18 +594,237 @@ export const updateProduct = async (req, res, next) => {
 /**
  * 5. Delete Product
  * DELETE /api/supplier/products/:id
+ * P0 Security Fix: Enforce strict supplierId ownership check
  */
 export const deleteProduct = async (req, res, next) => {
   try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
     const { id } = req.params;
 
-    await prisma.product.delete({
+    // Security Check: Verify product exists
+    const existing = await prisma.product.findUnique({
       where: { id },
+    });
+
+    if (!existing || existing.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    // Security Check: Enforce supplier ownership (Prevent cross-supplier deletion)
+    if (existing.supplierId && existing.supplierId !== supplierId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to delete another supplier\'s product',
+      });
+    }
+
+    const deletionResult = await prisma.$transaction(async (tx) => {
+      // Clean Cart & Wishlist references first to prevent PostgreSQL P2003 FK crashes
+      await Promise.all([
+        tx.cartItem.deleteMany({ where: { productId: id } }),
+        tx.wishlistItem.deleteMany({ where: { productId: id } }),
+      ]);
+
+      // Preserve historical customer orders by soft-deleting if order items reference this product
+      const orderItemCount = await tx.orderItem.count({ where: { productId: id } });
+      if (orderItemCount > 0) {
+        await tx.product.update({
+          where: { id },
+          data: {
+            isDeleted: true,
+            isActive: false,
+            deletedAt: new Date(),
+          },
+        });
+        return { softDeleted: true };
+      }
+
+      // Clean remaining review relations before hard delete
+      await tx.review.deleteMany({ where: { productId: id } });
+      await tx.product.delete({ where: { id } });
+      return { softDeleted: false };
     });
 
     return res.status(200).json({
       success: true,
-      message: 'Product deleted successfully!',
+      message: deletionResult.softDeleted
+        ? 'Product archived from catalog (existing orders preserved)!'
+        : 'Product deleted successfully!',
+      softDeleted: deletionResult.softDeleted,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 5b. Bulk Update Products (Stock & Price Batch Update)
+ * PATCH /api/supplier/products/bulk
+ */
+export const bulkUpdateProducts = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    const { productIds, action, stockValue, stockMode, priceValue, priceMode } = req.body;
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'productIds array is required and cannot be empty',
+      });
+    }
+
+    // Verify products belong to this supplier
+    const targetProducts = await prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        supplierId,
+        isDeleted: false,
+      },
+    });
+
+    if (targetProducts.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No matching products found for this supplier',
+      });
+    }
+
+    const updatedResults = await prisma.$transaction(async (tx) => {
+      const updates = [];
+
+      for (const prod of targetProducts) {
+        let newStock = prod.stock;
+        let newPrice = prod.price;
+
+        // Stock Updates
+        if (action === 'STOCK' || stockMode) {
+          if (stockMode === 'OUT_OF_STOCK') {
+            newStock = 0;
+          } else if (stockMode === 'SET' && stockValue !== undefined && stockValue !== null && stockValue !== '') {
+            newStock = Math.max(0, parseInt(stockValue, 10));
+          } else if (stockMode === 'ADD' && stockValue !== undefined && stockValue !== null && stockValue !== '') {
+            newStock = Math.max(0, prod.stock + parseInt(stockValue, 10));
+          }
+        }
+
+        // Price Updates
+        if (action === 'PRICE' || priceMode) {
+          if (priceMode === 'SET' && priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            newPrice = Math.max(1, parseFloat(priceValue));
+          } else if (priceMode === 'PERCENT_DISCOUNT' && priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            const pct = Math.min(99, Math.max(1, parseFloat(priceValue)));
+            newPrice = Math.max(1, Math.round(prod.price * (1 - pct / 100)));
+          } else if (priceMode === 'FLAT_DISCOUNT' && priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            const flat = parseFloat(priceValue);
+            newPrice = Math.max(1, Math.round(prod.price - flat));
+          }
+        }
+
+        // Apply update to product
+        const updated = await tx.product.update({
+          where: { id: prod.id },
+          data: {
+            stock: newStock,
+            price: newPrice,
+          },
+        });
+        updates.push(updated);
+      }
+
+      return updates;
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully bulk updated ${updatedResults.length} product(s)!`,
+      count: updatedResults.length,
+      data: updatedResults,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 5c. Bulk Delete Products
+ * POST /api/supplier/products/bulk-delete or DELETE /api/supplier/products/bulk
+ */
+export const bulkDeleteProducts = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    const { productIds } = req.body;
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'productIds array is required and cannot be empty',
+      });
+    }
+
+    // Verify products belong to this supplier
+    const targetProducts = await prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        supplierId,
+        isDeleted: false,
+      },
+      select: { id: true },
+    });
+
+    const validIds = targetProducts.map((p) => p.id);
+    if (validIds.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No matching products found for this supplier',
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Clean cart and wishlist references to prevent foreign key errors
+      await Promise.all([
+        tx.cartItem.deleteMany({ where: { productId: { in: validIds } } }),
+        tx.wishlistItem.deleteMany({ where: { productId: { in: validIds } } }),
+      ]);
+
+      // Soft delete all target products
+      await tx.product.updateMany({
+        where: { id: { in: validIds } },
+        data: {
+          isDeleted: true,
+          isActive: false,
+          deletedAt: new Date(),
+        },
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${validIds.length} product(s)!`,
+      count: validIds.length,
+      deletedIds: validIds,
     });
   } catch (error) {
     next(error);
@@ -475,7 +876,7 @@ export const addCategory = async (req, res, next) => {
 };
 
 /**
- * 7. Get Supplier Orders
+ * 7. Get Supplier Orders (Multi-Vendor Isolated)
  * GET /api/supplier/orders
  */
 export const getSupplierOrders = async (req, res, next) => {
@@ -498,6 +899,7 @@ export const getSupplierOrders = async (req, res, next) => {
       },
       include: {
         items: {
+          where: { product: { supplierId } }, // Isolate: only return THIS supplier's items
           include: { product: true },
         },
         user: {
@@ -507,9 +909,25 @@ export const getSupplierOrders = async (req, res, next) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Scope orderStatus and totalAmount strictly to this supplier's items to avoid multi-vendor collision
+    const scopedOrders = orders.map((ord) => {
+      const supplierTotal = ord.items.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
+        0
+      );
+      const supplierOrderStatus = deriveAggregateOrderStatus(ord.items);
+      return {
+        ...ord,
+        parentOrderStatus: ord.orderStatus,
+        parentTotalAmount: ord.totalAmount,
+        orderStatus: supplierOrderStatus,
+        totalAmount: Math.round(supplierTotal * 100) / 100,
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: orders,
+      data: scopedOrders,
     });
   } catch (error) {
     next(error);
@@ -517,13 +935,22 @@ export const getSupplierOrders = async (req, res, next) => {
 };
 
 /**
- * 8. Update Order Status
+ * 8. Update Order Status (Per-Item + Parent Order Aggregation)
  * PATCH /api/supplier/orders/:id/status
  */
 export const updateOrderStatus = async (req, res, next) => {
   try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
     const { id } = req.params;
-    const { orderStatus } = req.body;
+    const { orderItemId } = req.body;
+    const targetStatus = (req.body.orderStatus || req.body.status || '').toUpperCase();
 
     const allowedStatuses = [
       'ORDERED',
@@ -534,30 +961,113 @@ export const updateOrderStatus = async (req, res, next) => {
       'CANCELLED',
       'RETURN_REQUESTED',
       'RETURNED',
+      'REFUNDED',
     ];
 
-    if (!allowedStatuses.includes(orderStatus)) {
+    if (!allowedStatuses.includes(targetStatus)) {
       return res.status(400).json({
         success: false,
         message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}`,
       });
     }
 
-    const updatedOrder = await prisma.order.update({
+    // Verify order exists and contains items for this supplier
+    const order = await prisma.order.findUnique({
       where: { id },
-      data: { orderStatus },
+      include: {
+        items: {
+          include: {
+            product: { select: { supplierId: true } },
+          },
+        },
+      },
     });
 
-    if (orderStatus === 'OUT_FOR_DELIVERY') {
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const supplierItems = order.items.filter(
+      (item) => item.product?.supplierId === supplierId
+    );
+
+    if (supplierItems.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: "Forbidden: You do not have permission to modify status for another supplier's order",
+      });
+    }
+
+    if (orderItemId) {
+      const ownsTargetItem = supplierItems.some((it) => it.id === orderItemId);
+      if (!ownsTargetItem) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden: Target order item does not belong to your store',
+        });
+      }
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Update ONLY the target item (or all items belonging to this supplier in this order)
+      if (orderItemId) {
+        await tx.orderItem.update({
+          where: { id: orderItemId },
+          data: { itemStatus: targetStatus },
+        });
+      } else {
+        const supplierItemIds = supplierItems.map((it) => it.id);
+        await tx.orderItem.updateMany({
+          where: { id: { in: supplierItemIds } },
+          data: { itemStatus: targetStatus },
+        });
+      }
+
+      // 2. Re-read ALL items in the order (across all suppliers) to derive parent status cleanly
+      const allOrderItems = await tx.orderItem.findMany({
+        where: { orderId: id },
+        include: { product: true },
+      });
+
+      const derivedParentStatus = deriveAggregateOrderStatus(allOrderItems);
+
+      const updatedParentOrder = await tx.order.update({
+        where: { id },
+        data: {
+          orderStatus: derivedParentStatus,
+          ...(derivedParentStatus === 'DELIVERED' ? { paymentStatus: 'PAID' } : {}),
+        },
+      });
+
+      const scopedItems = allOrderItems.filter(
+        (it) => it.product?.supplierId === supplierId
+      );
+      const supplierOrderStatus = deriveAggregateOrderStatus(scopedItems);
+      const supplierTotal = scopedItems.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
+        0
+      );
+
+      return {
+        ...updatedParentOrder,
+        parentOrderStatus: derivedParentStatus,
+        parentTotalAmount: updatedParentOrder.totalAmount,
+        orderStatus: supplierOrderStatus,
+        totalAmount: Math.round(supplierTotal * 100) / 100,
+        items: scopedItems,
+      };
+    });
+
+    if (targetStatus === 'OUT_FOR_DELIVERY') {
       dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' })
-        .then((result) => console.log(`🚚 [Supplier Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${result.sentTo}`))
+        .then((resOtp) => console.log(`🚚 [Supplier Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${resOtp.sentTo}`))
         .catch((err) => console.error(`⚠️ [Supplier Order ${id}] OTP email failed:`, err.message));
     }
 
     return res.status(200).json({
       success: true,
-      message: `Order status updated to ${orderStatus}`,
-      data: updatedOrder,
+      message: `Item status updated to ${targetStatus} (Parent order: ${result.parentOrderStatus})`,
+      data: result,
     });
   } catch (error) {
     next(error);
@@ -620,13 +1130,34 @@ export const getSupplierSettlements = async (req, res, next) => {
       const tds = Math.round(itemTotal * 0.01 * 100) / 100;
       totalDeductions += tds;
 
-      const orderStatus = (item.order?.orderStatus || '').toUpperCase();
-      if (['DELIVERED', 'COMPLETED'].includes(orderStatus)) {
+      const itemStatus = (item.itemStatus || item.order?.orderStatus || '').toUpperCase();
+      if (['DELIVERED', 'COMPLETED'].includes(itemStatus)) {
         settledAmount += (itemTotal - tds);
-      } else if (['SHIPPED', 'CONFIRMED', 'OUT_FOR_DELIVERY', 'ORDERED'].includes(orderStatus)) {
+      } else if (['SHIPPED', 'CONFIRMED', 'OUT_FOR_DELIVERY', 'ORDERED'].includes(itemStatus)) {
         escrowBalance += (itemTotal - tds);
       }
     });
+
+    // 4. Fetch supplier wallet and past withdrawal transactions
+    let wallet = await prisma.wallet.findUnique({
+      where: { userId: supplierId },
+      include: {
+        transactions: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!wallet) {
+      wallet = await prisma.wallet.create({
+        data: { userId: supplierId, balance: 0, pending: 0 },
+        include: { transactions: true },
+      }).catch(() => null);
+    }
+
+    const withdrawalTxns = (wallet?.transactions || []).filter((t) => t.type === 'debit');
+    const totalWithdrawn = withdrawalTxns.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const availableWithdrawable = Math.max(0, Math.round(((settledAmount + escrowBalance) - totalWithdrawn) * 100) / 100);
 
     const now = new Date();
     const daysUntilNextPayout = ((2 - now.getDay() + 7) % 7) || 7;
@@ -637,10 +1168,31 @@ export const getSupplierSettlements = async (req, res, next) => {
       year: 'numeric',
     });
 
-    // 4. Generate Settlement Ledger strictly based on database orders
+    // 5. Generate Settlement Ledger strictly based on database order items and withdrawal transactions
     const settlements = [];
+
+    // Add withdrawal payout requests
+    withdrawalTxns.forEach((t) => {
+      const isPaid = (Date.now() - new Date(t.createdAt).getTime()) > 24 * 60 * 60 * 1000;
+      const utrMatch = t.description?.match(/UTR:\s*([A-Za-z0-9]+)/i);
+      const utrNumber = utrMatch ? utrMatch[1] : `CMS${t.id.slice(0, 9).toUpperCase()}IMPS`;
+      settlements.push({
+        id: `PAYOUT-${t.id.slice(0, 8).toUpperCase()}`,
+        date: new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        ordersCount: 1,
+        grossAmount: t.amount,
+        commissionRate: '0%',
+        tdsAmount: 0,
+        netAmount: t.amount,
+        status: isPaid ? 'PAID' : 'PROCESSING',
+        utrNumber,
+        bankName: profile?.bankDetails?.bankName || 'Registered Bank Account',
+        type: 'MANUAL_WITHDRAWAL',
+      });
+    });
+
     if (orderItems.length > 0) {
-      const deliveredItems = orderItems.filter((i) => i.order?.orderStatus === 'DELIVERED');
+      const deliveredItems = orderItems.filter((i) => (i.itemStatus || i.order?.orderStatus) === 'DELIVERED');
       if (deliveredItems.length > 0) {
         const batchGross = deliveredItems.reduce((acc, i) => acc + ((i.price || 0) * (i.quantity || 1)), 0);
         const batchTds = Math.round(batchGross * 0.01 * 100) / 100;
@@ -655,11 +1207,12 @@ export const getSupplierSettlements = async (req, res, next) => {
           status: 'PAID',
           utrNumber: `CMS${Date.now().toString().slice(-9)}NEFT`,
           bankName: profile?.bankDetails?.bankName || 'Registered Bank Account',
+          type: 'AUTOMATED_BATCH',
         });
       }
 
       if (escrowBalance > 0) {
-        const pendingItems = orderItems.filter((i) => i.order?.orderStatus !== 'DELIVERED');
+        const pendingItems = orderItems.filter((i) => ['SHIPPED', 'CONFIRMED', 'OUT_FOR_DELIVERY', 'ORDERED'].includes(i.itemStatus || i.order?.orderStatus));
         settlements.push({
           id: `STL-PENDING-${now.getFullYear()}${now.getMonth() + 1}`,
           date: nextPayoutDateStr,
@@ -671,6 +1224,7 @@ export const getSupplierSettlements = async (req, res, next) => {
           status: 'PROCESSING',
           utrNumber: 'Awaiting Bank Settlement Cycle',
           bankName: profile?.bankDetails?.bankName || 'Registered Bank Account',
+          type: 'ESCROW_TRANSIT',
         });
       }
     }
@@ -680,7 +1234,9 @@ export const getSupplierSettlements = async (req, res, next) => {
       data: {
         lifetimeSettled: Math.round(settledAmount * 100) / 100,
         escrowBalance: Math.round(escrowBalance * 100) / 100,
-        nextPayoutAmount: Math.round(escrowBalance * 100) / 100,
+        nextPayoutAmount: availableWithdrawable,
+        availableWithdrawable,
+        totalWithdrawn: Math.round(totalWithdrawn * 100) / 100,
         nextPayoutDate: nextPayoutDateStr,
         totalRevenue: Math.round(grossRevenue * 100) / 100,
         totalDeductions: Math.round(totalDeductions * 100) / 100,
@@ -713,7 +1269,7 @@ export const getSupplierAnalytics = async (req, res, next) => {
 
     const [products, orderItems] = await Promise.all([
       prisma.product.findMany({
-        where: { supplierId },
+        where: { supplierId, isDeleted: false },
         select: { id: true, title: true, price: true, stock: true, categorySlug: true, images: true },
       }),
       prisma.orderItem.findMany({
@@ -726,10 +1282,10 @@ export const getSupplierAnalytics = async (req, res, next) => {
     ]);
 
     const totalOrdersCount = orderItems.length;
-    const deliveredCount = orderItems.filter((i) => i.order?.orderStatus === 'DELIVERED').length;
-    const shippedCount = orderItems.filter((i) => ['SHIPPED', 'OUT_FOR_DELIVERY'].includes(i.order?.orderStatus)).length;
-    const pendingCount = orderItems.filter((i) => ['ORDERED', 'CONFIRMED'].includes(i.order?.orderStatus)).length;
-    const returnCount = orderItems.filter((i) => ['CANCELLED', 'RETURN_REQUESTED', 'RETURNED'].includes(i.order?.orderStatus)).length;
+    const deliveredCount = orderItems.filter((i) => (i.itemStatus || i.order?.orderStatus) === 'DELIVERED').length;
+    const shippedCount = orderItems.filter((i) => ['SHIPPED', 'OUT_FOR_DELIVERY'].includes(i.itemStatus || i.order?.orderStatus)).length;
+    const pendingCount = orderItems.filter((i) => ['ORDERED', 'CONFIRMED'].includes(i.itemStatus || i.order?.orderStatus)).length;
+    const returnCount = orderItems.filter((i) => ['CANCELLED', 'RETURN_REQUESTED', 'RETURNED', 'REFUNDED'].includes(i.itemStatus || i.order?.orderStatus)).length;
 
     const totalSales = orderItems.reduce((acc, i) => acc + ((i.price || 0) * (i.quantity || 1)), 0);
     const avgOrderValue = totalOrdersCount > 0 ? Math.round(totalSales / totalOrdersCount) : 0;
@@ -828,6 +1384,529 @@ export const getSupplierAnalytics = async (req, res, next) => {
       },
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 11. Download Tax Invoice PDF
+ * GET /api/supplier/orders/:id/invoice
+ */
+export const downloadOrderInvoice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          where: { product: { supplierId } }, // Only this supplier's items on their invoice
+          include: {
+            product: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Verify supplier ownership of this order
+    if (!order.items || order.items.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to download another supplier\'s invoice',
+      });
+    }
+
+    let supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Invoice-${order.id.slice(0, 8).toUpperCase()}.pdf"`);
+
+    const pdfDoc = generateOrderPdf(order, supplierProfile, 'invoice');
+    pdfDoc.pipe(res);
+  } catch (error) {
+    console.error('Error generating invoice PDF:', error);
+    next(error);
+  }
+};
+
+/**
+ * 12. Download 4x6 Shipping Label PDF
+ * GET /api/supplier/orders/:id/shipping-label
+ */
+export const downloadShippingLabel = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Supplier session missing' });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          where: { product: { supplierId } }, // Only this supplier's items on their shipping label
+          include: {
+            product: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Verify supplier ownership of this order
+    if (!order.items || order.items.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to download another supplier\'s shipping label',
+      });
+    }
+
+    let supplierProfile = await prisma.profile.findUnique({ where: { id: supplierId } }).catch(() => null);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="ShippingLabel-${order.id.slice(0, 8).toUpperCase()}.pdf"`);
+
+    const pdfDoc = generateOrderPdf(order, supplierProfile, 'label');
+    pdfDoc.pipe(res);
+  } catch (error) {
+    console.error('Error generating shipping label PDF:', error);
+    next(error);
+  }
+};
+
+/**
+ * 13. Get Supplier Returns & RTO Hub Data
+ * GET /api/supplier/returns
+ */
+export const getSupplierReturns = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    // 1. Fetch order items for this supplier
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        product: { supplierId },
+      },
+      include: {
+        product: true,
+        order: {
+          include: {
+            user: {
+              select: { id: true, fullName: true, email: true, phone: true },
+            },
+            returnRequest: true,
+          },
+        },
+      },
+      orderBy: {
+        order: { createdAt: 'desc' },
+      },
+    });
+
+    const totalOrdersCount = orderItems.length;
+
+    // Filter to return-related items (checking per-item status first)
+    const returnItems = orderItems.filter((item) => {
+      const ord = item.order;
+      if (!ord) return false;
+      const status = (item.itemStatus || ord.orderStatus || '').toUpperCase();
+      return (
+        ord.returnRequest !== null ||
+        status.includes('RETURN') ||
+        status === 'CANCELLED' ||
+        status.includes('RTO') ||
+        status === 'REFUNDED'
+      );
+    });
+
+    // Normalize and enrich each return entry
+    const returns = returnItems.map((item) => {
+      const ord = item.order;
+      const retReq = ord.returnRequest;
+      const itemStatus = (item.itemStatus || ord.orderStatus || '').toUpperCase();
+      const isCancelled = itemStatus === 'CANCELLED';
+
+      let rtoStatus = 'REQUESTED';
+      if (retReq?.status) {
+        rtoStatus = retReq.status.toUpperCase();
+      } else if (itemStatus === 'RETURNED' || itemStatus === 'REFUNDED' || itemStatus === 'RTO_DELIVERED') {
+        rtoStatus = 'REFUNDED';
+      } else if (isCancelled) {
+        rtoStatus = 'CANCELLED';
+      }
+
+      let parsedShipping = {};
+      if (typeof ord.shippingAddress === 'string') {
+        try {
+          parsedShipping = JSON.parse(ord.shippingAddress);
+        } catch (_) {}
+      } else if (ord.shippingAddress) {
+        parsedShipping = ord.shippingAddress;
+      }
+
+      let proofImages = [];
+      if (Array.isArray(retReq?.images)) {
+        proofImages = retReq.images;
+      } else if (typeof retReq?.images === 'string') {
+        try {
+          proofImages = JSON.parse(retReq.images);
+        } catch (_) {
+          proofImages = retReq.images.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+      }
+
+      return {
+        id: retReq?.id || `ret_${item.id}`,
+        orderItemId: item.id,
+        returnRequestId: retReq?.id || null,
+        orderId: ord.id,
+        orderStatus: itemStatus,
+        rtoStatus,
+        reason: retReq?.reason || (isCancelled ? 'Order cancelled before delivery' : 'Customer return requested'),
+        customerReason: retReq?.reason || (isCancelled ? 'Order cancelled by customer before delivery' : 'Customer doorstep return initiated'),
+        images: proofImages,
+        proofImages: proofImages,
+        hasCustomerProof: proofImages.length > 0,
+        claimType: retReq ? 'CUSTOMER_RETURN' : (isCancelled ? 'COURIER_CANCELLED' : 'COURIER_RTO'),
+        createdAt: retReq?.createdAt || ord.updatedAt || ord.createdAt,
+        totalAmount: (item.price || 0) * (item.quantity || 1),
+        product: {
+          id: item.product?.id,
+          title: item.product?.title || 'E-Commerce Item',
+          price: item.price || 0,
+          quantity: item.quantity || 1,
+          image: Array.isArray(item.product?.images) ? item.product.images[0] : null,
+          category: item.product?.categorySlug,
+        },
+        customer: {
+          name: parsedShipping.fullName || parsedShipping.name || ord.user?.name || 'Customer',
+          phone: parsedShipping.phone || ord.user?.phone || 'N/A',
+          city: parsedShipping.city || 'N/A',
+          state: parsedShipping.state || 'N/A',
+        },
+        awb: parsedShipping.awb || `RTO${ord.id.slice(0, 8).toUpperCase()}`,
+        courier: parsedShipping.courier || 'Delhivery Surface Reverse',
+      };
+    });
+
+    const pendingCount = returns.filter((r) => ['REQUESTED', 'APPROVED'].includes(r.rtoStatus)).length;
+    const completedCount = returns.filter((r) => ['PICKED_UP', 'REFUNDED'].includes(r.rtoStatus)).length;
+    const returnRate = totalOrdersCount > 0 ? Math.round((returns.length / totalOrdersCount) * 100) : 0;
+    const returnLossAmount = returns.reduce((acc, r) => acc + (r.totalAmount || 0), 0);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        stats: {
+          totalReturns: returns.length,
+          pendingAction: pendingCount,
+          completedReturns: completedCount,
+          returnRate: `${returnRate}%`,
+          returnLossAmount,
+        },
+        returns,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 14. Update Return / RTO Status
+ * PATCH /api/supplier/returns/:id/status
+ */
+export const updateReturnStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, disputeReason } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ success: false, message: 'Status is required' });
+    }
+
+    const cleanId = typeof id === 'string' && id.startsWith('ret_') ? id.replace('ret_', '') : id;
+
+    // Try finding ReturnRequest by id or orderId
+    let returnReq = await prisma.returnRequest.findUnique({
+      where: { id: cleanId },
+    }).catch(() => null);
+
+    if (!returnReq) {
+      returnReq = await prisma.returnRequest.findUnique({
+        where: { orderId: cleanId },
+      }).catch(() => null);
+    }
+
+    // Check if cleanId is an orderItemId
+    let orderItemId = null;
+    if (!returnReq) {
+      const item = await prisma.orderItem.findUnique({
+        where: { id: cleanId },
+        include: { order: { include: { returnRequest: true } } },
+      }).catch(() => null);
+      if (item) {
+        orderItemId = item.id;
+        returnReq = item.order?.returnRequest;
+      }
+    }
+
+    const normalizedStatus = status.toLowerCase();
+
+    if (returnReq) {
+      const updateData = { status: normalizedStatus };
+      if (disputeReason && typeof disputeReason === 'string' && disputeReason.trim()) {
+        updateData.reason = `${returnReq.reason} | [Supplier Dispute]: ${disputeReason.trim()}`;
+      }
+
+      const updated = await prisma.returnRequest.update({
+        where: { id: returnReq.id },
+        data: updateData,
+      });
+
+      // Update OrderItem itemStatus and aggregate Order status
+      const itemStatusMap = {
+        approved: 'RETURN_APPROVED',
+        refunded: 'RETURNED',
+        rejected: 'RETURN_REJECTED',
+        disputed: 'DISPUTED',
+      };
+      const newItemStatus = itemStatusMap[normalizedStatus] || 'RETURNED';
+
+      await prisma.orderItem.updateMany({
+        where: { orderId: returnReq.orderId },
+        data: { itemStatus: newItemStatus },
+      }).catch(() => null);
+
+      await prisma.order.update({
+        where: { id: returnReq.orderId },
+        data: { orderStatus: newItemStatus },
+      }).catch(() => null);
+
+      return res.status(200).json({
+        success: true,
+        message: `Return claim status updated to ${status}`,
+        data: updated,
+      });
+    }
+
+    // Fallback: update Order directly if ReturnRequest record doesn't exist
+    const order = await prisma.order.findUnique({ where: { id: cleanId } }).catch(() => null);
+    if (order) {
+      const newStatus = status.toUpperCase();
+      const updatedOrder = await prisma.order.update({
+        where: { id: order.id },
+        data: { orderStatus: newStatus },
+      });
+      await prisma.orderItem.updateMany({
+        where: { orderId: order.id },
+        data: { itemStatus: newStatus },
+      }).catch(() => null);
+
+      return res.status(200).json({
+        success: true,
+        message: `Order return status updated to ${status}`,
+        data: updatedOrder,
+      });
+    }
+
+    if (orderItemId) {
+      await prisma.orderItem.update({
+        where: { id: orderItemId },
+        data: { itemStatus: status.toUpperCase() },
+      }).catch(() => null);
+
+      return res.status(200).json({
+        success: true,
+        message: `Return item status updated to ${status}`,
+      });
+    }
+
+    return res.status(404).json({ success: false, message: 'Return record not found' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 15. Request Supplier Payout / Escrow Withdrawal
+ * POST /api/supplier/finance-settlements/withdraw
+ * POST /api/supplier/request-payout
+ */
+export const requestSupplierPayout = async (req, res, next) => {
+  try {
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Supplier session missing',
+      });
+    }
+
+    // 1. Fetch Profile and verified Bank Details
+    const profile = await prisma.profile.findUnique({
+      where: { id: supplierId },
+      select: {
+        id: true,
+        fullName: true,
+        storeName: true,
+        bankDetails: true,
+      },
+    });
+
+    if (!profile) {
+      return res.status(404).json({ success: false, message: 'Supplier profile not found' });
+    }
+
+    const bank = profile.bankDetails;
+    if (!bank || !bank.accountNumber || !bank.ifsc) {
+      return res.status(400).json({
+        success: false,
+        message: 'No verified bank account found. Please register your Bank Account Number & IFSC before requesting a payout.',
+      });
+    }
+
+    const { amount, payoutType = 'ON_DEMAND', notes } = req.body;
+    const numAmount = parseFloat(amount);
+
+    if (!numAmount || isNaN(numAmount) || numAmount < 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Minimum payout withdrawal amount is ₹100.00',
+      });
+    }
+
+    // 2. Fetch order items to calculate live real balance
+    const orderItems = await prisma.orderItem.findMany({
+      where: { product: { supplierId } },
+      include: { order: true },
+    });
+
+    let settledAmount = 0;
+    let escrowBalance = 0;
+
+    orderItems.forEach((item) => {
+      const itemTotal = (item.price || 0) * (item.quantity || 1);
+      const tds = Math.round(itemTotal * 0.01 * 100) / 100;
+      const net = itemTotal - tds;
+
+      const itemStatus = (item.itemStatus || item.order?.orderStatus || '').toUpperCase();
+      if (['DELIVERED', 'COMPLETED'].includes(itemStatus)) {
+        settledAmount += net;
+      } else if (['SHIPPED', 'CONFIRMED', 'OUT_FOR_DELIVERY', 'ORDERED'].includes(itemStatus)) {
+        escrowBalance += net;
+      }
+    });
+
+    // 3. Fetch past withdrawal transactions
+    let wallet = await prisma.wallet.findUnique({
+      where: { userId: supplierId },
+      include: { transactions: true },
+    });
+
+    if (!wallet) {
+      wallet = await prisma.wallet.create({
+        data: { userId: supplierId, balance: 0, pending: 0 },
+        include: { transactions: true },
+      });
+    }
+
+    const pastWithdrawals = (wallet.transactions || [])
+      .filter((t) => t.type === 'debit')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const maxEligible = Math.max(0, Math.round(((settledAmount + escrowBalance) - pastWithdrawals) * 100) / 100);
+
+    if (numAmount > maxEligible) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient balance for payout. Available: ₹${maxEligible.toLocaleString('en-IN')}, Requested: ₹${numAmount.toLocaleString('en-IN')}`,
+        availableBalance: maxEligible,
+      });
+    }
+
+    // 4. Atomic transaction to create payout withdrawal record
+    const utrRef = `CMS${Date.now().toString().slice(-8)}IMPS`;
+    const maskedAcc = `•••• ${String(bank.accountNumber).slice(-4)}`;
+    const destinationStr = `${bank.bankName || 'Bank Account'} (${maskedAcc}, IFSC: ${bank.ifsc})`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Create debit record in WalletTransaction
+      const txn = await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: numAmount,
+          type: 'debit',
+          description: `Payout Request to ${destinationStr} | UTR: ${utrRef} | Type: ${payoutType}`,
+        },
+      });
+
+      // Update wallet pending / balance counters
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          pending: { increment: numAmount },
+        },
+      });
+
+      // Create notification for supplier
+      await tx.notification.create({
+        data: {
+          userId: supplierId,
+          title: 'Payout Withdrawal Initiated! 🏦',
+          body: `Your payout request of ₹${numAmount.toLocaleString('en-IN')} has been initiated to ${destinationStr}. Reference: ${utrRef}`,
+          type: 'earning',
+          data: {
+            txnId: txn.id,
+            amount: numAmount,
+            utr: utrRef,
+            bank: destinationStr,
+          },
+        },
+      }).catch(() => {});
+
+      return txn;
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Payout request of ₹${numAmount.toLocaleString('en-IN')} initiated successfully to ${destinationStr}!`,
+      data: {
+        payoutId: result.id,
+        amount: numAmount,
+        utrNumber: utrRef,
+        bankDetails: {
+          bankName: bank.bankName,
+          accountNumber: maskedAcc,
+          ifsc: bank.ifsc,
+          beneficiaryName: bank.beneficiaryName || profile.fullName,
+        },
+        status: 'PROCESSING',
+        date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      },
+    });
+  } catch (error) {
+    console.error('Error requesting supplier payout:', error);
     next(error);
   }
 };

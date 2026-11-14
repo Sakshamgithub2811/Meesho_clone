@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import supabase from '../../config/supabaseClient.js';
-const prisma = new PrismaClient();
+import prisma from '../../config/prisma.js';
 
 /**
  * 1. GET DROPSHIPPER PROFILE

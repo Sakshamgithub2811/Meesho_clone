@@ -212,7 +212,7 @@ export default function NavDrawer({ isOpen, onClose, role = 'reseller', isCustom
               onClose();
               try { await signOut(auth); } catch (e) {}
               logoutCustomer();
-              navigate('/user-login');
+              navigate('/user/login');
             }}
             className="text-xs font-semibold text-[#FF3F6C] hover:underline cursor-pointer"
           >

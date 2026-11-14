@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
 import { getStoredAffiliate, logoutAffiliate, subscribeAffiliateAuth, getAffiliateStats, fetchAffiliateStats } from '../../services/affiliateAuthService';
-import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import { getAffiliateApp, saveAffiliateApp } from '../../services/affiliateSessionStore';
 import { getStoredCustomer } from '../../services/customerAuthService';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
 import { getUnreadCount, subscribeNotifications } from '../../services/notificationService';
 import { getWalletDetails } from '../../services/ecommerceService';
+import { API_V1_BASE } from '../../config/apiConfig';
 
 // Helper to initialize clean stats
 function getResolvedPartnerStats() {
@@ -35,39 +36,84 @@ export default function AffiliateProgramPanel() {
 
   // KYC Access Guard: User must have Approved KYC to access this panel
   useEffect(() => {
-    const customer = getStoredCustomer()?.user;
-    const app = getAffiliateApp();
-    const storedUser = affiliateSession?.user;
+    let isMounted = true;
+    const verifyAndGuard = async () => {
+      const customer = getStoredCustomer()?.user;
+      let app = getAffiliateApp();
+      const storedUser = affiliateSession?.user;
 
-    // Strict ownership check: prevent other users' leftover affiliate sessions
-    if (customer) {
-      if (app && app.userId && app.userId !== customer.id) {
-        logoutAffiliate();
-        navigate('/affiliate-kyc', { replace: true });
-        return;
+      // Strict ownership check: prevent other users' leftover affiliate sessions
+      if (customer) {
+        if (app && app.userId && app.userId !== customer.id) {
+          logoutAffiliate();
+          navigate('/affiliate-kyc', { replace: true });
+          return;
+        }
+        if (
+          storedUser &&
+          storedUser.id &&
+          storedUser.id !== `affiliate_${customer.phone}` &&
+          storedUser.email !== customer.email &&
+          storedUser.id !== customer.id
+        ) {
+          logoutAffiliate();
+          navigate('/affiliate-kyc', { replace: true });
+          return;
+        }
       }
-      if (
-        storedUser &&
-        storedUser.id &&
-        storedUser.id !== `affiliate_${customer.phone}` &&
-        storedUser.email !== customer.email &&
-        storedUser.id !== customer.id
-      ) {
-        logoutAffiliate();
-        navigate('/affiliate-kyc', { replace: true });
-        return;
+
+      // Live verification with PostgreSQL database to prevent stale localStorage cache kickout
+      try {
+        const curId = customer?.id || customer?.uid;
+        const curPhone = customer?.phone;
+        const curEmail = customer?.email;
+        if (curId || curPhone || curEmail) {
+          const queryParams = [];
+          if (curId) queryParams.push(`userId=${encodeURIComponent(curId)}`);
+          if (curPhone) queryParams.push(`phone=${encodeURIComponent(curPhone)}`);
+          if (curEmail) queryParams.push(`email=${encodeURIComponent(curEmail)}`);
+          const res = await fetch(`${API_V1_BASE}/admin-kyc/affiliate-status?${queryParams.join('&')}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (isMounted && data?.application) {
+              const dbApp = data.application;
+              const isDbApproved = dbApp.status === 'APPROVED';
+              const isDbRejected = dbApp.status === 'REJECTED';
+              const currentStatus = isDbApproved ? 'Approved' : isDbRejected ? 'Rejected' : 'Under Review';
+              const updated = {
+                ...(dbApp.documents || {}),
+                id: dbApp.id,
+                dbId: dbApp.id,
+                applicationId: dbApp.documents?.applicationId || dbApp.id,
+                fullName: dbApp.documents?.fullName || dbApp.user?.fullName || '',
+                status: currentStatus,
+                kycStatus: isDbApproved ? 'Approved' : isDbRejected ? 'Rejected' : 'Pending',
+                rejectionReason: dbApp.adminNotes || '',
+                userId: dbApp.userId,
+              };
+              saveAffiliateApp(updated);
+              app = updated;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('KYC live verification in panel error:', e);
       }
-    }
 
-    const currentStatus = app?.status || app?.kycStatus || storedUser?.kycStatus;
+      if (!isMounted) return;
 
-    if (!app && (!storedUser || storedUser?.kycStatus === 'NOT_SUBMITTED' || !storedUser?.kycStatus)) {
-      navigate('/affiliate-kyc', { replace: true });
-    } else if (currentStatus === 'Under Review' || currentStatus === 'Pending' || currentStatus === 'PENDING') {
-      navigate('/affiliate-kyc-status', { replace: true });
-    } else if (currentStatus === 'Rejected' || currentStatus === 'REJECTED') {
-      navigate('/affiliate-kyc-status', { replace: true });
-    }
+      const currentStatus = app?.status || app?.kycStatus || storedUser?.kycStatus;
+      if (!app && (!storedUser || storedUser?.kycStatus === 'NOT_SUBMITTED' || !storedUser?.kycStatus)) {
+        navigate('/affiliate-kyc', { replace: true });
+      } else if (currentStatus === 'Under Review' || currentStatus === 'Pending' || currentStatus === 'PENDING') {
+        navigate('/affiliate-kyc-status', { replace: true });
+      } else if (currentStatus === 'Rejected' || currentStatus === 'REJECTED') {
+        navigate('/affiliate-kyc-status', { replace: true });
+      }
+    };
+
+    verifyAndGuard();
+    return () => { isMounted = false; };
   }, [affiliateSession, navigate]);
 
   const [unreadNotifs, setUnreadNotifs] = useState(() => getUnreadCount());

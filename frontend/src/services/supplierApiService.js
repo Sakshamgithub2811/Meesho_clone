@@ -273,11 +273,23 @@ export async function createSupplierProduct(payload) {
   return data.data;
 }
 
-// Update Product
+// Update Product (Supports FormData with uploaded images or standard JSON)
 export async function updateSupplierProduct(productId, updateData) {
+  let body;
+  let headers = {};
+
+  if (updateData instanceof FormData) {
+    body = updateData;
+    // Let browser set multipart boundary
+  } else {
+    body = JSON.stringify(updateData);
+    headers['Content-Type'] = 'application/json';
+  }
+
   const data = await request(`/supplier/products/${productId}`, {
     method: 'PUT',
-    body: JSON.stringify(updateData),
+    headers,
+    body,
   });
   return data.data;
 }
@@ -287,6 +299,26 @@ export async function deleteSupplierProduct(productId) {
   return request(`/supplier/products/${productId}`, {
     method: 'DELETE',
   });
+}
+
+// Bulk Update Products (Stock or Price)
+export async function bulkUpdateSupplierProducts(payload) {
+  const data = await request('/supplier/products/bulk', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return data;
+}
+
+// Bulk Delete Products
+export async function bulkDeleteSupplierProducts(productIds) {
+  const data = await request('/supplier/products/bulk-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productIds }),
+  });
+  return data;
 }
 
 // Get Categories
@@ -310,11 +342,13 @@ export async function fetchSupplierOrders() {
   return data.data || [];
 }
 
-// Update Order Status
-export async function updateOrderStatus(orderId, orderStatus) {
+// Update Order Status (supports optional item-level targeting)
+export async function updateOrderStatus(orderId, orderStatus, orderItemId = null) {
+  const payload = { orderStatus };
+  if (orderItemId) payload.orderItemId = orderItemId;
   const data = await request(`/supplier/orders/${orderId}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ orderStatus }),
+    body: JSON.stringify(payload),
   });
   return data.data;
 }
@@ -325,10 +359,44 @@ export async function fetchSupplierSettlements() {
   return data.data;
 }
 
+// Request Escrow / Settled Payout Withdrawal to Registered Bank Account
+export async function requestSupplierPayout(amount, notes = '') {
+  const data = await request('/supplier/finance-settlements/withdraw', {
+    method: 'POST',
+    body: JSON.stringify({ amount, notes }),
+  });
+  return data;
+}
+
 // Get Supplier Analytics & Performance
 export async function fetchSupplierAnalytics() {
   const data = await request('/supplier/analytics');
   return data.data;
+}
+
+export function downloadOrderInvoice(orderId) {
+  const token = getAuthToken();
+  const url = `${API_BASE_URL}/supplier/orders/${orderId}/invoice${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  window.open(url, '_blank');
+}
+
+export function downloadShippingLabel(orderId) {
+  const token = getAuthToken();
+  const url = `${API_BASE_URL}/supplier/orders/${orderId}/shipping-label${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  window.open(url, '_blank');
+}
+
+export async function fetchSupplierReturns() {
+  const data = await request('/supplier/returns');
+  return data.data;
+}
+
+export async function updateReturnStatus(id, status, extra = {}) {
+  const data = await request(`/supplier/returns/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, ...extra }),
+  });
+  return data;
 }
 
 export default {
@@ -353,10 +421,17 @@ export default {
   createSupplierProduct,
   updateSupplierProduct,
   deleteSupplierProduct,
+  bulkUpdateSupplierProducts,
+  bulkDeleteSupplierProducts,
   fetchCategories,
   createCategory,
   fetchSupplierOrders,
   updateOrderStatus,
   fetchSupplierSettlements,
+  requestSupplierPayout,
   fetchSupplierAnalytics,
+  downloadOrderInvoice,
+  downloadShippingLabel,
+  fetchSupplierReturns,
+  updateReturnStatus,
 };

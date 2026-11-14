@@ -11,6 +11,8 @@ export const getActiveBanners = async (req, res) => {
       orderBy: { displayOrder: 'asc' },
     });
 
+    // High performance Vercel Edge caching header for sub-300ms banner delivery
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=900, stale-while-revalidate=1800');
     return res.status(200).json({
       success: true,
       count: liveBanners.length,

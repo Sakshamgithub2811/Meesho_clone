@@ -1,6 +1,7 @@
 import prisma from '../config/prisma.js';
 import transporter from '../config/emailTransporter.js';
 import { calculateCouponDiscount } from './coupon.controller.js';
+import { sendOrderConfirmationEmail } from '../utils/emailTemplates.js';
 
 const getUserId = (req) => {
   return req.user?.id || req.headers['x-user-id'] || req.query.userId || 'guest_customer';
@@ -57,6 +58,8 @@ export const createOrder = async (req, res) => {
 
     let parsedShippingAddress = typeof shippingAddress === 'string' ? JSON.parse(shippingAddress) : shippingAddress;
 
+    const incomingEmail = (req.body.customerEmail || req.headers['x-user-email'] || req.user?.email || parsedShippingAddress?.email || '').trim();
+
     if (parsedShippingAddress) {
       const name = (parsedShippingAddress.name || parsedShippingAddress.fullName || '').trim();
       const phone = (parsedShippingAddress.phone || parsedShippingAddress.mobileNumber || '').trim();
@@ -67,13 +70,19 @@ export const createOrder = async (req, res) => {
         name: name || 'Valued Customer',
         phone,
         details,
-        pincode
+        pincode,
+        ...(incomingEmail && incomingEmail.includes('@') ? { email: incomingEmail } : {})
       };
 
-      if (name) {
+      const profileUpdates = {};
+      if (name) profileUpdates.fullName = name;
+      if (incomingEmail && incomingEmail.includes('@') && !incomingEmail.endsWith('@customer.meesho')) {
+        profileUpdates.email = incomingEmail.toLowerCase();
+      }
+      if (Object.keys(profileUpdates).length > 0) {
         await prisma.profile.update({
           where: { id: userId },
-          data: { fullName: name }
+          data: profileUpdates
         }).catch(() => {});
       }
     }
@@ -154,7 +163,8 @@ export const createOrder = async (req, res) => {
               productId: item.productId,
               quantity: item.quantity,
               price: item.price,
-              size: item.size
+              size: item.size,
+              itemStatus: 'ORDERED'
             }))
           }
         },
@@ -163,7 +173,8 @@ export const createOrder = async (req, res) => {
             include: {
               product: true
             }
-          }
+          },
+          user: true
         }
       });
 
@@ -259,6 +270,32 @@ export const createOrder = async (req, res) => {
       } catch (affiliateErr) {
         console.warn('Affiliate commission credit note:', affiliateErr.message);
       }
+    }
+
+    // 6. Asynchronously dispatch branded Order Confirmation Email to the customer
+    let recipientEmail = incomingEmail;
+    if (!recipientEmail || recipientEmail.endsWith('@customer.meesho')) {
+      recipientEmail = order?.user?.email || (typeof parsedShippingAddress === 'object' ? parsedShippingAddress?.email : null);
+    }
+    const recipientName = (typeof parsedShippingAddress === 'object' ? parsedShippingAddress?.name : null) || order?.user?.fullName || 'Valued Customer';
+
+    const origin = req.headers['origin'] || req.headers['referer'] || '';
+    const clientBase = (origin.includes('vercel.app') || !origin.includes('localhost'))
+      ? 'https://meesho-clone-nu.vercel.app'
+      : (origin ? origin.replace(/\/+$/, '') : 'https://meesho-clone-nu.vercel.app');
+    const trackingUrl = `${clientBase}/user-dashboard1?tab=orders${order?.id ? `&orderId=${order.id}` : ''}`;
+
+    // 6. Await dispatch of branded Order Confirmation Email so Vercel Serverless doesn't terminate before SMTP completes
+    try {
+      const emailResult = await sendOrderConfirmationEmail({
+        order,
+        email: recipientEmail || undefined,
+        name: recipientName || undefined,
+        trackingUrl
+      });
+      console.log('📧 Order confirmation dispatch outcome:', emailResult);
+    } catch (emailErr) {
+      console.warn('⚠️ Order confirmation email non-fatal notice:', emailErr.message);
     }
 
     return res.status(201).json({
@@ -392,6 +429,12 @@ export const cancelOrder = async (req, res) => {
       }
     });
 
+    // Mark all items as CANCELLED
+    await prisma.orderItem.updateMany({
+      where: { orderId: id },
+      data: { itemStatus: 'CANCELLED' }
+    }).catch(() => {});
+
     // If order was PAID (online/wallet), automatically refund to User's Wallet!
     if (existing.paymentStatus === 'PAID') {
       try {
@@ -484,6 +527,23 @@ export const updateOrderStatus = async (req, res) => {
         }
       }
     });
+
+    // Auto-dispatch confirmation email if status is updated to CONFIRMED
+    if (upperStatus === 'CONFIRMED') {
+      const origin = req.headers['origin'] || req.headers['referer'] || '';
+      const clientBase = (origin.includes('vercel.app') || !origin.includes('localhost'))
+        ? 'https://meesho-clone-nu.vercel.app'
+        : (origin ? origin.replace(/\/+$/, '') : 'https://meesho-clone-nu.vercel.app');
+      const trackingUrl = `${clientBase}/user-dashboard1?tab=orders${updated?.id ? `&orderId=${updated.id}` : ''}`;
+      try {
+        await Promise.race([
+          sendOrderConfirmationEmail({ order: updated, trackingUrl }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Email dispatch timeout (6s)')), 6000))
+        ]);
+      } catch (err) {
+        console.warn(`⚠️ [Order ${id}] CONFIRMED status email dispatch notice:`, err.message);
+      }
+    }
 
     // Auto-dispatch delivery OTP email as soon as marked OUT_FOR_DELIVERY
     if (upperStatus === 'OUT_FOR_DELIVERY') {

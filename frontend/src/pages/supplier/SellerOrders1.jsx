@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import LogoutConfirmDialog from '../../components/ui/LogoutConfirmDialog';
@@ -24,9 +24,23 @@ import {
   MapPin,
   Calendar,
   AlertCircle,
-  Printer
+  Printer,
+  Volume2,
+  VolumeX,
+  Radio,
+  Sparkles,
+  BellRing,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import OrderPrintSlipModal from '../../components/admin/orders/OrderPrintSlipModal';
+import {
+  playOrderChime,
+  playTestChime,
+  isSoundAlertEnabled,
+  setSoundAlertEnabled
+} from '../../utils/orderSoundChime';
+import { exportOrdersToCsv } from '../../utils/csvExport';
 
 const STATUS_OPTIONS = [
   { id: 'ALL', label: 'All Orders' },
@@ -37,7 +51,7 @@ const STATUS_OPTIONS = [
   { id: 'CANCELLED', label: 'Cancelled' },
 ];
 
-export default function SellerOrders1({ onNavigate }) {
+export default function SellerOrders1({ onNavigate, embedded = false, onNavigateTab }) {
   const navigate = useNavigate();
 
   const handleNav = useCallback((path) => {
@@ -58,11 +72,19 @@ export default function SellerOrders1({ onNavigate }) {
   const [printOrder, setPrintOrder] = useState(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // Load real orders from backend
-  const loadOrders = useCallback(async (isRefresh = false) => {
+  // Real-Time Radar & Sound Chime Alert States
+  const [soundEnabled, setSoundEnabled] = useState(isSoundAlertEnabled);
+  const [radarActive, setRadarActive] = useState(true);
+  const [lastRadarPing, setLastRadarPing] = useState(null);
+  const [newlyArrivedIds, setNewlyArrivedIds] = useState(new Set());
+  const knownOrderIdsRef = useRef(new Set());
+  const isFirstLoadRef = useRef(true);
+
+  // Load real orders from backend (supports manual refresh & silent radar polling)
+  const loadOrders = useCallback(async (isRefresh = false, isSilentRadar = false) => {
     try {
       if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+      else if (!isSilentRadar) setLoading(true);
 
       const [ordersRes, profRes] = await Promise.allSettled([
         supplierApiService.fetchSupplierOrders(),
@@ -74,14 +96,57 @@ export default function SellerOrders1({ onNavigate }) {
           ordersRes.value.data ||
           ordersRes.value.orders ||
           (Array.isArray(ordersRes.value) ? ordersRes.value : []);
+
+        // Check for new incoming orders during radar ping
+        if (isFirstLoadRef.current) {
+          ordData.forEach((o) => knownOrderIdsRef.current.add(o.id));
+          isFirstLoadRef.current = false;
+        } else {
+          const freshIncoming = ordData.filter(
+            (o) => !knownOrderIdsRef.current.has(o.id)
+          );
+
+          if (freshIncoming.length > 0) {
+            // Play Real-Time Melodic Order Chime
+            playOrderChime();
+
+            // Track newly arrived IDs to highlight in table
+            setNewlyArrivedIds((prev) => {
+              const next = new Set(prev);
+              freshIncoming.forEach((o) => next.add(o.id));
+              return next;
+            });
+
+            // Prominent Toast Notification
+            const topOrder = freshIncoming[0];
+            const displayId = String(topOrder.id).slice(-8).toUpperCase();
+            const orderAmt = Number(topOrder.totalAmount || 0).toLocaleString('en-IN');
+            toast.success(
+              `🔔 New Order Received! #${displayId} (₹${orderAmt})`,
+              {
+                duration: 9000,
+                description: `${freshIncoming.length > 1 ? `+${freshIncoming.length - 1} more order(s). ` : ''}Fulfill promptly to maintain high seller rating.`,
+                action: {
+                  label: 'View Order',
+                  onClick: () => setSelectedOrder(topOrder),
+                },
+              }
+            );
+
+            // Add to known IDs
+            freshIncoming.forEach((o) => knownOrderIdsRef.current.add(o.id));
+          }
+        }
+
         setOrders(ordData);
-      } else {
+        setLastRadarPing(new Date());
+      } else if (!isSilentRadar) {
         setOrders([]);
       }
 
       if (profRes.status === 'fulfilled' && profRes.value) {
         setProfile(profRes.value);
-      } else {
+      } else if (!isSilentRadar) {
         setProfile(getCurrentSupplier());
       }
 
@@ -89,10 +154,12 @@ export default function SellerOrders1({ onNavigate }) {
         toast.success('Live supplier orders updated');
       }
     } catch (err) {
-      console.error('Error loading orders:', err);
-      toast.error('Failed to load orders from server');
+      if (!isSilentRadar) {
+        console.error('Error loading orders:', err);
+        toast.error('Failed to load orders from server');
+      }
     } finally {
-      setLoading(false);
+      if (!isSilentRadar) setLoading(false);
       setRefreshing(false);
     }
   }, []);
@@ -101,7 +168,52 @@ export default function SellerOrders1({ onNavigate }) {
     loadOrders();
   }, [loadOrders]);
 
+  // Real-Time Background Radar Polling (Every 15 seconds)
+  useEffect(() => {
+    if (!radarActive) return;
+
+    const interval = setInterval(() => {
+      loadOrders(false, true); // silent radar ping
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [radarActive, loadOrders]);
+
+  const toggleSoundAlert = () => {
+    const nextState = !soundEnabled;
+    setSoundEnabled(nextState);
+    setSoundAlertEnabled(nextState);
+    if (nextState) {
+      playTestChime();
+      toast.success('🔔 Order Sound Chime Enabled! Test chime played.');
+    } else {
+      toast.info('🔕 Order Sound Chime Muted');
+    }
+  };
+
+  const toggleRadar = () => {
+    const nextState = !radarActive;
+    setRadarActive(nextState);
+    if (nextState) {
+      toast.success('📡 Live Order Radar Activated (15s auto-check)');
+      loadOrders(false, true);
+    } else {
+      toast.info('⏸️ Live Order Radar Paused');
+    }
+  };
+
+  const handleExportOrders = () => {
+    const listToExport = filteredOrders.length > 0 ? filteredOrders : orders;
+    if (listToExport.length === 0) {
+      toast.error('No orders available to export');
+      return;
+    }
+    const count = exportOrdersToCsv(listToExport, supplierDisplayName);
+    toast.success(`Exported ${count} order(s) to CSV spreadsheet!`);
+  };
+
   const handleTabChange = (tabId) => {
+    if (onNavigateTab) return onNavigateTab(tabId);
     const item = SUPPLIER_MENU.find((m) => m.id === tabId);
     if (item?.path) handleNav(item.path);
   };
@@ -119,18 +231,47 @@ export default function SellerOrders1({ onNavigate }) {
     }
   };
 
-  // Update real order status via API
-  const handleStatusChange = async (orderId, newStatus) => {
+  // Update real order status via API (supports per-item or order-level update)
+  const handleStatusChange = async (orderId, newStatus, orderItemId = null) => {
     setIsUpdatingStatus(true);
     try {
-      await supplierApiService.updateOrderStatus(orderId, newStatus);
+      const updated = await supplierApiService.updateOrderStatus(orderId, newStatus, orderItemId);
       setOrders((prev) =>
-        prev.map((ord) => (ord.id === orderId ? { ...ord, orderStatus: newStatus } : ord))
+        prev.map((ord) => {
+          if (ord.id !== orderId) return ord;
+          const updatedItems = (ord.items || []).map((it) => {
+            if (!orderItemId || it.id === orderItemId) {
+              return { ...it, itemStatus: newStatus };
+            }
+            return it;
+          });
+          return {
+            ...ord,
+            orderStatus: updated?.orderStatus || newStatus,
+            items: updatedItems,
+          };
+        })
       );
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev) => ({ ...prev, orderStatus: newStatus }));
+        setSelectedOrder((prev) => {
+          const updatedItems = (prev.items || []).map((it) => {
+            if (!orderItemId || it.id === orderItemId) {
+              return { ...it, itemStatus: newStatus };
+            }
+            return it;
+          });
+          return {
+            ...prev,
+            orderStatus: updated?.orderStatus || newStatus,
+            items: updatedItems,
+          };
+        });
       }
-      toast.success(`Order #${orderId.slice(-6)} status updated to ${newStatus}`);
+      toast.success(
+        orderItemId
+          ? `Item status updated to ${newStatus}`
+          : `Order #${orderId.slice(-6).toUpperCase()} status updated to ${newStatus}`
+      );
     } catch (err) {
       console.error('Failed to update status:', err);
       toast.error(err.message || 'Failed to update order status');
@@ -168,18 +309,10 @@ export default function SellerOrders1({ onNavigate }) {
 
   const supplierDisplayName = profile?.storeName || profile?.fullName || profile?.name || 'Verified Supplier';
 
-  return (
-    <DashboardLayout
-      menuItems={SUPPLIER_MENU}
-      activeTab="orders"
-      onTabChange={handleTabChange}
-      roleName="SUPPLIER"
-      userName={supplierDisplayName}
-      onLogout={() => setShowLogoutConfirm(true)}
-    >
-      <div className="space-y-6 max-w-7xl mx-auto pb-12">
+  const mainContent = (
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold tracking-wide uppercase mb-1">
               <ShoppingCart className="w-3.5 h-3.5" />
@@ -193,15 +326,85 @@ export default function SellerOrders1({ onNavigate }) {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => loadOrders(true)}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span>Sync Orders</span>
-          </button>
+          {/* Real-time Order Radar & Sound Chime Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Live Radar Status & Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleRadar}
+              className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition active:scale-95 cursor-pointer ${
+                radarActive
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+              }`}
+              title={
+                radarActive
+                  ? `Live Radar Active: Polling every 15s ${lastRadarPing ? `(Last ping: ${lastRadarPing.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})` : ''}`
+                  : 'Radar Paused (Click to resume)'
+              }
+            >
+              <span className="relative flex h-2.5 w-2.5">
+                {radarActive && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span
+                  className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                    radarActive ? 'bg-emerald-500' : 'bg-slate-400'
+                  }`}
+                ></span>
+              </span>
+              <Radio className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{radarActive ? 'Live Radar (15s)' : 'Radar Paused'}</span>
+              <span className="sm:hidden">{radarActive ? 'Radar' : 'Off'}</span>
+            </button>
+
+            {/* Sound Chime Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleSoundAlert}
+              className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition active:scale-95 cursor-pointer ${
+                soundEnabled
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'
+              }`}
+              title={
+                soundEnabled
+                  ? 'Sound Chime is ON: Melodic bell rings on incoming orders (Click to test/mute)'
+                  : 'Sound Chime is MUTED (Click to enable)'
+              }
+            >
+              {soundEnabled ? (
+                <Volume2 className="w-4 h-4 text-indigo-600 animate-pulse" />
+              ) : (
+                <VolumeX className="w-4 h-4 text-slate-400" />
+              )}
+              <span className="hidden sm:inline">{soundEnabled ? 'Chime ON' : 'Chime Off'}</span>
+              <span className="sm:hidden">{soundEnabled ? 'Sound' : 'Muted'}</span>
+            </button>
+
+            {/* Export CSV Button */}
+            <button
+              type="button"
+              onClick={handleExportOrders}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition active:scale-95 cursor-pointer"
+              title="Download orders report in CSV / Excel spreadsheet format for GST and CA accounting"
+            >
+              <Download className="w-4 h-4 text-indigo-600" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </button>
+
+            {/* Manual Sync Button */}
+            <button
+              type="button"
+              onClick={() => loadOrders(true)}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
+              title="Manually synchronize orders immediately"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Sync Orders</span>
+            </button>
+          </div>
         </div>
 
         {/* Real Order Metric Counters */}
@@ -351,9 +554,17 @@ export default function SellerOrders1({ onNavigate }) {
                     return (
                       <tr key={ord.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="py-4 px-5">
-                          <span className="font-mono font-bold text-slate-900 block text-xs">
-                            #{String(ord.id).slice(-8).toUpperCase()}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-bold text-slate-900 block text-xs">
+                              #{String(ord.id).slice(-8).toUpperCase()}
+                            </span>
+                            {newlyArrivedIds.has(ord.id) && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500 text-white text-[9px] font-black uppercase tracking-wider animate-pulse shadow-xs">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                <span>NEW</span>
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[11px] text-slate-400 font-medium">
                             {ord.createdAt ? new Date(ord.createdAt).toLocaleDateString('en-IN') : 'Recent'}
                           </span>
@@ -500,27 +711,54 @@ export default function SellerOrders1({ onNavigate }) {
                   )}
                 </div>
 
-                {/* Items in Order */}
+                {/* Items in Order (with Per-Item Status Control) */}
                 <div>
                   <h4 className="font-bold text-slate-900 mb-2">Ordered Catalog Items</h4>
-                  <div className="space-y-2">
-                    {(selectedOrder.items || []).map((item, idx) => (
-                      <div key={item.id || idx} className="p-3 rounded-xl border border-slate-100 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-800 truncate">{item.product?.title || item.productTitle || 'Product'}</p>
-                          <p className="text-[11px] text-slate-400">Qty: {item.quantity || 1} • Unit: ₹{Number(item.price || 0).toLocaleString('en-IN')}</p>
+                  <div className="space-y-2.5">
+                    {(selectedOrder.items || []).map((item, idx) => {
+                      const iStatus = (item.itemStatus || selectedOrder.orderStatus || 'ORDERED').toUpperCase();
+                      return (
+                        <div key={item.id || idx} className="p-3 rounded-xl border border-slate-200 bg-white space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-800 truncate">{item.product?.title || item.productTitle || 'Product'}</p>
+                              <p className="text-[11px] text-slate-400">
+                                Qty: {item.quantity || 1} • Unit: ₹{Number(item.price || 0).toLocaleString('en-IN')}
+                              </p>
+                            </div>
+                            <span className="font-black text-slate-900 text-sm shrink-0">
+                              ₹{Number((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                              Item Stage: {iStatus}
+                            </span>
+                            {item.id && (
+                              <select
+                                value={iStatus}
+                                onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value, item.id)}
+                                disabled={isUpdatingStatus}
+                                className="h-7 px-2 rounded-lg border border-slate-200 bg-slate-50 font-bold text-slate-700 text-[11px]"
+                              >
+                                <option value="ORDERED">ORDERED</option>
+                                <option value="CONFIRMED">CONFIRMED</option>
+                                <option value="SHIPPED">SHIPPED</option>
+                                <option value="OUT_FOR_DELIVERY">OUT_FOR_DELIVERY</option>
+                                <option value="DELIVERED">DELIVERED</option>
+                                <option value="CANCELLED">CANCELLED</option>
+                              </select>
+                            )}
+                          </div>
                         </div>
-                        <span className="font-black text-slate-900 text-sm shrink-0">
-                          ₹{Number((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Status Update Dropdown */}
+                {/* Batch Status Update Dropdown (All Supplier Items in this Order) */}
                 <div className="p-4 rounded-2xl border border-indigo-100 bg-indigo-50/40">
-                  <label className="font-bold text-slate-800 block mb-1.5">Update Dispatch Status</label>
+                  <label className="font-bold text-slate-800 block mb-1.5">Update All Your Items in Order</label>
                   <div className="flex gap-2">
                     <select
                       value={selectedOrder.orderStatus || selectedOrder.status || 'ORDERED'}
@@ -531,6 +769,7 @@ export default function SellerOrders1({ onNavigate }) {
                       <option value="ORDERED">ORDERED (New)</option>
                       <option value="CONFIRMED">CONFIRMED</option>
                       <option value="SHIPPED">SHIPPED</option>
+                      <option value="OUT_FOR_DELIVERY">OUT FOR DELIVERY</option>
                       <option value="DELIVERED">DELIVERED</option>
                       <option value="CANCELLED">CANCELLED</option>
                     </select>
@@ -563,6 +802,22 @@ export default function SellerOrders1({ onNavigate }) {
           />
         )}
       </div>
+  );
+
+  if (embedded) {
+    return mainContent;
+  }
+
+  return (
+    <DashboardLayout
+      menuItems={SUPPLIER_MENU}
+      activeTab="orders"
+      onTabChange={handleTabChange}
+      roleName="SUPPLIER"
+      userName={supplierDisplayName}
+      onLogout={() => setShowLogoutConfirm(true)}
+    >
+      {mainContent}
 
       <LogoutConfirmDialog
         isOpen={showLogoutConfirm}

@@ -1,7 +1,8 @@
 import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { logout } from '../../redux/userSlice';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useLogout } from '../../hooks/useLogout';
 import { toast } from 'sonner';
@@ -110,7 +111,13 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   };
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !localStorage.getItem('mshoppy_user_orders');
+    } catch (_) {
+      return true;
+    }
+  });
 
   // Sync tab if URL query changes
   useEffect(() => {
@@ -124,8 +131,17 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   }, [location.search]);
 
   // Real Authentication & User State (No dummy fallback credentials)
+  const dispatch = useDispatch();
   const reduxUser = useSelector((state) => state.user?.currentUser);
   const [customerUser, setCustomerUser] = useState(() => getStoredCustomer()?.user || reduxUser || null);
+
+  // If not authenticated, protect account dashboard and redirect to login
+  useEffect(() => {
+    const isAuthed = Boolean(customerUser || getStoredCustomer()?.user || reduxUser);
+    if (!isAuthed) {
+      navigate('/user/login?redirect=' + encodeURIComponent(location.pathname + location.search));
+    }
+  }, [customerUser, reduxUser, navigate, location.pathname, location.search]);
 
   // Affiliate Program Session - strictly verify that stored KYC belongs to the current logged-in customer
   const [affiliateApp, setAffiliateApp] = useState(() => {
@@ -137,6 +153,10 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     }
     return stored;
   });
+
+  // Real-time synchronization states to eliminate stale cache flickering
+  const [isKycSyncing, setIsKycSyncing] = useState(true);
+  const [isWalletLoading, setIsWalletLoading] = useState(true);
 
   const customerName =
     customerUser?.fullName ||
@@ -231,14 +251,48 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   // Logout Handler (Clears Firebase, Redux & LocalStorage)
   const firebaseLogout = useLogout('/user/login');
   const handleLogout = () => {
+    try {
+      dispatch(logout());
+    } catch (_) {}
     logoutCustomer();
+    setCustomerUser(null);
+    setRealOrders([]);
+    setSavedAddresses([]);
+    setWishlistItems([]);
     firebaseLogout();
   };
 
-  // Real Database Data States
-  const [realOrders, setRealOrders] = useState([]);
-  const [wishlistItems, setWishlistItems] = useState([]);
-  const [savedAddresses, setSavedAddresses] = useState([]);
+  // Real Database Data States (Cache-first for instant < 50ms display)
+  const [realOrders, setRealOrders] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mshoppy_user_orders');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  });
+  const [wishlistItems, setWishlistItems] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mshoppy_wishlist');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  });
+  const [savedAddresses, setSavedAddresses] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mshoppy_user_addresses');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  });
   const [catalogProducts, setCatalogProducts] = useState(() => {
     try {
       const cached = localStorage.getItem('mshoppy_cached_catalog_prods');
@@ -401,7 +455,10 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         const curPhone = customerUser?.phone;
 
         if (!curId && !curPhone) {
-          if (isMounted) setAffiliateApp(null);
+          if (isMounted) {
+            setAffiliateApp(null);
+            setIsKycSyncing(false);
+          }
           return;
         }
 
@@ -414,7 +471,10 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
 
         const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
         const res = await fetch(`${API_V1_BASE}/admin-kyc/affiliate-status${queryString}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (isMounted) setIsKycSyncing(false);
+          return;
+        }
 
         const data = await res.json();
         if (isMounted) {
@@ -445,9 +505,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
             setAffiliateApp(null);
             clearAffiliateApp();
           }
+          setIsKycSyncing(false);
         }
       } catch (err) {
         console.warn('Failed to sync live affiliate status in dashboard:', err.message);
+        if (isMounted) setIsKycSyncing(false);
       }
     };
 
@@ -459,10 +521,10 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     };
   }, [customerUser?.id, customerUser?.uid, customerUser?.phone]);
 
-  // Fetch Live Dashboard Data from Database
+  // Fetch Live Dashboard Data from Database (Background SWR if cached)
   const loadDashboardData = useCallback(async () => {
     try {
-      setLoading(true);
+      if (realOrders.length === 0) setLoading(true);
       const [ordersRes, wishRes, addrRes, prodsRes, walletRes] = await Promise.allSettled([
         getOrders(),
         getWishlist(),
@@ -473,12 +535,14 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
 
       if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value)) {
         setRealOrders(ordersRes.value);
+        try { localStorage.setItem('mshoppy_user_orders', JSON.stringify(ordersRes.value)); } catch (_) {}
       }
       if (wishRes.status === 'fulfilled' && Array.isArray(wishRes.value)) {
         setWishlistItems(wishRes.value);
       }
       if (addrRes.status === 'fulfilled' && Array.isArray(addrRes.value)) {
         setSavedAddresses(addrRes.value);
+        try { localStorage.setItem('mshoppy_user_addresses', JSON.stringify(addrRes.value)); } catch (_) {}
       }
       if (prodsRes.status === 'fulfilled' && Array.isArray(prodsRes.value) && prodsRes.value.length > 0) {
         setCatalogProducts(prodsRes.value);
@@ -518,10 +582,13 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
           totalOrders: autoOrders
         });
       }
+      setIsWalletLoading(false);
     } catch (err) {
       console.error('Failed to load real user dashboard data:', err);
+      setIsWalletLoading(false);
     } finally {
       setLoading(false);
+      setIsWalletLoading(false);
     }
   }, []);
 
@@ -875,6 +942,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
 
   // Role & KYC Enforcement: Strictly ONLY unlocked if affiliateApp is APPROVED
   const isResellerApproved = Boolean(
+    !isKycSyncing &&
     affiliateApp && (
       affiliateApp.status === 'Approved' ||
       affiliateApp.status === 'APPROVED' ||
@@ -883,6 +951,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     )
   );
   const isKycUnderReview = Boolean(
+    !isKycSyncing &&
     affiliateApp && (
       affiliateApp.status === 'Pending' ||
       affiliateApp.status === 'PENDING' ||
@@ -891,23 +960,29 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     )
   );
   const isKycRejected = Boolean(
+    !isKycSyncing &&
     affiliateApp && (affiliateApp.status === 'Rejected' || affiliateApp.status === 'REJECTED')
   );
 
-  // Automatically redirect away from resale/wallet tabs if not approved & purge unapproved stats
+  // Automatically redirect away from resale/wallet tabs if not approved & purge unapproved stats (wait until sync completes)
   useEffect(() => {
+    if (isKycSyncing) return;
     if (!isResellerApproved) {
       if (activeTab === 'resale' || activeTab === 'wallet') {
         setActiveTab('affiliate');
       }
     }
-  }, [isResellerApproved, activeTab]);
+  }, [isKycSyncing, isResellerApproved, activeTab]);
   // Dynamic Badges & Titles for Sidebar
   let affiliateNavTitle = 'Become a Partner 🤝';
   let affiliateNavBadge = 'NEW';
   let affiliateNavBadgeClass = 'bg-[#b7004d] text-white';
 
-  if (affiliateApp) {
+  if (isKycSyncing) {
+    affiliateNavTitle = 'Partner Hub';
+    affiliateNavBadge = 'SYNC';
+    affiliateNavBadgeClass = 'bg-slate-200 text-slate-700 animate-pulse';
+  } else if (affiliateApp) {
     if (affiliateApp.status === 'Approved' || affiliateApp.status === 'APPROVED') {
       affiliateNavTitle = 'Partner Hub 🤝';
       affiliateNavBadge = 'ACTIVE';
@@ -1095,7 +1170,15 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
           <div className="space-y-6">
 
             {/* Dynamic Real Margin Summary Banner - Only shows resale margin to approved resellers */}
-            {isResellerApproved ? (
+            {isKycSyncing ? (
+              <div className="animate-pulse flex flex-wrap items-center justify-between gap-3 bg-slate-100/90 border border-slate-200/80 px-4 py-3 rounded-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                  <div className="h-4 w-48 sm:w-72 bg-slate-200 rounded-md"></div>
+                </div>
+                <div className="h-8 w-28 bg-slate-200 rounded-xl"></div>
+              </div>
+            ) : isResellerApproved ? (
               <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200/80 px-4 py-3 rounded-2xl">
                 <div className="flex items-center gap-2">
                   <span className="flex h-2.5 w-2.5 relative">
@@ -1348,7 +1431,18 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
               </div>
 
               {/* Card 4: Real Wallet Balance OR KYC Required Status */}
-              {isResellerApproved ? (
+              {isKycSyncing ? (
+                <div className="bg-slate-100/90 border border-slate-200/80 p-5 rounded-3xl animate-pulse flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-slate-200"></div>
+                    <div className="w-16 h-5 rounded-full bg-slate-200"></div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-3 w-24 bg-slate-200 rounded"></div>
+                    <div className="h-6 w-32 bg-slate-200 rounded"></div>
+                  </div>
+                </div>
+              ) : isResellerApproved ? (
                 <div className="bg-gradient-to-br from-[#b7004d] via-[#cf125d] to-[#e62973] text-white p-5 rounded-3xl shadow-lg shadow-pink-600/20 flex flex-col justify-between">
                   <div className="flex items-center justify-between mb-4">
                     <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
@@ -1365,7 +1459,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                   <div>
                     <p className="text-xs font-semibold text-pink-100">Reseller Wallet Balance</p>
                     <h3 className="text-2xl sm:text-3xl font-black mt-1">
-                      ₹{walletBalance.toLocaleString('en-IN')}
+                      {isWalletLoading ? (
+                        <span className="inline-block w-24 h-7 bg-white/30 rounded animate-pulse"></span>
+                      ) : (
+                        `₹${walletBalance.toLocaleString('en-IN')}`
+                      )}
                     </h3>
                   </div>
                 </div>
@@ -1761,8 +1859,20 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         {activeTab === 'affiliate' && (
           <div className="space-y-6">
 
-            {/* If Approved */}
-            {affiliateApp?.status === 'Approved' || affiliateApp?.status === 'APPROVED' ? (
+            {isKycSyncing ? (
+              <div className="space-y-6">
+                <div className="bg-slate-900/60 p-6 sm:p-8 rounded-3xl border border-slate-700/50 space-y-4 animate-pulse">
+                  <div className="h-6 w-48 bg-slate-800 rounded-full"></div>
+                  <div className="h-8 w-72 bg-slate-800 rounded-lg"></div>
+                  <div className="h-4 w-96 bg-slate-800/80 rounded"></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
+                    <div className="h-16 bg-slate-800/60 rounded-2xl"></div>
+                    <div className="h-16 bg-slate-800/60 rounded-2xl"></div>
+                    <div className="h-16 bg-slate-800/60 rounded-2xl"></div>
+                  </div>
+                </div>
+              </div>
+            ) : isResellerApproved ? (
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-[#005a2b] p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl text-white shadow-xl border border-emerald-500/30 space-y-4 min-w-0 w-full max-w-full overflow-hidden">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2171,7 +2281,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                   )}
                 </div>
               </div>
-            ) : affiliateApp?.status === 'Under Review' || affiliateApp?.status === 'REVIEW' || affiliateApp?.status === 'PENDING' || affiliateApp?.status === 'Pending' ? (
+            ) : isKycUnderReview ? (
               /* If Under Review */
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-[#78350f] p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl text-white shadow-xl border border-amber-500/30 space-y-4 min-w-0 w-full max-w-full overflow-hidden">
@@ -2568,7 +2678,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       <div className="space-y-3 cursor-pointer" onClick={() => setSelectedTrackingOrder(order)}>
                         {(order.items || []).map((item, idx) => {
                           const p = item.product || {};
-                          const img = p.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=200';
+                          const img = (Array.isArray(p.images) && p.images[0]) || p.image || 'https://images.meesho.com/images/products/placeholder.png';
                           return (
                             <div key={idx} className="flex items-center gap-3.5">
                               <img
@@ -2696,7 +2806,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 {wishlistItems.map((item) => {
                   const prod = item.product || item;
                   const prodId = item.productId || item.id;
-                  const img = prod.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400';
+                  const img = (Array.isArray(prod?.images) && prod.images[0]) || prod?.image || 'https://images.meesho.com/images/products/placeholder.png';
                   const title = prod.title || 'Product';
                   const price = prod.price ? `₹${prod.price}` : '₹0';
 
@@ -2901,7 +3011,11 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                     {isResellerApproved ? 'Available For Instant Withdrawal' : 'Usable on Checkout / Refund Balance'}
                   </p>
                   <h2 className="text-3xl sm:text-4xl font-black mt-1">
-                    ₹{walletBalance.toLocaleString('en-IN')}
+                    {isWalletLoading ? (
+                      <span className="inline-block w-32 h-9 bg-white/30 rounded animate-pulse"></span>
+                    ) : (
+                      `₹${walletBalance.toLocaleString('en-IN')}`
+                    )}
                   </h2>
                 </div>
                 <div>
@@ -3098,9 +3212,15 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                   <div className="min-w-0 flex-1">
                     <h3 className="text-base sm:text-lg font-black text-slate-900 truncate">{customerName}</h3>
                     <p className="text-xs text-slate-500 truncate">{customerEmail || 'No email registered'}</p>
-                    <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-pink-50 text-[#b7004d] text-[10px] font-black uppercase border border-pink-100 truncate max-w-full">
-                      {isResellerApproved ? 'Verified Partner & Reseller' : isKycUnderReview ? 'Partner (KYC Under Review)' : 'Verified Customer'}
-                    </span>
+                    {isKycSyncing ? (
+                      <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-400 text-[10px] font-black uppercase border border-slate-200 animate-pulse">
+                        Verifying Status...
+                      </span>
+                    ) : (
+                      <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-pink-50 text-[#b7004d] text-[10px] font-black uppercase border border-pink-100 truncate max-w-full">
+                        {isResellerApproved ? 'Verified Partner & Reseller' : isKycUnderReview ? 'Partner (KYC Under Review)' : 'Verified Customer'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -3194,7 +3314,9 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       type="text"
                       disabled
                       value={
-                        isResellerApproved
+                        isKycSyncing
+                          ? 'Verifying Status...'
+                          : isResellerApproved
                           ? 'Approved Reseller & Partner'
                           : isKycUnderReview
                           ? 'Partner (KYC Under Review)'

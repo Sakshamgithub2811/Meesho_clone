@@ -148,6 +148,10 @@ export async function updateCustomerProfile(updates) {
 export function logoutCustomer() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem('persist:root');
+  localStorage.removeItem('mshoppy_user_orders');
+  localStorage.removeItem('mshoppy_user_addresses');
+  localStorage.removeItem('mshoppy_wishlist');
   localStorage.removeItem('affiliate_kyc_application');
   localStorage.removeItem('current_session_affiliate_app');
   localStorage.removeItem('mshoppy_affiliate_token');
