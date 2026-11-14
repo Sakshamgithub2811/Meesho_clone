@@ -1,5 +1,27 @@
 [
   {
+    "id": "log_1794470640902_wlyp",
+    "adminEmail": "admin@meesho.com",
+    "adminName": "Super Admin",
+    "action": "KYC_APPROVED",
+    "targetType": "KYC",
+    "targetId": "6c65a0d6-517c-4f07-a214-972e53b8327f",
+    "details": "APPROVED KYC application for Pramod Lodhi (Type: affiliate) - Notes: fdsafdas",
+    "ipAddress": "127.0.0.1",
+    "timestamp": "2026-11-12T08:04:00.903Z"
+  },
+  {
+    "id": "log_1794469343135_go35",
+    "adminEmail": "sakshamshrivastava2811@gmail.com",
+    "adminName": "Saksham Shrivastava ",
+    "action": "COUPON_CREATED",
+    "targetType": "MARKETING",
+    "targetId": "9f792df1-cbb2-4b34-ae6a-733092f16fb0",
+    "details": "Created promo coupon \"MEESHO100\" (₹33 discount, Min Order: ₹199)",
+    "ipAddress": "127.0.0.1",
+    "timestamp": "2026-11-12T07:42:23.135Z"
+  },
+  {
     "id": "log_1794308598505_j2rv",
     "adminEmail": "sakshamshrivastava2811@gmail.com",
     "adminName": "Saksham Shrivastava ",
