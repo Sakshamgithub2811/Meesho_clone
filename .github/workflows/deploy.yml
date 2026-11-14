@@ -56,7 +56,7 @@ jobs:
             fi
 
             echo "🔀 Checking out and syncing branch: $TARGET_BRANCH"
-            git fetch origin "$TARGET_BRANCH"
+            git fetch --all
             git checkout "$TARGET_BRANCH"
             git reset --hard "origin/$TARGET_BRANCH"
 
