@@ -220,11 +220,10 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
     return ['All', ...cleanList];
   }, [currentCategory, categoryData, products]);
 
-  // 100% Dynamic Taglines and Metadata derived from the category object and live product counts
+  // Dynamic Taglines and Metadata derived from category object (no product count numbers shown)
   const categoryTitle = currentCategory?.name ? `${currentCategory.name} Collection` : 'All Categories';
-  const categoryCount = currentCategory?._count?.products || products.length || 0;
-  const categorySubtitle = currentCategory?.description || `Explore ${categoryCount > 0 ? `${categoryCount} verified wholesale styles` : 'curated collections'} direct from manufacturers`;
-  const bannerTag = categoryCount > 0 ? `${categoryCount} Styles Available` : 'Verified Direct';
+  const categorySubtitle = currentCategory?.description || 'Explore verified wholesale styles direct from manufacturers';
+  const bannerTag = 'Factory Direct';
 
   return (
     <div className="bg-[#f8f9fb] font-sans text-[#191c1e] h-screen max-h-screen overflow-hidden flex flex-col antialiased selection:bg-pink-100 selection:text-pink-700">
@@ -340,7 +339,6 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
               categories.map((cat) => {
                 const isActive = activeSlug === cat.slug;
                 const iconName = getCategoryIcon(cat.slug, cat.name);
-                const count = cat._count?.products || 0;
 
                 return (
                   <button
@@ -365,11 +363,6 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
                       <span className="text-[10px] sm:text-xs leading-[13px] sm:leading-tight font-bold block break-words line-clamp-2">
                         {cat.name}
                       </span>
-                      {count > 0 && (
-                        <span className={`text-[9px] font-semibold hidden sm:block mt-0.5 ${isActive ? 'text-[#FF3F6C]' : 'text-slate-400'}`}>
-                          {count} styles
-                        </span>
-                      )}
                     </div>
                   </button>
                 );
@@ -480,8 +473,9 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
               <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
                 {selectedSubcat === 'All' ? 'Available Products' : `${selectedSubcat} Styles`}
               </h3>
-              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
-                {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100/80 flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs">verified</span>
+                Verified Direct
               </span>
             </div>
 
