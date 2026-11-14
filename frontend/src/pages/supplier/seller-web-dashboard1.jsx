@@ -17,6 +17,7 @@ import SellerOrders1 from './SellerOrders1';
 import SellerSettlements1 from './SellerSettlements1';
 import SellerDropship1 from './SellerDropship1';
 import SellerReturns1 from './SellerReturns1';
+import SellerReviews1 from './SellerReviews1';
 import SellerAddProduct1 from './SellerAddProduct1';
 import SellerKyc1 from './SellerKyc1';
 import SellerAnalytics1 from './SellerAnalytics1';
@@ -42,9 +43,52 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
   const [stats, setStats] = useState(null);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => getCurrentSupplier() || null);
   const [kycData, setKycData] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Reactive Supplier Profile & Session Sync (Same Window + Cross-Tab)
+  useEffect(() => {
+    // 1. Same-window custom event from profile forms, API service, or Redux updates
+    const handleProfileUpdate = (event) => {
+      if (event?.detail) {
+        setProfile((prev) => ({ ...(prev || {}), ...event.detail }));
+      }
+    };
+
+    // 2. Same-window session cleared event
+    const handleSessionCleared = () => {
+      setProfile(null);
+    };
+
+    // 3. Cross-tab storage event (fired by browser in other tabs when localStorage is updated)
+    const handleStorageChange = (event) => {
+      if (event.key === 'meesho_supplier_user' || event.key === 'supplier') {
+        if (event.newValue) {
+          try {
+            const updated = JSON.parse(event.newValue);
+            setProfile((prev) => ({ ...(prev || {}), ...updated }));
+          } catch (e) {
+            console.warn('Cross-tab profile sync error in dashboard:', e);
+          }
+        } else if (!event.newValue && event.oldValue) {
+          // Logged out in another tab
+          setProfile(null);
+          toast.info('Supplier session closed in another window');
+        }
+      }
+    };
+
+    window.addEventListener('supplier-profile-updated', handleProfileUpdate);
+    window.addEventListener('supplier-session-cleared', handleSessionCleared);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('supplier-profile-updated', handleProfileUpdate);
+      window.removeEventListener('supplier-session-cleared', handleSessionCleared);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Sync tab with URL on browser back/forward (SPA navigation)
   useEffect(() => {
@@ -288,6 +332,11 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
       {/* 6. Returns & RTO Hub Tab */}
       {activeTab === 'returns' && (
         <SellerReturns1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+      )}
+
+      {/* 6b. Customer Ratings & Reviews Tab */}
+      {activeTab === 'reviews' && (
+        <SellerReviews1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
       )}
 
       {/* 7. Add Product Tab */}

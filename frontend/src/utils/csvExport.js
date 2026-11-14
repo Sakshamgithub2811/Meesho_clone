@@ -298,3 +298,41 @@ export function exportReturnsToCsv(returns = []) {
   return returns.length;
 }
 
+/**
+ * 5. Export Product Reviews & Ratings to CSV
+ */
+export function exportReviewsToCsv(reviews = []) {
+  if (!reviews || reviews.length === 0) return 0;
+
+  const headers = [
+    'Review ID',
+    'Review Date',
+    'Product Title',
+    'Rating (Stars)',
+    'Review Headline',
+    'Customer Feedback Comment',
+    'Customer Name',
+    'Unboxing Photos Count',
+    'Seller Reply Status',
+    'Official Seller Reply',
+  ];
+
+  const rows = reviews.map((r) => [
+    `#${String(r.id || '').slice(-8).toUpperCase()}`,
+    formatDate(r.createdAt),
+    r.product?.title || 'Catalog Product',
+    `${r.rating || 5} Star(s)`,
+    r.title || 'Product Feedback',
+    r.comment || '',
+    r.customer?.name || 'Verified Buyer',
+    r.customerPhotos?.length || 0,
+    r.hasReply ? 'Replied' : 'Pending Reply',
+    r.adminReply || 'No reply yet',
+  ]);
+
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const filename = `mshoppy_customer_reviews_${timestamp}.csv`;
+  exportToCsv(filename, headers, rows);
+  return reviews.length;
+}
+

@@ -1,5 +1,7 @@
 // frontend/src/services/supplierApiService.js
 import { API_BASE } from '../config/apiConfig';
+import { store } from '../redux/store';
+import { loginSuccess, updateProfileSuccess, logout } from '../redux/userSlice';
 
 const API_BASE_URL = API_BASE;
 
@@ -26,7 +28,7 @@ export function getCurrentSupplier() {
   }
 }
 
-export function saveAuthSession(token, supplier) {
+export function saveAuthSession(token, supplier, isNewLogin = false) {
   try {
     if (token) {
       localStorage.setItem(TOKEN_KEY, token);
@@ -35,6 +37,26 @@ export function saveAuthSession(token, supplier) {
     if (supplier) {
       localStorage.setItem(SUPPLIER_KEY, JSON.stringify(supplier));
       localStorage.setItem('supplier', JSON.stringify(supplier));
+
+      // 1. Reactive CustomEvent broadcast for active tab components (Header, Sidebar, Forms)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('supplier-profile-updated', { detail: supplier })
+        );
+      }
+
+      // 2. Synchronize Redux user slice state reactively
+      try {
+        if (store && store.dispatch) {
+          if (isNewLogin) {
+            store.dispatch(loginSuccess(supplier));
+          } else {
+            store.dispatch(updateProfileSuccess(supplier));
+          }
+        }
+      } catch (reduxErr) {
+        console.warn('Redux sync warning in saveAuthSession:', reduxErr);
+      }
     }
   } catch (err) {
     console.error('Failed to save session to localStorage:', err);
@@ -47,6 +69,20 @@ export function clearAuthSession() {
     localStorage.removeItem(SUPPLIER_KEY);
     localStorage.removeItem('supplierToken');
     localStorage.removeItem('supplier');
+
+    // 1. Reactive CustomEvent broadcast for active tab
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('supplier-session-cleared'));
+    }
+
+    // 2. Synchronize Redux user slice logout
+    try {
+      if (store && store.dispatch) {
+        store.dispatch(logout());
+      }
+    } catch (reduxErr) {
+      console.warn('Redux logout warning in clearAuthSession:', reduxErr);
+    }
   } catch (err) {
     console.error('Failed to clear session from localStorage:', err);
   }
@@ -117,7 +153,7 @@ export async function verifyOtp(phone, otp, name = '') {
   });
 
   if (data.token && data.supplier) {
-    saveAuthSession(data.token, data.supplier);
+    saveAuthSession(data.token, data.supplier, true);
   }
   return data;
 }
@@ -130,7 +166,7 @@ export async function loginSupplier({ firebaseUid, email }) {
   });
 
   if (data.user) {
-    saveAuthSession(firebaseUid, data.user);
+    saveAuthSession(firebaseUid, data.user, true);
   }
   return data;
 }
@@ -159,7 +195,7 @@ export async function registerSupplier(supplierData) {
   });
 
   if (data.user) {
-    saveAuthSession(firebaseUid, data.user);
+    saveAuthSession(firebaseUid, data.user, true);
   }
   return data;
 }
@@ -205,6 +241,11 @@ export async function updateBankDetails(bankData) {
     method: 'PUT',
     body: JSON.stringify(bankData),
   });
+  if (data.bankDetails) {
+    const current = getCurrentSupplier() || {};
+    const updated = { ...current, bankDetails: data.bankDetails };
+    saveAuthSession(getAuthToken(), updated);
+  }
   return data.bankDetails;
 }
 
@@ -214,6 +255,11 @@ export async function updateGstDetails(gstData) {
     method: 'PUT',
     body: JSON.stringify(gstData),
   });
+  if (data.gstDetails) {
+    const current = getCurrentSupplier() || {};
+    const updated = { ...current, gstDetails: data.gstDetails };
+    saveAuthSession(getAuthToken(), updated);
+  }
   return data.gstDetails;
 }
 
@@ -399,6 +445,20 @@ export async function updateReturnStatus(id, status, extra = {}) {
   return data;
 }
 
+// Product Reviews & Ratings (UGC & Feedback)
+export async function fetchSupplierReviews() {
+  const data = await request('/supplier/reviews');
+  return data.data;
+}
+
+export async function replyToSupplierReview(reviewId, reply) {
+  const data = await request(`/supplier/reviews/${reviewId}/reply`, {
+    method: 'POST',
+    body: JSON.stringify({ reply }),
+  });
+  return data;
+}
+
 export default {
   getAuthToken,
   getCurrentSupplier,
@@ -434,4 +494,6 @@ export default {
   downloadShippingLabel,
   fetchSupplierReturns,
   updateReturnStatus,
+  fetchSupplierReviews,
+  replyToSupplierReview,
 };
