@@ -36,44 +36,34 @@ jobs:
           script_stop: true
           script: |
             set -e
-            echo "🚀 ==================================================="
-            echo "🚀 Starting CI/CD Automated Deployment on VPS..."
-            echo "🚀 ==================================================="
+            echo "🚀 Starting Automated Deployment on VPS..."
 
             APP_DIR="/home/ubuntu/Meesho_clone"
             REPO_URL="https://github.com/Sakshamgithub2811/Meesho_clone.git"
             TARGET_BRANCH="${{ github.ref_name }}"
 
-            # 1. Clone repository if it doesn't exist, otherwise pull latest changes
             if [ ! -d "$APP_DIR" ]; then
-              echo "📦 Project not found on VPS. Cloning fresh repository..."
+              echo "📦 Cloning repository..."
               git clone "$REPO_URL" "$APP_DIR"
-              cd "$APP_DIR"
-            else
-              echo "🔄 Existing project found. Pulling latest code..."
-              cd "$APP_DIR"
-              git fetch origin
             fi
 
-            echo "🔀 Checking out and syncing branch: $TARGET_BRANCH"
+            cd "$APP_DIR"
             git fetch --all
             git checkout "$TARGET_BRANCH"
             git reset --hard "origin/$TARGET_BRANCH"
 
-            # 2. Ingest environment variables safely via base64 decoding
-            echo "🔐 Writing backend/.env and frontend/.env..."
-            echo "${{ steps.encode_env.outputs.backend_b64 }}" | base64 -d > backend/.env
-            echo "${{ steps.encode_env.outputs.frontend_b64 }}" | base64 -d > frontend/.env
+            echo "🔐 Writing environment variables with absolute paths..."
+            echo "${{ steps.encode_env.outputs.backend_b64 }}" | base64 -d > "$APP_DIR/backend/.env"
+            echo "${{ steps.encode_env.outputs.frontend_b64 }}" | base64 -d > "$APP_DIR/frontend/.env"
 
-            # 3. Build & start Docker containers
-            echo "🐳 Building Docker containers & launching services..."
+            echo "🐳 Launching Docker containers..."
+            cd "$APP_DIR"
             docker compose down --remove-orphans || true
             docker compose up -d --build --remove-orphans
 
-            # 4. Clean up dangling images to keep VPS storage lean
-            echo "🧹 Pruning dangling docker build cache..."
+            echo "🧹 Cleaning up dangling build cache..."
             docker image prune -f
 
-            # 5. Output active running status
             echo "✅ Deployment finished successfully! Running containers:"
+            cd "$APP_DIR"
             docker compose ps
