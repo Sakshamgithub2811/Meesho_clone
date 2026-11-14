@@ -9,6 +9,7 @@ import {
 } from '../../services/ecommerceService';
 import { useCart } from '../../hooks/useCart';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import { buildAffiliateProductUrl, getAffiliateMarginFromParams } from '../../utils/affiliateLinkHelper';
 import QuickEmailOtpModal from '../../components/auth/QuickEmailOtpModal';
 
 // Category-specific variant configuration & labels
@@ -209,8 +210,8 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // Dynamic Custom Affiliate Margin Support
-  const urlMargin = Number(searchParams.get('margin') || searchParams.get('m') || 0);
+  // Dynamic Custom Affiliate Margin Support (decoded safely from obfuscated 'sp' token or legacy 'margin')
+  const urlMargin = getAffiliateMarginFromParams(searchParams);
   const affiliateMargin = urlMargin > 0 ? urlMargin : Number(localStorage.getItem('mshoppy_affiliate_margin') || 0);
   const effectivePrice = (product?.price || 0) + (affiliateMargin > 0 ? affiliateMargin : 0);
 
@@ -234,7 +235,11 @@ export default function ProductDetail({ onNavigate = () => {}, onBack }) {
   const referralCode = getReferralCode();
   const numericResellerMargin = Number(selectedResellerMargin) || 0;
   const resellerSellingPrice = (product?.price || 0) + numericResellerMargin;
-  const productShareUrl = `${window.location.origin}/product?id=${product?.id || productId || ''}&ref=${referralCode}&margin=${numericResellerMargin}`;
+  const productShareUrl = buildAffiliateProductUrl({
+    productId: product?.id || productId || '',
+    refCode: referralCode,
+    margin: numericResellerMargin
+  });
 
   const handleShareToWhatsApp = (mode = shareMode) => {
     if (!product) return;

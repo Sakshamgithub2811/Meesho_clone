@@ -53,6 +53,7 @@ import ReturnRequest from './pages/customer & Reseller/ReturnRequest';
 import AffiliateKYC from './pages/customer & Reseller/AffiliateKYC';
 import AffiliateKycStatus from './pages/customer & Reseller/AffiliateKycStatus';
 import PolicyPage from './pages/customer & Reseller/PolicyPage';
+import { getAffiliateMarginFromParams } from './utils/affiliateLinkHelper';
 
 // Delivery & Driver Logistics Pages
 import DriverDashboardMobile from './pages/delivery & driver logistics/driver_dashboard_mobile';
@@ -496,13 +497,13 @@ function AppRoutes() {
     try {
       const searchParams = new URLSearchParams(location.search);
       const refCode = searchParams.get('ref') || searchParams.get('aff');
-      const customMargin = searchParams.get('margin') || searchParams.get('m');
+      const customMargin = getAffiliateMarginFromParams(searchParams);
       if (refCode && refCode.trim()) {
         const cleanRef = refCode.trim().toUpperCase();
         localStorage.setItem('mshoppy_referral_code', cleanRef);
         localStorage.setItem('mshoppy_referral_timestamp', Date.now().toString());
-        if (customMargin && !isNaN(Number(customMargin))) {
-          localStorage.setItem('mshoppy_affiliate_margin', Number(customMargin).toString());
+        if (customMargin > 0) {
+          localStorage.setItem('mshoppy_affiliate_margin', customMargin.toString());
         }
         recordAffiliateClick(cleanRef);
       }

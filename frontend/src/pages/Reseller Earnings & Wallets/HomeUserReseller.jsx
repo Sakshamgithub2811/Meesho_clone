@@ -5,6 +5,7 @@ import AppBottomNav from "../../components/AppBottomNav";
 import { getUnreadCount, subscribeNotifications } from '../../services/notificationService';
 import { getProducts } from '../../services/ecommerceService';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import { buildAffiliateProductUrl } from '../../utils/affiliateLinkHelper';
 
 const categories = [
   { name: "All", icon: "dashboard" },
@@ -54,7 +55,7 @@ export default function HomeUserReseller() {
     const refCode = getReferralCode();
     const numericMargin = Number(margin) || 0;
     const finalPrice = prod.price + numericMargin;
-    const orderLink = `${window.location.origin}/product?id=${prod.id}&ref=${refCode}&margin=${numericMargin}`;
+    const orderLink = buildAffiliateProductUrl({ productId: prod.id, refCode, margin: numericMargin });
     const msg = `✨ *${prod.title}*\n\nSpecial Price: ₹${finalPrice} only (Free Shipping!)\n\n✅ 7-Day Easy Replacement Guarantee\n✅ Cash on Delivery Available\n\n👉 Order directly online:\n${orderLink}\n\nOr reply with your delivery address & size to book!`;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
@@ -65,7 +66,7 @@ export default function HomeUserReseller() {
   const handleCopyQuickLink = (prod, margin) => {
     const refCode = getReferralCode();
     const numericMargin = Number(margin) || 0;
-    const orderLink = `${window.location.origin}/product?id=${prod.id}&ref=${refCode}&margin=${numericMargin}`;
+    const orderLink = buildAffiliateProductUrl({ productId: prod.id, refCode, margin: numericMargin });
     navigator.clipboard.writeText(orderLink);
     setCopiedLink(true);
     setToastMessage('Referral link with margin copied!');

@@ -4,6 +4,7 @@ import NavDrawer from '../../components/NavDrawer';
 import AppBottomNav from '../../components/AppBottomNav';
 import { getProducts, getProductById } from '../../services/ecommerceService';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
+import { buildAffiliateProductUrl } from '../../utils/affiliateLinkHelper';
 
 export default function ShareEarnConfig() {
   const navigate = useNavigate();
@@ -89,7 +90,11 @@ export default function ShareEarnConfig() {
   };
 
   const referralCode = getReferralCode();
-  const orderLink = `${window.location.origin}/product?id=${activeProduct.id || ''}&ref=${referralCode}&margin=${numericMargin}`;
+  const orderLink = buildAffiliateProductUrl({
+    productId: activeProduct.id || '',
+    refCode: referralCode,
+    margin: numericMargin
+  });
 
   const handleShareToWhatsApp = () => {
     let msg = '';

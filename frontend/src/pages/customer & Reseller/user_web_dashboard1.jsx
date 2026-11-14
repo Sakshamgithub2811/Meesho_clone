@@ -35,6 +35,7 @@ import {
 } from '../../services/customerAuthService';
 import { addNotification } from '../../services/notificationService';
 import INDIAN_STATES from '../../utils/indianStates';
+import { buildAffiliateProductUrl } from '../../utils/affiliateLinkHelper';
 
 import CancelOrderModal from '../../components/customer/CancelOrderModal';
 import OrderTrackingModal from '../../components/customer/OrderTrackingModal';
@@ -688,12 +689,12 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     return { weeklyEarnings: bars, totalResaleMargin: totalMargin };
   }, [realOrders]);
 
-  // Handle Share Real Product with Custom Margin
+  // Handle Share Real Product with Custom Margin (Obfuscated parameter protecting margin)
   const handleShareProductWithMargin = (prod, customMargin) => {
     const margin = customMargin !== undefined ? customMargin : getProductMargin(prod?.id);
     const finalPrice = Number(prod?.price || 0) + Number(margin || 0);
     const refCode = affiliateApp?.applicationId || customerUser?.id || 'aff_verified';
-    const link = `${window.location.origin}/product/${prod?.id || ''}?ref=${refCode}&margin=${margin}`;
+    const link = buildAffiliateProductUrl({ productId: prod?.id || '', refCode, margin });
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(link);
       toast.success('Custom product link copied!', {
@@ -708,7 +709,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     const margin = customMargin !== undefined ? customMargin : getProductMargin(prod?.id);
     const finalPrice = Number(prod?.price || 0) + Number(margin || 0);
     const refCode = affiliateApp?.applicationId || customerUser?.id || 'aff_verified';
-    const link = `${window.location.origin}/product/${prod?.id || ''}?ref=${refCode}&margin=${margin}`;
+    const link = buildAffiliateProductUrl({ productId: prod?.id || '', refCode, margin });
     const msg = `🛍️ *${prod?.title || 'Special Exclusive Product'}*\n\nSpecial Price: ₹${finalPrice} only!\n✅ Direct Supplier Quality\n✅ 7-Day Easy Replacement\n✅ Cash on Delivery Available\n\nOrder here: ${link}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
   };
@@ -736,14 +737,23 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   const handleShareCustomMarginWhatsApp = (prod, margin) => {
     const targetProd = prod || activeMarginProd;
     const finalP = (targetProd?.price || 499) + Number(margin || customMarginVal || 0);
-    const msg = `🛍️ *${targetProd?.title || 'Special Exclusive Product'}*\n\nSpecial Price: ₹${finalP} only!\n✅ Direct Supplier Quality\n✅ 7-Day Easy Replacement\n✅ Cash on Delivery Available\n\nOrder here: ${window.location.origin}/product/${targetProd?.id || ''}?ref=${affiliateApp?.applicationId || 'aff_verified'}&margin=${margin || customMarginVal || 0}`;
+    const link = buildAffiliateProductUrl({
+      productId: targetProd?.id || '',
+      refCode: affiliateApp?.applicationId || 'aff_verified',
+      margin: margin || customMarginVal || 0
+    });
+    const msg = `🛍️ *${targetProd?.title || 'Special Exclusive Product'}*\n\nSpecial Price: ₹${finalP} only!\n✅ Direct Supplier Quality\n✅ 7-Day Easy Replacement\n✅ Cash on Delivery Available\n\nOrder here: ${link}`;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   };
 
   const handleCopyCustomMarginLink = (prod, margin) => {
     const targetProd = prod || activeMarginProd;
-    const link = `${window.location.origin}/product/${targetProd?.id || ''}?ref=${affiliateApp?.applicationId || 'aff_verified'}&margin=${margin || customMarginVal || 0}`;
+    const link = buildAffiliateProductUrl({
+      productId: targetProd?.id || '',
+      refCode: affiliateApp?.applicationId || 'aff_verified',
+      margin: margin || customMarginVal || 0
+    });
     navigator.clipboard?.writeText(link);
     toast.success(`Custom product link copied with ₹${margin || customMarginVal || 0} margin!`);
   };
@@ -2073,7 +2083,12 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                             type="button"
                             onClick={() => {
                               const refCode = affiliateApp?.applicationId || 'aff_verified';
-                              window.open(`/product?id=${activeMarginProd.id}&ref=${refCode}&margin=${customMarginVal}`, '_blank');
+                              const liveUrl = buildAffiliateProductUrl({
+                                productId: activeMarginProd.id,
+                                refCode,
+                                margin: customMarginVal
+                              });
+                              window.open(liveUrl, '_blank');
                             }}
                             className="py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 shrink-0"
                             title="Open live product page with your custom margin applied"
@@ -2227,7 +2242,12 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                                   type="button"
                                   onClick={() => {
                                     const refCode = affiliateApp?.applicationId || 'aff_verified';
-                                    window.open(`/product?id=${prod.id}&ref=${refCode}&margin=150`, '_blank');
+                                    const liveUrl = buildAffiliateProductUrl({
+                                      productId: prod.id,
+                                      refCode,
+                                      margin: 150
+                                    });
+                                    window.open(liveUrl, '_blank');
                                   }}
                                   className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1"
                                   title="View live product with +₹150 margin"
