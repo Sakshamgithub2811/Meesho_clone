@@ -18,7 +18,7 @@ function notifyListeners() {
 /**
  * Reseller Login with 10-digit mobile number & optional OTP
  */
-export async function loginReseller({ phone, fullName, otp = '123456' }) {
+export async function loginReseller({ phone, fullName, otp }) {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/reseller-login`, {
       method: 'POST',
@@ -49,36 +49,7 @@ export async function loginReseller({ phone, fullName, otp = '123456' }) {
     return data;
   } catch (error) {
     console.error('Reseller login API error:', error);
-    // Graceful fallback for offline / mock testing
-    const fallbackUser = {
-      id: `reseller_${phone}`,
-      phone,
-      fullName: fullName || `Reseller +91 ${phone}`,
-      role: 'RESELLER',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    };
-    const fallbackWallet = {
-      balance: 24850.50,
-      pendingAmount: 1240.00,
-      totalEarned: 48920.00,
-      withdrawnAmount: 24069.50,
-      upiId: `${phone}@upi`,
-      bankLinked: true,
-      bankName: 'HDFC Bank',
-      accountLast4: '4192',
-    };
-
-    localStorage.setItem(TOKEN_KEY, 'mock_token_' + Date.now());
-    localStorage.setItem(USER_KEY, JSON.stringify(fallbackUser));
-    localStorage.setItem(WALLET_KEY, JSON.stringify(fallbackWallet));
-    notifyListeners();
-
-    return {
-      success: true,
-      user: fallbackUser,
-      wallet: fallbackWallet,
-      isOfflineFallback: true,
-    };
+    throw new Error(error.message || 'Reseller login failed. Please check your credentials or network connection.');
   }
 }
 

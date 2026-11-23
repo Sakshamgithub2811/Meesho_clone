@@ -1,28 +1,58 @@
 import prisma from '../config/prisma.js';
 import transporter from '../config/emailTransporter.js';
 import { calculateCouponDiscount } from './coupon.controller.js';
-import { sendOrderConfirmationEmail } from '../utils/emailTemplates.js';
+import {
+  sendOrderConfirmationEmail,
+  sendOrderDispatchedEmail,
+  sendOrderOutForDeliveryEmail
+} from '../utils/emailTemplates.js';
 
 const getUserId = (req) => {
   return req.user?.id || req.headers['x-user-id'] || req.query.userId || 'guest_customer';
 };
 
-const ensureProfile = async (userId) => {
+const ensureProfile = async (userId, incomingEmail = null, fullName = null, phone = null) => {
   if (!userId) return null;
+  const cleanEmail = (incomingEmail && incomingEmail.includes('@') && !incomingEmail.endsWith('@customer.meesho'))
+    ? incomingEmail.toLowerCase().trim()
+    : `${userId}@customer.meesho`;
+
   try {
+    if (incomingEmail && incomingEmail.includes('@') && !incomingEmail.endsWith('@customer.meesho')) {
+      const existing = await prisma.profile.findFirst({
+        where: { email: { equals: incomingEmail.toLowerCase().trim(), mode: 'insensitive' } }
+      });
+      if (existing) return existing;
+    }
+
     return await prisma.profile.upsert({
       where: { id: userId },
       update: {},
       create: {
         id: userId,
-        fullName: 'Customer',
-        email: `${userId}@customer.meesho`,
+        fullName: fullName || 'Customer',
+        email: cleanEmail,
+        phone: phone || null,
         role: 'CUSTOMER'
       }
     });
   } catch (err) {
     if (err.code === 'P2002') {
-      return await prisma.profile.findUnique({ where: { id: userId } });
+      try {
+        return await prisma.profile.upsert({
+          where: { id: userId },
+          update: {},
+          create: {
+            id: userId,
+            fullName: fullName || 'Customer',
+            email: `${userId}@customer.meesho`,
+            phone: phone || null,
+            role: 'CUSTOMER'
+          }
+        });
+      } catch (_) {
+        return await prisma.profile.findFirst({ where: { OR: [{ id: userId }, { email: cleanEmail }] } });
+      }
     }
     throw err;
   }
@@ -30,8 +60,7 @@ const ensureProfile = async (userId) => {
 
 export const createOrder = async (req, res) => {
   try {
-    const userId = getUserId(req);
-    await ensureProfile(userId);
+    let userId = getUserId(req);
 
     const {
       items, // array of { productId, quantity, size }
@@ -41,6 +70,17 @@ export const createOrder = async (req, res) => {
       referralCode
     } = req.body;
 
+    // Validate and sanitize payment method to match Prisma PaymentMethod enum: COD, UPI, CARD, NETBANKING, WALLET
+    const rawMethod = (paymentMethod || 'COD').toString().toUpperCase().trim();
+    let validPaymentMethod = 'COD';
+    if (['COD', 'UPI', 'CARD', 'NETBANKING', 'WALLET'].includes(rawMethod)) {
+      validPaymentMethod = rawMethod;
+    } else if (rawMethod === 'ONLINE' || rawMethod === 'RAZORPAY') {
+      validPaymentMethod = 'UPI';
+    } else {
+      validPaymentMethod = 'COD';
+    }
+
     if (!items || !items.length) {
       return res.status(400).json({ success: false, message: 'Order items are required' });
     }
@@ -49,16 +89,33 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Shipping address is required' });
     }
 
-    // Map payment method to enum
-    let validPaymentMethod = 'COD';
-    const pmUpper = (paymentMethod || '').toUpperCase();
-    if (['COD', 'UPI', 'CARD', 'NETBANKING', 'WALLET'].includes(pmUpper)) {
-      validPaymentMethod = pmUpper;
-    }
-
     let parsedShippingAddress = typeof shippingAddress === 'string' ? JSON.parse(shippingAddress) : shippingAddress;
 
-    const incomingEmail = (req.body.customerEmail || req.headers['x-user-email'] || req.user?.email || parsedShippingAddress?.email || '').trim();
+    const incomingEmail = (req.body.customerEmail || req.headers['x-user-email'] || req.user?.email || parsedShippingAddress?.email || '').trim().toLowerCase();
+    const incomingPhone = (parsedShippingAddress?.phone || parsedShippingAddress?.mobileNumber || req.headers['x-user-phone'] || '').trim();
+
+    // If userId is unauthenticated/guest or customer_..., automatically link to real profile if email/phone matches
+    if (!req.user?.id || userId.startsWith('guest_') || userId.startsWith('customer_')) {
+      if (incomingEmail && incomingEmail.includes('@') && !incomingEmail.endsWith('@customer.meesho')) {
+        const existingUser = await prisma.profile.findFirst({
+          where: { email: { equals: incomingEmail, mode: 'insensitive' } },
+          orderBy: { createdAt: 'asc' }
+        });
+        if (existingUser) {
+          userId = existingUser.id;
+        }
+      } else if (incomingPhone && incomingPhone.length === 10) {
+        const existingUser = await prisma.profile.findFirst({
+          where: { phone: incomingPhone },
+          orderBy: { createdAt: 'asc' }
+        });
+        if (existingUser) {
+          userId = existingUser.id;
+        }
+      }
+    }
+
+    await ensureProfile(userId, incomingEmail, parsedShippingAddress?.name, incomingPhone);
 
     if (parsedShippingAddress) {
       const name = (parsedShippingAddress.name || parsedShippingAddress.fullName || '').trim();
@@ -142,19 +199,25 @@ export const createOrder = async (req, res) => {
       finalOrderTotal = Math.max(0, authoritativeTotal - discount);
     }
 
-    // Atomic transaction: Decrement stock, create order, clear user cart
+    const allowedPaymentMethods = ['COD', 'UPI', 'CARD', 'NETBANKING', 'WALLET'];
+    const normalizedMethod = String(paymentMethod || 'COD').toUpperCase().trim();
+    const validPaymentMethod = allowedPaymentMethods.includes(normalizedMethod) ? normalizedMethod : 'COD';
+
+    // Atomic transaction: Decrement stock, create order, clear user cart with extended timeout for cloud DB
     const order = await prisma.$transaction(async (tx) => {
-      // 1. Decrement inventory for each product
-      for (const item of validatedItems) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: {
-              decrement: item.quantity
+      // 1. Decrement inventory for each product in parallel
+      await Promise.all(
+        validatedItems.map(item =>
+          tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: {
+                decrement: item.quantity
+              }
             }
-          }
-        });
-      }
+          })
+        )
+      );
 
       // 2. Create the order with verified pricing
       const newOrder = await tx.order.create({
@@ -199,6 +262,9 @@ export const createOrder = async (req, res) => {
       }
 
       return newOrder;
+    }, {
+      maxWait: 15000,
+      timeout: 30000
     });
 
     // 5. Affiliate Referral Attribution & Real Database Custom Margin Credit
@@ -216,71 +282,73 @@ export const createOrder = async (req, res) => {
         const directMargin = parseFloat(req.body.marginAmount) || 0;
         const commissionAmount = Math.round(Math.max(calculatedMargin, directMargin));
 
-        // Find the affiliate partner profile
-        const refPrefix = cleanRef.replace(/^AFF-/, '').slice(0, 5).toLowerCase();
+        // Find the referrer or affiliate partner profile
+        const cleanSuffix = cleanRef.replace(/^(MSHOPPY|AFF-)/, '');
         let affiliateProfile = await prisma.profile.findFirst({
           where: {
             OR: [
               { storeName: cleanRef },
               { id: cleanRef },
-              ...(refPrefix.length >= 3 ? [{ email: { startsWith: refPrefix } }] : [])
+              ...(cleanSuffix.length >= 3 ? [{ email: { startsWith: cleanSuffix.toLowerCase() } }] : []),
+              ...(cleanSuffix.length >= 4 ? [{ phone: { endsWith: cleanSuffix } }] : [])
             ]
           },
           include: { wallet: true }
         });
 
-        // Fallback: If not found, match with active reseller/affiliate
-        if (!affiliateProfile) {
-          affiliateProfile = await prisma.profile.findFirst({
-            where: { role: 'RESELLER' },
-            include: { wallet: true }
-          });
-        }
-
-        if (affiliateProfile && affiliateProfile.id !== userId && commissionAmount > 0) {
-          // Record referral in PostgreSQL referrals table
-          await prisma.referral.create({
-            data: {
+        if (affiliateProfile && affiliateProfile.id !== userId) {
+          // Record or link referral in PostgreSQL referrals table for Invite & Earn
+          const existingRef = await prisma.referral.findFirst({
+            where: {
               referrerId: affiliateProfile.id,
-              referredId: userId,
-              code: cleanRef,
-              rewardAmount: commissionAmount,
-              isRedeemed: true
+              referredId: userId
             }
-          }).catch(e => console.warn('Referral creation note:', e.message));
+          });
 
-          // Ensure wallet exists for affiliate
-          let wallet = affiliateProfile.wallet;
-          if (!wallet) {
-            wallet = await prisma.wallet.create({
+          if (!existingRef) {
+            await prisma.referral.create({
               data: {
-                userId: affiliateProfile.id,
-                balance: 0,
-                pending: 0
+                referrerId: affiliateProfile.id,
+                referredId: userId,
+                code: cleanRef,
+                rewardAmount: commissionAmount > 0 ? commissionAmount : 0,
+                isRedeemed: true
               }
-            });
+            }).catch(e => console.warn('Referral creation note:', e.message));
           }
 
-          // Credit the custom margin into the affiliate's real database wallet
-          await prisma.wallet.update({
-            where: { id: wallet.id },
-            data: {
-              balance: { increment: commissionAmount }
+          // If there is custom reseller margin commission, credit to wallet immediately
+          if (commissionAmount > 0) {
+            let wallet = affiliateProfile.wallet;
+            if (!wallet) {
+              wallet = await prisma.wallet.create({
+                data: {
+                  userId: affiliateProfile.id,
+                  balance: 0,
+                  pending: 0
+                }
+              });
             }
-          });
 
-          // Create wallet transaction record for passbook & audit trail
-          await prisma.walletTransaction.create({
-            data: {
-              walletId: wallet.id,
-              amount: commissionAmount,
-              type: 'credit',
-              description: `Affiliate Custom Margin for Order #${order.id.slice(-6).toUpperCase()}`,
-              orderId: order.id
-            }
-          });
+            await prisma.wallet.update({
+              where: { id: wallet.id },
+              data: {
+                balance: { increment: commissionAmount }
+              }
+            });
 
-          console.log(`[Affiliate] Credited ₹${commissionAmount} custom margin to ${affiliateProfile.email || affiliateProfile.fullName} for Order ${order.id}`);
+            await prisma.walletTransaction.create({
+              data: {
+                walletId: wallet.id,
+                amount: commissionAmount,
+                type: 'credit',
+                description: `Affiliate Custom Margin for Order #${order.id.slice(-6).toUpperCase()}`,
+                orderId: order.id
+              }
+            });
+
+            console.log(`[Affiliate] Credited ₹${commissionAmount} custom margin to ${affiliateProfile.email || affiliateProfile.fullName} for Order ${order.id}`);
+          }
         }
       } catch (affiliateErr) {
         console.warn('Affiliate custom margin credit note:', affiliateErr.message);
@@ -330,11 +398,30 @@ export const createOrder = async (req, res) => {
 
 export const getOrders = async (req, res) => {
   try {
-    const userId = getUserId(req);
+    let userId = getUserId(req);
     await ensureProfile(userId);
 
+    const userIds = [userId];
+    const profile = await prisma.profile.findUnique({ where: { id: userId } });
+
+    // Link orders across matching email or phone so customer never loses visibility
+    if (profile?.email && !profile.email.endsWith('@customer.meesho')) {
+      const peers = await prisma.profile.findMany({
+        where: { email: { equals: profile.email, mode: 'insensitive' } },
+        select: { id: true }
+      });
+      peers.forEach(p => { if (!userIds.includes(p.id)) userIds.push(p.id); });
+    }
+    if (profile?.phone) {
+      const peers = await prisma.profile.findMany({
+        where: { phone: profile.phone },
+        select: { id: true }
+      });
+      peers.forEach(p => { if (!userIds.includes(p.id)) userIds.push(p.id); });
+    }
+
     const orders = await prisma.order.findMany({
-      where: { userId },
+      where: { userId: { in: userIds } },
       include: {
         items: {
           include: {
@@ -560,13 +647,71 @@ export const updateOrderStatus = async (req, res) => {
       }
     }
 
-    // Auto-dispatch delivery OTP email as soon as marked OUT_FOR_DELIVERY
+    // Auto-dispatch dispatch alert email if status is updated to SHIPPED
+    if (upperStatus === 'SHIPPED') {
+      sendOrderDispatchedEmail({ order: updated })
+        .then((res) => console.log(`📦 [Order ${id}] Automated SHIPPED email sent to: ${res.sentTo} (AWB: ${res.awb})`))
+        .catch((err) => console.warn(`⚠️ [Order ${id}] Automated SHIPPED email error:`, err.message));
+    }
+
+    // Auto-dispatch universal delivery verification OTP email if status is updated to OUT_FOR_DELIVERY
     if (upperStatus === 'OUT_FOR_DELIVERY') {
+      sendOrderOutForDeliveryEmail({ order: updated })
+        .then((res) => console.log(`🚚 [Order ${id}] Automated OUT_FOR_DELIVERY OTP email sent to: ${res.sentTo} (OTP: ${res.otp})`))
+        .catch((err) => console.warn(`⚠️ [Order ${id}] Automated OUT_FOR_DELIVERY OTP email error:`, err.message));
+    }
+
+    // Auto-credit ₹123 referral cashback to the referrer if this is the friend's 1st delivered order!
+    if (upperStatus === 'DELIVERED') {
       try {
-        const otpResult = await dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' });
-        console.log(`🚚 [Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${otpResult.sentTo}`);
-      } catch (err) {
-        console.error(`⚠️ [Order ${id}] OUT_FOR_DELIVERY email dispatch error:`, err.message);
+        const referral = await prisma.referral.findFirst({
+          where: {
+            referredId: updated.userId
+          },
+          include: { referrer: { include: { wallet: true } } }
+        });
+
+        if (referral) {
+          let referrerWallet = referral.referrer?.wallet;
+          if (!referrerWallet) {
+            referrerWallet = await prisma.wallet.create({
+              data: { userId: referral.referrerId, balance: 0, pending: 0 }
+            });
+          }
+
+          const alreadyCredited = referrerWallet?.id ? await prisma.walletTransaction.findFirst({
+            where: {
+              walletId: referrerWallet.id,
+              description: { contains: 'Refer & Earn' }
+            }
+          }) : null;
+
+          if (!alreadyCredited) {
+            await prisma.wallet.update({
+              where: { id: referrerWallet.id },
+              data: { balance: { increment: 123 } }
+            });
+
+            await prisma.walletTransaction.create({
+              data: {
+                walletId: referrerWallet.id,
+                amount: 123,
+                type: 'credit',
+                description: `Refer & Earn: ₹123 credited! Friend's 1st order was delivered!`,
+                orderId: updated.id
+              }
+            });
+
+            await prisma.referral.update({
+              where: { id: referral.id },
+              data: { rewardAmount: (referral.rewardAmount || 0) + 123, isRedeemed: true }
+            });
+
+            console.log(`🎁 [Referral Reward] Credited ₹123 cash into referrer ${referral.referrerId}'s wallet!`);
+          }
+        }
+      } catch (refErr) {
+        console.warn('Referral reward processing note:', refErr.message);
       }
     }
 
@@ -645,31 +790,47 @@ export const dispatchDeliveryOtpEmail = async ({
     }
   }
 
-  // Default to SMTP user for development/demo testing if dummy email
+  // Only send to valid real customer email address
   if (!targetEmail || targetEmail.endsWith('@customer.meesho')) {
-    targetEmail = email || process.env.SMTP_USER;
-  }
-
-  const isPickup = (type || '').toUpperCase().includes('PICKUP') || (type || '').toUpperCase().includes('RETURN');
-
-  // Strict enforcement: DELIVERY OTP is only emailed when the order is OUT_FOR_DELIVERY
-  if (!isPickup && orderDetails) {
-    const currentStatus = (orderDetails.orderStatus || '').toUpperCase();
-    if (currentStatus !== 'OUT_FOR_DELIVERY') {
-      console.log(`ℹ️ [OTP Email] Skipping DELIVERY OTP for Order ${orderId}: status is "${currentStatus}" (OTP only sent upon OUT_FOR_DELIVERY).`);
+    if (email && !email.endsWith('@customer.meesho')) {
+      targetEmail = email;
+    } else {
       return {
         success: false,
-        message: `Delivery OTP email is only dispatched when order is OUT_FOR_DELIVERY (current: ${currentStatus}).`,
+        message: 'No valid customer email address available for OTP delivery.',
         sentTo: null,
         otp: null
       };
     }
   }
 
+  const isPickup = (type || '').toUpperCase().includes('PICKUP') || (type || '').toUpperCase().includes('RETURN');
+
+  // Strict enforcement: RETURN PICKUP OTP is only sent if slot is TODAY or driver has arrived
+  if (isPickup && slotLabel && !slotLabel.toLowerCase().includes('today')) {
+    console.log(`ℹ️ [OTP Email] Skipping RETURN OTP for Order ${orderId}: scheduled for "${slotLabel}" (OTP is only sent on pickup day).`);
+    return {
+      success: false,
+      message: `Return pickup OTP email is only dispatched on scheduled pickup day (current: ${slotLabel}).`,
+      sentTo: null,
+      otp: null
+    };
+  }
+
+  // Universal Delivery Verification OTP: Applicable for BOTH Prepaid and COD orders!
+  if (!isPickup) {
+    return await sendOrderOutForDeliveryEmail({
+      order: orderDetails,
+      orderId,
+      otp: finalOtp,
+      customEmail: targetEmail,
+      recipientName: targetName,
+      slotLabel
+    });
+  }
+
   console.log(`📨 [OTP Email] Sending ${type} OTP (${finalOtp}) to login email: ${targetEmail}`);
-  const subject = isPickup
-    ? `🚚 Mshoppy Return Pickup Alert: Rider arriving for pickup (OTP: ${finalOtp})`
-    : `🚚 Mshoppy Order Delivery Alert: Out for Delivery (OTP: ${finalOtp})`;
+  const subject = `🚚 Mshoppy Return Pickup Alert: Rider arriving for pickup (OTP: ${finalOtp})`;
 
   const itemTitle = orderDetails?.items?.[0]?.product?.title || 'Catalog Purchase';
 
@@ -752,6 +913,79 @@ export const sendOtpEmail = async (req, res) => {
   }
 };
 
+/**
+ * Manual Admin / Operational trigger: Resend Order Dispatched (SHIPPED) Email
+ * POST /api/orders/:id/resend-dispatch-email
+ */
+export const resendDispatchEmail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { customEmail, courierPartner, trackingNumber, trackingUrl, recipientName } = req.body;
+
+    const result = await sendOrderDispatchedEmail({
+      orderId: id,
+      courierPartner,
+      trackingNumber,
+      trackingUrl,
+      customEmail,
+      recipientName
+    });
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Dispatch alert email successfully sent to ${result.sentTo}`,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error resending dispatch email:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to resend dispatch email',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Manual Admin / Operational trigger: Resend Out for Delivery OTP Email
+ * POST /api/orders/:id/resend-delivery-otp
+ */
+export const resendDeliveryOtpEmail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { customEmail, otp, recipientName, slotLabel } = req.body;
+
+    const result = await sendOrderOutForDeliveryEmail({
+      orderId: id,
+      otp,
+      customEmail,
+      recipientName,
+      slotLabel
+    });
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Delivery OTP email successfully sent to ${result.sentTo} (OTP: ${result.otp})`,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error resending delivery OTP email:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to resend delivery OTP email',
+      error: error.message
+    });
+  }
+};
+
 export const submitReturnRequest = async (req, res) => {
   try {
     const {
@@ -789,14 +1023,15 @@ export const submitReturnRequest = async (req, res) => {
     const finalReason = reasonParts.join(' | ') || 'Customer Return Request';
 
     // Sanitize image URLs/filenames to pure string array (Prisma requires String[])
+    // Disallow local browser blob: URLs as they cannot be viewed across sessions/devices
     const cleanImages = Array.isArray(images)
       ? images
           .map((img) => {
-            if (typeof img === 'string') return img;
-            if (img && typeof img === 'object') return img.url || img.name || '';
+            if (typeof img === 'string') return img.trim();
+            if (img && typeof img === 'object') return (img.url || img.remoteUrl || img.name || '').trim();
             return '';
           })
-          .filter(Boolean)
+          .filter((img) => img && !img.startsWith('blob:'))
       : [];
 
     // Upsert return request in PostgreSQL database

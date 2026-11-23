@@ -24,6 +24,14 @@ export default function CustomerOrders({ onNavigate, onBack }) {
   const [cancellingOrder, setCancellingOrder] = useState(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
+  const [collapsedTracking, setCollapsedTracking] = useState({});
+
+  const toggleTracking = (orderId) => {
+    setCollapsedTracking((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }));
+  };
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -195,33 +203,7 @@ export default function CustomerOrders({ onNavigate, onBack }) {
 
   // Dynamic Flipkart tracking timeline calculator based on order timestamps
   const getTrackingTimeline = (order) => {
-    const baseTime = new Date(order.rawCreatedAt || Date.now());
-
-    const dayOrdinal = (d) => {
-      const day = d.getDate();
-      if (day > 3 && day < 21) return `${day}th`;
-      switch (day % 10) {
-        case 1: return `${day}st`;
-        case 2: return `${day}nd`;
-        case 3: return `${day}rd`;
-        default: return `${day}th`;
-      }
-    };
-
-    const fmtFull = (d) => {
-      const weekday = d.toLocaleDateString('en-IN', { weekday: 'short' });
-      const month = d.toLocaleDateString('en-IN', { month: 'short' });
-      const year = d.toLocaleDateString('en-IN', { year: '2-digit' });
-      const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
-      return `${weekday}, ${dayOrdinal(d)} ${month} '${year} - ${time}`;
-    };
-
-    const fmtDayDate = (d) => {
-      const weekday = d.toLocaleDateString('en-IN', { weekday: 'short' });
-      const month = d.toLocaleDateString('en-IN', { month: 'short' });
-      const year = d.toLocaleDateString('en-IN', { year: '2-digit' });
-      return `${weekday}, ${dayOrdinal(d)} ${month} '${year}`;
-    };
+    const baseTime = new Date(order.rawCreatedAt || order.createdAt || Date.now());
 
     const fmtShortDate = (d) => {
       const weekday = d.toLocaleDateString('en-IN', { weekday: 'short' });
@@ -230,35 +212,36 @@ export default function CustomerOrders({ onNavigate, onBack }) {
       return `${weekday} ${month} ${day}`;
     };
 
-    // Realistic milestone offsets
-    const tPlaced = new Date(baseTime.getTime());
-    const tProcessed = new Date(baseTime.getTime() + 16 * 3600 * 1000);
-    const tPickedUp = new Date(baseTime.getTime() + 43 * 3600 * 1000);
-    const tShipped = new Date(baseTime.getTime() + 45 * 3600 * 1000);
-    const tArrived1 = new Date(baseTime.getTime() + 57 * 3600 * 1000);
-    const tArrived2 = new Date(baseTime.getTime() + 58 * 3600 * 1000);
-    const tLeft = new Date(baseTime.getTime() + 61 * 3600 * 1000);
-    const tExpected = new Date(baseTime.getTime() + 7 * 24 * 3600 * 1000);
+    const fmtDayDate = (d) => {
+      const weekday = d.toLocaleDateString('en-IN', { weekday: 'short' });
+      const day = d.getDate();
+      const month = d.toLocaleDateString('en-IN', { month: 'short' });
+      const year = d.toLocaleDateString('en-IN', { year: '2-digit' });
+      return `${weekday}, ${day} ${month} '${year}`;
+    };
 
-    const trackingCode = 'SF' + (order.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase() || '3604819638F');
+    const placedDateStr = fmtDayDate(baseTime);
+    const shortPlacedDate = fmtShortDate(baseTime);
+    const shippedDateStr = order.shippedAt ? fmtDayDate(new Date(order.shippedAt)) : fmtDayDate(baseTime);
+    const shortShippedDate = order.shippedAt ? fmtShortDate(new Date(order.shippedAt)) : fmtShortDate(baseTime);
 
     return {
-      placedDateStr: fmtDayDate(tPlaced),
-      shippedDateStr: fmtDayDate(tShipped),
-      shortPlacedDate: fmtShortDate(tPlaced),
-      shortShippedDate: fmtShortDate(tShipped),
-      deliveryLabelDate: `${fmtShortDate(tExpected)} by 11 PM`,
-      expectedDeliveryStr: `Fri ${dayOrdinal(tExpected)} ${tExpected.toLocaleDateString('en-IN', { month: 'short' })}`,
-      trackingPartner: 'Shadowfax',
-      trackingCode,
+      placedDateStr,
+      shippedDateStr,
+      shortPlacedDate,
+      shortShippedDate,
+      deliveryLabelDate: 'Delivery in progress',
+      expectedDeliveryStr: 'Soon',
+      trackingPartner: 'Standard Courier',
+      trackingCode: '',
       events: {
-        placed: fmtFull(tPlaced),
-        processed: fmtFull(tProcessed),
-        pickedUp: fmtFull(tPickedUp),
-        shipped: fmtFull(tShipped),
-        arrived1: `${fmtFull(tArrived1)} - Gurgaon`,
-        arrived2: `${fmtFull(tArrived2)} - Gurgaon`,
-        left: `${fmtFull(tLeft)} - Gurgaon`,
+        placed: `${baseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Order received & verified`,
+        processed: 'Seller acknowledged & packed item',
+        pickedUp: 'Courier partner dispatched package',
+        shipped: shippedDateStr,
+        arrived1: 'In transit to destination city',
+        arrived2: 'In transit to destination city',
+        left: 'Arrived at local delivery hub',
       }
     };
   };
@@ -459,6 +442,7 @@ export default function CustomerOrders({ onNavigate, onBack }) {
             const isCancellable = (isOrdered || isShipped) && !isReturned;
 
             const returnData = order.returnRequest || null;
+            const isCollapsed = !!collapsedTracking[order.id];
 
             return (
               <article
@@ -560,10 +544,14 @@ export default function CustomerOrders({ onNavigate, onBack }) {
                         Flipkart Order Status Card Component
                         ───────────────────────────────────────────────────────────── */}
                     <div className="bg-[#fafbfc] rounded-2xl border border-slate-200/90 p-4 space-y-3.5">
-                    {/* Status Header */}
-                    <div className="flex items-center justify-between">
+                    {/* Status Header (Clickable Accordion) */}
+                    <div
+                      onClick={() => toggleTracking(order.id)}
+                      className="flex items-center justify-between cursor-pointer select-none group"
+                      title={isCollapsed ? 'Click to view tracking details' : 'Click to collapse tracking details'}
+                    >
                       <div className="flex items-center gap-1.5">
-                        <h3 className="font-extrabold text-slate-900 text-sm sm:text-base tracking-tight">
+                        <h3 className="font-extrabold text-slate-900 text-sm sm:text-base tracking-tight group-hover:text-[#9f0038] transition-colors">
                           {isReturned
                             ? 'Return in Progress'
                             : isDelivered
@@ -576,7 +564,9 @@ export default function CustomerOrders({ onNavigate, onBack }) {
                             ? 'Shipped'
                             : 'Order Confirmed'}
                         </h3>
-                        <span className="material-symbols-outlined text-slate-400 text-base">expand_less</span>
+                        <span className="material-symbols-outlined text-slate-400 group-hover:text-slate-700 text-base transition-transform duration-200">
+                          {isCollapsed ? 'expand_more' : 'expand_less'}
+                        </span>
                       </div>
                       <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-md ${
                         isReturned
@@ -605,241 +595,245 @@ export default function CustomerOrders({ onNavigate, onBack }) {
                       </span>
                     </div>
 
-                    {/* Live Status Description */}
-                    <p className="text-xs text-slate-700 font-medium">
-                      {isReturned ? (
-                        <span>
-                          Return registered{returnData?.requestedAt ? ` on ${new Date(returnData.requestedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}: Our courier partner (Shadowfax Logistics) is scheduled for return collection during your slot: <strong>{returnData?.slot || 'Today'}</strong>.
-                        </span>
-                      ) : isDelivered ? (
-                        <span>Delivered safely on {order.orderDate}. Handed directly to recipient.</span>
-                      ) : isCancelled ? (
-                        <span className="text-red-700 font-semibold">
-                          This order was cancelled. {order.paymentMethod !== 'COD' ? 'Refund initiated to your account.' : 'No payment was deducted.'}
-                        </span>
-                      ) : isOutForDelivery ? (
-                        <span>Today: Out for delivery with delivery partner. Arriving by 9 PM.</span>
-                      ) : isShipped ? (
-                        <span>In Transit: Product has left the facility and is on its way to your destination city.</span>
-                      ) : (
-                        <span>Placed on {order.orderDate}: Order received! Seller is preparing and packing your package for dispatch.</span>
-                      )}
-                    </p>
-
-                    {/* Horizontal 3-Step Progress Bar */}
-                    <div className="pt-2 px-1">
-                      {isReturned ? (
-                        <div className="relative flex items-center justify-between">
-                          {/* Connecting Track Line */}
-                          <div className="absolute left-8 right-8 top-3 h-0.5 bg-slate-200 -z-0">
-                            <div
-                              className="h-full bg-gradient-to-r from-emerald-600 to-amber-500 transition-all duration-500"
-                              style={{ width: '50%' }}
-                            />
-                          </div>
-
-                          {/* Step 1: Return Requested */}
-                          <div className="flex flex-col items-center relative z-10 text-center w-28">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm bg-emerald-600 text-white">
-                              ✓
-                            </div>
-                            <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Return Requested</span>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              {returnData?.requestedAt ? new Date(returnData.requestedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Done'}
+                    {!isCollapsed && (
+                      <>
+                        {/* Live Status Description */}
+                        <p className="text-xs text-slate-700 font-medium">
+                          {isReturned ? (
+                            <span>
+                              Return registered{returnData?.requestedAt ? ` on ${new Date(returnData.requestedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}: Our courier partner (Shadowfax Logistics) is scheduled for return collection during your slot: <strong>{returnData?.slot || 'Today'}</strong>.
                             </span>
-                          </div>
-
-                          {/* Step 2: Courier Pickup */}
-                          <div className="flex flex-col items-center relative z-10 text-center w-28">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm bg-amber-500 text-white animate-pulse">
-                              ⏳
-                            </div>
-                            <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Courier Pickup</span>
-                            <span className="text-[10px] text-amber-700 font-bold">
-                              {returnData?.slot ? returnData.slot.split(',')[0] : 'In Progress'}
+                          ) : isDelivered ? (
+                            <span>Delivered safely on {order.orderDate}. Handed directly to recipient.</span>
+                          ) : isCancelled ? (
+                            <span className="text-red-700 font-semibold">
+                              This order was cancelled. {order.paymentMethod !== 'COD' ? 'Refund initiated to your account.' : 'No payment was deducted.'}
                             </span>
-                          </div>
+                          ) : isOutForDelivery ? (
+                            <span>Today: Out for delivery with delivery partner. Arriving by 9 PM.</span>
+                          ) : isShipped ? (
+                            <span>In Transit: Product has left the facility and is on its way to your destination city.</span>
+                          ) : (
+                            <span>Placed on {order.orderDate}: Order received! Seller is preparing and packing your package for dispatch.</span>
+                          )}
+                        </p>
 
-                          {/* Step 3: Refund Processed */}
-                          <div className="flex flex-col items-center relative z-10 text-center w-28">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm border-2 border-slate-300 bg-white text-slate-400">
-                              ₹
+                        {/* Horizontal 3-Step Progress Bar */}
+                        <div className="pt-2 px-1">
+                          {isReturned ? (
+                            <div className="relative flex items-center justify-between">
+                              {/* Connecting Track Line */}
+                              <div className="absolute left-8 right-8 top-3 h-0.5 bg-slate-200 -z-0">
+                                <div
+                                  className="h-full bg-gradient-to-r from-emerald-600 to-amber-500 transition-all duration-500"
+                                  style={{ width: '50%' }}
+                                />
+                              </div>
+
+                              {/* Step 1: Return Requested */}
+                              <div className="flex flex-col items-center relative z-10 text-center w-28">
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm bg-emerald-600 text-white">
+                                  ✓
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Return Requested</span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {returnData?.requestedAt ? new Date(returnData.requestedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Done'}
+                                </span>
+                              </div>
+
+                              {/* Step 2: Courier Pickup */}
+                              <div className="flex flex-col items-center relative z-10 text-center w-28">
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm bg-amber-500 text-white animate-pulse">
+                                  ⏳
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Courier Pickup</span>
+                                <span className="text-[10px] text-amber-700 font-bold">
+                                  {returnData?.slot ? returnData.slot.split(',')[0] : 'In Progress'}
+                                </span>
+                              </div>
+
+                              {/* Step 3: Refund Processed */}
+                              <div className="flex flex-col items-center relative z-10 text-center w-28">
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm border-2 border-slate-300 bg-white text-slate-400">
+                                  ₹
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Refund Credited</span>
+                                <span className="text-[10px] text-slate-400 font-medium">₹{order.price} to Bank</span>
+                              </div>
                             </div>
-                            <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Refund Credited</span>
-                            <span className="text-[10px] text-slate-400 font-medium">₹{order.price} to Bank</span>
-                          </div>
+                          ) : (
+                            <div className="relative flex items-center justify-between">
+                              {/* Connecting Track Line */}
+                              <div className="absolute left-8 right-8 top-3 h-0.5 bg-slate-200 -z-0">
+                                <div
+                                  className="h-full bg-emerald-600 transition-all duration-500"
+                                  style={{
+                                    width: isDelivered
+                                      ? '100%'
+                                      : isCancelled
+                                      ? '0%'
+                                      : isOutForDelivery
+                                      ? '80%'
+                                      : isShipped
+                                      ? '50%'
+                                      : '0%'
+                                  }}
+                                />
+                              </div>
+
+                              {/* Step 1: Order Confirmed */}
+                              <div className="flex flex-col items-center relative z-10 text-center w-24">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${
+                                  isCancelled ? 'bg-slate-300 text-white' : 'bg-emerald-600 text-white'
+                                }`}>
+                                  ✓
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Order Confirmed</span>
+                                <span className="text-[10px] text-slate-400 font-medium">{trackInfo.shortPlacedDate}</span>
+                              </div>
+
+                              {/* Step 2: Shipped */}
+                              <div className="flex flex-col items-center relative z-10 text-center w-24">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${
+                                  isCancelled
+                                    ? 'bg-red-500 text-white'
+                                    : (isShipped || isOutForDelivery || isDelivered)
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'border-2 border-slate-300 bg-white text-transparent'
+                                }`}>
+                                  {isCancelled ? '✕' : (isShipped || isOutForDelivery || isDelivered) ? '✓' : ''}
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">
+                                  {isCancelled ? 'Cancelled' : 'Shipped'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {isCancelled
+                                    ? order.orderDate
+                                    : (isShipped || isOutForDelivery || isDelivered)
+                                    ? trackInfo.shortShippedDate
+                                    : 'Pending'}
+                                </span>
+                              </div>
+
+                              {/* Step 3: Delivery */}
+                              <div className="flex flex-col items-center relative z-10 text-center w-28">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${
+                                  isDelivered
+                                    ? 'bg-emerald-600 text-white'
+                                    : isCancelled
+                                    ? 'border-2 border-slate-200 bg-slate-100 text-slate-400'
+                                    : 'border-2 border-slate-300 bg-white text-transparent'
+                                }`}>
+                                  {isDelivered ? '✓' : isCancelled ? '—' : ''}
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Delivery</span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {isDelivered ? order.orderDate : isCancelled ? 'Cancelled' : trackInfo.deliveryLabelDate}
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <div className="relative flex items-center justify-between">
-                          {/* Connecting Track Line */}
-                          <div className="absolute left-8 right-8 top-3 h-0.5 bg-slate-200 -z-0">
-                            <div
-                              className="h-full bg-emerald-600 transition-all duration-500"
-                              style={{
-                                width: isDelivered
-                                  ? '100%'
-                                  : isCancelled
-                                  ? '0%'
-                                  : isOutForDelivery
-                                  ? '80%'
-                                  : isShipped
-                                  ? '50%'
-                                  : '0%'
-                              }}
-                            />
-                          </div>
 
-                          {/* Step 1: Order Confirmed */}
-                          <div className="flex flex-col items-center relative z-10 text-center w-24">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${
-                              isCancelled ? 'bg-slate-300 text-white' : 'bg-emerald-600 text-white'
-                            }`}>
-                              ✓
-                            </div>
-                            <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Order Confirmed</span>
-                            <span className="text-[10px] text-slate-400 font-medium">{trackInfo.shortPlacedDate}</span>
-                          </div>
-
-                          {/* Step 2: Shipped */}
-                          <div className="flex flex-col items-center relative z-10 text-center w-24">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${
-                              isCancelled
-                                ? 'bg-red-500 text-white'
-                                : (isShipped || isOutForDelivery || isDelivered)
-                                ? 'bg-emerald-600 text-white'
-                                : 'border-2 border-slate-300 bg-white text-transparent'
-                            }`}>
-                              {isCancelled ? '✕' : (isShipped || isOutForDelivery || isDelivered) ? '✓' : ''}
-                            </div>
-                            <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">
-                              {isCancelled ? 'Cancelled' : 'Shipped'}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              {isCancelled
-                                ? order.orderDate
-                                : (isShipped || isOutForDelivery || isDelivered)
-                                ? trackInfo.shortShippedDate
-                                : 'Pending'}
-                            </span>
-                          </div>
-
-                          {/* Step 3: Delivery */}
-                          <div className="flex flex-col items-center relative z-10 text-center w-28">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${
-                              isDelivered
-                                ? 'bg-emerald-600 text-white'
-                                : isCancelled
-                                ? 'border-2 border-slate-200 bg-slate-100 text-slate-400'
-                                : 'border-2 border-slate-300 bg-white text-transparent'
-                            }`}>
-                              {isDelivered ? '✓' : isCancelled ? '—' : ''}
-                            </div>
-                            <span className="text-[11px] font-bold text-slate-800 mt-1 leading-tight">Delivery</span>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              {isDelivered ? order.orderDate : isCancelled ? 'Cancelled' : trackInfo.deliveryLabelDate}
-                            </span>
-                          </div>
+                        {/* Notice Callout */}
+                        <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 flex items-start gap-2 text-xs">
+                          <span className="material-symbols-outlined text-slate-400 text-base shrink-0 mt-0.5">
+                            {isReturned ? 'inventory_2' : 'info'}
+                          </span>
+                          <p className="text-slate-600 font-medium leading-relaxed">
+                            {isReturned
+                              ? 'Courier partner (Shadowfax) will visit your doorstep for pickup. Please keep product tags intact and share the 4-digit verification OTP only after item inspection.'
+                              : isDelivered
+                              ? 'Delivery Executive safely completed delivery to your location.'
+                              : isCancelled
+                              ? 'This shipment was cancelled and will not be dispatched to destination.'
+                              : isOutForDelivery
+                              ? 'Delivery partner is on the way to your doorstep. Keep phone reachable.'
+                              : isShipped
+                              ? 'Delivery Executive details will be available once the order is out for delivery.'
+                              : 'Seller is verifying and preparing your package. Tracking code will activate once dispatched.'}
+                          </p>
                         </div>
-                      )}
-                    </div>
 
-                    {/* Notice Callout */}
-                    <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 flex items-start gap-2 text-xs">
-                      <span className="material-symbols-outlined text-slate-400 text-base shrink-0 mt-0.5">
-                        {isReturned ? 'inventory_2' : 'info'}
-                      </span>
-                      <p className="text-slate-600 font-medium leading-relaxed">
-                        {isReturned
-                          ? 'Courier partner (Shadowfax) will visit your doorstep for pickup. Please keep product tags intact and share the 4-digit verification OTP only after item inspection.'
-                          : isDelivered
-                          ? 'Delivery Executive safely completed delivery to your location.'
-                          : isCancelled
-                          ? 'This shipment was cancelled and will not be dispatched to destination.'
-                          : isOutForDelivery
-                          ? 'Delivery partner is on the way to your doorstep. Keep phone reachable.'
-                          : isShipped
-                          ? 'Delivery Executive details will be available once the order is out for delivery.'
-                          : 'Seller is verifying and preparing your package. Tracking code will activate once dispatched.'}
-                      </p>
-                    </div>
-
-                    {/* Doorstep Return Pickup OTP Mini-Card */}
-                    {isReturned && (
-                      <div className="bg-gradient-to-r from-rose-50/90 via-pink-50/60 to-white border border-rose-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-pink-100 text-[#9f0038] flex items-center justify-center text-sm font-black shrink-0">
-                            🛡️
+                        {/* Doorstep Return Pickup OTP Mini-Card */}
+                        {isReturned && (
+                          <div className="bg-gradient-to-r from-rose-50/90 via-pink-50/60 to-white border border-rose-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-lg bg-pink-100 text-[#9f0038] flex items-center justify-center text-sm font-black shrink-0">
+                                🛡️
+                              </div>
+                              <div>
+                                <p className="text-[10px] uppercase font-black text-[#9f0038] tracking-wider">
+                                  Doorstep Return Pickup OTP
+                                </p>
+                                <p className="text-lg font-black font-mono tracking-widest text-slate-900">
+                                  {returnData?.otp || 'Ready'}
+                                </p>
+                              </div>
+                            </div>
+                            {returnData?.otp && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(String(returnData.otp));
+                                  showToast('Pickup OTP copied to clipboard! 📋');
+                                }}
+                                className="px-3 py-1.5 text-xs font-black bg-white hover:bg-rose-50 text-[#9f0038] rounded-xl border border-rose-300 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                              >
+                                Copy OTP
+                              </button>
+                            )}
                           </div>
-                          <div>
-                            <p className="text-[10px] uppercase font-black text-[#9f0038] tracking-wider">
-                              Doorstep Return Pickup OTP
-                            </p>
-                            <p className="text-lg font-black font-mono tracking-widest text-slate-900">
-                              {returnData?.otp || 'Ready'}
-                            </p>
-                          </div>
-                        </div>
-                        {returnData?.otp && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(String(returnData.otp));
-                              showToast('Pickup OTP copied to clipboard! 📋');
-                            }}
-                            className="px-3 py-1.5 text-xs font-black bg-white hover:bg-rose-50 text-[#9f0038] rounded-xl border border-rose-300 shadow-2xs cursor-pointer active:scale-95 transition-all"
-                          >
-                            Copy OTP
-                          </button>
                         )}
-                      </div>
-                    )}
 
-                    {/* Doorstep Prepaid Delivery OTP Mini-Card (Active when OUT_FOR_DELIVERY) */}
-                    {isOutForDelivery && order.paymentMethod !== 'COD' && (() => {
-                      const dynamicDeliveryOtp = order.deliveryOtp || getDynamicDeliveryOtp(order.id);
-                      return (
-                        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/60 to-white border border-emerald-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center text-sm font-black shrink-0">
-                              📦
+                        {/* Doorstep Prepaid Delivery OTP Mini-Card (Active when OUT_FOR_DELIVERY) */}
+                        {isOutForDelivery && order.paymentMethod !== 'COD' && (() => {
+                          const dynamicDeliveryOtp = order.deliveryOtp || getDynamicDeliveryOtp(order.id);
+                          return (
+                            <div className="bg-gradient-to-r from-emerald-50 via-teal-50/60 to-white border border-emerald-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center text-sm font-black shrink-0">
+                                  📦
+                                </div>
+                                <div>
+                                  <p className="text-[10px] uppercase font-black text-emerald-800 tracking-wider">
+                                    Prepaid Delivery OTP (Share with delivery partner)
+                                  </p>
+                                  <p className="text-lg font-black font-mono tracking-widest text-slate-900">
+                                    {dynamicDeliveryOtp}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-1 rounded-md hidden sm:inline-block">
+                                  📱 Sent via SMS &amp; Email
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    copyToClipboard(String(dynamicDeliveryOtp), 'Delivery OTP copied to clipboard! 📋');
+                                  }}
+                                  className="px-3 py-1.5 text-xs font-black bg-white hover:bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-300 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                                >
+                                  Copy OTP
+                                </button>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-[10px] uppercase font-black text-emerald-800 tracking-wider">
-                                Prepaid Delivery OTP (Share with delivery partner)
-                              </p>
-                              <p className="text-lg font-black font-mono tracking-widest text-slate-900">
-                                {dynamicDeliveryOtp}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-1 rounded-md hidden sm:inline-block">
-                              📱 Sent via SMS &amp; Email
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                copyToClipboard(String(dynamicDeliveryOtp), 'Delivery OTP copied to clipboard! 📋');
-                              }}
-                              className="px-3 py-1.5 text-xs font-black bg-white hover:bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-300 shadow-2xs cursor-pointer active:scale-95 transition-all"
-                            >
-                              Copy OTP
-                            </button>
-                          </div>
+                          );
+                        })()}
+
+                        {/* "See all updates" Blue Trigger */}
+                        <div className="pt-1 text-center border-t border-slate-200/60">
+                          <button
+                            onClick={() => setTrackingModalOrder(order)}
+                            className="text-xs sm:text-sm font-black text-blue-600 hover:text-blue-800 cursor-pointer inline-flex items-center gap-1 hover:underline transition-colors py-1"
+                          >
+                            <span>See all updates</span>
+                            <span className="material-symbols-outlined text-sm">chevron_right</span>
+                          </button>
                         </div>
-                      );
-                    })()}
-
-                    {/* "See all updates" Blue Trigger */}
-                    <div className="pt-1 text-center border-t border-slate-200/60">
-                      <button
-                        onClick={() => setTrackingModalOrder(order)}
-                        className="text-xs sm:text-sm font-black text-blue-600 hover:text-blue-800 cursor-pointer inline-flex items-center gap-1 hover:underline transition-colors py-1"
-                      >
-                        <span>See all updates</span>
-                        <span className="material-symbols-outlined text-sm">chevron_right</span>
-                      </button>
-                    </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Actions & Buttons Row */}

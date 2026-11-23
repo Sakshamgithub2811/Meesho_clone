@@ -125,9 +125,11 @@ export default function ShoppingCart({ onNavigate, onBack }) {
       if (savedCoupon) {
         try {
           const parsed = JSON.parse(savedCoupon);
-          if (parsed?.code && parsed?.discountAmount) {
+          if (parsed?.code) {
             setAppliedCoupon(parsed.code);
-            setCouponDiscount(parsed.discountAmount);
+            if (parsed.discountAmount) {
+              setCouponDiscount(parsed.discountAmount);
+            }
           }
         } catch (e) {}
       }
@@ -192,8 +194,11 @@ export default function ShoppingCart({ onNavigate, onBack }) {
         setCouponDiscount(res.data.discountAmount);
         setCouponCode('');
         localStorage.setItem('mshoppy_applied_coupon', JSON.stringify(res.data));
+        if (res.data.isReferralCode || (res.data.code && res.data.code.startsWith('MSHOPPY'))) {
+          localStorage.setItem('mshoppy_referral_code', res.data.code);
+        }
         setShowCouponsModal(false);
-        triggerToast(`🎉 Coupon "${res.data.code}" Applied! Saved ₹${res.data.discountAmount}`);
+        triggerToast(`🎉 Code "${res.data.code}" Applied! Saved ₹${res.data.discountAmount}`);
       } else {
         triggerToast(res?.message || 'Invalid coupon code. Only generated codes are accepted.');
       }
@@ -212,19 +217,34 @@ export default function ShoppingCart({ onNavigate, onBack }) {
   const items = cartData.items || [];
   const totalItemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
 
-  // Dynamic Affiliate Margin Support (e.g. ₹849 + ₹150 = ₹999)
-  const affiliateMargin = Number(localStorage.getItem('mshoppy_affiliate_margin') || 0);
+  // Dynamic Affiliate Margin Support
+  const affiliateMargin = 0;
 
   const totalMRP = items.reduce((acc, item) => {
     const orig = item.product?.originalPrice || item.product?.price || 0;
-    return acc + (orig + (affiliateMargin > 0 ? affiliateMargin : 0)) * item.quantity;
+    return acc + orig * item.quantity;
   }, 0);
 
   const rawProductTotal = items.reduce((acc, item) => {
     const baseP = item.product?.price || 0;
-    const effP = baseP + (affiliateMargin > 0 ? affiliateMargin : 0);
-    return acc + effP * item.quantity;
+    return acc + baseP * item.quantity;
   }, 0);
+
+  useEffect(() => {
+    if (appliedCoupon && rawProductTotal > 0) {
+      const savedCoupon = localStorage.getItem('mshoppy_applied_coupon');
+      if (savedCoupon) {
+        try {
+          const parsed = JSON.parse(savedCoupon);
+          if (parsed?.discountPercent && !parsed.discountAmount) {
+            const calc = Math.round((rawProductTotal * parsed.discountPercent) / 100);
+            const maxD = Number(parsed.maxDiscount || 0);
+            setCouponDiscount(maxD > 0 ? Math.min(calc, maxD) : calc);
+          }
+        } catch (_) {}
+      }
+    }
+  }, [rawProductTotal, appliedCoupon]);
   const totalAmount = Math.max(0, rawProductTotal - (items.length > 0 ? couponDiscount : 0));
   const totalDiscount = totalMRP - rawProductTotal + (items.length > 0 ? couponDiscount : 0);
 
@@ -770,7 +790,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
                         type="text"
                         value={couponCode}
                         onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        placeholder="Enter Coupon (e.g. SAVE50, FESTIVE15)"
+                        placeholder="Enter Coupon or Referral Code"
                         className="flex-1 bg-[#f8f9fb] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-400 uppercase tracking-wider"
                       />
                       <button

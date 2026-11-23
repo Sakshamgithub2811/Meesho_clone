@@ -1,6 +1,7 @@
 import { API_BASE, API_V1_BASE } from '../../config/apiConfig';
 import React from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { auth } from '../../utils/firebase';
 
 export default function OrderTrackingModal({
@@ -13,6 +14,7 @@ export default function OrderTrackingModal({
 }) {
   if (!order) return null;
 
+  const navigate = useNavigate();
   const reduxUser = useSelector((state) => state.user?.currentUser);
 
   const st = (order.orderStatus || order.status || 'ORDERED').toUpperCase();
@@ -42,21 +44,21 @@ export default function OrderTrackingModal({
     ? order.shippingAddress
     : {};
 
-  const realCourier = addr.courier || addr.courierPartner || 'Delhivery Express';
-  const realAwb = addr.awb || addr.trackingNumber || ('DEL' + (order.id?.slice(0, 8).toUpperCase() || '1029384'));
+  const realCourier = addr.courier || addr.courierPartner || '';
+  const realAwb = addr.awb || addr.trackingNumber || '';
   const realTrackingUrl = addr.trackingUrl || '';
 
   const defaultTimeline = {
-    trackingPartner: `${realCourier} (AWB: ${realAwb})`,
+    trackingPartner: realCourier ? `${realCourier} ${realAwb ? `(AWB: ${realAwb})` : ''}` : 'Standard Delivery',
     placedDateStr: orderDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-    shippedDateStr: addr.shippedAt ? new Date(addr.shippedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : new Date(orderDate.getTime() + 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-    expectedDeliveryStr: addr.estimatedDelivery ? new Date(addr.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(orderDate.getTime() + 4 * 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+    shippedDateStr: addr.shippedAt ? new Date(addr.shippedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : orderDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+    expectedDeliveryStr: addr.estimatedDelivery ? new Date(addr.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Soon',
     events: {
-      placed: `${orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Order received & verified`,
-      processed: 'Seller acknowledged & packed item',
-      pickedUp: `Courier partner (${realCourier}) picked up package from warehouse`,
-      arrived1: 'Arrived at nearest sorting hub facility',
-      left: 'In transit to destination city hub',
+      placed: `${orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Order placed & confirmed`,
+      processed: 'Seller processed item',
+      pickedUp: realCourier ? `Picked up by ${realCourier}` : 'Dispatched by seller',
+      arrived1: 'In transit to delivery hub',
+      left: 'In transit to doorstep',
     }
   };
   const track = (getTrackingTimeline ? getTrackingTimeline(order) : null) || defaultTimeline;
@@ -68,11 +70,20 @@ export default function OrderTrackingModal({
     if (onToast) onToast(msg);
   };
 
-  // Deterministic 4-digit Delivery OTP based on order ID
+  // Deterministic 4-digit Delivery OTP (multiplier 33) & Return Pickup OTP (multiplier 41)
   const deliveryOtp = React.useMemo(() => {
     const seed = (order.id || 'order-sample').split('').reduce((acc, char) => (acc * 33 + char.charCodeAt(0)) % 9000, 1000);
     return Math.abs(seed) + 1000;
   }, [order.id]);
+
+  const returnPickupOtp = React.useMemo(() => {
+    const seed = (order.id || 'order-sample').split('').reduce((acc, char) => (acc * 41 + char.charCodeAt(0)) % 9000, 1000);
+    return Math.abs(seed) + 1000;
+  }, [order.id]);
+
+  const isPickupToday = Boolean(
+    (returnData?.slot || '').toLowerCase().includes('today')
+  );
 
   const customerEmail = React.useMemo(() => {
     // 1. Check logged-in user in Redux
@@ -113,11 +124,11 @@ export default function OrderTrackingModal({
     return order?.user?.email || '';
   }, [reduxUser, order?.shippingAddress, order?.user]);
 
-  // Automated silent OTP email dispatch as soon as order is OUT_FOR_DELIVERY
+  // Automated silent OTP email dispatch as soon as order is OUT_FOR_DELIVERY (Prepaid only)
   const autoSentRef = React.useRef(false);
 
   React.useEffect(() => {
-    if (isOutForDelivery && customerEmail && !autoSentRef.current) {
+    if (isOutForDelivery && isPrepaid && customerEmail && !autoSentRef.current) {
       const storageKey = `otp_email_sent_${order.id}_${deliveryOtp}`;
       if (!sessionStorage.getItem(storageKey)) {
         autoSentRef.current = true;
@@ -166,7 +177,10 @@ export default function OrderTrackingModal({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => onToast && onToast('Dedicated Support available 24x7: support@mshoppy.in 📞')}
+              onClick={() => {
+                if (onClose) onClose();
+                navigate(`/support-center?orderId=${order.id}`);
+              }}
               className="text-xs font-bold text-slate-700 border border-slate-200 px-3 py-1 rounded-full hover:bg-slate-50 transition-colors cursor-pointer"
             >
               Help
@@ -225,25 +239,33 @@ export default function OrderTrackingModal({
                     Doorstep Return Handover OTP
                   </span>
                   <span className="text-[9px] bg-pink-200 text-[#9f0038] font-extrabold px-2 py-0.5 rounded-full">
-                    Keep Ready for Courier
+                    {isPickupToday ? 'Keep Ready for Courier' : 'Scheduled'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-lg font-black tracking-widest text-[#9f0038] font-mono">
-                    {returnData?.otp || deliveryOtp}
-                  </span>
-                  <button
-                    onClick={() => copyToClipboard(String(returnData?.otp || deliveryOtp), 'Return OTP copied to clipboard! 📋')}
-                    className="text-[10px] text-[#9f0038] font-bold hover:underline cursor-pointer flex items-center gap-0.5 bg-white border border-rose-200 px-2 py-0.5 rounded-md"
-                  >
-                    <span>Copy</span>
-                  </button>
-                  {customerEmail && (
-                    <span className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-md">
-                      <span>✓</span> Emailed to {customerEmail}
+                {isPickupToday ? (
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-lg font-black tracking-widest text-[#9f0038] font-mono">
+                      {returnData?.otp || returnPickupOtp}
                     </span>
-                  )}
-                </div>
+                    <button
+                      onClick={() => copyToClipboard(String(returnData?.otp || returnPickupOtp), 'Return OTP copied to clipboard! 📋')}
+                      className="text-[10px] text-[#9f0038] font-bold hover:underline cursor-pointer flex items-center gap-0.5 bg-white border border-rose-200 px-2 py-0.5 rounded-md"
+                    >
+                      <span>Copy</span>
+                    </button>
+                    {customerEmail && (
+                      <span className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-md">
+                        <span>✓</span> Emailed to {customerEmail}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-1 text-[11px] text-slate-700 font-medium">
+                    <p className="font-bold flex items-center gap-1 text-slate-800">
+                      <span>🔒</span> OTP will be sent on pickup day ({returnData?.slot || 'Scheduled Day'})
+                    </p>
+                  </div>
+                )}
 
                 <p className="text-[10px] text-slate-600 mt-1 leading-snug">
                   🕒 Pickup Slot: <strong className="text-slate-800">{returnData?.slot || 'Today'}</strong> • Courier: Shadowfax Logistics
@@ -256,57 +278,87 @@ export default function OrderTrackingModal({
           </div>
         ) : !isCancelled && !isDelivered && (
           isOutForDelivery ? (
-            <div className="mx-5 mt-4 p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-3 shadow-xs shrink-0 animate-in fade-in">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-black text-xl shrink-0">
-                  🔐
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900">
-                      {isPrepaid ? 'Prepaid Delivery OTP' : 'Doorstep Delivery OTP'}
-                    </span>
-                    <span className="text-[9px] bg-emerald-200/70 text-emerald-900 font-extrabold px-2 py-0.5 rounded-full">
-                      Out for Delivery • Share with Driver
-                    </span>
+            isPrepaid ? (
+              <div className="mx-5 mt-4 p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-3 shadow-xs shrink-0 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-black text-xl shrink-0">
+                    🔐
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-lg font-black tracking-widest text-slate-900 font-mono">
-                      {deliveryOtp}
-                    </span>
-                    <button
-                      onClick={() => copyToClipboard(String(deliveryOtp), 'Delivery OTP copied to clipboard! 📋')}
-                      className="text-[10px] text-emerald-800 font-bold hover:underline cursor-pointer flex items-center gap-0.5 bg-emerald-100/60 px-2 py-0.5 rounded-md"
-                    >
-                      <span>Copy</span>
-                    </button>
-                    {customerEmail && (
-                      <span className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1 bg-white border border-emerald-200 px-2 py-0.5 rounded-md shadow-2xs">
-                        <span>✓</span> Emailed to {customerEmail}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900">
+                        Prepaid Delivery OTP
                       </span>
-                    )}
-                  </div>
+                      <span className="text-[9px] bg-emerald-200/70 text-emerald-900 font-extrabold px-2 py-0.5 rounded-full">
+                        Out for Delivery • Share with Driver
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-lg font-black tracking-widest text-slate-900 font-mono">
+                        {deliveryOtp}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(String(deliveryOtp), 'Delivery OTP copied to clipboard! 📋')}
+                        className="text-[10px] text-emerald-800 font-bold hover:underline cursor-pointer flex items-center gap-0.5 bg-emerald-100/60 px-2 py-0.5 rounded-md"
+                      >
+                        <span>Copy</span>
+                      </button>
+                      {customerEmail && (
+                        <span className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1 bg-white border border-emerald-200 px-2 py-0.5 rounded-md shadow-2xs">
+                          <span>✓</span> Emailed to {customerEmail}
+                        </span>
+                      )}
+                    </div>
 
-                  <p className="text-[10px] text-slate-600 mt-1 leading-snug">
-                    🕒 Delivery Window: <strong className="text-slate-800">9:00 AM – 8:00 PM</strong> • Delivery Today
-                  </p>
-                  <p className="text-[10px] text-emerald-700 font-semibold mt-0.5 flex items-center gap-1">
-                    <span>📲</span> Share this 4-digit OTP with your delivery partner at doorstep
-                  </p>
+                    <p className="text-[10px] text-slate-600 mt-1 leading-snug">
+                      🕒 Delivery Window: <strong className="text-slate-800">9:00 AM – 8:00 PM</strong> • Delivery Today
+                    </p>
+                    <p className="text-[10px] text-emerald-700 font-semibold mt-0.5 flex items-center gap-1">
+                      <span>📲</span> Share this 4-digit OTP with your delivery partner at doorstep
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="mx-5 mt-4 p-3.5 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/80 rounded-2xl flex items-center justify-between gap-3 shadow-xs shrink-0 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-black text-xl shrink-0">
+                    💵
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-900">
+                        Cash on Delivery (COD)
+                      </span>
+                      <span className="text-[9px] bg-amber-200/70 text-amber-900 font-extrabold px-2 py-0.5 rounded-full">
+                        Out for Delivery Today
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-sm font-black text-slate-900">
+                        Amount to Pay: <strong className="text-[#b7004d]">₹{price.toLocaleString('en-IN')}</strong>
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-1 leading-snug">
+                      🕒 Keep exact cash or UPI ready for the courier partner at doorstep.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
           ) : (
             <div className="mx-5 mt-4 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center gap-3 shadow-2xs shrink-0">
               <div className="w-9 h-9 rounded-xl bg-slate-200/60 text-slate-600 flex items-center justify-center font-bold text-lg shrink-0">
-                🔒
+                {isPrepaid ? '🔒' : '💵'}
               </div>
               <div className="text-xs">
                 <p className="font-bold text-slate-800 text-[11px]">
-                  {isPrepaid ? 'Prepaid Delivery OTP Security' : 'Delivery OTP Verification'}
+                  {isPrepaid ? 'Prepaid Delivery OTP Security' : 'Cash on Delivery Verification'}
                 </p>
                 <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
-                  Delivery OTP will be generated &amp; sent to your email/SMS <strong className="text-slate-700">only when package is Out For Delivery</strong>.
+                  {isPrepaid
+                    ? 'Delivery OTP will be generated & sent to your email/SMS only when package is Out For Delivery.'
+                    : `Please keep ₹${price.toLocaleString('en-IN')} cash or UPI ready at the time of delivery.`}
                 </p>
               </div>
             </div>
@@ -368,7 +420,7 @@ export default function OrderTrackingModal({
                 <div className="flex-1 pb-4">
                   <h4 className="font-extrabold text-sm text-slate-700">Doorstep Verification &amp; Handover</h4>
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Courier executive will verify the product at doorstep. Share the 4-digit OTP: <strong className="font-mono text-[#9f0038]">{returnData?.otp || deliveryOtp}</strong>.
+                    Courier executive will verify the product at doorstep. Share the 4-digit OTP: <strong className="font-mono text-[#9f0038]">{returnData?.otp || returnPickupOtp}</strong>.
                   </p>
                 </div>
               </div>
@@ -454,50 +506,40 @@ export default function OrderTrackingModal({
                   <span className="text-slate-500 font-semibold">{track?.shippedDateStr}</span>
                 </div>
 
-                {/* Real Courier & AWB Tracking Card */}
-                <div className="mt-2.5 bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2">
-                  <div className="flex items-center justify-between flex-wrap gap-1">
-                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      🚚 {realCourier}
-                    </span>
-                    {realTrackingUrl && (
-                      <a
-                        href={realTrackingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 bg-white border border-emerald-200 px-2 py-0.5 rounded-md shadow-xs"
+                {/* Only show Courier & AWB Card if real courier info exists */}
+                {realCourier && realAwb && (
+                  <div className="mt-2.5 bg-slate-50 border border-slate-200/90 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        🚚 {realCourier}
+                      </span>
+                      {realTrackingUrl && (
+                        <a
+                          href={realTrackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 bg-white border border-emerald-200 px-2 py-0.5 rounded-md shadow-xs"
+                        >
+                          Track on Portal ↗
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-600 font-mono">
+                      <span>AWB: <strong className="text-slate-900">{realAwb}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(realAwb, 'AWB Copied to clipboard!')}
+                        className="text-[10px] text-blue-600 font-sans font-semibold hover:underline cursor-pointer"
                       >
-                        Track on Portal ↗
-                      </a>
-                    )}
+                        Copy AWB
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-slate-600 font-mono">
-                    <span>AWB: <strong className="text-slate-900">{realAwb}</strong></span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(realAwb, 'AWB Copied to clipboard!')}
-                      className="text-[10px] text-blue-600 font-sans font-semibold hover:underline cursor-pointer"
-                    >
-                      Copy AWB
-                    </button>
-                  </div>
-                </div>
+                )}
 
-                <div className="mt-2.5 space-y-2.5 pl-1 text-slate-600 font-medium">
-                  <div>
-                    <p className="text-slate-800 font-semibold">
-                      Courier partner ({realCourier}) has dispatched your item.
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{track?.events?.pickedUp}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-800 font-semibold">Your item has arrived at a hub facility</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{track?.events?.arrived1}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-800 font-semibold">Your item has left a delivery partner facility</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{track?.events?.left}</p>
-                  </div>
+                <div className="mt-2.5 pl-1 text-slate-600 font-medium text-xs">
+                  <p className="text-slate-800 font-semibold">Your package has been dispatched by the seller.</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">In transit to destination city</p>
                 </div>
               </div>
             </div>
@@ -516,7 +558,7 @@ export default function OrderTrackingModal({
                 <div className="mt-2.5 space-y-2 pl-1 text-slate-500 font-medium">
                   <p className="text-slate-700 font-semibold">Package is being prepared by the seller.</p>
                   <p className="text-[11px] text-slate-400">
-                    Courier partner (Shadowfax) will pick up the package once packing is done.
+                    Courier partner will pick up package once packed.
                   </p>
                 </div>
               </div>
@@ -577,7 +619,7 @@ export default function OrderTrackingModal({
 
               <div className="flex-1">
                 <h4 className={`font-extrabold text-sm ${isDelivered ? 'text-emerald-700' : 'text-slate-500'}`}>
-                  {isDelivered ? 'Delivered' : `Delivery Expected By ${track?.expectedDeliveryStr}`}
+                  {isDelivered ? 'Delivered' : 'Delivery Expected Soon'}
                 </h4>
                 <div className="mt-1 pl-1 text-[11px] text-slate-400 space-y-0.5 font-medium">
                   <p>{isDelivered ? 'Delivered to your doorstep.' : 'Item yet to be delivered.'}</p>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import AppBottomNav from '../../components/AppBottomNav';
 import {
@@ -16,6 +16,7 @@ import {
 import { recordAffiliateOrder } from '../../services/affiliateAuthService';
 import { addNotification } from '../../services/notificationService';
 import { API_BASE } from '../../config/apiConfig';
+import { getAffiliateMarginFromParams } from '../../utils/affiliateLinkHelper';
 
 export default function CheckoutPayment({ onNavigate, onBack }) {
   const navigate = useNavigate();
@@ -152,7 +153,17 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
         if (savedCoupon) {
           try {
             const parsed = JSON.parse(savedCoupon);
-            if (parsed?.code) setAppliedCoupon(parsed);
+            if (parsed?.code) {
+              setAppliedCoupon(parsed);
+              const computedSubtotal = items.reduce((sum, it) => sum + ((it.product?.price || 0) * it.quantity), 0);
+              if (computedSubtotal > 0) {
+                validateCoupon(parsed.code, computedSubtotal).then(res => {
+                  if (res?.success && res.data) {
+                    setAppliedCoupon(res.data);
+                  }
+                }).catch(() => {});
+              }
+            }
           } catch (e) {}
         }
 
@@ -191,15 +202,42 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
     init();
   }, [urlMode, urlProductId, urlSize]);
 
-  // Dynamic Affiliate Margin Support (e.g. ₹849 + ₹150 = ₹999)
-  const affiliateMargin = Number(localStorage.getItem('mshoppy_affiliate_margin') || 0);
+  // Dynamic Affiliate Margin Support (ONLY when coming from an explicit reseller share URL or in reselling mode)
+  const urlMargin = getAffiliateMarginFromParams(searchParams);
+  const affiliateMargin = urlMargin > 0 ? urlMargin : (isReselling ? Number(localStorage.getItem('mshoppy_affiliate_margin') || 0) : 0);
 
   const basePrice = cartItems.reduce((sum, it) => {
     const baseP = it.product?.price || 0;
-    const effP = baseP + (affiliateMargin > 0 ? affiliateMargin : 0);
+    const itemMargin = it.affiliateMargin || (affiliateMargin > 0 ? affiliateMargin : 0);
+    const effP = baseP + itemMargin;
     return sum + (effP * it.quantity);
   }, 0);
-  const couponDiscount = appliedCoupon ? (appliedCoupon.discountAmount || 0) : 0;
+
+  const couponDiscount = useMemo(() => {
+    if (!appliedCoupon || basePrice <= 0) return 0;
+
+    // 1. Concrete discountAmount from API if available
+    const explicitAmt = Number(appliedCoupon.discountAmount);
+    if (!isNaN(explicitAmt) && explicitAmt > 0) {
+      return explicitAmt;
+    }
+
+    // 2. Percentage based discount (e.g. 40% OFF Referral Welcome up to ₹100)
+    const percent = Number(appliedCoupon.discountPercent || (appliedCoupon.type === 'PERCENT' ? appliedCoupon.value : 0));
+    if (percent > 0) {
+      const calculated = Math.round((basePrice * percent) / 100);
+      const maxD = Number(appliedCoupon.maxDiscount || 0);
+      return maxD > 0 ? Math.min(calculated, maxD) : calculated;
+    }
+
+    // 3. Flat discount
+    if ((appliedCoupon.type === 'FLAT' || appliedCoupon.type === 'FIXED') && appliedCoupon.value) {
+      return Math.min(basePrice, Number(appliedCoupon.value));
+    }
+
+    return 0;
+  }, [appliedCoupon, basePrice]);
+
   const finalAmount = Math.max(0, basePrice - couponDiscount);
   const customerInvoiceTotal = isReselling ? finalAmount + Number(marginAmount || 0) : finalAmount;
 
@@ -257,9 +295,12 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
       if (res?.success && res.data) {
         setAppliedCoupon(res.data);
         localStorage.setItem('mshoppy_applied_coupon', JSON.stringify(res.data));
+        if (res.data.isReferralCode || (res.data.code && res.data.code.startsWith('MSHOPPY'))) {
+          localStorage.setItem('mshoppy_referral_code', res.data.code);
+        }
         setCouponInput('');
         setShowCouponModal(false);
-        triggerToast(`🎉 Coupon "${res.data.code}" Applied! Saved ₹${res.data.discountAmount}`);
+        triggerToast(`🎉 Code "${res.data.code}" Applied! Saved ₹${res.data.discountAmount}`);
       } else {
         const errMsg = res?.message || 'Invalid or non-existent coupon code. Only generated codes are accepted.';
         setCouponError(errMsg);
@@ -310,13 +351,32 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
         shippingAddress: address,
         paymentMethod: paymentMethodToSave.toUpperCase(),
         totalAmount: finalAmount,
+        couponCode: appliedCoupon?.code || undefined,
         referralCode: referralCode || undefined,
         customerEmail: userEmail || address?.email || undefined
       };
 
       const res = await createOrder(orderPayload);
+      if (!res?.success || !res?.data) {
+        throw new Error(res?.message || 'Failed to place order in database');
+      }
+
       localStorage.removeItem('mshoppy_applied_coupon');
-      const placedOrderId = (res?.data?.id) || ('ORD-' + Math.floor(100000 + Math.random() * 900000));
+      const placedOrderId = (res.data.id) || ('ORD-' + Math.floor(100000 + Math.random() * 900000));
+
+      // Instant 0ms Cross-Tab Real-Time Broadcast to Supplier Dashboard / Orders
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('mshoppy_order_events');
+          bc.postMessage({
+            type: 'ORDER_PLACED',
+            orderId: placedOrderId,
+            totalAmount: finalAmount,
+            timestamp: Date.now()
+          });
+          bc.close();
+        }
+      } catch (_) {}
 
       if (referralCode) {
         const affiliateMargin = localStorage.getItem('mshoppy_affiliate_margin');
@@ -343,19 +403,15 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
         data: { orderId: placedOrderId, amount: finalAmount }
       });
 
-      if (res?.success && res.data) {
-        setConfirmedOrder({ ...res.data, referralCode });
-        if (isBuyNow) {
-          localStorage.removeItem('mshoppy_buynow_item');
-          localStorage.removeItem('mshoppy_checkout_mode');
-        } else {
-          try {
-            await clearCart();
-            localStorage.removeItem('mshoppy_checkout_mode');
-          } catch (e) {}
-        }
+      setConfirmedOrder({ ...res.data, referralCode });
+      if (isBuyNow) {
+        localStorage.removeItem('mshoppy_buynow_item');
+        localStorage.removeItem('mshoppy_checkout_mode');
       } else {
-        throw new Error(res?.message || 'Failed to place order in database');
+        try {
+          await clearCart();
+          localStorage.removeItem('mshoppy_checkout_mode');
+        } catch (e) {}
       }
     } catch (err) {
       console.error('Failed to place order:', err);
@@ -892,7 +948,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                             handleApplyCoupon();
                           }
                         }}
-                        placeholder="Enter Code (e.g. SAVE50, FESTIVE15)"
+                        placeholder="Enter Coupon or Referral Code"
                         className="flex-1 bg-[#f8f9fb] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-400 tracking-wider uppercase"
                       />
                       <button
@@ -987,7 +1043,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                         />
                         <div className="flex-1 min-w-0 text-xs">
                           <p className="font-bold text-slate-800 truncate">{it.product?.title}</p>
-                          <p className="text-[11px] text-slate-400">Qty: {it.quantity} • ₹{it.product?.price}</p>
+                          <p className="text-[11px] text-slate-400">Qty: {it.quantity} • ₹{(it.product?.price || 0) + (it.affiliateMargin || (affiliateMargin > 0 ? affiliateMargin : 0))}</p>
                         </div>
                       </div>
                     ))}
@@ -1114,7 +1170,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                     One-Time Password (OTP) Sent
                   </p>
                   <p className="text-[11px] text-blue-800 leading-snug">
-                    An OTP has been sent to your mobile ending with <strong className="font-bold">***{address?.phone?.slice(-4) || '3465'}</strong> linked to Card ending in <strong className="font-bold">***{paymentProcessing.cardLast4}</strong>.
+                    An OTP has been sent to your mobile ending with <strong className="font-bold">***{address?.phone?.slice(-4) || 'XXXX'}</strong> linked to Card ending in <strong className="font-bold">***{paymentProcessing.cardLast4}</strong>.
                   </p>
                 </div>
 

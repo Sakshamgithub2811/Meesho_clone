@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import GoogleAuthButton from '@/components/ui/GoogleAuthButton';
+import { Eye, EyeOff } from 'lucide-react';
 import { API_V1_BASE } from '../../config/apiConfig';
 
 export default function AffiliateLogin() {
@@ -31,11 +32,13 @@ export default function AffiliateLogin() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Register form state
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [referralTag, setReferralTag] = useState('');
 
   const handleAuth = async (e, isRegistering) => {
@@ -130,15 +133,25 @@ export default function AffiliateLogin() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="affiliate-login-password">Password</Label>
-        <Input 
-          id="affiliate-login-password" 
-          type="password" 
-          placeholder="••••••••" 
-          value={loginPassword}
-          onChange={(e) => setLoginPassword(e.target.value)}
-          required 
-          className="h-12 px-4 text-base rounded-xl focus-visible:ring-[#b7004d]/30"
-        />
+        <div className="relative">
+          <Input 
+            id="affiliate-login-password" 
+            type={showLoginPassword ? "text" : "password"} 
+            placeholder="••••••••" 
+            value={loginPassword}
+            onChange={(e) => setLoginPassword(e.target.value)}
+            required 
+            className="h-12 px-4 pr-11 text-base rounded-xl focus-visible:ring-[#b7004d]/30"
+          />
+          <button
+            type="button"
+            onClick={() => setShowLoginPassword(!showLoginPassword)}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#b7004d] p-1 cursor-pointer transition-colors"
+            title={showLoginPassword ? "Hide password" : "Show password"}
+          >
+            {showLoginPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+          </button>
+        </div>
         <div className="flex justify-end pt-1">
           <button 
             type="button" 
@@ -192,22 +205,32 @@ export default function AffiliateLogin() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="affiliate-register-password">Password</Label>
-        <Input 
-          id="affiliate-register-password" 
-          type="password" 
-          placeholder="••••••••" 
-          value={registerPassword}
-          onChange={(e) => setRegisterPassword(e.target.value)}
-          required 
-          className="h-12 px-4 text-base rounded-xl focus-visible:ring-[#b7004d]/30"
-        />
+        <div className="relative">
+          <Input 
+            id="affiliate-register-password" 
+            type={showRegisterPassword ? "text" : "password"} 
+            placeholder="••••••••" 
+            value={registerPassword}
+            onChange={(e) => setRegisterPassword(e.target.value)}
+            required 
+            className="h-12 px-4 pr-11 text-base rounded-xl focus-visible:ring-[#b7004d]/30"
+          />
+          <button
+            type="button"
+            onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#b7004d] p-1 cursor-pointer transition-colors"
+            title={showRegisterPassword ? "Hide password" : "Show password"}
+          >
+            {showRegisterPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor="affiliate-register-referral">Custom Referral Tag (Optional)</Label>
         <Input 
           id="affiliate-register-referral" 
           type="text" 
-          placeholder="e.g. MEESHOVIP" 
+          placeholder="e.g. MSHOPPYVIP" 
           value={referralTag}
           onChange={(e) => setReferralTag(e.target.value.toUpperCase())}
           className="h-12 px-4 text-base rounded-xl focus-visible:ring-[#b7004d]/30"

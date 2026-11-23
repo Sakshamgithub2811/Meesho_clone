@@ -40,7 +40,7 @@ const ProtectedRoute = ({ children, role = 'customer', allowedRoles, requiresKyc
     if (role === 'customer') {
       isAuth = isCustomerAuthenticated();
     } else if (role === 'affiliate') {
-      isAuth = isAffiliateAuthenticated();
+      isAuth = isAffiliateAuthenticated() || isCustomerAuthenticated();
     } else if (role === 'reseller') {
       isAuth = isResellerAuthenticated();
     } else if (role === 'any') {

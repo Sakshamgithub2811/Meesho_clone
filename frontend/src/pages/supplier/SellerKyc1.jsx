@@ -6,7 +6,13 @@ import supplierApiService, { clearAuthSession, getCurrentSupplier } from '../../
 import { auth } from '../../utils/firebase';
 import { signOut } from 'firebase/auth';
 import { toast } from 'sonner';
-import { SUPPLIER_MENU } from './supplierNavConfig';
+import {
+  SUPPLIER_MENU,
+  SUPPLIER_ROLES,
+  getStoredSupplierSubRole,
+  getSupplierMenuForRole,
+  isTabAllowedForRole,
+} from './supplierNavConfig';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -33,6 +39,14 @@ import {
   Download,
   AlertCircle
 } from 'lucide-react';
+
+// Modular Sub-Components
+import KycStatusBanner from '../../components/supplier/kyc/KycStatusBanner';
+import KycStep1Business from '../../components/supplier/kyc/KycStep1Business';
+import KycStep2Tax from '../../components/supplier/kyc/KycStep2Tax';
+import KycStep3Bank from '../../components/supplier/kyc/KycStep3Bank';
+import KycStep4Warehouse from '../../components/supplier/kyc/KycStep4Warehouse';
+import KycDocPreviewModal from '../../components/supplier/kyc/KycDocPreviewModal';
 
 // Canvas image compressor to optimize uploaded docs to ~100KB
 const compressDocImage = (file) => {
@@ -85,6 +99,16 @@ export default function SellerKyc1({ onNavigate, embedded = false, onNavigateTab
   const [activeStep, setActiveStep] = useState(1); // 1: Business, 2: GST & PAN, 3: Bank, 4: Warehouse
   const [previewDoc, setPreviewDoc] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [currentSubRole, setCurrentSubRole] = useState(getStoredSupplierSubRole);
+
+  useEffect(() => {
+    const handleRole = (e) => setCurrentSubRole(e?.detail || getStoredSupplierSubRole());
+    window.addEventListener('supplier_subrole_changed', handleRole);
+    return () => window.removeEventListener('supplier_subrole_changed', handleRole);
+  }, []);
+
+  const isAllowed = isTabAllowedForRole('kyc', currentSubRole);
+  const currentRoleCfg = SUPPLIER_ROLES[currentSubRole] || SUPPLIER_ROLES.OWNER;
 
   // Form State
   const [formData, setFormData] = useState({
@@ -300,10 +324,13 @@ export default function SellerKyc1({ onNavigate, embedded = false, onNavigateTab
     (profile?.tierLabel?.toLowerCase().includes('verified') ? 'APPROVED' : null) ||
     'PENDING'
   ).toUpperCase();
-  const isApproved = kycStatus === 'APPROVED' || kycData?.isVerified === true;
-  const isUnderReview = kycStatus === 'UNDER_REVIEW' || (kycData && kycStatus === 'PENDING');
-  const isRejected = kycStatus === 'REJECTED';
-  const isNotSubmitted = !kycData;
+  const isApproved =
+    kycStatus === 'APPROVED' ||
+    kycData?.isVerified === true ||
+    Boolean(profile?.tierLabel?.toLowerCase().includes('verified'));
+  const isUnderReview = !isApproved && (kycStatus === 'UNDER_REVIEW' || kycStatus === 'PENDING');
+  const isRejected = !isApproved && kycStatus === 'REJECTED';
+  const isNotSubmitted = !isApproved && (!kycData || kycStatus === 'NOT_SUBMITTED');
 
   const mainContent = (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
@@ -336,107 +363,13 @@ export default function SellerKyc1({ onNavigate, embedded = false, onNavigateTab
         </div>
 
         {/* Dynamic Status Banner */}
-        {isApproved && (
-          <div className="p-6 rounded-3xl bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
-                <CheckCircle2 className="w-7 h-7" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-black text-emerald-950">
-                    KYC Verified Merchant
-                  </h3>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
-                    Level 1 Verified
-                  </span>
-                </div>
-                <p className="text-xs text-emerald-800/80 mt-0.5 leading-relaxed">
-                  Your business identity and bank accounts have been verified by Meesho Compliance. Your products receive verified trust badges and daily payouts are active.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs font-bold text-emerald-700 bg-white px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
-                Ref: #{kycData?.id?.slice(-8) || 'VERIFIED'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {isUnderReview && (
-          <div className="p-6 rounded-3xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-white border border-amber-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
-                <Clock className="w-7 h-7" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-black text-amber-950">
-                    KYC Under Compliance Review
-                  </h3>
-                  <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black uppercase">
-                    Verification In Progress
-                  </span>
-                </div>
-                <p className="text-xs text-amber-900/80 mt-0.5 leading-relaxed">
-                  Your documents are currently being checked by the Meesho merchant verification desk. Verification typically completes within 4–12 business hours.
-                </p>
-              </div>
-            </div>
-
-            <div className="text-right shrink-0">
-              <span className="text-xs font-mono font-bold text-amber-800 block">
-                Application #{kycData?.id?.slice(-8) || 'KYC-SUBMITTED'}
-              </span>
-              <span className="text-[11px] text-amber-600">Priority Processing</span>
-            </div>
-          </div>
-        )}
-
-        {isRejected && (
-          <div className="p-6 rounded-3xl bg-rose-50 border border-rose-200 shadow-sm space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-black text-rose-950">
-                  Verification Action Needed (KYC Rejected)
-                </h3>
-                <p className="text-xs text-rose-700">
-                  Please review compliance feedback below, update the highlighted documents, and re-submit.
-                </p>
-              </div>
-            </div>
-
-            {kycData?.adminNotes && (
-              <div className="p-3.5 rounded-2xl bg-white border border-rose-200 text-xs text-rose-900">
-                <span className="font-bold block mb-0.5">Admin Compliance Officer Remarks:</span>
-                <p className="italic">{kycData.adminNotes}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {isNotSubmitted && (
-          <div className="p-5 rounded-3xl bg-pink-50/60 border border-pink-100 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#d82a62] text-white flex items-center justify-center shrink-0">
-                <FileCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
-                  KYC Verification Pending
-                </h4>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Complete the 4 sections below to unlock wholesale inventory dropshipping and auto-payouts.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        <KycStatusBanner
+          isApproved={isApproved}
+          isUnderReview={isUnderReview}
+          isRejected={isRejected}
+          isNotSubmitted={isNotSubmitted}
+          kycData={kycData}
+        />
 
         {/* 4-Step Wizard Navigation */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/80">
@@ -464,645 +397,115 @@ export default function SellerKyc1({ onNavigate, embedded = false, onNavigateTab
 
         {/* Multi-Step Form */}
         <form onSubmit={handleSubmitKyc} className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
-          
-          {/* ───────────────── STEP 1: BUSINESS & LEGAL ENTITY ───────────────── */}
           {activeStep === 1 && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-[#d82a62]" />
-                  <span>Step 1: Business Identity & Store Registration</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Enter registered business identity details as recognized by state authorities and tax departments.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Business Legal Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="businessName"
-                    placeholder="e.g. Shree Balaji Textile Mills Pvt Ltd"
-                    value={formData.businessName}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-medium rounded-2xl border border-slate-200 focus:border-[#d82a62] focus:ring-2 focus:ring-pink-100 outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Trade Name / Store Display Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="tradeName"
-                    placeholder="e.g. Balaji Fashion Hub"
-                    value={formData.tradeName}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-medium rounded-2xl border border-slate-200 focus:border-[#d82a62] focus:ring-2 focus:ring-pink-100 outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Business Entity Type
-                  </label>
-                  <select
-                    name="businessType"
-                    value={formData.businessType}
-                    onChange={handleChange}
-                    className="w-full h-11 px-3 text-xs font-semibold rounded-2xl border border-slate-200 bg-white text-slate-700 outline-none"
-                  >
-                    <option value="Sole Proprietorship">Sole Proprietorship</option>
-                    <option value="Partnership Firm">Partnership Firm</option>
-                    <option value="Private Limited Company">Private Limited Company (Pvt Ltd)</option>
-                    <option value="Limited Liability Partnership (LLP)">Limited Liability Partnership (LLP)</option>
-                    <option value="Individual / Unregistered">Individual / Artisan</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Pincode
-                  </label>
-                  <input
-                    type="text"
-                    name="pincode"
-                    maxLength={6}
-                    placeholder="e.g. 395002"
-                    value={formData.pincode}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-mono rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Registered Business Address
-                </label>
-                <textarea
-                  name="businessAddress"
-                  rows={2}
-                  placeholder="Street address, building number, industrial zone..."
-                  value={formData.businessAddress}
-                  onChange={handleChange}
-                  className="w-full p-3 text-xs rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none resize-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">City</label>
-                  <input
-                    type="text"
-                    name="city"
-                    placeholder="e.g. Surat"
-                    value={formData.city}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">State</label>
-                  <input
-                    type="text"
-                    name="state"
-                    placeholder="e.g. Gujarat"
-                    value={formData.state}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveStep(2)}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#d82a62] hover:bg-[#b7004d] text-white text-xs font-black transition cursor-pointer shadow-md shadow-pink-600/20"
-                >
-                  <span>Continue to GST & PAN</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <KycStep1Business
+              formData={formData}
+              onChange={handleChange}
+              onNext={() => setActiveStep(2)}
+            />
           )}
 
-          {/* ───────────────── STEP 2: GST & PAN VERIFICATION ───────────────── */}
           {activeStep === 2 && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-[#d82a62]" />
-                  <span>Step 2: Tax Registration (GSTIN & PAN Verification)</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  GSTIN and PAN are required by law for inter-state wholesale e-commerce fulfillment.
-                </p>
-              </div>
-
-              {/* GSTIN Box */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 block mb-1">
-                      15-Digit GSTIN Number <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="gstin"
-                      maxLength={15}
-                      placeholder="e.g. 24AAACB1234F1Z8"
-                      value={formData.gstin}
-                      onChange={handleChange}
-                      className="w-full h-11 px-4 text-xs font-mono font-bold uppercase rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none bg-white"
-                      required
-                    />
-                  </div>
-
-                  {/* GST Document Upload */}
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 block mb-1">
-                      GST Registration Certificate Proof
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <label className="flex-1 h-11 px-4 rounded-2xl border-2 border-dashed border-slate-300 hover:border-pink-400 bg-white flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer transition">
-                        <Upload className="w-4 h-4 text-slate-400" />
-                        <span className="truncate">
-                          {formData.gstCertificate ? 'Certificate Attached ✅' : 'Choose GST Photo/PDF'}
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={(e) => handleDocUpload('gstCertificate', e.target.files[0])}
-                          className="hidden"
-                        />
-                      </label>
-
-                      {formData.gstCertificate && (
-                        <button
-                          type="button"
-                          onClick={() => setPreviewDoc({ title: 'GST Certificate', url: formData.gstCertificate })}
-                          className="w-11 h-11 rounded-2xl border border-slate-200 hover:bg-slate-50 text-[#b7004d] flex items-center justify-center shrink-0 cursor-pointer"
-                          title="Preview GST Document"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* PAN Box */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 block mb-1">
-                      10-Digit PAN Number <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="panNumber"
-                      maxLength={10}
-                      placeholder="e.g. AAACB1234F"
-                      value={formData.panNumber}
-                      onChange={handleChange}
-                      className="w-full h-11 px-4 text-xs font-mono font-bold uppercase rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none bg-white"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 block mb-1">
-                      Name on PAN Card
-                    </label>
-                    <input
-                      type="text"
-                      name="panName"
-                      placeholder="Exact name on PAN"
-                      value={formData.panName}
-                      onChange={handleChange}
-                      className="w-full h-11 px-4 text-xs font-medium rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none bg-white"
-                    />
-                  </div>
-
-                  {/* PAN Document Upload */}
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 block mb-1">
-                      PAN Card Photo Proof
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <label className="flex-1 h-11 px-4 rounded-2xl border-2 border-dashed border-slate-300 hover:border-pink-400 bg-white flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer transition">
-                        <Upload className="w-4 h-4 text-slate-400" />
-                        <span className="truncate">
-                          {formData.panImage ? 'PAN Photo Attached ✅' : 'Upload PAN Card'}
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleDocUpload('panImage', e.target.files[0])}
-                          className="hidden"
-                        />
-                      </label>
-
-                      {formData.panImage && (
-                        <button
-                          type="button"
-                          onClick={() => setPreviewDoc({ title: 'PAN Card Photo', url: formData.panImage })}
-                          className="w-11 h-11 rounded-2xl border border-slate-200 hover:bg-slate-50 text-[#b7004d] flex items-center justify-center shrink-0 cursor-pointer"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Aadhaar Box (Optional) */}
-              <div className="p-4 rounded-2xl bg-slate-50/60 border border-slate-200/60 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700">Aadhaar Card (Optional for Individuals)</span>
-                  <span className="text-[10px] text-slate-400">Owner Verification</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    name="aadhaarNumber"
-                    maxLength={14}
-                    placeholder="12-digit Aadhaar Number (Optional)"
-                    value={formData.aadhaarNumber}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-mono rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none bg-white"
-                  />
-
-                  <label className="h-11 px-4 rounded-2xl border-2 border-dashed border-slate-300 hover:border-pink-400 bg-white flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer transition">
-                    <Upload className="w-4 h-4 text-slate-400" />
-                    <span className="truncate">
-                      {formData.aadhaarFrontImage ? 'Aadhaar Attached ✅' : 'Upload Aadhaar Photo'}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleDocUpload('aadhaarFrontImage', e.target.files[0])}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveStep(1)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back to Business Info</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveStep(3)}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#d82a62] hover:bg-[#b7004d] text-white text-xs font-black transition cursor-pointer shadow-md shadow-pink-600/20"
-                >
-                  <span>Continue to Bank & Payout</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <KycStep2Tax
+              formData={formData}
+              onChange={handleChange}
+              onDocUpload={handleDocUpload}
+              onPreviewDoc={setPreviewDoc}
+              onBack={() => setActiveStep(1)}
+              onNext={() => setActiveStep(3)}
+            />
           )}
 
-          {/* ───────────────── STEP 3: BANK & PAYOUT SETTLEMENT ───────────────── */}
           {activeStep === 3 && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <Landmark className="w-5 h-5 text-[#d82a62]" />
-                  <span>Step 3: Settlement Bank Account & NEFT Payouts</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Daily wholesale orders payments and customer dispatch reconciliations are credited to this verified account.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Beneficiary Account Holder Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="accountHolder"
-                    placeholder="e.g. Shree Balaji Textile Mills Pvt Ltd"
-                    value={formData.accountHolder}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-medium rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Bank Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="bankName"
-                    placeholder="e.g. HDFC Bank / State Bank of India"
-                    value={formData.bankName}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-medium rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Bank Account Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    name="accountNumber"
-                    placeholder="Enter bank account number"
-                    value={formData.accountNumber}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-mono font-bold rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Confirm Account Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="confirmAccountNumber"
-                    placeholder="Re-enter bank account number"
-                    value={formData.confirmAccountNumber}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-mono font-bold rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    IFSC Code <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="ifsc"
-                    maxLength={11}
-                    placeholder="e.g. HDFC0000128"
-                    value={formData.ifsc}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-mono font-bold uppercase rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Settlement UPI VPA (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    name="upiId"
-                    placeholder="e.g. storename@hdfcbank"
-                    value={formData.upiId}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-mono rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Cancelled Cheque upload */}
-              <div>
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Cancelled Cheque or Bank Passbook Proof Photo
-                </label>
-                <div className="flex items-center gap-2">
-                  <label className="flex-1 h-12 px-4 rounded-2xl border-2 border-dashed border-slate-300 hover:border-pink-400 bg-white flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer transition">
-                    <Upload className="w-4 h-4 text-slate-400" />
-                    <span className="truncate">
-                      {formData.chequeImage ? 'Bank Proof Attached ✅' : 'Upload Cancelled Cheque / Passbook Image'}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleDocUpload('chequeImage', e.target.files[0])}
-                      className="hidden"
-                    />
-                  </label>
-
-                  {formData.chequeImage && (
-                    <button
-                      type="button"
-                      onClick={() => setPreviewDoc({ title: 'Cancelled Cheque Proof', url: formData.chequeImage })}
-                      className="w-12 h-12 rounded-2xl border border-slate-200 hover:bg-slate-50 text-[#b7004d] flex items-center justify-center shrink-0 cursor-pointer"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveStep(2)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back to GST & PAN</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveStep(4)}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#d82a62] hover:bg-[#b7004d] text-white text-xs font-black transition cursor-pointer shadow-md shadow-pink-600/20"
-                >
-                  <span>Continue to Warehouse Details</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <KycStep3Bank
+              formData={formData}
+              onChange={handleChange}
+              onDocUpload={handleDocUpload}
+              onPreviewDoc={setPreviewDoc}
+              onBack={() => setActiveStep(2)}
+              onNext={() => setActiveStep(4)}
+            />
           )}
 
-          {/* ───────────────── STEP 4: WAREHOUSE & PICKUP LOCATION ───────────────── */}
           {activeStep === 4 && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-[#d82a62]" />
-                  <span>Step 4: Dispatch Warehouse & Pickup Location</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Courier logistics partners (Delhivery, Shadowfax, Xpressbees) pick up packed wholesale parcels from this hub.
-                </p>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Warehouse Physical Address <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  name="warehouseAddress"
-                  rows={3}
-                  placeholder="Complete dispatch hub address with landmark, gate number..."
-                  value={formData.warehouseAddress}
-                  onChange={handleChange}
-                  className="w-full p-3.5 text-xs rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none resize-none"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Pickup Pincode <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="warehousePincode"
-                    maxLength={6}
-                    placeholder="e.g. 395002"
-                    value={formData.warehousePincode}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-mono font-bold rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Dispatch Manager Name
-                  </label>
-                  <input
-                    type="text"
-                    name="warehouseContactPerson"
-                    placeholder="e.g. Ramesh Kumar"
-                    value={formData.warehouseContactPerson}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-medium rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
-                    Dispatch Phone / Mobile
-                  </label>
-                  <input
-                    type="tel"
-                    name="warehousePhone"
-                    maxLength={10}
-                    placeholder="e.g. 9876543210"
-                    value={formData.warehousePhone}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 text-xs font-mono rounded-2xl border border-slate-200 focus:border-[#d82a62] outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Review summary box */}
-              <div className="p-4 rounded-2xl bg-pink-50/70 border border-pink-100 text-xs text-[#880e4f] space-y-1.5">
-                <p className="font-bold">📋 Legal Declaration & Merchant Agreement:</p>
-                <p className="text-pink-900/80 leading-relaxed text-[11px]">
-                  By clicking Submit KYC Verification, you certify that the provided GSTIN, PAN, and Bank details are true and belong to the registered legal merchant. False submissions are subject to account suspension per IT Act compliance rules.
-                </p>
-              </div>
-
-              <div className="flex justify-between items-center pt-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveStep(3)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back to Bank Details</span>
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#d82a62] to-[#eb3678] hover:opacity-95 text-white text-sm font-black transition cursor-pointer shadow-lg shadow-pink-600/25 disabled:opacity-50"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>{submitting ? 'Submitting KYC Documents...' : 'Submit KYC for Verification'}</span>
-                </button>
-              </div>
-            </div>
+            <KycStep4Warehouse
+              formData={formData}
+              onChange={handleChange}
+              submitting={submitting}
+              onBack={() => setActiveStep(3)}
+            />
           )}
-
         </form>
 
-      {/* Document Zoom / Preview Modal */}
-      {previewDoc && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h4 className="font-black text-slate-900 text-sm">{previewDoc.title}</h4>
-              <button
-                type="button"
-                onClick={() => setPreviewDoc(null)}
-                className="p-1 rounded-xl text-slate-400 hover:text-slate-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="w-full h-80 rounded-2xl bg-slate-100 overflow-hidden flex items-center justify-center">
-              <img
-                src={previewDoc.url}
-                alt={previewDoc.title}
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <div className="text-right">
-              <button
-                type="button"
-                onClick={() => setPreviewDoc(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200"
-              >
-                Close Preview
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        {/* Document Zoom / Preview Modal */}
+        <KycDocPreviewModal
+          previewDoc={previewDoc}
+          onClose={() => setPreviewDoc(null)}
+        />
     </div>
   );
 
   if (embedded) {
+    if (!isAllowed) {
+      return (
+        <div className="max-w-2xl mx-auto my-10 bg-white rounded-2xl border border-rose-200 p-8 shadow-lg text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-2xl">
+            🛡️
+          </div>
+          <h3 className="text-xl font-black text-slate-900">
+            Access Restricted: Business KYC Protected
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            Your role <strong className="text-slate-900 font-bold">{currentRoleCfg.label}</strong> does not have permission to view or edit Business KYC, Bank Account Verification & GSTIN records.
+          </p>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => onNavigateTab ? onNavigateTab('staff') : handleNav('/seller-web-dashboard1?tab=staff')}
+              className="px-5 py-2.5 rounded-xl bg-[#b7004d] text-white font-bold text-xs hover:bg-[#92003d] transition cursor-pointer shadow-xs"
+            >
+              Open RBAC & Staff Management
+            </button>
+          </div>
+        </div>
+      );
+    }
     return mainContent;
   }
 
   return (
     <DashboardLayout
-      menuItems={SUPPLIER_MENU}
+      menuItems={getSupplierMenuForRole(currentSubRole)}
       activeTab="kyc"
       onTabChange={handleTabChange}
-      roleName="SUPPLIER"
+      roleName={`SUPPLIER • ${currentRoleCfg.shortLabel}`}
       userName={supplierDisplayName}
       onLogout={() => setShowLogoutConfirm(true)}
     >
-      {mainContent}
+      {!isAllowed ? (
+        <div className="max-w-2xl mx-auto my-10 bg-white rounded-2xl border border-rose-200 p-8 shadow-lg text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-2xl">
+            🛡️
+          </div>
+          <h3 className="text-xl font-black text-slate-900">
+            Access Restricted: Business KYC Protected
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            Your role <strong className="text-slate-900 font-bold">{currentRoleCfg.label}</strong> does not have permission to view or edit Business KYC, Bank Account Verification & GSTIN records.
+          </p>
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleNav('/seller-web-dashboard1?tab=staff')}
+              className="px-5 py-2.5 rounded-xl bg-[#b7004d] text-white font-bold text-xs hover:bg-[#92003d] transition cursor-pointer shadow-xs"
+            >
+              Open RBAC & Staff Management
+            </button>
+          </div>
+        </div>
+      ) : (
+        mainContent
+      )}
 
       <LogoutConfirmDialog
         isOpen={showLogoutConfirm}

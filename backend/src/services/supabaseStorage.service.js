@@ -12,7 +12,17 @@ export const DEFAULT_BUCKET = 'dropshipper-assets';
 export const IMAGE_BUCKET = 'images';
 
 // Supabase Storage Client
-export const supabase = defaultSupabaseClient || createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let supabaseStorageClient = defaultSupabaseClient;
+if (!supabaseStorageClient && SUPABASE_URL && SUPABASE_ANON_KEY) {
+  try {
+    supabaseStorageClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false },
+    });
+  } catch (err) {
+    console.warn("⚠️ Failed to initialize Supabase Storage Client:", err?.message || err);
+  }
+}
+export const supabase = supabaseStorageClient;
 
 /**
  * Universal upload function supporting both Dropshipper Assets and Supplier Images
@@ -40,6 +50,9 @@ export async function uploadFileToSupabase({
   const activeBuffer = fileBuffer || buffer;
   if (!activeBuffer) {
     throw new Error('No file buffer provided for Supabase upload.');
+  }
+  if (!supabase) {
+    throw new Error('Supabase Storage Client is not available or configured.');
   }
 
   const activeName = originalname || originalFilename;

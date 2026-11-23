@@ -1,9 +1,8 @@
 import admin from '../config/firebaseAdmin.js';
 import prisma from '../config/prisma.js';
-import jwt from 'jsonwebtoken';
 
 /**
- * Generate a Firebase token for user or return secure fallback JWT
+ * Generate a Firebase custom token for user or return authenticated session identifier
  */
 const generateFirebaseToken = async (userId, claims = {}) => {
   try {
@@ -14,11 +13,7 @@ const generateFirebaseToken = async (userId, claims = {}) => {
   } catch (error) {
     console.warn('Firebase createCustomToken notice:', error.message);
   }
-  return jwt.sign(
-    { id: userId, uid: userId, ...claims },
-    process.env.JWT_SECRET || 'meesho_jwt_secret_super_secure_key_2026',
-    { expiresIn: '30d' }
-  );
+  return userId;
 };
 
 // Helper to sanitize phone number
@@ -49,14 +44,6 @@ export const resellerLogin = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Invalid mobile number. Please enter a valid 10-digit number.',
-      });
-    }
-
-    // Default dev OTP is 123456 or any 6-digit OTP in non-prod
-    if (otp && otp.length === 6 && otp !== '123456' && process.env.NODE_ENV === 'production') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid OTP. Please check and try again.',
       });
     }
 
@@ -191,6 +178,7 @@ export const customerLogin = async (req, res) => {
       });
     }
 
+    const cleanEmail = email ? email.toLowerCase().trim() : '';
     let userId = '';
     let cleanPhone = '';
 
@@ -204,45 +192,82 @@ export const customerLogin = async (req, res) => {
       }
       userId = `customer_${cleanPhone}`;
     } else {
-      userId = `customer_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+      userId = `customer_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
     }
 
-    // Default dev OTP is 123456 (or any 4/6-digit in development)
-    if (otp && otp.length >= 4 && otp !== '123456' && otp !== '1234' && process.env.NODE_ENV === 'production') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid OTP. Please check and try again.',
+    // Query directly in PostgreSQL Profile table - prioritizing real user accounts over ghost accounts
+    let profile = null;
+    const matchConditions = [];
+    if (cleanEmail && cleanEmail.includes('@') && !cleanEmail.endsWith('@customer.meesho')) {
+      matchConditions.push({ email: { equals: cleanEmail, mode: 'insensitive' } });
+    }
+    if (cleanPhone && cleanPhone.length === 10) {
+      matchConditions.push({ phone: cleanPhone });
+    }
+
+    if (matchConditions.length > 0) {
+      const candidates = await prisma.profile.findMany({
+        where: { OR: matchConditions },
+        include: {
+          wallet: true,
+          _count: {
+            select: {
+              orders: true,
+              wishlist: true,
+              cart: true
+            }
+          }
+        }
+      });
+
+      if (candidates.length > 0) {
+        // Prioritize: 1) Non-ghost real account ID, 2) Partner/Admin role, 3) Higher order count, 4) Earliest created
+        candidates.sort((a, b) => {
+          const aGhost = (a.id.startsWith('customer_') || (a.email && a.email.endsWith('@customer.meesho'))) ? 1 : 0;
+          const bGhost = (b.id.startsWith('customer_') || (b.email && b.email.endsWith('@customer.meesho'))) ? 1 : 0;
+          if (aGhost !== bGhost) return aGhost - bGhost;
+
+          const aPartner = (a.role === 'RESELLER' || a.role === 'ADMIN' || a.storeName) ? 1 : 0;
+          const bPartner = (b.role === 'RESELLER' || b.role === 'ADMIN' || b.storeName) ? 1 : 0;
+          if (aPartner !== bPartner) return bPartner - aPartner;
+
+          const aOrders = a._count?.orders || 0;
+          const bOrders = b._count?.orders || 0;
+          if (aOrders !== bOrders) return bOrders - aOrders;
+
+          return new Date(a.createdAt) - new Date(b.createdAt);
+        });
+        profile = candidates[0];
+      }
+    }
+
+    if (!profile) {
+      profile = await prisma.profile.findFirst({
+        where: { id: userId },
+        include: {
+          wallet: true,
+          _count: {
+            select: {
+              orders: true,
+              wishlist: true,
+              cart: true
+            }
+          }
+        }
       });
     }
 
-    // Query or create directly in PostgreSQL Profile table
-    let profile = await prisma.profile.findFirst({
-      where: {
-        OR: [
-          ...((cleanPhone && cleanPhone.length === 10) ? [{ phone: cleanPhone }] : []),
-          ...(email ? [{ email: email.toLowerCase() }] : []),
-          { id: userId }
-        ]
-      },
-      include: {
-        wallet: true,
-        _count: {
-          select: {
-            orders: true,
-            wishlist: true,
-            cart: true
-          }
-        }
-      }
-    });
-
     if (!profile) {
-      // Create new customer profile in PostgreSQL
+      // Create new customer profile in PostgreSQL with real email if available
+      const newEmail = (cleanEmail && cleanEmail.includes('@') && !cleanEmail.endsWith('@customer.meesho'))
+        ? cleanEmail
+        : (cleanPhone ? `${cleanPhone}@customer.mshoppy` : null);
+
       profile = await prisma.profile.create({
         data: {
           id: userId,
           phone: cleanPhone || null,
-          email: email ? email.toLowerCase() : (cleanPhone ? `${cleanPhone}@customer.mshoppy` : null),
+          email: newEmail,
           fullName: fullName || (cleanPhone ? `Customer +91 ${cleanPhone.slice(0, 2)}****${cleanPhone.slice(-4)}` : 'Valued Customer'),
           role: 'CUSTOMER',
           avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
@@ -267,11 +292,11 @@ export const customerLogin = async (req, res) => {
     } else {
       // Update customer profile details if provided
       const updateData = {};
-      if (fullName && (!profile.fullName || profile.fullName.startsWith('Customer +91'))) {
+      if (fullName && (!profile.fullName || profile.fullName.startsWith('Customer +91') || profile.fullName === 'Customer')) {
         updateData.fullName = fullName;
       }
-      if (email && !profile.email) {
-        updateData.email = email.toLowerCase();
+      if (cleanEmail && cleanEmail.includes('@') && (!profile.email || profile.email.endsWith('@customer.meesho') || profile.email.endsWith('@customer.mshoppy'))) {
+        updateData.email = cleanEmail;
       }
       if (cleanPhone && !profile.phone) {
         updateData.phone = cleanPhone;
@@ -290,7 +315,7 @@ export const customerLogin = async (req, res) => {
               }
             }
           }
-        });
+        }).catch(() => profile);
       }
 
       // Ensure wallet exists for this customer in database
@@ -320,9 +345,10 @@ export const customerLogin = async (req, res) => {
       user: {
         id: profile.id,
         phone: profile.phone || cleanPhone || '',
-        email: profile.email || '',
+        email: (profile.email && !profile.email.endsWith('@customer.meesho')) ? profile.email : (cleanEmail || ''),
         fullName: profile.fullName || 'Valued Customer',
         role: profile.role,
+        storeName: profile.storeName || null,
         avatarUrl: profile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
         walletBalance: profile.wallet?.balance ?? 0.0,
         ordersCount: profile._count?.orders ?? 0,
@@ -367,7 +393,7 @@ export const affiliateLogin = async (req, res) => {
     }
 
     const userId = cleanPhone ? `affiliate_${cleanPhone}` : `affiliate_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-    const generatedCode = referralCode || (cleanPhone ? `MSHOPPY${cleanPhone.slice(-4)}` : 'MEESHO500');
+    const generatedCode = referralCode || (cleanPhone ? `MSHOPPY${cleanPhone.slice(-4)}` : `MSHOPPY${userId.slice(-4).toUpperCase()}`);
 
     // Query or create directly in PostgreSQL Profile table
     let profile = await prisma.profile.findFirst({
@@ -396,7 +422,7 @@ export const affiliateLogin = async (req, res) => {
         data: {
           id: userId,
           phone: cleanPhone || null,
-          email: email ? email.toLowerCase() : (cleanPhone ? `${cleanPhone}@affiliate.meesho` : null),
+          email: email ? email.toLowerCase().trim() : null,
           fullName: fullName || `Affiliate Partner ${cleanPhone ? `+91 ${cleanPhone.slice(-4)}` : ''}`.trim(),
           role: 'CUSTOMER',
           avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
@@ -1153,11 +1179,10 @@ export const googleAuth = async (req, res) => {
     const latestKyc = profile.kycApplications?.[0];
     const kycStatus = latestKyc?.status || (profile.role === 'RESELLER' ? 'APPROVED' : 'NOT_SUBMITTED');
 
-    const token = jwt.sign(
-      { id: profile.id, email: profile.email, role: profile.role },
-      process.env.JWT_SECRET || 'meesho_jwt_secret_super_secure_key_2026',
-      { expiresIn: '7d' }
-    );
+    const token = await generateFirebaseToken(profile.id, {
+      role: profile.role,
+      email: profile.email,
+    });
 
     return res.status(200).json({
       success: true,

@@ -4,6 +4,10 @@ import prisma from '../../config/prisma.js';
 import supabase from '../../config/supabaseClient.js';
 import slugify from 'slugify';
 import { dispatchDeliveryOtpEmail } from '../order.controller.js';
+import {
+  sendOrderDispatchedEmail,
+  sendOrderOutForDeliveryEmail
+} from '../../utils/emailTemplates.js';
 import { getUploadDir } from '../../middlewares/upload.middleware.js';
 import { uploadFileToSupabase } from '../../services/supabaseStorage.service.js';
 import { generateOrderPdf } from '../../services/invoicePdf.service.js';
@@ -277,6 +281,8 @@ export const addProduct = async (req, res, next) => {
       stock,
       sku,
       variants,
+      videoUrl,
+      videoType,
       isFreeDelivery,
       supplierName = supplierProfile.storeName || supplierProfile.fullName || 'Verified Supplier',
     } = req.body;
@@ -305,15 +311,25 @@ export const addProduct = async (req, res, next) => {
       finalCategorySlug = 'women-ethnic';
     }
 
-    // Ensure Category exists or create it
-    await prisma.category.upsert({
+    // Ensure Category exists or create it (Custom categories added by suppliers require Admin approval)
+    let category = await prisma.category.findUnique({
       where: { slug: finalCategorySlug },
-      update: {},
-      create: {
-        name: categoryName || finalCategorySlug.replace(/-/g, ' ').toUpperCase(),
-        slug: finalCategorySlug,
-      },
     });
+
+    let isNewCustomCategory = false;
+    if (!category) {
+      isNewCustomCategory = true;
+      category = await prisma.category.create({
+        data: {
+          name: categoryName || finalCategorySlug.replace(/-/g, ' ').toUpperCase(),
+          slug: finalCategorySlug,
+          status: 'PENDING',
+          requestedBySupplierId: supplierId || null,
+        },
+      });
+    }
+
+    const isCategoryPending = isNewCustomCategory || (category && category.status === 'PENDING');
 
     // Handle Uploaded Images & Multiple Image URLs
     let imageUrls = [];
@@ -457,19 +473,22 @@ export const addProduct = async (req, res, next) => {
         thicknesses: parsedThicknesses,
         sku: (sku || '').trim() || null,
         variants: parsedVariants,
+        videoUrl: (videoUrl || '').trim() || null,
+        videoType: (videoType || '').trim() || null,
         stock: finalStock,
         isFreeDelivery: isFreeDelivery === 'false' ? false : Boolean(isFreeDelivery),
         supplierName,
         supplierId,
+        isActive: !isCategoryPending, // Product is Held Under Review until Admin approves custom category
       },
       include: {
         category: true,
       },
     });
 
-    // Also sync to Supabase if available
+    // Also sync to Supabase if available (Only sync to public live catalog if category is approved)
     try {
-      if (supabase && newProduct) {
+      if (supabase && newProduct && !isCategoryPending) {
         await supabase.from('products').insert([
           {
             id: newProduct.id,
@@ -481,15 +500,22 @@ export const addProduct = async (req, res, next) => {
             category_slug: newProduct.categorySlug,
             supplier_id: supplierId,
             supplier_name: supplierName,
+            video_url: newProduct.videoUrl,
+            video_type: newProduct.videoType,
           }
         ]).select().catch(() => {});
       }
     } catch (_) {}
 
+    const responseMsg = isCategoryPending
+      ? `Product "${newProduct.title}" submitted! It is currently UNDER REVIEW pending Admin approval for category "${category?.name || finalCategorySlug}".`
+      : 'Product created and published successfully to live catalog!';
+
     return res.status(201).json({
       success: true,
-      message: 'Product created and published successfully to database!',
+      message: responseMsg,
       data: newProduct,
+      isUnderReview: isCategoryPending,
     });
   } catch (error) {
     console.error('Error in addProduct:', error);
@@ -650,6 +676,13 @@ export const updateProduct = async (req, res, next) => {
       updateData.sku = typeof updateData.sku === 'string' && updateData.sku.trim() ? updateData.sku.trim() : null;
     }
 
+    if (updateData.videoUrl !== undefined) {
+      updateData.videoUrl = typeof updateData.videoUrl === 'string' && updateData.videoUrl.trim() ? updateData.videoUrl.trim() : null;
+    }
+    if (updateData.videoType !== undefined) {
+      updateData.videoType = typeof updateData.videoType === 'string' && updateData.videoType.trim() ? updateData.videoType.trim() : null;
+    }
+
     if (updateData.variants !== undefined) {
       let rawVariants = updateData.variants;
       if (typeof rawVariants === 'string') {
@@ -679,14 +712,19 @@ export const updateProduct = async (req, res, next) => {
       updateData.categorySlug = slugify(updateData.categoryName, { lower: true, strict: true });
     }
     if (updateData.categorySlug) {
-      await prisma.category.upsert({
+      const existingCat = await prisma.category.findUnique({
         where: { slug: updateData.categorySlug },
-        update: {},
-        create: {
-          name: updateData.categoryName || updateData.categorySlug.replace(/-/g, ' ').toUpperCase(),
-          slug: updateData.categorySlug,
-        },
       });
+      if (!existingCat) {
+        await prisma.category.create({
+          data: {
+            name: updateData.categoryName || updateData.categorySlug.replace(/-/g, ' ').toUpperCase(),
+            slug: updateData.categorySlug,
+            status: 'PENDING',
+            requestedBySupplierId: supplierId || null,
+          },
+        });
+      }
     }
     delete updateData.categoryName;
 
@@ -958,15 +996,24 @@ export const bulkUploadProducts = async (req, res, next) => {
       let catSlug = item.categorySlug || slugify(catName, { lower: true, strict: true });
       if (!catSlug) catSlug = 'women-ethnic';
 
-      // Ensure Category exists
-      await prisma.category.upsert({
+      // Ensure Category exists (Custom category from supplier requires Admin approval)
+      const existingCat = await prisma.category.findUnique({
         where: { slug: catSlug },
-        update: {},
-        create: {
-          name: catName,
-          slug: catSlug,
-        },
       });
+      let isCatPending = false;
+      if (!existingCat) {
+        isCatPending = true;
+        await prisma.category.create({
+          data: {
+            name: catName,
+            slug: catSlug,
+            status: 'PENDING',
+            requestedBySupplierId: supplierId || null,
+          },
+        });
+      } else if (existingCat.status === 'PENDING') {
+        isCatPending = true;
+      }
 
       // Parse sizes
       let parsedSizes = ['Free Size'];
@@ -1066,6 +1113,7 @@ export const bulkUploadProducts = async (req, res, next) => {
           isFreeDelivery: item.isFreeDelivery !== false,
           supplierName: supplierDisplayName,
           supplierId,
+          isActive: !isCatPending,
         },
       });
 
@@ -1160,7 +1208,14 @@ export const bulkDeleteProducts = async (req, res, next) => {
  */
 export const getCategories = async (req, res, next) => {
   try {
+    const supplierId = req.supplierId || req.user?.id;
     const categories = await prisma.category.findMany({
+      where: {
+        OR: [
+          { status: 'APPROVED' },
+          ...(supplierId ? [{ status: 'PENDING', requestedBySupplierId: supplierId }] : [])
+        ]
+      },
       orderBy: { name: 'asc' },
     });
 
@@ -1175,22 +1230,61 @@ export const getCategories = async (req, res, next) => {
 
 export const addCategory = async (req, res, next) => {
   try {
-    const { name, imageUrl } = req.body;
-    if (!name) {
+    const { name, imageUrl, parentId } = req.body;
+    const supplierId = req.supplierId || req.user?.id;
+    if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Category name is required' });
     }
 
-    const slug = slugify(name, { lower: true, strict: true });
-    const category = await prisma.category.upsert({
-      where: { slug },
-      update: { name, imageUrl: imageUrl || null },
-      create: { name, slug, imageUrl: imageUrl || null },
+    const cleanName = name.trim();
+    const slug = slugify(cleanName, { lower: true, strict: true });
+
+    // Check if category already exists
+    const existing = await prisma.category.findFirst({
+      where: {
+        OR: [
+          { slug },
+          { name: { equals: cleanName, mode: 'insensitive' } }
+        ]
+      }
+    });
+
+    if (existing) {
+      if (existing.status === 'APPROVED') {
+        return res.status(200).json({
+          success: true,
+          message: 'Category already exists and is active!',
+          data: existing,
+          isPendingApproval: false
+        });
+      }
+      if (existing.status === 'PENDING') {
+        return res.status(200).json({
+          success: true,
+          message: 'This category has already been submitted and is pending Admin approval.',
+          data: existing,
+          isPendingApproval: true
+        });
+      }
+    }
+
+    // New custom category -> status: 'PENDING' for Admin review
+    const category = await prisma.category.create({
+      data: {
+        name: cleanName,
+        slug,
+        imageUrl: imageUrl || null,
+        parentId: parentId || null,
+        status: 'PENDING',
+        requestedBySupplierId: supplierId || null,
+      }
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Category saved successfully!',
+      message: 'Custom category submitted for Admin approval! It will be activated once approved by Admin.',
       data: category,
+      isPendingApproval: true
     });
   } catch (error) {
     next(error);
@@ -1380,10 +1474,16 @@ export const updateOrderStatus = async (req, res, next) => {
       };
     });
 
+    if (targetStatus === 'SHIPPED') {
+      sendOrderDispatchedEmail({ orderId: id })
+        .then((resDispatch) => console.log(`📦 [Supplier Order ${id}] Automated SHIPPED email sent to: ${resDispatch.sentTo} (AWB: ${resDispatch.awb})`))
+        .catch((err) => console.warn(`⚠️ [Supplier Order ${id}] Dispatch email notice:`, err.message));
+    }
+
     if (targetStatus === 'OUT_FOR_DELIVERY') {
-      dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' })
-        .then((resOtp) => console.log(`🚚 [Supplier Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${resOtp.sentTo}`))
-        .catch((err) => console.error(`⚠️ [Supplier Order ${id}] OTP email failed:`, err.message));
+      sendOrderOutForDeliveryEmail({ orderId: id })
+        .then((resOtp) => console.log(`🚚 [Supplier Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${resOtp.sentTo} (OTP: ${resOtp.otp})`))
+        .catch((err) => console.warn(`⚠️ [Supplier Order ${id}] OTP email notice:`, err.message));
     }
 
     return res.status(200).json({
@@ -1495,9 +1595,29 @@ export const getSupplierSettlements = async (req, res, next) => {
 
     // Add withdrawal payout requests
     withdrawalTxns.forEach((t) => {
-      const isPaid = (Date.now() - new Date(t.createdAt).getTime()) > 24 * 60 * 60 * 1000;
-      const utrMatch = t.description?.match(/UTR:\s*([A-Za-z0-9]+)/i);
-      const utrNumber = utrMatch ? utrMatch[1] : `CMS${t.id.slice(0, 9).toUpperCase()}IMPS`;
+      const desc = t.description || '';
+      const d = desc.toLowerCase();
+      let status = 'PROCESSING';
+      let utrNumber = 'Awaiting Admin Approval';
+
+      if (d.includes('rejected') || t.type === 'reversed') {
+        status = 'REJECTED';
+        utrNumber = 'Rejected by Admin';
+      } else if (
+        d.includes('withdrawal paid') ||
+        d.includes('payout paid') ||
+        d.includes('status: paid') ||
+        (d.includes('paid') && d.includes('utr:')) ||
+        d.includes('completed')
+      ) {
+        status = 'PAID';
+        const utrMatch = desc.match(/UTR[:\s]+([A-Za-z0-9_-]+)/i);
+        utrNumber = utrMatch ? utrMatch[1] : 'UTR Confirmed';
+      }
+
+      const destMatch = desc.match(/(?:to|dest:)\s+([^|]+)/i);
+      const bankName = destMatch ? destMatch[1].trim() : (profile?.bankDetails?.bankName || 'Registered Bank Account');
+
       settlements.push({
         id: `PAYOUT-${t.id.slice(0, 8).toUpperCase()}`,
         date: new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -1506,9 +1626,9 @@ export const getSupplierSettlements = async (req, res, next) => {
         commissionRate: '0%',
         tdsAmount: 0,
         netAmount: t.amount,
-        status: isPaid ? 'PAID' : 'PROCESSING',
+        status,
         utrNumber,
-        bankName: profile?.bankDetails?.bankName || 'Registered Bank Account',
+        bankName,
         type: 'MANUAL_WITHDRAWAL',
       });
     });
@@ -1886,6 +2006,10 @@ export const getSupplierReturns = async (req, res, next) => {
         parsedShipping = ord.shippingAddress;
       }
 
+      const addressParts = (parsedShipping.details || '').split(',').map((s) => s.trim()).filter(Boolean);
+      const derivedCity = parsedShipping.city || (addressParts.length > 0 ? addressParts[0] : 'N/A');
+      const derivedState = parsedShipping.state || (addressParts.length > 2 ? addressParts[2] : (addressParts.length > 1 ? addressParts[1] : ''));
+
       let proofImages = [];
       if (Array.isArray(retReq?.images)) {
         proofImages = retReq.images;
@@ -1896,6 +2020,9 @@ export const getSupplierReturns = async (req, res, next) => {
           proofImages = retReq.images.split(',').map((s) => s.trim()).filter(Boolean);
         }
       }
+      proofImages = (Array.isArray(proofImages) ? proofImages : [])
+        .map((img) => (typeof img === 'string' ? img.trim() : ''))
+        .filter((img) => img && !img.startsWith('blob:'));
 
       return {
         id: retReq?.id || `ret_${item.id}`,
@@ -1921,10 +2048,10 @@ export const getSupplierReturns = async (req, res, next) => {
           category: item.product?.categorySlug,
         },
         customer: {
-          name: parsedShipping.fullName || parsedShipping.name || ord.user?.name || 'Customer',
+          name: parsedShipping.fullName || parsedShipping.name || ord.user?.fullName || ord.user?.name || 'Customer',
           phone: parsedShipping.phone || ord.user?.phone || 'N/A',
-          city: parsedShipping.city || 'N/A',
-          state: parsedShipping.state || 'N/A',
+          city: derivedCity,
+          state: derivedState,
         },
         awb: parsedShipping.awb || `RTO${ord.id.slice(0, 8).toUpperCase()}`,
         courier: parsedShipping.courier || 'Delhivery Surface Reverse',
@@ -2167,19 +2294,18 @@ export const requestSupplierPayout = async (req, res, next) => {
       });
     }
 
-    // 4. Atomic transaction to create payout withdrawal record
-    const utrRef = `CMS${Date.now().toString().slice(-8)}IMPS`;
+    // 4. Atomic transaction to create payout withdrawal record (Status: PENDING for Admin Review)
     const maskedAcc = `•••• ${String(bank.accountNumber).slice(-4)}`;
     const destinationStr = `${bank.bankName || 'Bank Account'} (${maskedAcc}, IFSC: ${bank.ifsc})`;
 
     const result = await prisma.$transaction(async (tx) => {
-      // Create debit record in WalletTransaction
+      // Create debit record in WalletTransaction with Status: PENDING (Admin approval required)
       const txn = await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
           amount: numAmount,
           type: 'debit',
-          description: `Payout Request to ${destinationStr} | UTR: ${utrRef} | Type: ${payoutType}`,
+          description: `Payout Request to ${destinationStr} | Status: PENDING | Type: ${payoutType}`,
         },
       });
 
@@ -2195,13 +2321,13 @@ export const requestSupplierPayout = async (req, res, next) => {
       await tx.notification.create({
         data: {
           userId: supplierId,
-          title: 'Payout Withdrawal Initiated! 🏦',
-          body: `Your payout request of ₹${numAmount.toLocaleString('en-IN')} has been initiated to ${destinationStr}. Reference: ${utrRef}`,
+          title: 'Payout Request Submitted for Admin Approval ⏳',
+          body: `Your payout request of ₹${numAmount.toLocaleString('en-IN')} has been submitted to Admin Panel for review. Payment will be disbursed to ${destinationStr} upon approval.`,
           type: 'earning',
           data: {
             txnId: txn.id,
             amount: numAmount,
-            utr: utrRef,
+            status: 'PENDING',
             bank: destinationStr,
           },
         },
@@ -2212,11 +2338,11 @@ export const requestSupplierPayout = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: `Payout request of ₹${numAmount.toLocaleString('en-IN')} initiated successfully to ${destinationStr}!`,
+      message: `Payout request of ₹${numAmount.toLocaleString('en-IN')} submitted to Admin Panel for approval. Funds will be disbursed to your bank account upon approval.`,
       data: {
         payoutId: result.id,
         amount: numAmount,
-        utrNumber: utrRef,
+        utrNumber: 'Awaiting Admin Approval',
         bankDetails: {
           bankName: bank.bankName,
           accountNumber: maskedAcc,

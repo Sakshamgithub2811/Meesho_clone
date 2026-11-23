@@ -27,6 +27,30 @@ export async function uploadImageToSupabase(file, folder = 'general') {
 }
 
 /**
+ * Universal Service to upload image or video file
+ */
+export async function uploadMediaToSupabase(file, folder = 'products') {
+  if (!file) throw new Error('No media file provided for upload.');
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('image', file);
+
+  const endpoint = `${API_V1_BASE}/upload?folder=${encodeURIComponent(folder)}`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    body: formData,
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success || !data.url) {
+    throw new Error(data.message || data.error || 'Failed to upload media file.');
+  }
+
+  return data.url;
+}
+
+/**
  * Upload multiple images concurrently to Supabase Storage Bucket
  * @param {File[]} files - Array of File objects
  * @param {string} [folder='products'] - Subfolder inside bucket

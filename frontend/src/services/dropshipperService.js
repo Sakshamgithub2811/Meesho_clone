@@ -12,6 +12,14 @@ export const getDropshipperDashboardOverviewApi = async (firebaseUid) => {
 };
 
 /**
+ * 0.1 Public Dynamic Landing Page Metrics & Wholesale Catalog Preview
+ */
+export const getDropshipperLandingMetricsApi = async () => {
+  const response = await axios.get(`${API_BASE}/dropshipper/landing-metrics`);
+  return response.data;
+};
+
+/**
  * 1. Register a new Dropshipper in database with role DROPSHIPPER
  */
 export const registerDropshipperApi = async ({ firebaseUid, email, fullName, phone, businessName }) => {

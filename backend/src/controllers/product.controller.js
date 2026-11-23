@@ -6,7 +6,7 @@ import redisClient from '../config/redisClient.js';
  */
 export const getProducts = async (req, res) => {
   try {
-    const { category, search, minPrice, maxPrice, sort, page = 1, limit, all } = req.query;
+    const { category, search, minPrice, maxPrice, sort, page = 1, limit, all, categories, gender, minRating, minDiscount } = req.query;
 
     const isFetchAll = all === 'true' || limit === 'all' || limit === '0' || limit === 'max';
     const pageNum = parseInt(page) || 1;
@@ -14,7 +14,7 @@ export const getProducts = async (req, res) => {
     const skip = isFetchAll ? undefined : ((pageNum - 1) * take);
 
     // Fast-path: Check Redis cache if running
-    const cacheKey = `products:${category || 'all'}:${search || ''}:${minPrice || ''}:${maxPrice || ''}:${sort || 'default'}:${isFetchAll ? 'all' : pageNum}:${isFetchAll ? 'all' : take}`;
+    const cacheKey = `products:${category || 'all'}:${search || ''}:${categories || ''}:${gender || ''}:${minRating || ''}:${minDiscount || ''}:${minPrice || ''}:${maxPrice || ''}:${sort || 'default'}:${isFetchAll ? 'all' : pageNum}:${isFetchAll ? 'all' : take}`;
     if (redisClient?.isOpen) {
       try {
         const cached = await redisClient.get(cacheKey);
@@ -25,7 +25,9 @@ export const getProducts = async (req, res) => {
     }
 
     const conditions = [
-      { isDeleted: false } // Soft delete filter: do not show discontinued/deleted products in live catalog
+      { isDeleted: false }, // Soft delete filter: do not show discontinued/deleted products in live catalog
+      { isActive: true }, // Only show active products (exclude under-review products)
+      { category: { status: 'APPROVED' } } // Category must be approved by admin before appearing in live catalog
     ];
 
     // Category filter - exact slug/name matching (prevents 'men' from loosely matching 'women-ethnic')
@@ -77,6 +79,198 @@ export const getProducts = async (req, res) => {
           { category: { name: { contains: q, mode: 'insensitive' } } },
         ]
       });
+    }
+
+    // Sidebar multi-category filter with intelligent category rules & negative exclusions
+    if (categories && categories.trim() !== '') {
+      const catList = categories.split(',').map((c) => c.trim().toLowerCase()).filter(Boolean);
+      const CATEGORY_DEFINITIONS = {
+        'women tops and tunics': {
+          targetSlugs: ['women-western'],
+          terms: ['top', 'tops', 'tunic', 'tunics', 'crop top', 'peplum'],
+          negativeTerms: ['laptop', 'desktop', 'tabletop']
+        },
+        'women tshirts': {
+          targetSlugs: ['women-western'],
+          terms: ['tshirt', 't-shirt', 'tee']
+        },
+        'sarees': {
+          targetSlugs: ['women-ethnic'],
+          terms: ['saree', 'sari']
+        },
+        'kurtis': {
+          targetSlugs: ['women-ethnic'],
+          terms: ['kurti', 'kurta', 'anarkali']
+        },
+        'blouses': {
+          targetSlugs: ['women-ethnic'],
+          terms: ['blouse']
+        },
+        'dresses': {
+          targetSlugs: ['women-western'],
+          terms: ['dress', 'midi', 'maxi', 'frock', 'gown']
+        },
+        'perfumes': {
+          targetSlugs: ['beauty-health'],
+          terms: ['perfume', 'edp', 'fragrance', 'body mist', 'deodorant', 'attar', 'cologne']
+        },
+        'lipsticks': {
+          targetSlugs: ['beauty-health'],
+          terms: ['lipstick', 'lip gloss', 'lip balm', 'lip crayon', 'matte lip']
+        },
+        'hair oil': {
+          targetSlugs: ['beauty-health'],
+          terms: ['hair oil', 'ayurvedic oil', 'oil']
+        },
+        'handbags': {
+          targetSlugs: ['jewellery', 'accessories'],
+          terms: ['handbag', 'tote bag', 'sling bag', 'clutch', 'backpack', 'purse', 'bag', 'tote', 'sling']
+        },
+        'footwear': {
+          targetSlugs: ['footwear'],
+          terms: ['shoe', 'chappal', 'sandal', 'loafer', 'sneaker', 'clog', 'flat', 'heel', 'footwear', 'boots', 'slippers']
+        },
+        'audio & earbuds': {
+          targetSlugs: ['electronics'],
+          terms: ['earbud', 'headphone', 'tws', 'speaker', 'bluetooth', 'earphone', 'neckband']
+        },
+        'earrings & studs': {
+          targetSlugs: ['jewellery'],
+          terms: ['earring', 'stud', 'jhumka', 'jhumki', 'bali']
+        },
+        'analog watches': {
+          targetSlugs: ['jewellery', 'electronics'],
+          terms: ['watch', 'analog']
+        },
+        'bedsheets': {
+          targetSlugs: ['home-kitchen'],
+          terms: ['bedsheet', 'bed sheet', 'bed cover', 'sheet']
+        },
+        'fridge covers': {
+          targetSlugs: ['home-kitchen'],
+          terms: ['fridge cover', 'refrigerator cover']
+        },
+        'appliance covers': {
+          targetSlugs: ['home-kitchen'],
+          terms: ['appliance cover', 'washing machine cover', 'cover']
+        },
+        'caps & hats': {
+          targetSlugs: ['men', 'women-western', 'kids'],
+          terms: ['cap', 'hat', 'beanie'],
+          negativeTerms: ['handicap', 'landscape']
+        }
+      };
+
+      const categoryConditions = catList.map((catKey) => {
+        const rule = CATEGORY_DEFINITIONS[catKey];
+        if (!rule) {
+          const raw = catKey.endsWith('s') ? catKey.slice(0, -1) : catKey;
+          return {
+            OR: [
+              { title: { contains: raw, mode: 'insensitive' } },
+              { subCategory: { contains: raw, mode: 'insensitive' } }
+            ]
+          };
+        }
+
+        const andClauses = [];
+        if (rule.targetSlugs?.length) {
+          andClauses.push({
+            OR: [
+              { categorySlug: { in: rule.targetSlugs } },
+              { category: { slug: { in: rule.targetSlugs } } }
+            ]
+          });
+        }
+
+        const termClauses = rule.terms.flatMap((term) => [
+          { title: { contains: term, mode: 'insensitive' } },
+          { subCategory: { contains: term, mode: 'insensitive' } }
+        ]);
+        if (termClauses.length) {
+          andClauses.push({ OR: termClauses });
+        }
+
+        if (rule.negativeTerms?.length) {
+          andClauses.push({
+            NOT: rule.negativeTerms.map((neg) => ({
+              title: { contains: neg, mode: 'insensitive' }
+            }))
+          });
+        }
+
+        return { AND: andClauses };
+      });
+
+      if (categoryConditions.length > 0) {
+        conditions.push({ OR: categoryConditions });
+      }
+    }
+
+    // Gender filter
+    if (gender && gender.trim() !== '') {
+      const g = gender.trim().toLowerCase();
+      if (g === 'men') {
+        conditions.push({
+          AND: [
+            { categorySlug: { notIn: ['women-ethnic', 'women-western'] } },
+            {
+              OR: [
+                { categorySlug: 'men' },
+                { title: { contains: 'men', mode: 'insensitive' } },
+                { description: { contains: 'men', mode: 'insensitive' } }
+              ]
+            },
+            { title: { not: { contains: 'women', mode: 'insensitive' } } }
+          ]
+        });
+      } else if (g === 'women') {
+        conditions.push({
+          OR: [
+            { categorySlug: { in: ['women-ethnic', 'women-western'] } },
+            { title: { contains: 'women', mode: 'insensitive' } },
+            { description: { contains: 'women', mode: 'insensitive' } }
+          ]
+        });
+      } else if (g === 'boys' || g === 'boy') {
+        conditions.push({
+          OR: [
+            { title: { contains: 'boy', mode: 'insensitive' } },
+            { categorySlug: 'kids' }
+          ]
+        });
+      } else if (g === 'girls' || g === 'girl') {
+        conditions.push({
+          OR: [
+            { title: { contains: 'girl', mode: 'insensitive' } },
+            { categorySlug: 'kids' }
+          ]
+        });
+      } else {
+        conditions.push({
+          OR: [
+            { title: { contains: g, mode: 'insensitive' } },
+            { description: { contains: g, mode: 'insensitive' } },
+            { categorySlug: { contains: g, mode: 'insensitive' } }
+          ]
+        });
+      }
+    }
+
+    // Rating filter
+    if (minRating) {
+      const r = parseFloat(minRating);
+      if (!isNaN(r)) {
+        conditions.push({ rating: { gte: r } });
+      }
+    }
+
+    // Discount filter
+    if (minDiscount) {
+      const d = parseInt(minDiscount);
+      if (!isNaN(d)) {
+        conditions.push({ discountPercentage: { gte: d } });
+      }
     }
 
     // Price range filter
@@ -174,11 +368,46 @@ export const getProductById = async (req, res) => {
       });
     }
 
+    // Dynamic supplier metrics calculated from database
+    let supplierStats = {
+      productCount: 1,
+      rating: product.rating || 4.2,
+      totalRatings: product.reviewsCount || 0,
+      isVerified: true
+    };
+
+    if (product.supplierName) {
+      try {
+        const [supCount, supAgg] = await Promise.all([
+          prisma.product.count({
+            where: { supplierName: product.supplierName, isDeleted: false }
+          }),
+          prisma.product.aggregate({
+            where: { supplierName: product.supplierName, isDeleted: false },
+            _avg: { rating: true },
+            _sum: { reviewsCount: true }
+          })
+        ]);
+
+        supplierStats = {
+          productCount: supCount || 1,
+          rating: Number(supAgg._avg.rating ? supAgg._avg.rating.toFixed(1) : (product.rating || 4.2)),
+          totalRatings: Number(supAgg._sum.reviewsCount !== null && supAgg._sum.reviewsCount !== undefined ? supAgg._sum.reviewsCount : (product.reviewsCount || 0)),
+          isVerified: true
+        };
+      } catch (e) {
+        console.warn('Failed to calculate dynamic supplier metrics:', e?.message || e);
+      }
+    }
+
     // High performance Vercel Edge caching header for sub-300ms global delivery
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     return res.status(200).json({
       success: true,
-      data: product
+      data: {
+        ...product,
+        supplierStats
+      }
     });
   } catch (error) {
     console.error('Error fetching product by ID:', error);
@@ -206,6 +435,8 @@ export const createProduct = async (req, res) => {
       images,
       sizes,
       colors,
+      videoUrl,
+      videoType,
       stock = 50,
       isFreeDelivery = true,
       supplierName = 'Verified Supplier',
@@ -288,6 +519,8 @@ export const createProduct = async (req, res) => {
         images: productImages,
         sizes: productSizes,
         colors: productColors,
+        videoUrl: (videoUrl || '').trim() || null,
+        videoType: (videoType || '').trim() || null,
         stock: parseInt(stock, 10) || 50,
         isFreeDelivery: Boolean(isFreeDelivery),
         supplierName: supplierName || 'Verified Supplier'
@@ -377,6 +610,8 @@ export const updateProduct = async (req, res) => {
     }
 
     if (supplierName !== undefined) data.supplierName = supplierName;
+    if (req.body.videoUrl !== undefined) data.videoUrl = (req.body.videoUrl || '').trim() || null;
+    if (req.body.videoType !== undefined) data.videoType = (req.body.videoType || '').trim() || null;
 
     const updated = await prisma.product.update({
       where: { id },

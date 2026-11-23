@@ -3,7 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { auth } from '../../utils/firebase';
 import AppBottomNav from '../../components/AppBottomNav';
-import { submitReturnRequest } from '../../services/ecommerceService';
+import { submitReturnRequest, getOrderById } from '../../services/ecommerceService';
+import { uploadImageToSupabase } from '../../services/uploadService';
 import { API_V1_BASE } from '../../config/apiConfig';
 
 const RETURN_REASONS = [
@@ -43,11 +44,34 @@ export default function ReturnRequest({ onNavigate, onBack }) {
   // Parse query params if any
   const searchParams = new URLSearchParams(location.search);
   const orderIdParam = searchParams.get('orderId') || '';
-  const itemParam = searchParams.get('item') || 'Delivered Product';
-  const priceParam = searchParams.get('price') || '799';
+  const itemParam = searchParams.get('item') || '';
+  const priceParam = searchParams.get('price') || '';
   const imageParam = searchParams.get('image') || '';
-  const sizeParam = searchParams.get('size') || 'Free Size';
-  const deliveredDateParam = searchParams.get('deliveredDate') || 'Recently Delivered';
+  const sizeParam = searchParams.get('size') || '';
+  const deliveredDateParam = searchParams.get('deliveredDate') || '';
+
+  const [orderData, setOrderData] = useState(null);
+
+  useEffect(() => {
+    if (orderIdParam) {
+      getOrderById(orderIdParam).then((ord) => {
+        if (ord) setOrderData(ord);
+      }).catch(() => {});
+    }
+  }, [orderIdParam]);
+
+  const displayItemName = orderData?.productName || orderData?.items?.[0]?.product?.title || itemParam || 'Ordered Item';
+  const displayImage = orderData?.image || orderData?.items?.[0]?.product?.images?.[0] || imageParam || '';
+  const displayPrice = orderData?.totalAmount || orderData?.price || (priceParam ? Number(priceParam) : 0);
+  const displaySize = orderData?.size || orderData?.items?.[0]?.size || sizeParam || 'Standard Size';
+  const displayDeliveredDate = orderData?.deliveryDate || deliveredDateParam || 'Recently';
+  const courierPartner = orderData?.courier || orderData?.shippingAddress?.courier || 'Express Courier Partner';
+
+  const returnTrackingId = React.useMemo(() => {
+    if (orderData?.returnRequest?.id) return `RET-${orderData.returnRequest.id.slice(0, 8).toUpperCase()}`;
+    if (orderIdParam) return `RET-${orderIdParam.slice(0, 8).toUpperCase()}`;
+    return `RET-${Date.now().toString().slice(-6)}`;
+  }, [orderData, orderIdParam]);
 
   // Step state (1: Mode & Reason, 2: Proof & Photos, 3: Refund/Exchange, 4: Pickup Slot, 5: Success)
   const [currentStep, setCurrentStep] = useState(() => {
@@ -99,6 +123,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
     slot_tomorrow_evening: 'Tomorrow, 2:00 PM - 6:00 PM',
   };
   const selectedSlotLabel = pickupSlotLabels[pickupSlot] || 'Tomorrow, 9:00 AM - 1:00 PM';
+  const isPickupToday = selectedSlotLabel.toLowerCase().includes('today');
 
   const reduxUser = useSelector((state) => state.user?.currentUser);
 
@@ -156,12 +181,11 @@ export default function ReturnRequest({ onNavigate, onBack }) {
     }
   };
 
-  // Handle actual file upload from user device / gallery
-  const handleRealFileUpload = (e) => {
+  // Handle actual file upload from user device / gallery to cloud storage
+  const handleRealFileUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    const newProofs = [];
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
         showToast(`"${file.name}" is not an image! Please select JPG, PNG, or WebP images.`);
@@ -172,36 +196,56 @@ export default function ReturnRequest({ onNavigate, onBack }) {
         continue;
       }
 
+      const tempId = `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const localUrl = URL.createObjectURL(file);
       const sizeInKb = Math.round(file.size / 1024);
       const formattedSize = sizeInKb > 1024 ? `${(sizeInKb / 1024).toFixed(1)} MB` : `${sizeInKb} KB`;
 
-      newProofs.push({
-        id: `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      // 1. Add immediately with local preview and isUploading: true
+      const newEntry = {
+        id: tempId,
         name: file.name,
         url: localUrl,
+        localUrl,
+        remoteUrl: null,
         size: formattedSize,
-        type: proofs.length === 0 && newProofs.length === 0 ? 'Product Photo' : 'Tag / Defect Detail',
-        isLocal: true,
-      });
-    }
+        type: 'Defect Proof',
+        isUploading: true,
+        file,
+      };
+      setProofs((prev) => [...prev, newEntry]);
 
-    if (newProofs.length > 0) {
-      setProofs((prev) => [...prev, ...newProofs]);
-      showToast(`${newProofs.length} photo(s) selected from your gallery! 📸`);
+      // 2. Concurrently upload to Supabase Cloud Storage
+      try {
+        const cloudUrl = await uploadImageToSupabase(file, 'returns');
+        setProofs((prev) =>
+          prev.map((p) => (p.id === tempId ? { ...p, url: cloudUrl, remoteUrl: cloudUrl, isUploading: false } : p))
+        );
+        showToast('Photo uploaded securely to cloud! ☁️');
+      } catch (err) {
+        console.warn('Cloud upload failed, encoding as permanent Base64 data URL:', err);
+        // Fallback: convert file to Base64 data URL so it's a permanent self-contained string, NOT a dead blob URL!
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64Url = reader.result;
+          setProofs((prev) =>
+            prev.map((p) => (p.id === tempId ? { ...p, url: base64Url, remoteUrl: base64Url, isUploading: false } : p))
+          );
+        };
+        reader.readAsDataURL(file);
+      }
     }
 
     // Reset input so same file can be chosen again if needed
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
   const handleRemovePhoto = (id) => {
     setProofs((prev) => {
       const target = prev.find((p) => p.id === id);
-      if (target && target.isLocal && target.url) {
-        URL.revokeObjectURL(target.url);
+      if (target && target.localUrl) {
+        URL.revokeObjectURL(target.localUrl);
       }
       return prev.filter((p) => p.id !== id);
     });
@@ -214,7 +258,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
       return;
     }
     setIsUpiVerified(true);
-    showToast('✓ UPI ID verified: PRIYA SHARMA (HDFC Bank)');
+    showToast(`✓ UPI ID (${upiId}) verified successfully!`);
   };
 
   const handleSendEmailOtp = async () => {
@@ -256,11 +300,18 @@ export default function ReturnRequest({ onNavigate, onBack }) {
       return;
     }
 
+    if (proofs.some((p) => p.isUploading)) {
+      showToast('Please wait, uploading your defect proof photos to cloud storage... ⏳');
+      return;
+    }
+
     try {
       // 1. Submit to real backend database (inserts in Prisma ReturnRequest and updates Order status)
       if (orderIdParam) {
         const imageStrings = Array.isArray(proofs)
-          ? proofs.map((p) => (typeof p === 'string' ? p : p?.url || p?.name || '')).filter(Boolean)
+          ? proofs
+              .map((p) => (typeof p === 'string' ? p : p?.remoteUrl || p?.url || ''))
+              .filter((u) => u && !u.startsWith('blob:'))
           : [];
 
         const result = await submitReturnRequest({
@@ -282,7 +333,9 @@ export default function ReturnRequest({ onNavigate, onBack }) {
       }
 
       setCurrentStep(5); // Show success screen
-      handleSendEmailOtp(); // Trigger real email via SMTP
+      if (isPickupToday) {
+        handleSendEmailOtp(); // Only trigger email if pickup is Today
+      }
     } catch (e) {
       console.error('Error submitting return to database:', e);
       showToast(e.message || 'Could not submit return request. Please try again.');
@@ -385,22 +438,22 @@ export default function ReturnRequest({ onNavigate, onBack }) {
         {currentStep < 5 && (
           <section className="bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 flex items-center gap-3 sm:gap-4">
             <img
-              src={imageParam || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&auto=format&fit=crop&q=80'}
-              alt={itemParam}
-              className="w-14 h-18 sm:w-20 sm:h-24 object-cover rounded-xl sm:rounded-2xl border border-slate-200 shrink-0"
+              src={displayImage || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5'><rect width='20' height='20' x='2' y='2' rx='4'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='m21 15-5-5L5 21'/></svg>"}
+              alt={displayItemName}
+              className="w-14 h-18 sm:w-20 sm:h-24 object-cover rounded-xl sm:rounded-2xl border border-slate-200 shrink-0 bg-slate-50"
               onError={(e) => {
                 e.currentTarget.onerror = null;
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400';
+                e.currentTarget.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5'><rect width='20' height='20' x='2' y='2' rx='4'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='m21 15-5-5L5 21'/></svg>";
               }}
             />
             <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
               <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full inline-block">
-                Delivered on {deliveredDateParam}
+                Delivered on {displayDeliveredDate}
               </span>
-              <h2 className="font-extrabold text-xs sm:text-sm text-slate-900 truncate">{itemParam}</h2>
+              <h2 className="font-extrabold text-xs sm:text-sm text-slate-900 truncate">{displayItemName}</h2>
               <p className="text-[11px] sm:text-xs text-slate-500 leading-tight">
-                Size: <strong className="text-slate-800">{sizeParam}</strong> • Qty: <strong>1</strong> • Refund:{' '}
-                <strong className="text-[#9f0038] font-black">₹{priceParam}</strong>
+                Size: <strong className="text-slate-800">{displaySize}</strong> • Qty: <strong>1</strong> • Refund:{' '}
+                <strong className="text-[#9f0038] font-black">₹{displayPrice}</strong>
               </p>
             </div>
           </section>
@@ -677,10 +730,16 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                     >
                       <div className="w-full h-32 sm:h-36 overflow-hidden bg-slate-100 relative">
                         <img src={p.url} alt={p.name} className="w-full h-full object-cover object-center" />
+                        {p.isUploading && (
+                          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] flex flex-col items-center justify-center text-white text-[11px] font-bold gap-1.5 z-10">
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Uploading to cloud...</span>
+                          </div>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleRemovePhoto(p.id)}
-                          className="absolute top-2 right-2 bg-rose-600 hover:bg-rose-700 text-white w-6 h-6 rounded-full shadow-md flex items-center justify-center text-xs font-black cursor-pointer transition-transform active:scale-90"
+                          className="absolute top-2 right-2 bg-rose-600 hover:bg-rose-700 text-white w-6 h-6 rounded-full shadow-md flex items-center justify-center text-xs font-black cursor-pointer transition-transform active:scale-90 z-20"
                           title="Remove Photo"
                         >
                           ✕
@@ -692,7 +751,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                         </p>
                         <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
                           <span className="text-[#9f0038] font-bold">{p.type}</span>
-                          <span>{p.size || 'Attached'}</span>
+                          <span>{p.isUploading ? 'Uploading...' : p.size || 'Attached'}</span>
                         </div>
                       </div>
                     </div>
@@ -840,7 +899,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                         </div>
                         {isUpiVerified && (
                           <p className="text-xs text-emerald-700 font-bold flex items-center gap-1.5 leading-snug">
-                            <span>✓</span> Verified Name: <strong>PRIYA SHARMA</strong> (HDFC Bank)
+                            <span>✓</span> Verified UPI ID: <strong>{upiId}</strong>
                           </p>
                         )}
                       </div>
@@ -898,7 +957,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                     )}
                   </div>
 
-                  {/* Option 3: Meesho Wallet Credit */}
+                  {/* Option 3: Store Wallet Credit */}
                   <div
                     onClick={() => setRefundMethod('wallet')}
                     className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all cursor-pointer ${
@@ -909,14 +968,9 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                         <span className="text-xl sm:text-2xl shrink-0">👛</span>
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                            <h4 className="font-black text-xs sm:text-sm text-slate-900">Store Wallet Balance</h4>
-                            <span className="text-[9px] sm:text-[10px] font-black bg-rose-100 text-[#9f0038] px-2 py-0.5 rounded-full shrink-0">
-                              +₹50 Extra Bonus
-                            </span>
-                          </div>
+                          <h4 className="font-black text-xs sm:text-sm text-slate-900">Store Wallet Balance</h4>
                           <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                            Instant ₹{priceParam} + ₹50 shopping bonus = ₹{Number(priceParam) + 50} credit for next orders
+                            Instant ₹{displayPrice} refund credited to wallet for next orders
                           </p>
                         </div>
                       </div>
@@ -1108,15 +1162,15 @@ export default function ReturnRequest({ onNavigate, onBack }) {
 
             <div>
               <span className="inline-block px-3 py-1 bg-pink-50 text-[#9f0038] font-black text-[11px] sm:text-xs rounded-full uppercase tracking-wide mb-2">
-                Return ID: #RET-92841
+                Return ID: #{returnTrackingId}
               </span>
               <h2 className="text-xl sm:text-3xl font-black text-slate-900">
                 {actionType === 'return' ? 'Return Request Placed! 🎉' : 'Exchange Scheduled! 🔄'}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
                 {actionType === 'return'
-                  ? `Our courier partner will visit your address to pick up the item. Your refund of ₹${priceParam} will be credited immediately upon pickup.`
-                  : `Your size ${selectedExchangeSize} replacement has been booked and will be dispatched once rider picks up the current item.`}
+                  ? `Our courier partner will visit your address to pick up the item. Your refund of ₹${displayPrice} will be credited immediately upon pickup.`
+                  : `Your replacement has been booked and will be dispatched once rider picks up the current item.`}
               </p>
             </div>
 
@@ -1127,35 +1181,46 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                   <span>🛡️</span> Doorstep Return Pickup OTP
                 </span>
                 <span className="text-[10px] font-black bg-pink-100 text-[#9f0038] px-2.5 py-0.5 rounded-full">
-                  Keep Ready
+                  {isPickupToday ? 'Keep Ready' : 'Scheduled'}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between bg-white p-3.5 rounded-xl border border-rose-200 shadow-2xs">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Your 4-Digit Pickup OTP</p>
-                  <p className="text-2xl sm:text-3xl font-black font-mono tracking-widest text-[#9f0038] mt-0.5">
-                    {pickupOtp}
+              {isPickupToday ? (
+                <div className="flex items-center justify-between bg-white p-3.5 rounded-xl border border-rose-200 shadow-2xs">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Your 4-Digit Pickup OTP</p>
+                    <p className="text-2xl sm:text-3xl font-black font-mono tracking-widest text-[#9f0038] mt-0.5">
+                      {pickupOtp}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(String(pickupOtp));
+                        showToast('Pickup OTP copied to clipboard! 📋');
+                      }}
+                      className="px-3.5 py-2 bg-pink-50 hover:bg-pink-100 active:scale-95 text-[#9f0038] font-black text-xs rounded-xl cursor-pointer transition-colors"
+                    >
+                      Copy OTP
+                    </button>
+                    {customerEmail && (
+                      <span className="text-[11px] text-emerald-800 font-bold flex items-center gap-1 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 rounded-xl">
+                        <span>✓</span> Emailed to {customerEmail}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white p-3.5 rounded-xl border border-rose-200 shadow-2xs space-y-1">
+                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>🔒</span> OTP will be sent on pickup day
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Since pickup is scheduled for <strong className="text-[#9f0038]">{selectedSlotLabel}</strong>, your verification OTP will be generated &amp; emailed on your pickup day when the executive arrives.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (navigator?.clipboard?.writeText) navigator.clipboard.writeText(String(pickupOtp));
-                      showToast('Pickup OTP copied to clipboard! 📋');
-                    }}
-                    className="px-3.5 py-2 bg-pink-50 hover:bg-pink-100 active:scale-95 text-[#9f0038] font-black text-xs rounded-xl cursor-pointer transition-colors"
-                  >
-                    Copy OTP
-                  </button>
-                  {customerEmail && (
-                    <span className="text-[11px] text-emerald-800 font-bold flex items-center gap-1 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 rounded-xl">
-                      <span>✓</span> Emailed to {customerEmail}
-                    </span>
-                  )}
-                </div>
-              </div>
+              )}
 
               <div className="text-[11px] text-slate-600 space-y-1.5 pt-1">
                 <p className="text-slate-800 font-bold flex items-center gap-1">
@@ -1163,7 +1228,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                   <span className="text-[#9f0038]">{selectedSlotLabel}</span>
                 </p>
                 <p className="text-slate-500 leading-relaxed text-[11px]">
-                  ⚠️ <strong>Security Note:</strong> Share this OTP with courier partner (Shadowfax) only after physical inspection of tags &amp; parcel handover. Once entered by the rider, your refund of <strong className="text-slate-700">₹{priceParam}</strong> will be processed instantly.
+                  ⚠️ <strong>Security Note:</strong> Share this OTP with courier partner ({courierPartner}) only after physical inspection of tags &amp; parcel handover. Once entered by the rider, your refund of <strong className="text-slate-700">₹{displayPrice}</strong> will be processed instantly.
                 </p>
                 <p className="text-emerald-700 font-semibold text-[10px] flex items-center gap-1 pt-0.5">
                   <span>📧</span> Sent automatically to your login email address
@@ -1186,7 +1251,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                     current: false,
                   },
                   {
-                    title: 'Courier Rider Assigned (Shadowfax)',
+                    title: `Courier Rider Assigned (${courierPartner})`,
                     desc: 'Courier executive will arrive to collect return parcel',
                     done: false,
                     current: true,
@@ -1200,7 +1265,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
                   {
                     title:
                       actionType === 'return'
-                        ? `₹${priceParam} Refund Credited to UPI/Bank`
+                        ? `₹${displayPrice} Refund Credited to UPI/Bank`
                         : 'New Replacement Size Dispatched',
                     desc:
                       actionType === 'return'

@@ -561,16 +561,28 @@ export const getAffiliateKycStatus = async (req, res) => {
     // 1. Locate user if userId, email, or phone is provided
     let user = null;
     if (userId || cleanEmail || cleanPhone) {
-      user = await prisma.profile.findFirst({
+      const candidates = await prisma.profile.findMany({
         where: {
           OR: [
             userId ? { id: userId } : undefined,
-            cleanEmail ? { email: cleanEmail } : undefined,
+            (cleanEmail && !cleanEmail.endsWith('@customer.meesho')) ? { email: { equals: cleanEmail, mode: 'insensitive' } } : undefined,
             cleanPhone ? { phone: cleanPhone } : undefined,
             cleanPhone ? { id: `affiliate_${cleanPhone}` } : undefined
           ].filter(Boolean)
+        },
+        include: {
+          kycApplications: {
+            where: { type: 'affiliate' },
+            orderBy: { createdAt: 'desc' }
+          }
         }
       });
+
+      if (candidates.length > 0) {
+        // Prioritize profile that has the actual affiliate KYC application
+        const withKyc = candidates.find(c => c.kycApplications && c.kycApplications.length > 0);
+        user = withKyc || candidates[0];
+      }
     }
 
     // 2. If user exists, find THEIR affiliate KYC

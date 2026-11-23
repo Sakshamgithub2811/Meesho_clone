@@ -29,7 +29,7 @@ async function testSupplierAuth() {
     const otpData = await otpRes.json();
     console.log(`   Status: ${otpRes.status} | Response:`, otpData);
 
-    // 2. Verify OTP (Receive JWT Token)
+    // 2. Verify OTP (Receive Auth Token)
     console.log('\n2️⃣ Testing Verify OTP (POST /api/supplier/auth/verify-otp)...');
     const verifyRes = await fetch(`${BASE_URL}/supplier/auth/verify-otp`, {
       method: 'POST',
@@ -87,7 +87,7 @@ async function testSupplierAuth() {
     console.log(`   Status: ${regRes.status} | Created Supplier: ${regData.supplier?.name} (ID: ${regData.supplier?.id})`);
     console.log(`   Registered Bank: ${regData.supplier?.bankDetails?.bankName} | IFSC: ${regData.supplier?.bankDetails?.ifsc} | GSTIN: ${regData.supplier?.gstDetails?.gstin}`);
 
-    // 5. Fetch Profile using JWT Bearer Token
+    // 5. Fetch Profile using Bearer Auth Token
     console.log('\n5️⃣ Testing GET Profile with Bearer Token (GET /api/supplier/auth/me)...');
     const profileRes = await fetch(`${BASE_URL}/supplier/auth/me`, {
       headers: {

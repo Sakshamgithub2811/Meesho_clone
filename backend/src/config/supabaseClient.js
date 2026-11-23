@@ -17,10 +17,12 @@ export let supabase = null;
 
 if (supabaseUrl && supabaseAnonKey) {
   try {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+    });
     console.log("⚡ Supabase Client initialized successfully!");
   } catch (err) {
-    console.warn("⚠️ Failed to initialize Supabase Client:", err.message);
+    console.warn("⚠️ Failed to initialize Supabase Client:", err?.message || err);
   }
 } else {
   console.warn("⚠️ Supabase URL or Anon Key is missing in .env (running without Supabase direct client)");

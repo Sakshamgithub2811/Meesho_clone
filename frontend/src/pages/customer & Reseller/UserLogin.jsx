@@ -24,7 +24,9 @@ import {
   CheckCircle2,
   RefreshCw,
   AlertCircle,
-  Inbox
+  Inbox,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export default function UserLogin() {
@@ -47,11 +49,13 @@ export default function UserLogin() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Register form state
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
 
   // State for new user registration email verification
   const [pendingRegisteredUser, setPendingRegisteredUser] = useState(null); // user profile data
@@ -206,15 +210,22 @@ export default function UserLogin() {
         id: response.data?.user?.id || firebaseUser.uid,
         email: response.data?.user?.email || firebaseUser.email || cleanEmail,
         fullName: response.data?.user?.fullName || firebaseUser.displayName || cleanEmail.split('@')[0],
-        role: 'CUSTOMER',
+        role: response.data?.user?.role || 'CUSTOMER',
       };
 
       // 3. Save to Redux & Local storage customer session
       dispatch(loginSuccess(userData));
-      await loginCustomer({
+      const custLoginRes = await loginCustomer({
         email: userData.email,
         fullName: userData.fullName,
-      }).catch(() => { });
+      }).catch(() => null);
+
+      if (custLoginRes?.user) {
+        dispatch(loginSuccess({
+          ...userData,
+          ...custLoginRes.user
+        }));
+      }
 
       // 4. Redirect immediately without OTP
       navigate(redirectParam);
@@ -266,15 +277,25 @@ export default function UserLogin() {
       </div>
       <div className="space-y-1 text-left">
         <Label htmlFor="user-register-password" className="text-xs font-bold text-slate-700">Password</Label>
-        <Input
-          id="user-register-password"
-          type="password"
-          placeholder="Minimum 6 characters"
-          value={registerPassword}
-          onChange={(e) => setRegisterPassword(e.target.value)}
-          required
-          className="h-10 px-3.5 text-xs sm:text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
-        />
+        <div className="relative">
+          <Input
+            id="user-register-password"
+            type={showRegisterPassword ? "text" : "password"}
+            placeholder="Minimum 6 characters"
+            value={registerPassword}
+            onChange={(e) => setRegisterPassword(e.target.value)}
+            required
+            className="h-10 px-3.5 pr-10 text-xs sm:text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          />
+          <button
+            type="button"
+            onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#b7004d] p-1 cursor-pointer transition-colors"
+            title={showRegisterPassword ? "Hide password" : "Show password"}
+          >
+            {showRegisterPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
       {(error || googleError) && !loading && !googleLoading && (
         <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">
@@ -340,15 +361,25 @@ export default function UserLogin() {
             Forgot Password?
           </button>
         </div>
-        <Input
-          id="user-login-password"
-          type="password"
-          placeholder="••••••••"
-          value={loginPassword}
-          onChange={(e) => setLoginPassword(e.target.value)}
-          required
-          className="h-10 px-3.5 text-xs sm:text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
-        />
+        <div className="relative">
+          <Input
+            id="user-login-password"
+            type={showLoginPassword ? "text" : "password"}
+            placeholder="••••••••"
+            value={loginPassword}
+            onChange={(e) => setLoginPassword(e.target.value)}
+            required
+            className="h-10 px-3.5 pr-10 text-xs sm:text-sm rounded-xl border-slate-200 focus-visible:ring-[#b7004d]/20 focus-visible:border-[#b7004d]"
+          />
+          <button
+            type="button"
+            onClick={() => setShowLoginPassword(!showLoginPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#b7004d] p-1 cursor-pointer transition-colors"
+            title={showLoginPassword ? "Hide password" : "Show password"}
+          >
+            {showLoginPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
       {(error || googleError) && !loading && !googleLoading && (
         <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold text-left flex items-center gap-2">

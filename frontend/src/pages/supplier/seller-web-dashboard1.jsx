@@ -8,7 +8,15 @@ import { signOut } from 'firebase/auth';
 import { toast } from 'sonner';
 import { playOrderChime } from '../../utils/orderSoundChime';
 
-import { SUPPLIER_MENU } from './supplierNavConfig';
+import {
+  SUPPLIER_MENU,
+  SUPPLIER_ROLES,
+  getStoredSupplierSubRole,
+  setStoredSupplierSubRole,
+  getSupplierMenuForRole,
+  isTabAllowedForRole,
+} from './supplierNavConfig';
+import { Sparkles, ShieldAlert } from 'lucide-react';
 
 // Tab Components (Mounted inside the persistent DashboardLayout without flickers)
 import SupplierDashboardOverview from '../../components/supplier/dashboard/SupplierDashboardOverview';
@@ -22,6 +30,7 @@ import SellerAddProduct1 from './SellerAddProduct1';
 import SellerKyc1 from './SellerKyc1';
 import SellerAnalytics1 from './SellerAnalytics1';
 import SellerProfile1 from './SellerProfile1';
+import SellerStaffManagement from '../../components/supplier/staff/SellerStaffManagement';
 
 export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) {
   const navigate = useNavigate();
@@ -29,12 +38,18 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
   // Derive initial tab from URL or props
   const getTabFromLocation = useCallback(() => {
     if (initialTab) return initialTab;
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tabParam = searchParams.get('tab');
+      if (tabParam) return tabParam;
+    } catch (_) {}
     const path = window.location.pathname;
     const match = SUPPLIER_MENU.find((m) => m.path === path);
     return match ? match.id : 'overview';
   }, [initialTab]);
 
   const [activeTab, setActiveTab] = useState(getTabFromLocation);
+  const [currentSubRole, setCurrentSubRole] = useState(getStoredSupplierSubRole);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -90,6 +105,34 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
     };
   }, []);
 
+  // Handle in-place tab switch without layout unmounting
+  const handleTabChange = useCallback((tabId) => {
+    setActiveTab(tabId);
+    const item = SUPPLIER_MENU.find((m) => m.id === tabId);
+    const targetUrl =
+      item?.path ||
+      (tabId === 'overview' ? '/seller-web-dashboard1' : `/seller-web-dashboard1?tab=${tabId}`);
+    const currentFullUrl = window.location.pathname + window.location.search;
+    if (currentFullUrl !== targetUrl) {
+      window.history.pushState({ tab: tabId }, '', targetUrl);
+    }
+  }, []);
+
+  // React to sub-role change events across components/tabs
+  useEffect(() => {
+    const handleRoleChanged = (e) => {
+      const nextRole = e?.detail || getStoredSupplierSubRole();
+      setCurrentSubRole(nextRole);
+      // If currently active tab is not allowed in new role, redirect to first allowed tab
+      if (!isTabAllowedForRole(activeTab, nextRole)) {
+        const allowed = SUPPLIER_ROLES[nextRole]?.allowedTabs || ['overview'];
+        handleTabChange(allowed[0]);
+      }
+    };
+    window.addEventListener('supplier_subrole_changed', handleRoleChanged);
+    return () => window.removeEventListener('supplier_subrole_changed', handleRoleChanged);
+  }, [activeTab, handleTabChange]);
+
   // Sync tab with URL on browser back/forward (SPA navigation)
   useEffect(() => {
     const handlePopState = () => {
@@ -106,17 +149,6 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
       setActiveTab(initialTab);
     }
   }, [initialTab]);
-
-  // Handle in-place tab switch without layout unmounting
-  const handleTabChange = useCallback((tabId) => {
-    setActiveTab(tabId);
-    const item = SUPPLIER_MENU.find((m) => m.id === tabId);
-    if (item && item.path) {
-      if (window.location.pathname !== item.path) {
-        window.history.pushState({ tab: tabId }, '', item.path);
-      }
-    }
-  }, []);
 
   // In-dashboard Navigation Helper
   const handleNav = useCallback((path) => {
@@ -178,11 +210,6 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
 
       if (profRes.status === 'fulfilled' && profRes.value) {
         setProfile(profRes.value);
-      } else {
-        const fallbackSupplier = getCurrentSupplier();
-        if (fallbackSupplier) {
-          setProfile(fallbackSupplier);
-        }
       }
 
       if (kycRes.status === 'fulfilled' && kycRes.value) {
@@ -192,14 +219,11 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
           raw?.isVerified ||
           actualKyc?.status === 'APPROVED' ||
           raw?.status === 'APPROVED' ||
-          (raw?.profile?.gstin && raw?.profile?.bankDetails)
+          profRes.value?.profile?.tierLabel?.toLowerCase().includes('verified')
         );
-        const resolvedStatus = (
-          actualKyc?.status ||
-          raw?.status ||
-          (isVerified ? 'APPROVED' : null) ||
-          'PENDING'
-        ).toUpperCase();
+        const resolvedStatus = isVerified
+          ? 'APPROVED'
+          : (actualKyc?.status || raw?.status || 'NOT_SUBMITTED').toUpperCase();
 
         setKycData({
           ...(actualKyc && typeof actualKyc === 'object' ? actualKyc : {}),
@@ -229,7 +253,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
   const knownOrderIdsRef = useRef(new Set());
   const isFirstLoadRef = useRef(true);
 
-  // Background radar for incoming orders (every 20s) when not on orders tab
+  // Background radar for incoming orders (every 8s) when not on orders tab
   useEffect(() => {
     const radarInterval = setInterval(async () => {
       // If currently on orders tab, SellerOrders1 handles its own real-time radar
@@ -271,10 +295,32 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
           }
         }
       } catch (_) {}
-    }, 20000);
+    }, 8000);
 
     return () => clearInterval(radarInterval);
   }, [activeTab, handleTabChange]);
+
+  // Real-Time Cross-Tab Broadcast listener (0ms latency for orders placed in same browser)
+  useEffect(() => {
+    let bc;
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        bc = new BroadcastChannel('mshoppy_order_events');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'ORDER_PLACED') {
+            playOrderChime();
+            loadDashboardData(false);
+          }
+        };
+      }
+    } catch (_) {}
+
+    return () => {
+      try {
+        if (bc) bc.close();
+      } catch (_) {}
+    };
+  }, [loadDashboardData]);
 
   // Safe Logout Handler
   const performLogout = async () => {
@@ -305,78 +351,162 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
     (typeof profile?.name === 'string' && profile.name.trim()) ||
     'Verified Supplier';
 
+  const currentRoleConfig = SUPPLIER_ROLES[currentSubRole] || SUPPLIER_ROLES.OWNER;
+  const isAllowed = isTabAllowedForRole(activeTab, currentSubRole);
+
+  const activeMenuItems = React.useMemo(() => {
+    return getSupplierMenuForRole(currentSubRole);
+  }, [currentSubRole]);
+
   return (
     <DashboardLayout
-      menuItems={SUPPLIER_MENU}
+      menuItems={activeMenuItems}
       activeTab={activeTab}
       onTabChange={handleTabChange}
-      roleName="SUPPLIER"
+      roleName={`SUPPLIER • ${currentRoleConfig.shortLabel}`}
       userName={supplierDisplayName}
       onLogout={() => setShowLogoutConfirm(true)}
     >
-      {/* 1. Overview Tab */}
-      {activeTab === 'overview' && (
-        <SupplierDashboardOverview
-          onNavigateTab={handleTabChange}
-          stats={stats}
-          products={products}
-          orders={orders}
-          profile={profile}
-          kycData={kycData}
-          loading={loading}
-          refreshing={refreshing}
-          onRefresh={() => loadDashboardData(true)}
-        />
-      )}
+      {/* Active Sub-Role Status Pill Banner */}
+      <div className="mb-4 bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-slate-500 font-semibold">Store RBAC Role:</span>
+          <span className={`inline-flex items-center gap-1.5 font-bold px-2.5 py-0.5 rounded-full border ${currentRoleConfig.badgeClass}`}>
+            <span>{currentSubRole === 'OWNER' ? '👑' : currentSubRole === 'DISPATCH_STAFF' ? '🚚' : '📦'}</span>
+            <span>{currentRoleConfig.label}</span>
+          </span>
+          <span className="hidden sm:inline text-slate-400">•</span>
+          <span className="hidden sm:inline text-slate-500 text-[11px] truncate max-w-md">
+            {currentRoleConfig.description}
+          </span>
+        </div>
 
-      {/* 2. Inventory / Products Catalog Tab */}
-      {activeTab === 'inventory' && (
-        <SellerInventory1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
-      )}
+        <button
+          type="button"
+          onClick={() => handleTabChange('staff')}
+          className="inline-flex items-center gap-1.5 font-bold text-pink-700 hover:text-pink-800 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-lg transition cursor-pointer text-xs"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Switch / Test RBAC Roles</span>
+        </button>
+      </div>
 
-      {/* 3. Orders & Dispatch Tab */}
-      {activeTab === 'orders' && (
-        <SellerOrders1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
-      )}
+      {!isAllowed ? (
+        <div className="max-w-2xl mx-auto my-10 bg-white rounded-2xl border border-rose-200 p-8 shadow-lg text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-2xl">
+            🛡️
+          </div>
+          <h3 className="text-xl font-black text-slate-900">
+            Access Restricted: Role Permission Required
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            Your current assigned sub-role <strong className="text-slate-900 font-bold">{currentRoleConfig.label}</strong> does not have permission to access the <strong className="text-pink-600 font-bold uppercase">{activeTab}</strong> section.
+          </p>
+          <div className="bg-slate-50 rounded-xl p-3.5 text-xs text-slate-500 text-left border border-slate-200 space-y-1">
+            <p className="font-semibold text-slate-700">🔒 Security Boundary:</p>
+            <p>• Warehouse Dispatch Staff only has access to Orders, Labels, Manifest, and RTO.</p>
+            <p>• Catalog Executive only has access to Products & Inventory.</p>
+            <p>• Financial Payouts & Bank Details are reserved strictly for the Store Owner (Admin).</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                const allowed = currentRoleConfig.allowedTabs || ['overview'];
+                handleTabChange(allowed[0]);
+              }}
+              className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition cursor-pointer"
+            >
+              Go to Allowed Work Area
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange('staff')}
+              className="px-5 py-2.5 rounded-xl bg-[#b7004d] text-white font-bold text-xs hover:bg-[#92003d] transition flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Open RBAC Simulator</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* 1. Overview Tab */}
+          {activeTab === 'overview' && (
+            <SupplierDashboardOverview
+              onNavigateTab={handleTabChange}
+              stats={stats}
+              products={products}
+              orders={orders}
+              profile={profile}
+              kycData={kycData}
+              loading={loading}
+              refreshing={refreshing}
+              onRefresh={() => loadDashboardData(true)}
+            />
+          )}
 
-      {/* 4. Settlements & Payouts Tab */}
-      {activeTab === 'finance' && (
-        <SellerSettlements1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
-      )}
+          {/* 2. Inventory / Products Catalog Tab */}
+          {activeTab === 'inventory' && (
+            <SellerInventory1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
 
-      {/* 5. Dropship Fulfillment Tab */}
-      {activeTab === 'dropship' && (
-        <SellerDropship1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
-      )}
+          {/* 3. Orders & Dispatch Tab */}
+          {activeTab === 'orders' && (
+            <SellerOrders1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
 
-      {/* 6. Returns & RTO Hub Tab */}
-      {activeTab === 'returns' && (
-        <SellerReturns1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
-      )}
+          {/* 4. Settlements & Payouts Tab */}
+          {activeTab === 'finance' && (
+            <SellerSettlements1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
 
-      {/* 6b. Customer Ratings & Reviews Tab */}
-      {activeTab === 'reviews' && (
-        <SellerReviews1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
-      )}
+          {/* 5. Dropship Fulfillment Tab */}
+          {activeTab === 'dropship' && (
+            <SellerDropship1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
 
-      {/* 7. Add Product Tab */}
-      {activeTab === 'add-product' && (
-        <SellerAddProduct1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
-      )}
+          {/* 6. Returns & RTO Hub Tab */}
+          {activeTab === 'returns' && (
+            <SellerReturns1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
 
-      {/* 8. Supplier KYC Hub Tab */}
-      {activeTab === 'kyc' && (
-        <SellerKyc1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
-      )}
+          {/* 6b. Customer Ratings & Reviews Tab */}
+          {activeTab === 'reviews' && (
+            <SellerReviews1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
 
-      {/* 9. Sales Analytics Tab */}
-      {activeTab === 'analytics' && (
-        <SellerAnalytics1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
-      )}
+          {/* 7. Add Product Tab */}
+          {activeTab === 'add-product' && (
+            <SellerAddProduct1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
 
-      {/* 10. Store Profile & Bank Tab */}
-      {activeTab === 'profile' && (
-        <SellerProfile1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          {/* 8. Supplier KYC Hub Tab */}
+          {activeTab === 'kyc' && (
+            <SellerKyc1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
+
+          {/* 9. Sales Analytics Tab */}
+          {activeTab === 'analytics' && (
+            <SellerAnalytics1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
+
+          {/* 10. Store Profile & Bank Tab */}
+          {activeTab === 'profile' && (
+            <SellerProfile1 embedded onNavigate={handleNav} onNavigateTab={handleTabChange} />
+          )}
+
+          {/* 11. Team & RBAC Permissions Tab */}
+          {activeTab === 'staff' && (
+            <SellerStaffManagement
+              currentSubRole={currentSubRole}
+              onRoleChange={(newRole) => {
+                setStoredSupplierSubRole(newRole);
+                setCurrentSubRole(newRole);
+              }}
+            />
+          )}
+        </>
       )}
 
       {/* Confirmation Dialog for Secure Supplier Logout */}

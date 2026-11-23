@@ -57,7 +57,7 @@ export default function RatingsReviews({ onNavigate = () => {}, onBack }) {
                   month: 'short',
                   year: 'numeric',
                 }),
-                comment: r.comment || r.title || 'Verified purchase review',
+                comment: r.comment || r.title || '',
                 photos: Array.isArray(r.images) ? r.images : [],
                 type: r.rating >= 4 ? 'positive' : 'critical',
               }))
@@ -136,7 +136,7 @@ export default function RatingsReviews({ onNavigate = () => {}, onBack }) {
             <h1 className="font-extrabold text-base md:text-lg text-[#191c1e]">
               Ratings &amp; Reviews
             </h1>
-            <p className="text-[11px] text-slate-400 line-clamp-1">{product?.title || 'Verified Catalog Product'} ➔</p>
+            <p className="text-[11px] text-slate-400 line-clamp-1">{product?.title || ''} ➔</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -321,9 +321,11 @@ export default function RatingsReviews({ onNavigate = () => {}, onBack }) {
                     </div>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal">
-                    {review.comment}
-                  </p>
+                  {review.comment && (
+                    <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal">
+                      {review.comment}
+                    </p>
+                  )}
 
                   {/* Customer Photos */}
                   {review.photos && review.photos.length > 0 && (

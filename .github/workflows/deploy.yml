@@ -64,6 +64,16 @@ jobs:
             echo "🧹 Cleaning up dangling build cache..."
             docker image prune -f
 
+            echo "⏳ Waiting for containers to stabilize..."
+            sleep 8
+
             echo "✅ Deployment finished successfully! Running containers:"
             cd "$APP_DIR"
             docker compose ps
+
+            echo "📋 Backend logs (last 50 lines):"
+            docker compose logs --tail=50 backend
+
+            echo "📋 Frontend logs (last 20 lines):"
+            docker compose logs --tail=20 frontend
+            docker exec meesho-frontend rm -f /usr/share/nginx/html/deploy-debug.txt || true

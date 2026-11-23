@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { QRCodeSVG } from 'qrcode.react';
 import { getStoredCustomer, subscribeCustomerAuth } from '../../services/customerAuthService';
 import NavDrawer from "../../components/NavDrawer";
 import AppBottomNav from "../../components/AppBottomNav";
@@ -14,6 +15,8 @@ import {
 import { useCart } from "../../hooks/useCart";
 import { getUnreadCount, subscribeNotifications } from "../../services/notificationService";
 import GuestWelcomeModal from "../../components/customer/GuestWelcomeModal";
+import ProductFilterSidebar from "../../components/customer/ProductFilterSidebar";
+import CountdownTimer from "../../components/customer/CountdownTimer";
 
 const REAL_DATABASE_BANNERS = [
   {
@@ -70,6 +73,145 @@ const REAL_DATABASE_BANNERS = [
   }
 ];
 
+const ORIGINAL_BRAND_CATEGORIES = [
+  {
+    id: 'personal_care',
+    name: 'Personal Care',
+    image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Beauty & Health',
+    searchQuery: 'Care',
+  },
+  {
+    id: 'electronics',
+    name: 'Electronics',
+    image: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Electronics & Gadgets',
+    searchQuery: '',
+  },
+  {
+    id: 'makeup',
+    name: 'Makeup',
+    image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Beauty & Health',
+    searchQuery: 'Lipstick',
+  },
+  {
+    id: 'men_perfume',
+    name: 'Men Perfume',
+    image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Beauty & Health',
+    searchQuery: 'Perfume',
+  },
+  {
+    id: 'bags',
+    name: 'Bags',
+    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'All',
+    searchQuery: 'Bag',
+  },
+  {
+    id: 'footwear',
+    name: 'Footwear',
+    image: 'https://images.unsplash.com/photo-1603808033192-082d6919d3e1?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Footwear',
+    searchQuery: '',
+  },
+  {
+    id: 'books',
+    name: 'Books',
+    image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'All',
+    searchQuery: 'Book',
+  },
+  {
+    id: 'smart_watches',
+    name: 'Smart Watches',
+    image: 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'All',
+    searchQuery: 'Watch',
+  },
+  {
+    id: 'jewellery',
+    name: 'Jewellery',
+    image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Jewellery & Accessories',
+    searchQuery: '',
+  },
+  {
+    id: 'kitchen_appliances',
+    name: 'Kitchen',
+    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Home & Kitchen',
+    searchQuery: '',
+  },
+  {
+    id: 'home_decor',
+    name: 'Home Decor',
+    image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Home & Kitchen',
+    searchQuery: '',
+  },
+  {
+    id: 'kids_wear',
+    name: 'Kids Wear',
+    image: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Kids',
+    searchQuery: '',
+  },
+  {
+    id: 'women_western',
+    name: 'Women Western',
+    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Women Western',
+    searchQuery: '',
+  },
+  {
+    id: 'sports_fitness',
+    name: 'Sports & Fitness',
+    image: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&auto=format&fit=crop&q=80',
+    targetCategory: 'Men',
+    searchQuery: '',
+  },
+];
+
+const FEATURED_BRAND_LOGOS = [
+  { name: 'mamaearth', display: 'mamaearth', color: 'text-emerald-600', icon: '🌿' },
+  { name: 'WILD STONE', display: 'WILD STONE', color: 'text-slate-900 dark:text-white' },
+  { name: 'plūm', display: 'plūm', color: 'text-purple-700 dark:text-purple-400' },
+  { name: 'NIVEA', display: 'NIVEA', color: 'bg-[#002b7f] text-white', isCircleBadge: true },
+  { name: 'Himalaya', display: 'Himalaya', sub: 'SINCE 1930', color: 'text-teal-700' },
+  { name: 'Mi', display: 'mi', color: 'bg-[#ff6900] text-white', isSquareBadge: true },
+  { name: 'Bata', display: 'Bata', color: 'text-red-600 italic font-serif text-lg font-black' },
+  { name: 'WOW', display: 'WOW', sub: 'SKIN SCIENCE', color: 'text-slate-900 dark:text-white' },
+];
+
+const CURATED_OFFER_TILES = [
+  {
+    id: 'trending',
+    title: 'Trending Now',
+    image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=500&auto=format&fit=crop&q=80',
+    filterTag: 'Trending',
+  },
+  {
+    id: 'budget',
+    title: 'Budget Buys',
+    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
+    filterTag: 'Under ₹349',
+  },
+  {
+    id: 'top_rated',
+    title: 'Top Rated Picks',
+    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
+    filterTag: '4★ & Above',
+  },
+  {
+    id: 'daily_essentials',
+    title: 'Daily Essentials',
+    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&auto=format&fit=crop&q=80',
+    filterTag: 'Essentials',
+  },
+];
+
 export default function HomeUserCustomer() {
   const navigate = useNavigate();
   const bannerRef = React.useRef(null);
@@ -90,6 +232,91 @@ export default function HomeUserCustomer() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedSubcat, setSelectedSubcat] = useState("All");
+  const [curatedFilter, setCuratedFilter] = useState(null);
+  const [sidebarFilters, setSidebarFilters] = useState({
+    categories: [],
+    gender: null,
+    priceRange: null,
+    minRating: null,
+    colors: [],
+    fabrics: [],
+    sizes: [],
+    minDiscount: null,
+    mallOnly: false,
+  });
+  const [sortBy, setSortBy] = useState('relevance');
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [showAppDownloadModal, setShowAppDownloadModal] = useState(false);
+
+  // Lock body scroll when App Download Modal is open
+  useEffect(() => {
+    if (showAppDownloadModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showAppDownloadModal]);
+
+  const handleFilterChange = (key, value) => {
+    setSidebarFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleClearAllFilters = () => {
+    setSidebarFilters({
+      categories: [],
+      gender: null,
+      priceRange: null,
+      minRating: null,
+      colors: [],
+      fabrics: [],
+      sizes: [],
+      minDiscount: null,
+      mallOnly: false,
+    });
+    setSelectedCategory("All");
+    setSelectedSubcat("All");
+    setCuratedFilter(null);
+  };
+
+  const brandCategoriesRef = useRef(null);
+  const [canScrollBrandLeft, setCanScrollBrandLeft] = useState(false);
+  const [canScrollBrandRight, setCanScrollBrandRight] = useState(true);
+
+  const checkBrandScroll = useCallback(() => {
+    if (brandCategoriesRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = brandCategoriesRef.current;
+      setCanScrollBrandLeft(scrollLeft > 20);
+      setCanScrollBrandRight(scrollLeft < scrollWidth - clientWidth - 20);
+    }
+  }, []);
+
+  const scrollBrandCategories = (direction) => {
+    if (brandCategoriesRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = brandCategoriesRef.current;
+      if (direction === 'right') {
+        if (scrollLeft >= scrollWidth - clientWidth - 25) {
+          // If at the end, smoothly loop back to start
+          brandCategoriesRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          brandCategoriesRef.current.scrollBy({ left: 320, behavior: 'smooth' });
+        }
+      } else {
+        brandCategoriesRef.current.scrollBy({ left: -320, behavior: 'smooth' });
+      }
+    }
+  };
+
+  const handleCuratedFilterClick = (filterTag) => {
+    if (curatedFilter === filterTag) {
+      setCuratedFilter(null);
+    } else {
+      setCuratedFilter(filterTag);
+      const el = document.getElementById('products-grid-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
   const [products, setProducts] = useState(() => {
     try {
       const cached = JSON.parse(sessionStorage.getItem('mshoppy_cached_home_prods') || localStorage.getItem('mshoppy_cached_catalog_prods') || '[]');
@@ -228,6 +455,17 @@ export default function HomeUserCustomer() {
     return unsub;
   }, []);
 
+  // Referral attribution state
+  const [activeReferralCode, setActiveReferralCode] = useState(() => {
+    try {
+      const dismissed = localStorage.getItem('mshoppy_referral_banner_dismissed');
+      if (dismissed === 'true') return null;
+      return localStorage.getItem('mshoppy_referral_code');
+    } catch {
+      return null;
+    }
+  });
+
   // 1. Load Categories, Banners & Wishlist on initial mount
   useEffect(() => {
     let isMounted = true;
@@ -258,11 +496,11 @@ export default function HomeUserCustomer() {
     return () => { isMounted = false; };
   }, []);
 
-  // 2. Fetch Products on Initial Mount & whenever Category or Search Query changes
+  // 2. Fetch Products on Initial Mount & whenever Category, Search, or Sidebar Filters change
   useEffect(() => {
     let isMounted = true;
     async function fetchInitialProducts() {
-      if (products.length === 0) setLoading(true);
+      setLoading(true);
       setLoadingMore(false);
       setPage(1);
       setHasMore(true);
@@ -271,9 +509,17 @@ export default function HomeUserCustomer() {
 
       try {
         const targetCategory = selectedCategory === "All" ? "" : selectedCategory;
+        const filterCats = sidebarFilters.categories?.length > 0 ? sidebarFilters.categories.join(',') : '';
         const res = await getProducts({
           category: targetCategory,
           search: searchQuery,
+          categories: filterCats,
+          gender: sidebarFilters.gender || '',
+          minPrice: sidebarFilters.priceRange?.min,
+          maxPrice: sidebarFilters.priceRange?.max,
+          minRating: sidebarFilters.minRating || '',
+          minDiscount: sidebarFilters.minDiscount || '',
+          sort: sortBy,
           page: 1,
           limit: 28,
           withMeta: true
@@ -285,7 +531,7 @@ export default function HomeUserCustomer() {
           setTotalProducts(res.total || 0);
           setHasMore(res.hasMore);
           hasMoreRef.current = res.hasMore;
-          if (loadedProds.length > 0) {
+          if (loadedProds.length > 0 && !filterCats && !sidebarFilters.gender) {
             try {
               sessionStorage.setItem('mshoppy_cached_home_prods', JSON.stringify(loadedProds));
               if (!localStorage.getItem('mshoppy_cached_catalog_prods')) {
@@ -304,7 +550,17 @@ export default function HomeUserCustomer() {
     setSelectedSubcat("All");
     fetchInitialProducts();
     return () => { isMounted = false; };
-  }, [selectedCategory, searchQuery]);
+  }, [
+    selectedCategory,
+    searchQuery,
+    sortBy,
+    sidebarFilters.categories,
+    sidebarFilters.gender,
+    sidebarFilters.priceRange,
+    sidebarFilters.minRating,
+    sidebarFilters.minDiscount,
+    sidebarFilters.mallOnly
+  ]);
 
   // 3. Load Next Batch (Infinite Scroll)
   const loadMoreProducts = useCallback(async () => {
@@ -315,11 +571,19 @@ export default function HomeUserCustomer() {
 
     const nextPage = pageRef.current + 1;
     const targetCategory = selectedCategory === "All" ? "" : selectedCategory;
+    const filterCats = sidebarFilters.categories?.length > 0 ? sidebarFilters.categories.join(',') : '';
 
     try {
       const res = await getProducts({
         category: targetCategory,
         search: searchQuery,
+        categories: filterCats,
+        gender: sidebarFilters.gender || '',
+        minPrice: sidebarFilters.priceRange?.min,
+        maxPrice: sidebarFilters.priceRange?.max,
+        minRating: sidebarFilters.minRating || '',
+        minDiscount: sidebarFilters.minDiscount || '',
+        sort: sortBy,
         page: nextPage,
         limit: 28,
         withMeta: true
@@ -346,7 +610,17 @@ export default function HomeUserCustomer() {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [selectedCategory, searchQuery]);
+  }, [
+    selectedCategory,
+    searchQuery,
+    sortBy,
+    sidebarFilters.categories,
+    sidebarFilters.gender,
+    sidebarFilters.priceRange,
+    sidebarFilters.minRating,
+    sidebarFilters.minDiscount,
+    sidebarFilters.mallOnly
+  ]);
 
   // 4. Dual Sentinel (IntersectionObserver + Smooth Window Scroll Listener)
   useEffect(() => {
@@ -451,16 +725,237 @@ export default function HomeUserCustomer() {
 
   const displayedProducts = useMemo(() => {
     if (!products) return [];
-    if (selectedSubcat === 'All') return products;
-    const term = selectedSubcat.toLowerCase().trim();
-    return products.filter((p) => {
-      const pSub = (p.subCategory || '').toLowerCase().trim();
-      if (pSub === term) return true;
-      if (pSub) return false;
-      const full = `${p.title || ''} ${p.description || ''}`.toLowerCase();
-      return full.includes(term);
-    });
-  }, [products, selectedSubcat]);
+    let list = [...products];
+
+    // 1. Curated offer filter
+    if (curatedFilter === 'Under ₹349') {
+      list = list.filter((p) => Number(p.price) <= 349);
+    } else if (curatedFilter === '4★ & Above') {
+      list = list.filter((p) => Number(p.rating || 0) >= 4.0);
+    } else if (curatedFilter === 'Trending') {
+      list.sort((a, b) => (b.reviewsCount || 0) - (a.reviewsCount || 0));
+    } else if (curatedFilter === 'Essentials') {
+      list = list.filter((p) => {
+        const cat = (p.category || p.categoryName || '').toLowerCase();
+        return cat.includes('home') || cat.includes('kitchen') || cat.includes('beauty') || cat.includes('personal');
+      });
+    }
+
+    // 2. Subcategory filter
+    if (selectedSubcat !== 'All') {
+      const term = selectedSubcat.toLowerCase().trim();
+      list = list.filter((p) => {
+        const pSub = (p.subCategory || '').toLowerCase().trim();
+        if (pSub === term) return true;
+        if (pSub) return false;
+        const full = `${p.title || ''} ${p.description || ''}`.toLowerCase();
+        return full.includes(term);
+      });
+    }
+
+    // 3. Sidebar Categories filter with intelligent category rules & negative exclusions
+    if (sidebarFilters.categories?.length > 0) {
+      const CATEGORY_DEFINITIONS = {
+        'women tops and tunics': {
+          targetSlugs: ['women-western'],
+          terms: ['top', 'tops', 'tunic', 'tunics', 'crop top', 'peplum'],
+          negativeTerms: ['laptop', 'desktop', 'tabletop']
+        },
+        'women tshirts': {
+          targetSlugs: ['women-western'],
+          terms: ['tshirt', 't-shirt', 'tee']
+        },
+        'sarees': {
+          targetSlugs: ['women-ethnic'],
+          terms: ['saree', 'sari']
+        },
+        'kurtis': {
+          targetSlugs: ['women-ethnic'],
+          terms: ['kurti', 'kurta', 'anarkali']
+        },
+        'blouses': {
+          targetSlugs: ['women-ethnic'],
+          terms: ['blouse']
+        },
+        'dresses': {
+          targetSlugs: ['women-western'],
+          terms: ['dress', 'midi', 'maxi', 'frock', 'gown']
+        },
+        'perfumes': {
+          targetSlugs: ['beauty-health'],
+          terms: ['perfume', 'edp', 'fragrance', 'body mist', 'deodorant', 'attar', 'cologne']
+        },
+        'lipsticks': {
+          targetSlugs: ['beauty-health'],
+          terms: ['lipstick', 'lip gloss', 'lip balm', 'lip crayon', 'matte lip']
+        },
+        'hair oil': {
+          targetSlugs: ['beauty-health'],
+          terms: ['hair oil', 'ayurvedic oil', 'oil']
+        },
+        'handbags': {
+          targetSlugs: ['jewellery', 'accessories'],
+          terms: ['handbag', 'tote bag', 'sling bag', 'clutch', 'backpack', 'purse', 'bag', 'tote', 'sling']
+        },
+        'footwear': {
+          targetSlugs: ['footwear'],
+          terms: ['shoe', 'chappal', 'sandal', 'loafer', 'sneaker', 'clog', 'flat', 'heel', 'footwear', 'boots', 'slippers']
+        },
+        'audio & earbuds': {
+          targetSlugs: ['electronics'],
+          terms: ['earbud', 'headphone', 'tws', 'speaker', 'bluetooth', 'earphone', 'neckband']
+        },
+        'earrings & studs': {
+          targetSlugs: ['jewellery'],
+          terms: ['earring', 'stud', 'jhumka', 'jhumki', 'bali']
+        },
+        'analog watches': {
+          targetSlugs: ['jewellery', 'electronics'],
+          terms: ['watch', 'analog']
+        },
+        'bedsheets': {
+          targetSlugs: ['home-kitchen'],
+          terms: ['bedsheet', 'bed sheet', 'bed cover', 'sheet']
+        },
+        'fridge covers': {
+          targetSlugs: ['home-kitchen'],
+          terms: ['fridge cover', 'refrigerator cover']
+        },
+        'appliance covers': {
+          targetSlugs: ['home-kitchen'],
+          terms: ['appliance cover', 'washing machine cover', 'cover']
+        },
+        'caps & hats': {
+          targetSlugs: ['men', 'women-western', 'kids'],
+          terms: ['cap', 'hat', 'beanie'],
+          negativeTerms: ['handicap', 'landscape']
+        }
+      };
+
+      list = list.filter((p) => {
+        const catSlug = (p.categorySlug || p.category?.slug || '').toLowerCase();
+        const title = (p.title || '').toLowerCase();
+        const subCat = (p.subCategory || '').toLowerCase();
+        const fullText = `${title} ${subCat}`;
+
+        return sidebarFilters.categories.some((filterCat) => {
+          const raw = filterCat.toLowerCase().trim();
+          const rule = CATEGORY_DEFINITIONS[raw];
+
+          if (!rule) {
+            const fallback = raw.endsWith('s') ? raw.slice(0, -1) : raw;
+            return fullText.includes(fallback);
+          }
+
+          // If targetSlugs defined, must match categorySlug
+          if (rule.targetSlugs && !rule.targetSlugs.includes(catSlug)) {
+            return false;
+          }
+
+          // If negative terms present (e.g. 'laptop'), reject
+          if (rule.negativeTerms?.some((neg) => title.includes(neg))) {
+            return false;
+          }
+
+          // Must match at least one positive term using word boundary or clean phrase
+          return rule.terms.some((term) => {
+            const regex = new RegExp(`\\b${term}\\b`, 'i');
+            return regex.test(title) || regex.test(subCat) || fullText.includes(term);
+          });
+        });
+      });
+    }
+
+    // 4. Gender filter
+    if (sidebarFilters.gender) {
+      const g = sidebarFilters.gender.toLowerCase().trim();
+      list = list.filter((p) => {
+        const catName = typeof p.category === 'object' ? (p.category?.name || '') : (p.category || '');
+        const slug = (p.categorySlug || '').toLowerCase();
+        const title = (p.title || '').toLowerCase();
+        const desc = (p.description || '').toLowerCase();
+        const text = `${title} ${catName} ${slug} ${p.gender || ''} ${desc}`.toLowerCase();
+
+        if (g === 'men') {
+          if (slug.startsWith('women')) return false;
+          const clean = text.replace(/\bwomen('s)?\b|\bladies\b|\bfemale\b/gi, '');
+          return slug === 'men' || slug === 'men-western' || slug === 'men-ethnic' || /\b(men|mens|men's|male|gentlemen)\b/i.test(clean);
+        }
+
+        if (g === 'women') {
+          return slug.startsWith('women') || slug === 'jewellery' || /\b(women|womens|women's|female|ladies)\b/i.test(text);
+        }
+
+        if (g === 'boys' || g === 'boy') {
+          return /\b(boys?|boy's)\b/i.test(title) || (slug === 'kids' && !/\b(girls?)\b/i.test(title));
+        }
+
+        if (g === 'girls' || g === 'girl') {
+          return /\b(girls?|girl's)\b/i.test(title) || (slug === 'kids' && !/\b(boys?)\b/i.test(title));
+        }
+
+        return text.includes(g);
+      });
+    }
+
+    // 5. Price Range filter
+    if (sidebarFilters.priceRange) {
+      const { min, max } = sidebarFilters.priceRange;
+      list = list.filter((p) => {
+        const pr = Number(p.price);
+        if (min !== undefined && pr < min) return false;
+        if (max !== undefined && pr > max) return false;
+        return true;
+      });
+    }
+
+    // 6. Rating filter
+    if (sidebarFilters.minRating) {
+      list = list.filter((p) => Number(p.rating || 0) >= sidebarFilters.minRating);
+    }
+
+    // 7. Colors filter
+    if (sidebarFilters.colors?.length > 0) {
+      list = list.filter((p) => {
+        const text = `${p.title || ''} ${p.color || ''} ${p.description || ''}`.toLowerCase();
+        return sidebarFilters.colors.some((c) => text.includes(c.toLowerCase()));
+      });
+    }
+
+    // 8. Size filter
+    if (sidebarFilters.sizes?.length > 0) {
+      list = list.filter((p) => {
+        const sizes = Array.isArray(p.sizes) ? p.sizes : [p.size].filter(Boolean);
+        if (sizes.length === 0) return true;
+        return sidebarFilters.sizes.some((s) => sizes.includes(s));
+      });
+    }
+
+    // 9. Discount filter
+    if (sidebarFilters.minDiscount) {
+      list = list.filter((p) => Number(p.discountPercentage || 0) >= sidebarFilters.minDiscount);
+    }
+
+    // 10. Mall Only filter
+    if (sidebarFilters.mallOnly) {
+      list = list.filter((p) => p.isMall || p.discountPercentage >= 30 || p.rating >= 4.0);
+    }
+
+    // 11. Sorting
+    if (sortBy === 'price_asc') {
+      list.sort((a, b) => Number(a.price) - Number(b.price));
+    } else if (sortBy === 'price_desc') {
+      list.sort((a, b) => Number(b.price) - Number(a.price));
+    } else if (sortBy === 'rating') {
+      list.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+    } else if (sortBy === 'popularity') {
+      list.sort((a, b) => (b.reviewsCount || 0) - (a.reviewsCount || 0));
+    } else if (sortBy === 'newest') {
+      list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+
+    return list;
+  }, [products, selectedSubcat, curatedFilter, sidebarFilters, sortBy]);
 
   const categoryChips = [
     { name: "All", slug: "All", icon: "dashboard" },
@@ -633,6 +1128,29 @@ export default function HomeUserCustomer() {
             )}
           </div>
 
+          {/* Partner & Merchant Program CTAs (Meesho Style) */}
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => navigate('/supplier')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-[#b7004d] hover:bg-pink-50 dark:hover:bg-slate-800 border border-slate-200/90 dark:border-slate-700 transition-all cursor-pointer active:scale-95"
+              title="Sell Online at 0% Commission on MShoppy"
+            >
+              <span className="material-symbols-outlined text-[17px] text-[#b7004d]">storefront</span>
+              <span>Become a Supplier</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/dropshipper')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 border border-slate-200/90 dark:border-slate-700 transition-all cursor-pointer active:scale-95"
+              title="Resell products with zero investment and earn margins"
+            >
+              <span className="material-symbols-outlined text-[17px] text-indigo-600">hub</span>
+              <span>Join as Dropshipper</span>
+            </button>
+          </div>
+
           {/* Action Icons */}
           <div className="flex items-center gap-0.5 sm:gap-2.5 shrink-0">
             <button 
@@ -699,6 +1217,28 @@ export default function HomeUserCustomer() {
           </div>
         </div>
       </header>
+
+      {/* Active Friend Referral 40% OFF Banner */}
+      {activeReferralCode && (
+        <div className="bg-gradient-to-r from-rose-600 via-[#9f0038] to-purple-700 text-white px-4 py-2 flex items-center justify-between text-xs sm:text-sm font-semibold shadow-xs">
+          <div className="flex items-center gap-2 mx-auto">
+            <span className="text-base">🎉</span>
+            <span>
+              Friend Invite Active: <strong>Flat 40% OFF (Up to ₹100)</strong> applied on your 1st order (Code: <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-white font-bold">{activeReferralCode}</span>)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveReferralCode(null);
+              try { localStorage.setItem('mshoppy_referral_banner_dismissed', 'true'); } catch (_) {}
+            }}
+            className="text-white/80 hover:text-white text-xs font-bold px-2 py-0.5 cursor-pointer ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pb-24 md:pb-12">
         {/* Mobile Search */}
@@ -902,6 +1442,195 @@ export default function HomeUserCustomer() {
           </div>
         </section>
 
+        {/* =========================================================================
+            SECTION 1: ORIGINAL BRANDS, FEATURED BRANDS & PROMOTIONAL BANNERS (Matching Screenshot 1)
+        ========================================================================= */}
+        <section className="mt-8 space-y-6">
+          {/* 1. Header: Original Brands + VIEW ALL */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="font-headline font-black text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight">
+                Original Brands
+              </h3>
+              <span className="w-5 h-5 rounded-full bg-[#5c3bf5] text-white flex items-center justify-center text-[11px] font-bold shadow-xs">
+                ✓
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/explorer')}
+              className="text-[#9f0038] hover:text-[#78002a] text-xs font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>VIEW ALL</span>
+              <span className="text-sm">›</span>
+            </button>
+          </div>
+
+          {/* 2. Original Brands Category Carousel with Left & Right Arrows */}
+          <div className="relative group">
+            {/* Left Arrow Button on carousel */}
+            {canScrollBrandLeft && (
+              <button
+                type="button"
+                onClick={() => scrollBrandCategories('left')}
+                className="absolute -left-2 sm:-left-3.5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition-all cursor-pointer z-10 hover:scale-105 active:scale-95"
+                aria-label="Previous categories"
+              >
+                <span className="material-symbols-outlined text-base font-bold">chevron_left</span>
+              </button>
+            )}
+
+            <div
+              ref={brandCategoriesRef}
+              onScroll={checkBrandScroll}
+              className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-2 scroll-smooth"
+            >
+              {ORIGINAL_BRAND_CATEGORIES.map((cat) => (
+                <div
+                  key={cat.id}
+                  onClick={() => {
+                    if (cat.searchQuery) {
+                      setSearchQuery(cat.searchQuery);
+                    } else {
+                      setSearchQuery('');
+                    }
+                    setSelectedCategory(cat.targetCategory || 'All');
+                    setSelectedSubcat('All');
+                    const el = document.getElementById('products-grid-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex-shrink-0 w-28 sm:w-36 md:w-40 rounded-2xl sm:rounded-3xl bg-[#f0f3ff] dark:bg-slate-800/80 border border-indigo-100/70 dark:border-indigo-900/40 p-2 sm:p-2.5 flex flex-col items-center justify-between cursor-pointer hover:shadow-lg hover:border-indigo-300 transition-all duration-300 group/card"
+                >
+                  <div className="w-full aspect-[4/5] rounded-xl overflow-hidden flex items-center justify-center mb-2">
+                    <img
+                      src={cat.image}
+                      alt={cat.name}
+                      className="w-full h-full object-contain group-hover/card:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="w-full bg-[#5838fc] group-hover/card:bg-[#461fe0] text-white text-center py-1.5 sm:py-2 px-2 rounded-xl sm:rounded-2xl shadow-xs transition-colors">
+                    <span className="text-[11px] sm:text-xs font-bold tracking-tight block truncate">
+                      {cat.name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Right Arrow Button on carousel */}
+            <button
+              type="button"
+              onClick={() => scrollBrandCategories('right')}
+              className="absolute -right-2 sm:-right-3.5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition-all cursor-pointer z-10 hover:scale-105 active:scale-95"
+              aria-label="Next categories"
+            >
+              <span className="material-symbols-outlined text-base font-bold">chevron_right</span>
+            </button>
+          </div>
+
+          {/* 3. Featured Brand Logos Strip */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3 sm:p-4 shadow-2xs">
+            <div className="flex items-center justify-between gap-6 sm:gap-8 overflow-x-auto no-scrollbar py-1 px-2">
+              {FEATURED_BRAND_LOGOS.map((b, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setSearchQuery(b.name);
+                    handleSearchSubmit(b.name);
+                  }}
+                  className="flex-shrink-0 cursor-pointer flex items-center justify-center transition-all hover:scale-105 select-none"
+                  title={`Shop ${b.name}`}
+                >
+                  {b.isCircleBadge ? (
+                    <span className="w-9 h-9 rounded-full bg-[#002b7f] text-white font-black text-[9px] flex items-center justify-center tracking-tighter shadow-xs">
+                      {b.display}
+                    </span>
+                  ) : b.isSquareBadge ? (
+                    <span className="w-8 h-8 rounded-lg bg-[#ff6900] text-white font-black text-sm flex items-center justify-center shadow-xs">
+                      {b.display}
+                    </span>
+                  ) : b.sub ? (
+                    <div className="text-center leading-tight">
+                      <span className={`font-extrabold text-sm sm:text-base ${b.color}`}>
+                        {b.display}
+                      </span>
+                      <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">
+                        {b.sub}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className={`font-black text-sm sm:text-base tracking-tight ${b.color}`}>
+                      {b.display} {b.icon || ''}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Promotional Banners: Left 35% OFF First Order + Right 4 Curated Category Tiles */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 items-stretch">
+            {/* Left Card: 35% OFF on First Order */}
+            <div className="lg:col-span-4 bg-gradient-to-br from-[#f59e0b] via-[#fbbf24] to-[#f59e0b] rounded-2xl sm:rounded-3xl p-5 sm:p-6 text-slate-900 relative overflow-hidden flex flex-col justify-between shadow-sm">
+              <div className="space-y-1">
+                <span className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-amber-950/80">
+                  Up to
+                </span>
+                <h4 className="text-4xl sm:text-5xl font-black text-[#85002f] tracking-tight drop-shadow-xs">
+                  35% OFF
+                </h4>
+                <p className="text-sm sm:text-base font-extrabold text-amber-950">
+                  on first order
+                </p>
+                <p className="text-[11px] font-semibold text-amber-900/80">
+                  *Only on App
+                </p>
+              </div>
+
+              <div className="pt-4 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowAppDownloadModal(true)}
+                  className="bg-white hover:bg-slate-50 text-slate-900 px-5 py-2.5 rounded-full font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer"
+                >
+                  Download Now
+                </button>
+                <span className="text-[9px] text-amber-950/60 font-semibold">T&amp;C Apply*</span>
+              </div>
+            </div>
+
+            {/* Right Banner: Purple Gradient with 4 Curated Tiles */}
+            <div className="lg:col-span-8 bg-gradient-to-r from-[#5a0044] via-[#750059] to-[#800062] rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white relative overflow-hidden flex flex-col justify-center shadow-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                {CURATED_OFFER_TILES.map((tile) => (
+                  <div
+                    key={tile.id}
+                    onClick={() => handleCuratedFilterClick(tile.filterTag)}
+                    className={`bg-white/10 hover:bg-white/20 backdrop-blur-xs border-2 ${
+                      curatedFilter === tile.filterTag ? 'border-amber-300 ring-2 ring-amber-300/50' : 'border-amber-200/50'
+                    } rounded-2xl p-2 flex flex-col items-center justify-between cursor-pointer transition-all duration-300 hover:scale-[1.02] group/tile`}
+                  >
+                    <div className="w-full aspect-[4/5] rounded-xl overflow-hidden mb-2 relative bg-purple-950/40">
+                      <img
+                        src={tile.image}
+                        alt={tile.title}
+                        className="w-full h-full object-cover group-hover/tile:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="w-full bg-white text-slate-900 text-center py-1.5 px-1.5 rounded-xl shadow-xs">
+                      <span className="text-[10px] sm:text-xs font-black tracking-tight block truncate">
+                        {tile.title}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Database Categories Bar */}
         <section className="mt-8">
           <div className="flex items-center justify-between mb-4">
@@ -957,145 +1686,242 @@ export default function HomeUserCustomer() {
 
         </section>
 
-        {/* Real Products Grid from PostgreSQL Database */}
-        <section className="mt-10">
-          <div className="flex items-center justify-between mb-6">
+        {/* =========================================================================
+            SECTION 2: PRODUCT LISTING ENHANCEMENTS WITH SIDEBAR FILTERS & COUNTDOWN (Matching Screenshot 2)
+        ========================================================================= */}
+        <section id="products-grid-section" className="mt-10">
+          {/* Header Row: Title on Left, Mobile Filter Trigger & Sort Dropdown on Right */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-2 border-b border-slate-100 dark:border-slate-800">
             <div>
-              <h3 className="font-headline font-extrabold text-2xl text-[#191c1e] dark:text-slate-100">
+              <h3 className="font-headline font-black text-2xl text-[#191c1e] dark:text-slate-100 tracking-tight">
                 Products For You
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Lowest prices, verified suppliers & top quality products
+                Lowest prices, verified suppliers &amp; top quality products ({displayedProducts.length} items)
               </p>
             </div>
 
+            <div className="flex items-center gap-3">
+              {/* Mobile Filter Trigger Button */}
+              <button
+                type="button"
+                onClick={() => setIsMobileFilterOpen(true)}
+                className="md:hidden flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer shadow-2xs"
+              >
+                <span className="material-symbols-outlined text-base">filter_list</span>
+                <span>Filters</span>
+              </button>
+
+              {/* Sort By Dropdown (Matching Screenshot 2) */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 whitespace-nowrap hidden sm:inline">
+                  Sort by:
+                </span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#9f0038] shadow-2xs cursor-pointer"
+                >
+                  <option value="relevance">Relevance</option>
+                  <option value="price_asc">Price: Low to High</option>
+                  <option value="price_desc">Price: High to Low</option>
+                  <option value="rating">Rating: High to Low</option>
+                  <option value="popularity">Popularity</option>
+                  <option value="newest">New Arrivals</option>
+                </select>
+              </div>
+            </div>
           </div>
 
-          {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                <div key={n} className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 animate-pulse">
-                  <div className="aspect-[3/4] bg-slate-200 dark:bg-slate-800 rounded-xl mb-3"></div>
-                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4 mb-2"></div>
-                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2"></div>
-                </div>
-              ))}
-            </div>
-          ) : products.length === 0 ? (
-            <div className="py-12 text-center flex flex-col items-center justify-center bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 p-8">
-              <span className="material-symbols-outlined text-5xl text-slate-300 mb-2">inventory_2</span>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                No products found in "{selectedCategory}"
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Explore other categories or check all available items.
-              </p>
-              <button 
-                onClick={() => setSelectedCategory("All")} 
-                className="mt-4 px-4 py-2 text-xs font-bold text-[#b90041] bg-[#b90041]/10 rounded-xl hover:bg-[#b90041]/20 transition-colors cursor-pointer"
+          {/* Curated Active Filter Pill */}
+          {curatedFilter && (
+            <div className="flex items-center gap-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-4 py-2 rounded-xl text-xs">
+              <span className="text-amber-800 dark:text-amber-300 font-bold">
+                Active Offer Filter: <strong>{curatedFilter}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setCuratedFilter(null)}
+                className="text-amber-900 dark:text-amber-200 font-black hover:underline cursor-pointer ml-auto flex items-center gap-1"
               >
-                View All Products
+                <span>Clear Filter</span>
+                <span>✕</span>
               </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-              {displayedProducts.map((p) => {
-                const isFav = favorites.includes(p.id);
-                const mainImg = p.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
-
-                return (
-                  <div 
-                    key={p.id} 
-                    className="bg-white dark:bg-slate-900 rounded-2xl p-2.5 sm:p-3.5 border border-slate-100 dark:border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
-                  >
-                    <div 
-                      onClick={() => navigate(`/product?id=${p.id}`)} 
-                      className="cursor-pointer" 
-                      title={`View ${p.title}`}
-                    >
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden relative mb-3 bg-slate-100 dark:bg-slate-800">
-                        <img 
-                          src={mainImg} 
-                          alt={p.title} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                          loading="lazy"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
-                          }}
-                        />
-                        {p.rating > 0 && (
-                          <span className="absolute bottom-2 left-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-2 py-0.5 rounded-lg text-[10px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-0.5 shadow-sm">
-                            <span className="text-amber-500 font-bold text-xs">★</span> {p.rating}
-                            {p.reviewsCount > 0 && <span className="text-slate-400 text-[9px]">({p.reviewsCount})</span>}
-                          </span>
-                        )}
-                        <button 
-                          onClick={(e) => handleToggleFavorite(p.id, e, p)}
-                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md flex items-center justify-center shadow-sm active:scale-90 transition-transform cursor-pointer hover:bg-white"
-                          title="Wishlist"
-                        >
-                          <span 
-                            className={`material-symbols-outlined text-sm ${isFav ? 'text-[#FF3F6C]' : 'text-slate-400'}`}
-                            style={isFav ? { fontVariationSettings: "'FILL' 1" } : {}}
-                          >
-                            favorite
-                          </span>
-                        </button>
-                      </div>
-
-                      <div className="px-1 min-w-0">
-                        <h4 
-                          className="text-[11.5px] sm:text-xs md:text-sm font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 mb-1 leading-snug min-h-[2.25rem] break-words"
-                          title={p.title}
-                        >
-                          {p.title}
-                        </h4>
-                        <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2 mb-2">
-                          <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-                            ₹{p.price}
-                          </span>
-                          {p.originalPrice && p.originalPrice > p.price && (
-                            <span className="text-[11px] sm:text-xs text-slate-400 line-through">
-                              ₹{p.originalPrice}
-                            </span>
-                          )}
-                          {p.discountPercentage > 0 && (
-                            <span className="text-[11px] sm:text-xs font-bold text-[#FF3F6C] whitespace-nowrap">
-                              {p.discountPercentage}% OFF
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Customer Bottom Action: Free Delivery & View Details */}
-                    <div 
-                      onClick={() => navigate(`/product?id=${p.id}`)}
-                      className="bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/40 rounded-xl px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-emerald-100/70 transition-colors group/btn mt-1"
-                    >
-                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[13px]">local_shipping</span>
-                        Free Delivery
-                      </span>
-                      <span className="text-[10px] font-bold text-[#b90041] flex items-center gap-0.5 group-hover/btn:translate-x-0.5 transition-transform">
-                        Shop <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           )}
 
-          {/* Real Meesho Infinite Scroll Sentinel & Loader */}
-          <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[90px]">
-            {loadingMore && (
-              <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-extrabold text-[#b90041] animate-pulse">
-                <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
-                <span>Loading more trending products for you...</span>
+          {/* 2-Column Responsive Layout: Left Sidebar + Right Products Grid */}
+          <div className="flex items-start gap-6">
+            {/* Left Filter Sidebar (Matching Screenshot 2) */}
+            <ProductFilterSidebar
+              filters={sidebarFilters}
+              onFilterChange={handleFilterChange}
+              onClearAll={handleClearAllFilters}
+              totalCount={displayedProducts.length}
+              isOpen={isMobileFilterOpen}
+              onClose={() => setIsMobileFilterOpen(false)}
+            />
+
+            {/* Right Main Product Grid Area */}
+            <div className="flex-1 min-w-0">
+              {loading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <div key={n} className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 animate-pulse">
+                      <div className="aspect-[3/4] bg-slate-200 dark:bg-slate-800 rounded-xl mb-3"></div>
+                      <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4 mb-2"></div>
+                      <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : displayedProducts.length === 0 ? (
+                <div className="py-12 text-center flex flex-col items-center justify-center bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 p-8">
+                  <span className="material-symbols-outlined text-5xl text-slate-300 mb-2">inventory_2</span>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    No products found matching selected filters
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Try clearing some filters or exploring other categories.
+                  </p>
+                  <button 
+                    onClick={handleClearAllFilters} 
+                    className="mt-4 px-4 py-2 text-xs font-bold text-[#b90041] bg-[#b90041]/10 rounded-xl hover:bg-[#b90041]/20 transition-colors cursor-pointer"
+                  >
+                    Reset All Filters
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                  {displayedProducts.map((p, idx) => {
+                    const isFav = favorites.includes(p.id);
+                    const mainImg = p.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
+                    const hasOffer = Boolean(Number(p.discountPercentage) >= 40);
+                    const isMall = Boolean(p.isMall || (Number(p.discountPercentage) >= 35));
+
+                    return (
+                      <div 
+                        key={p.id} 
+                        className="bg-white dark:bg-slate-900 rounded-2xl p-2.5 sm:p-3 border border-slate-100 dark:border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                      >
+                        <div 
+                          onClick={() => navigate(`/product?id=${p.id}`)} 
+                          className="cursor-pointer" 
+                          title={`View ${p.title}`}
+                        >
+                          <div className="aspect-[3/4] rounded-xl overflow-hidden relative mb-2.5 bg-slate-100 dark:bg-slate-800">
+                            <img 
+                              src={mainImg} 
+                              alt={p.title} 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
+                              }}
+                            />
+                            
+                            <button 
+                              onClick={(e) => handleToggleFavorite(p.id, e, p)}
+                              className="absolute top-2 right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md flex items-center justify-center shadow-sm active:scale-90 transition-transform cursor-pointer hover:bg-white"
+                              title="Wishlist"
+                            >
+                              <span 
+                                className={`material-symbols-outlined text-sm ${isFav ? 'text-[#FF3F6C]' : 'text-slate-400'}`}
+                                style={isFav ? { fontVariationSettings: "'FILL' 1" } : {}}
+                              >
+                                favorite
+                              </span>
+                            </button>
+                          </div>
+
+                          {/* Dynamic Deal Countdown Timer (Matching Screenshot 2 red highlighted timer) */}
+                          {hasOffer && (
+                            <div className="mb-2">
+                              <CountdownTimer
+                                productId={p.id}
+                                initialHours={4 - (idx % 3)}
+                                initialMinutes={31 + (idx * 5) % 25}
+                                initialSeconds={22 + (idx * 7) % 35}
+                              />
+                            </div>
+                          )}
+
+                          <div className="px-0.5 min-w-0 space-y-1">
+                            <h4 
+                              className="text-[11.5px] sm:text-xs font-medium text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug min-h-[2rem] break-words"
+                              title={p.title}
+                            >
+                              {p.title}
+                            </h4>
+
+                            {/* Price, Original Price, Discount & Mall Badge */}
+                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                              <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                                ₹{p.price}
+                              </span>
+                              {p.originalPrice && p.originalPrice > p.price && (
+                                <span className="text-[11px] text-slate-400 line-through">
+                                  ₹{p.originalPrice}
+                                </span>
+                              )}
+                              {p.discountPercentage > 0 && (
+                                <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400">
+                                  {p.discountPercentage}% off
+                                </span>
+                              )}
+                              {isMall && (
+                                <span className="text-[9px] font-black bg-sky-100 text-sky-800 px-1 py-0.2 rounded-xs ml-auto">
+                                  Mall
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Star Rating & Review Count */}
+                            <div className="flex items-center gap-1.5 pt-0.5">
+                              <span className="inline-flex items-center gap-0.5 bg-[#038d63] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                                <span>{p.rating !== undefined && Number(p.rating) > 0 ? Number(p.rating).toFixed(1) : '4.2'}</span>
+                                <span className="text-[9px]">★</span>
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-medium truncate">
+                                {p.reviewsCount !== undefined && Number(p.reviewsCount) > 0 ? `${Number(p.reviewsCount).toLocaleString()} Reviews` : (Number(p.rating) > 0 ? `${Math.round(Number(p.rating) * 5)} Reviews` : 'No reviews')}
+                              </span>
+                            </div>
+
+                            {/* Delivery Info */}
+                            <p className="text-[10px] font-semibold text-slate-500 pt-0.5 flex items-center gap-1">
+                              <span className="text-emerald-700 dark:text-emerald-400 font-bold">Free Delivery</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Customer Bottom Action */}
+                        <div 
+                          onClick={() => navigate(`/product?id=${p.id}`)}
+                          className="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/40 rounded-xl px-2.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-rose-100/60 transition-colors group/btn mt-2.5"
+                        >
+                          <span className="text-[10px] font-bold text-[#b90041] uppercase tracking-wider">
+                            View Details
+                          </span>
+                          <span className="material-symbols-outlined text-xs text-[#b90041] group-hover/btn:translate-x-0.5 transition-transform">
+                            arrow_forward
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Real Meesho Infinite Scroll Sentinel & Loader */}
+              <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[90px]">
+                {loadingMore && (
+                  <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-extrabold text-[#b90041] animate-pulse">
+                    <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
+                    <span>Loading more trending products for you...</span>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </section>
       </main>
@@ -1110,6 +1936,120 @@ export default function HomeUserCustomer() {
         onContinueAsGuest={handleContinueAsGuest}
         onLogin={handleModalLogin}
       />
+
+      {/* App Download Modal for 35% OFF First Order with QR Code (Exact Replica of Meesho Web) */}
+      {showAppDownloadModal && (
+        <div
+          onClick={() => setShowAppDownloadModal(false)}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full shadow-2xl relative border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 overflow-hidden"
+          >
+            {/* Modal Header Matching Meesho */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base sm:text-lg font-bold text-[#5c0632] dark:text-rose-400">
+                Shop Now on App to get Upto 35% off on 1st Order
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAppDownloadModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-lg font-bold"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content: 2-Column Banner & QR Code Matching Frame 303 */}
+            <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+              {/* Left Column: 35% OFF Promotional Banner */}
+              <div className="w-full md:w-[62%] rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 bg-[#5c0632]">
+                <img
+                  src="/meesho_app_modal_banner.jpg"
+                  alt="Shop Now on App to get Upto 35% off on 1st Order"
+                  className="w-full h-auto object-cover rounded-2xl block"
+                />
+              </div>
+
+              {/* Right Column: Scan Now to download App + Crisp QR Code */}
+              <div className="w-full md:w-[38%] flex flex-col items-center justify-center text-center px-2">
+                <h4 className="text-sm sm:text-base font-extrabold text-[#5c0632] dark:text-rose-400 mb-3">
+                  Scan Now to download App!
+                </h4>
+                <div className="bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-sm inline-block">
+                  <QRCodeSVG
+                    value="https://play.google.com/store/apps"
+                    size={180}
+                    bgColor="#ffffff"
+                    fgColor="#000000"
+                    level="Q"
+                    includeMargin={false}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* App Download Modal for 35% OFF First Order with QR Code (Exact Replica of Meesho Web) */}
+      {showAppDownloadModal && (
+        <div
+          onClick={() => setShowAppDownloadModal(false)}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full shadow-2xl relative border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 overflow-hidden"
+          >
+            {/* Modal Header Matching Meesho */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base sm:text-lg font-bold text-[#5c0632] dark:text-rose-400">
+                Shop Now on App to get Upto 35% off on 1st Order
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAppDownloadModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-lg font-bold"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content: 2-Column Banner & QR Code Matching Frame 303 */}
+            <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+              {/* Left Column: 35% OFF Promotional Banner */}
+              <div className="w-full md:w-[62%] rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 bg-[#5c0632]">
+                <img
+                  src="/meesho_app_modal_banner.jpg"
+                  alt="Shop Now on App to get Upto 35% off on 1st Order"
+                  className="w-full h-auto object-cover rounded-2xl block"
+                />
+              </div>
+
+              {/* Right Column: Scan Now to download App + Crisp QR Code */}
+              <div className="w-full md:w-[38%] flex flex-col items-center justify-center text-center px-2">
+                <h4 className="text-sm sm:text-base font-extrabold text-[#5c0632] dark:text-rose-400 mb-3">
+                  Scan Now to download App!
+                </h4>
+                <div className="bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-sm inline-block">
+                  <QRCodeSVG
+                    value="https://play.google.com/store/apps"
+                    size={180}
+                    bgColor="#ffffff"
+                    fgColor="#000000"
+                    level="Q"
+                    includeMargin={false}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

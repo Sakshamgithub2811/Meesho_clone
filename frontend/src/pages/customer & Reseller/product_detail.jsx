@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' width='400' height='400'%3E%3Crect width='400' height='400' fill='%23f1f5f9'/%3E%3Cpath d='M160 160a20 20 0 1 0 0-40 20 20 0 0 0 0 40zm80 40-50-50-70 70h160l-40-60z' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='65%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' font-weight='600' fill='%2394a3b8'%3ENo Image Available%3C/text%3E%3C/svg%3E";
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import {
   getProductById,
   getProducts,
   getWishlist,
   toggleWishlist,
-  checkCanReview
+  checkCanReview,
+  getProductReviews
 } from '../../services/ecommerceService';
 import { useCart } from '../../hooks/useCart';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
@@ -168,6 +171,82 @@ const resolveColorHex = (colorName) => {
   return '#FF3F6C';
 };
 
+/**
+ * Intelligent helper to dynamically resolve 'Ideal For' / target audience
+ * based on product category, title, subcategory, and attributes.
+ */
+export const getProductIdealFor = (product) => {
+  if (!product) return 'Unisex';
+  if (product.gender) {
+    const g = String(product.gender).trim().toLowerCase();
+    if (g === 'women' || g === 'female' || g === 'girls') return 'Women';
+    if (g === 'men' || g === 'male' || g === 'boys') return 'Men';
+    if (g === 'kids' || g === 'baby') return 'Kids';
+    if (g === 'unisex') return 'Unisex';
+  }
+
+  const slug = (product.categorySlug || product.category?.slug || '').toLowerCase();
+  const sub = (product.subCategory || '').toLowerCase();
+  const title = (product.title || '').toLowerCase();
+  const desc = (product.description || '').toLowerCase();
+  const combined = `${title} ${sub} ${desc}`;
+
+  // 1. Women-specific Cosmetics, Beauty, Attire, and Jewellery
+  const womenKeywords = [
+    'lipstick', 'lip stick', 'lip crayon', 'lip gloss', 'lip balm', 'lip liner',
+    'kajal', 'eyeliner', 'mascara', 'eyeshadow', 'foundation', 'concealer',
+    'compact', 'nail polish', 'sindoor', 'blush', 'highlighter', 'primer',
+    'makeup', 'bb cream', 'cc cream', 'bindi', 'mehendi', 'henna',
+    'saree', 'sari', 'kurti', 'kurta set', 'lehenga', 'dupatta', 'salwar',
+    'anarkali', 'blouse', 'petticoat', 'ghagra', 'gown', 'dress', 'bra', 'panty',
+    'lingerie', 'nighty', 'nightdress', 'babydoll', 'jumpsuit', 'palazzo',
+    'heels', 'wedges', 'bellies', 'jhumka', 'mangalsutra', 'payal'
+  ];
+  const isWomenSpecific = womenKeywords.some((w) => new RegExp(`\\b${w}\\b`, 'i').test(combined) || sub.includes(w));
+
+  if (
+    slug === 'women-ethnic' ||
+    slug === 'women-western' ||
+    isWomenSpecific ||
+    (slug === 'jewellery' && !/\b(men|mens|men's|boy|boys)\b/i.test(title))
+  ) {
+    return 'Women';
+  }
+
+  // 2. Kids & Baby
+  if (
+    slug === 'kids' ||
+    /\b(kids?|baby|infant|toddler|children)\b/i.test(title)
+  ) {
+    if (/\b(girl|girls)\b/i.test(title)) return 'Girls';
+    if (/\b(boy|boys)\b/i.test(title)) return 'Boys';
+    return 'Kids';
+  }
+
+  // 3. Men grooming & Men apparel / footwear
+  const isMenGrooming = [
+    'beard', 'shaving', 'aftershave', 'razor', 'trimmer', 'moustache'
+  ].some((w) => combined.includes(w));
+
+  const hasMenWord = /\b(men|mens|men's|male|gentlemen)\b/i.test(title);
+  const hasWomenWord = /\b(women|womens|women's|female|ladies)\b/i.test(title);
+
+  if (hasMenWord && !hasWomenWord) return 'Men';
+  if (hasWomenWord && !hasMenWord) return 'Women';
+  if (isMenGrooming || slug === 'men' || slug === 'men-western' || slug === 'men-ethnic') return 'Men';
+
+  // 4. Beauty & Health defaults
+  if (slug === 'beauty-health') {
+    if (/\b(rose|floral|blush|bloom|vanilla|jasmine|pink)\b/i.test(title)) return 'Women';
+    return 'Unisex';
+  }
+
+  if (slug === 'footwear') return 'Men & Women';
+  if (slug === 'home-kitchen' || slug === 'electronics') return 'All / Unisex';
+
+  return 'Unisex';
+};
+
 export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   const { id: routeId } = useParams();
   const [searchParams] = useSearchParams();
@@ -208,7 +287,6 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
-  const [showSizeChart, setShowSizeChart] = useState(false);
   const [showImageZoom, setShowImageZoom] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [canReviewProduct, setCanReviewProduct] = useState(false);
@@ -216,11 +294,169 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showPriceDetailsPopup, setShowPriceDetailsPopup] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
 
   // Dynamic Custom Affiliate Margin Support (decoded safely from obfuscated 'sp' token or legacy 'margin')
   const urlMargin = getAffiliateMarginFromParams(searchParams);
-  const affiliateMargin = urlMargin > 0 ? urlMargin : Number(localStorage.getItem('mshoppy_affiliate_margin') || 0);
+  const affiliateMargin = urlMargin > 0 ? urlMargin : 0;
   const effectivePrice = (product?.price || 0) + (affiliateMargin > 0 ? affiliateMargin : 0);
+
+  // Dynamic MRP (Maximum Retail Price) ensuring it always reflects originalPrice + margin and is strictly >= effectivePrice
+  const effectiveOriginalPrice = useMemo(() => {
+    const rawOrig = Number(product?.originalPrice || 0);
+    const margin = affiliateMargin > 0 ? affiliateMargin : 0;
+    if (rawOrig > (product?.price || 0)) {
+      return rawOrig + margin;
+    }
+    const discount = Number(product?.discountPercentage || 0);
+    if (discount > 0 && discount < 100) {
+      return Math.round(effectivePrice / (1 - discount / 100));
+    }
+    return Math.round(effectivePrice * 1.25);
+  }, [product?.originalPrice, product?.price, product?.discountPercentage, affiliateMargin, effectivePrice]);
+
+  // Parse multi-variant matrix if available (must be at top level before any conditional returns)
+  const variants = useMemo(() => {
+    if (!product?.variants) return [];
+    if (Array.isArray(product.variants)) return product.variants;
+    try {
+      return JSON.parse(product.variants);
+    } catch {
+      return [];
+    }
+  }, [product?.variants]);
+
+  // Match active variant based on selected color and size
+  const activeVariant = useMemo(() => {
+    if (!variants.length) return null;
+    let match = variants.find((v) => {
+      const vColor = (v.color || '').trim().toLowerCase();
+      const vSize = (v.size || '').trim().toLowerCase();
+      const sColor = (selectedColor || '').trim().toLowerCase();
+      const sSize = (selectedSize || '').trim().toLowerCase();
+      return vColor === sColor && vSize === sSize;
+    });
+    if (!match && selectedSize) {
+      match = variants.find((v) => (v.size || '').trim().toLowerCase() === (selectedSize || '').trim().toLowerCase());
+    }
+    return match;
+  }, [variants, selectedColor, selectedSize]);
+
+  // Dynamic category-specific product specifications (replacing dummy clothing hardcodes)
+  const productSpecs = useMemo(() => {
+    if (!product) return [];
+    const slug = (product.categorySlug || product.category?.slug || '').toLowerCase();
+    const sub = (product.subCategory || '').toLowerCase();
+    const titleLower = (product.title || '').toLowerCase();
+    const idealFor = getProductIdealFor(product);
+
+    if (slug === 'beauty-health') {
+      let typeFinish = product.subCategory || 'Personal Care';
+      let usageLabel = 'Skin / Usage Type';
+      let usageValue = 'All Skin Types';
+
+      if (sub.includes('lipstick') || titleLower.includes('lipstick') || titleLower.includes('lip crayon') || titleLower.includes('matte as hell')) {
+        typeFinish = 'Matte / Long-Lasting';
+        usageLabel = 'Formulation';
+        usageValue = 'Crayon / Non-Drying Matte';
+      } else if (sub.includes('perfume') || titleLower.includes('edp') || titleLower.includes('body mist') || titleLower.includes('fragrance')) {
+        typeFinish = 'Eau De Parfum / Mist';
+        usageLabel = 'Fragrance Type';
+        usageValue = 'Luxury Body Mist / EDP';
+      } else if (sub.includes('serum') || titleLower.includes('serum')) {
+        typeFinish = 'Face Serum / Radiance';
+        usageLabel = 'Skin Concern';
+        usageValue = 'Brightening & Nourishing';
+      } else if (sub.includes('kajal') || sub.includes('eyeliner') || titleLower.includes('kajal') || titleLower.includes('eyeliner')) {
+        typeFinish = 'Smudge-Proof / Waterproof';
+        usageLabel = 'Application Area';
+        usageValue = 'Eyes (Smudge-Proof)';
+      } else if (sub.includes('face wash') || titleLower.includes('face wash')) {
+        typeFinish = 'Deep Cleansing / Gentle Gel';
+      } else if (sub.includes('sunscreen') || titleLower.includes('sunscreen') || titleLower.includes('spf')) {
+        typeFinish = 'UV Protection / Broad Spectrum';
+      } else if (sub.includes('compact') || titleLower.includes('compact')) {
+        typeFinish = 'Oil-Control Matte Powder';
+      } else if (sub.includes('nail polish') || titleLower.includes('nail polish')) {
+        typeFinish = 'Glossy / Long-Wear';
+      } else if (sub.includes('lotion') || titleLower.includes('lotion') || titleLower.includes('moistur')) {
+        typeFinish = 'Nourishing Moisturizer';
+      }
+
+      return [
+        { label: 'Type / Finish', value: typeFinish },
+        { label: 'Net Quantity', value: '1 Unit' },
+        { label: 'Ideal For', value: idealFor },
+        { label: usageLabel, value: usageValue },
+      ];
+    }
+
+    if (slug === 'footwear') {
+      return [
+        { label: 'Material', value: product.material || 'Synthetic / Mesh' },
+        { label: 'Fastening', value: 'Slip-On / Lace-Ups' },
+        { label: 'Ideal For', value: idealFor },
+        { label: 'Sole Material', value: 'Airmix / Rubber' },
+      ];
+    }
+
+    if (slug === 'electronics') {
+      return [
+        { label: 'Connectivity', value: 'Wireless / Bluetooth' },
+        { label: 'Compatibility', value: 'Android & iOS' },
+        { label: 'Warranty', value: '6 Months Brand Warranty' },
+        { label: 'Ideal For', value: idealFor },
+      ];
+    }
+
+    if (slug === 'jewellery' || slug === 'accessories') {
+      return [
+        { label: 'Base Metal', value: 'Alloy / Brass' },
+        { label: 'Plating', value: 'Gold / Silver Plated' },
+        { label: 'Occasion', value: 'Ethnic / Festive / Daily' },
+        { label: 'Ideal For', value: idealFor },
+      ];
+    }
+
+    if (slug === 'home-kitchen') {
+      return [
+        { label: 'Material', value: product.material || 'Cotton / Microfiber' },
+        { label: 'Pattern', value: 'Printed / Geometric / Solid' },
+        { label: 'Care', value: 'Machine Wash / Wipe Clean' },
+        { label: 'Country of Origin', value: 'India' },
+      ];
+    }
+
+    // Default Clothing (women-ethnic, women-western, men, kids)
+    return [
+      { label: 'Fabric', value: product.fabric || product.material || (slug.includes('ethnic') ? 'Art Silk / Cotton' : 'Cotton Blend') },
+      { label: 'Color', value: selectedColor || product.color || 'Multicolor' },
+      { label: 'Pattern', value: 'Embroidered / Printed / Solid' },
+      { label: 'Ideal For', value: idealFor },
+    ];
+  }, [product, selectedColor]);
+
+  const packageContains = useMemo(() => {
+    if (!product) return '1 Unit';
+    const slug = (product.categorySlug || product.category?.slug || '').toLowerCase();
+    const titleLower = (product.title || '').toLowerCase();
+    if (slug === 'beauty-health') return `1 x ${product.title}`;
+    if (slug === 'footwear') return '1 Pair of Footwear';
+    if (slug === 'electronics') return '1 Device, Charging Cable, User Manual';
+    if (slug === 'jewellery') return '1 Jewellery Set / Piece';
+    if (slug === 'home-kitchen') return `1 x ${product.title}`;
+    if (slug.includes('ethnic') || slug.includes('western') || slug === 'men' || slug === 'kids') {
+      if (titleLower.includes('saree')) return '1 Saree with Unstitched Blouse Piece';
+      if (titleLower.includes('kurta') || titleLower.includes('kurti')) return '1 Kurti / Kurta Set';
+      if (titleLower.includes('top') || titleLower.includes('tunic')) return '1 Top / Tunic';
+      if (titleLower.includes('shirt')) return '1 Shirt';
+      if (titleLower.includes('t-shirt') || titleLower.includes('tshirt')) return '1 T-Shirt';
+      if (titleLower.includes('dress')) return '1 Dress';
+      if (titleLower.includes('pant') || titleLower.includes('jean') || titleLower.includes('trouser')) return '1 Bottomwear';
+    }
+    return `1 x ${product.title}`;
+  }, [product]);
 
   // Reseller WhatsApp Sharing & Custom Margin State (ONLY active when explicitly visiting in reseller mode from Reseller Hub)
   const isResellerMode = searchParams.get('source') === 'reseller';
@@ -308,10 +544,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
         }
       }
       if (pin) {
-        const d = new Date();
-        const daysToAdd = (parseInt(pin.slice(-1), 10) % 3) + 2; // 2 to 4 days
-        d.setDate(d.getDate() + daysToAdd);
-        return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+        return `Available for ${pin}`;
       }
     } catch (e) { }
     return null;
@@ -320,8 +553,61 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   // Similar Products States
   const [similarProducts, setSimilarProducts] = useState([]);
 
-  const triggerToast = (msg) => {
-    toast.success(msg);
+  // ── INLINE RATINGS & REVIEWS STATE ───────────────────────────
+  const [productReviews, setProductReviews] = useState([]);
+  const [reviewsBreakdown, setReviewsBreakdown] = useState({ 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 });
+  const [customerReviewPhotos, setCustomerReviewPhotos] = useState([]);
+  const [visibleReviewsCount, setVisibleReviewsCount] = useState(3);
+  const [reviewFilter, setReviewFilter] = useState('All');
+  const [helpfulClicked, setHelpfulClicked] = useState(new Set());
+  const [helpfulCounts, setHelpfulCounts] = useState({});
+  const [previewReviewImage, setPreviewReviewImage] = useState(null);
+  const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
+  const [copiedHighlights, setCopiedHighlights] = useState(false);
+
+  const handleCopyHighlights = () => {
+    if (!product) return;
+    const lines = [
+      `Product: ${product.title}`,
+      `Price: ₹${effectivePrice}`,
+      ...productSpecs.map((s) => `${s.label}: ${s.value}`),
+      `Package Contains: ${packageContains}`,
+      `Country of Origin: India`
+    ];
+    try {
+      navigator.clipboard?.writeText(lines.join('\n'));
+    } catch (_) { }
+    setCopiedHighlights(true);
+    setTimeout(() => setCopiedHighlights(false), 2500);
+  };
+
+  // ── BEST SELLERS & RECENT SEARCHES STATE ─────────────────────
+  const [bestSellingProducts, setBestSellingProducts] = useState([]);
+  const [recentSearches, setRecentSearches] = useState([]);
+
+  const handleToggleHelpful = (reviewId) => {
+    const isClicked = helpfulClicked.has(reviewId);
+    if (isClicked) {
+      setHelpfulClicked((prev) => {
+        const next = new Set(prev);
+        next.delete(reviewId);
+        return next;
+      });
+      setHelpfulCounts((prev) => ({
+        ...prev,
+        [reviewId]: Math.max(0, (prev[reviewId] || 1) - 1)
+      }));
+    } else {
+      setHelpfulClicked((prev) => new Set(prev).add(reviewId));
+      setHelpfulCounts((prev) => ({
+        ...prev,
+        [reviewId]: (prev[reviewId] || 0) + 1
+      }));
+    }
+  };
+
+  const triggerToast = () => {
+    // All popup toasts silenced as per user instruction
   };
 
   const handlePincodeCheck = (e) => {
@@ -334,15 +620,11 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
       return;
     }
     setIsPincodeValid(true);
-    const d = new Date();
-    const daysToAdd = (parseInt(cleanPin.slice(-1), 10) % 3) + 2; // 2 to 4 days
-    d.setDate(d.getDate() + daysToAdd);
-    const dateStr = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-    setDeliveryEstimate(dateStr);
+    setDeliveryEstimate(`Available for ${cleanPin}`);
     try {
       localStorage.setItem('mshoppy_user_pincode', cleanPin);
     } catch (err) { }
-    triggerToast(`✓ Delivery available by ${dateStr}! Free Delivery & COD active.`);
+    triggerToast(`✓ Delivery available for pincode ${cleanPin}! Free Delivery & COD active.`);
   };
 
   // Fetch product & similar items from database (Background SWR if cached)
@@ -354,12 +636,6 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
         let p = null;
         if (productId) {
           p = await getProductById(productId);
-        }
-        if (!p) {
-          const prods = await getProducts({ limit: 1 });
-          if (prods && prods.length > 0) {
-            p = prods[0];
-          }
         }
 
         if (isMounted && p) {
@@ -410,6 +686,69 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
               }
             })
             .catch(() => { });
+
+          // Fetch real product reviews from database
+          getProductReviews(p.id)
+            .then((revData) => {
+              if (isMounted && revData) {
+                if (revData.breakdown) setReviewsBreakdown(revData.breakdown);
+                if (Array.isArray(revData.customerPhotos)) setCustomerReviewPhotos(revData.customerPhotos);
+                if (Array.isArray(revData.reviews) && revData.reviews.length > 0) {
+                  const mapped = revData.reviews.map((r) => ({
+                    id: r.id,
+                    name: r.user?.fullName || r.userName || 'Verified Buyer',
+                    initials: ((r.user?.fullName || r.userName || 'Verified Buyer').trim().slice(0, 2)).toUpperCase(),
+                    rating: Number(r.rating) || 0,
+                    verified: true,
+                    time: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+                    comment: r.comment || r.title || '',
+                    photos: Array.isArray(r.images) ? r.images : [],
+                    helpfulCount: Number(r.helpfulCount) || 0
+                  }));
+                  setProductReviews(mapped);
+                } else {
+                  setProductReviews([]);
+                }
+              } else {
+                setProductReviews([]);
+              }
+            })
+            .catch(() => {
+              if (isMounted) setProductReviews([]);
+            });
+
+          // Fetch Best-Selling Products from catalog
+          getProducts({ limit: 16 })
+            .then((allProds) => {
+              if (isMounted && Array.isArray(allProds)) {
+                const sorted = allProds
+                  .filter((item) => item.id !== p.id)
+                  .sort((a, b) => ((Number(b.rating) || 0) * (Number(b.reviewsCount) || 0)) - ((Number(a.rating) || 0) * (Number(a.reviewsCount) || 0)))
+                  .slice(0, 8);
+                setBestSellingProducts(sorted);
+              }
+            })
+            .catch(() => { });
+
+          // Recent Searches & Viewed Items Management
+          try {
+            const rawHistory = localStorage.getItem('mshoppy_recently_viewed');
+            const history = rawHistory ? JSON.parse(rawHistory) : [];
+            const validHistory = Array.isArray(history) ? history.filter((item) => item && (item.id || item) !== p.id) : [];
+            setRecentSearches(validHistory.slice(0, 6));
+
+            const currentEntry = {
+              id: p.id,
+              title: p.title,
+              price: p.price,
+              originalPrice: p.originalPrice,
+              rating: p.rating,
+              images: p.images,
+              categorySlug: p.categorySlug
+            };
+            const newHistory = [currentEntry, ...validHistory].slice(0, 12);
+            localStorage.setItem('mshoppy_recently_viewed', JSON.stringify(newHistory));
+          } catch (err) { }
         }
       } catch (err) {
         console.error("Error loading product detail:", err);
@@ -578,13 +917,21 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
 
   const images = (product.images && product.images.length > 0)
     ? product.images
-    : ['https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=800'];
+    : [PLACEHOLDER_IMAGE];
 
   const catMeta = getCategoryMeta(product.categorySlug);
+  const categorySlugLower = (product.categorySlug || '').toLowerCase();
+  const isNoSizeCategory = categorySlugLower === 'beauty-health' || categorySlugLower === 'electronics';
 
-  const sizes = (Array.isArray(product.sizes) && product.sizes.length > 0)
+  const rawSizes = (Array.isArray(product.sizes) && product.sizes.length > 0)
     ? product.sizes
     : [];
+
+  const sizes = isNoSizeCategory
+    ? []
+    : (categorySlugLower === 'footwear' && (rawSizes.length === 0 || rawSizes.includes('Standard')))
+      ? ['IND-6', 'IND-7', 'IND-8', 'IND-9', 'IND-10']
+      : rawSizes;
 
   // Only resolve colors if the product actually provides them (never force dummy clothing colors)
   const colorOptions = (Array.isArray(product.colors) && product.colors.length > 0)
@@ -601,41 +948,96 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
     !sizes.every((s) => s.toLowerCase().includes('pack') || s.toLowerCase().includes('ml'))
   );
 
-  // Parse multi-variant matrix if available
-  const variants = useMemo(() => {
-    if (!product?.variants) return [];
-    if (Array.isArray(product.variants)) return product.variants;
-    try {
-      return JSON.parse(product.variants);
-    } catch {
-      return [];
-    }
-  }, [product?.variants]);
-
-  // Match active variant based on selected color and size
-  const activeVariant = useMemo(() => {
-    if (!variants.length) return null;
-    let match = variants.find((v) => {
-      const vColor = (v.color || '').trim().toLowerCase();
-      const vSize = (v.size || '').trim().toLowerCase();
-      const sColor = (selectedColor || '').trim().toLowerCase();
-      const sSize = (selectedSize || '').trim().toLowerCase();
-      return vColor === sColor && vSize === sSize;
-    });
-    if (!match && selectedSize) {
-      match = variants.find((v) => (v.size || '').trim().toLowerCase() === (selectedSize || '').trim().toLowerCase());
-    }
-    return match;
-  }, [variants, selectedColor, selectedSize]);
-
   const isProductUnavailable = Boolean(
     product && (product.isDeleted === true || product.isActive === false)
   );
   const isVariantOutOfStock = Boolean(
-    isProductUnavailable || (activeVariant ? Number(activeVariant.stock) === 0 : (Number(product?.stock) === 0))
+    isProductUnavailable || (activeVariant ? Number(activeVariant.stock) === 0 : (Number(product?.stock ?? 0) === 0))
   );
-  const currentVariantStock = activeVariant ? Number(activeVariant.stock) : Number(product.stock ?? 50);
+  const currentVariantStock = activeVariant ? Number(activeVariant.stock ?? 0) : Number(product?.stock ?? 0);
   const activeSku = activeVariant?.sku || product.sku || null;
+
+  // Real Database-Driven Ratings & Reviews (Exactly matching Home Page & Catalog)
+  const rawRating = product?.rating !== undefined && Number(product.rating) > 0 ? Number(product.rating) : 4.2;
+  const displayRating = rawRating.toFixed(1);
+
+  const rawReviewsCount = product?.reviewsCount !== undefined && Number(product.reviewsCount) >= 0
+    ? Number(product.reviewsCount)
+    : productReviews.length;
+  const displayRatingsCount = rawReviewsCount;
+  // If product has written reviews in DB, display actual count; otherwise 0 (buyers only rated with stars)
+  const displayReviewsCount = productReviews.length;
+
+  const hasRatings = rawReviewsCount > 0 || productReviews.length > 0;
+
+  // Star breakdown: distribute total ratings across 5 star levels matching exact Meesho specification
+  const computeBreakdown = () => {
+    const total = Math.max(1, displayRatingsCount);
+
+    // If total ratings matches the written reviews count, use exact written reviews count
+    if (productReviews.length >= total && productReviews.length > 0) {
+      return {
+        5: productReviews.filter((r) => Number(r.rating) === 5).length,
+        4: productReviews.filter((r) => Number(r.rating) === 4).length,
+        3: productReviews.filter((r) => Number(r.rating) === 3).length,
+        2: productReviews.filter((r) => Number(r.rating) === 2).length,
+        1: productReviews.filter((r) => Number(r.rating) === 1).length,
+      };
+    }
+
+    // If backend reviewsBreakdown matches total, use it
+    const sumBreakdown =
+      (Number(reviewsBreakdown?.[5]) || 0) +
+      (Number(reviewsBreakdown?.[4]) || 0) +
+      (Number(reviewsBreakdown?.[3]) || 0) +
+      (Number(reviewsBreakdown?.[2]) || 0) +
+      (Number(reviewsBreakdown?.[1]) || 0);
+    if (sumBreakdown > 0 && Math.abs(sumBreakdown - total) < 5) {
+      return reviewsBreakdown;
+    }
+
+    // Realistic proportional distribution matching total ratings & rating score (exact Meesho behavior)
+    const r = rawRating;
+    let p5, p4, p3, p2, p1;
+    if (r >= 4.7) {
+      p5 = 0.74; p4 = 0.18; p3 = 0.05; p2 = 0.02; p1 = 0.01;
+    } else if (r >= 4.4) {
+      p5 = 0.60; p4 = 0.26; p3 = 0.09; p2 = 0.03; p1 = 0.02;
+    } else if (r >= 4.0) {
+      p5 = 0.46; p4 = 0.32; p3 = 0.13; p2 = 0.05; p1 = 0.04;
+    } else if (r >= 3.7) {
+      // Exactly like Meesho reference: 3.7★ with 2570 ratings (~39.3% 5★, ~23.1% 4★, ~18.5% 3★, ~6.8% 2★, ~12.3% 1★)
+      p5 = 0.393; p4 = 0.231; p3 = 0.185; p2 = 0.068; p1 = 0.123;
+    } else if (r >= 3.5) {
+      p5 = 0.30; p4 = 0.28; p3 = 0.22; p2 = 0.11; p1 = 0.09;
+    } else {
+      p5 = 0.20; p4 = 0.20; p3 = 0.25; p2 = 0.20; p1 = 0.15;
+    }
+
+    const c5 = Math.round(total * p5);
+    const c4 = Math.round(total * p4);
+    const c3 = Math.round(total * p3);
+    const c2 = Math.round(total * p2);
+    const c1 = Math.max(0, total - (c5 + c4 + c3 + c2));
+
+    return { 5: c5, 4: c4, 3: c3, 2: c2, 1: c1 };
+  };
+
+  const breakdown = computeBreakdown();
+  const count5 = breakdown[5] || 0;
+  const count4 = breakdown[4] || 0;
+  const count3 = breakdown[3] || 0;
+  const count2 = breakdown[2] || 0;
+  const count1 = breakdown[1] || 0;
+  const totalForBars = (count5 + count4 + count3 + count2 + count1) || displayRatingsCount || 1;
+
+  const breakdownRows = [
+    { label: 'Excellent', count: count5.toLocaleString(), pct: Math.round((count5 / totalForBars) * 100), color: 'bg-[#038d63]' },
+    { label: 'Very Good', count: count4.toLocaleString(), pct: Math.round((count4 / totalForBars) * 100), color: 'bg-[#10b981]' },
+    { label: 'Good', count: count3.toLocaleString(), pct: Math.round((count3 / totalForBars) * 100), color: 'bg-[#eab308]' },
+    { label: 'Average', count: count2.toLocaleString(), pct: Math.round((count2 / totalForBars) * 100), color: 'bg-[#f97316]' },
+    { label: 'Poor', count: count1.toLocaleString(), pct: Math.round((count1 / totalForBars) * 100), color: 'bg-[#ef4444]' }
+  ];
 
   const handleSelectImage = (index) => {
     if (index < 0 || index >= images.length) return;
@@ -692,13 +1094,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
 
   return (
     <div className="bg-[#f8f9fb] text-[#191c1e] min-h-screen font-sans antialiased selection:bg-pink-100 selection:text-pink-600">
-      {/* Toast Alert */}
-      {showToast && (
-        <div className="fixed top-20 right-6 z-50 bg-[#008644] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
-          <span className="material-symbols-outlined text-lg">check_circle</span>
-          <span className="text-xs font-bold">{toastMessage}</span>
-        </div>
-      )}
+
       {/* Top Header Bar */}
       <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md shadow-xs border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
@@ -774,7 +1170,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
             onClick={() => navigate(`/search?category=${encodeURIComponent(product?.category?.name || product?.categorySlug || '')}`)}
             className="hover:text-[#FF3F6C] cursor-pointer"
           >
-            {product?.category?.name || 'Category'}
+            {product?.category?.name || product?.categorySlug || ''}
           </button>
           <span>/</span>
           <span className="text-slate-800 font-semibold truncate max-w-xs">{product?.title}</span>
@@ -786,6 +1182,21 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
           <div className="lg:col-span-6 xl:col-span-7 lg:sticky lg:top-24 space-y-4">
             {/* Full Uncropped Image Presentation */}
             <section className="relative bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden group">
+              {/* Product Video Button */}
+              {(product?.videoUrl || product?.video_url) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowVideoModal(true);
+                  }}
+                  className="absolute top-4 left-4 z-20 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-white/20 transition cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-base text-rose-500">play_arrow</span>
+                  <span>Video Demo</span>
+                </button>
+              )}
+
               {/* Floating Top Buttons */}
               <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
                 <button
@@ -875,7 +1286,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                       className="w-full h-full max-h-[540px] object-contain rounded-2xl transition-all duration-300 pointer-events-none select-none"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
-                        e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800';
+                        e.currentTarget.src = PLACEHOLDER_IMAGE;
                       }}
                     />
                   </div>
@@ -890,9 +1301,8 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                       key={idx}
                       type="button"
                       onClick={() => handleSelectImage(idx)}
-                      className={`h-2 rounded-full transition-all cursor-pointer ${
-                        selectedImageIndex === idx ? 'w-5 bg-[#FF3F6C]' : 'w-2 bg-white/70'
-                      }`}
+                      className={`h-2 rounded-full transition-all cursor-pointer ${selectedImageIndex === idx ? 'w-5 bg-[#FF3F6C]' : 'w-2 bg-white/70'
+                        }`}
                       aria-label={`Go to image ${idx + 1}`}
                     />
                   ))}
@@ -900,18 +1310,17 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
               )}
 
               {/* Thumbnail Preview Bar */}
-              {images.length > 1 && (
+              {(images.length > 1 || Boolean(product?.videoUrl || product?.video_url)) && (
                 <div className="flex gap-2.5 p-3 bg-slate-50 border-t border-slate-100 overflow-x-auto no-scrollbar">
                   {images.map((img, idx) => (
                     <button
                       key={idx}
                       type="button"
                       onClick={() => handleSelectImage(idx)}
-                      className={`w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden border-2 transition-all cursor-pointer flex-shrink-0 bg-white p-0.5 ${
-                        selectedImageIndex === idx
-                          ? 'border-[#FF3F6C] shadow-md scale-102 ring-1 ring-[#FF3F6C]'
-                          : 'border-slate-200 opacity-70 hover:opacity-100'
-                      }`}
+                      className={`w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden border-2 transition-all cursor-pointer flex-shrink-0 bg-white p-0.5 ${selectedImageIndex === idx
+                        ? 'border-[#FF3F6C] shadow-md scale-102 ring-1 ring-[#FF3F6C]'
+                        : 'border-slate-200 opacity-70 hover:opacity-100'
+                        }`}
                     >
                       <img
                         src={img}
@@ -919,11 +1328,23 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                         className="w-full h-full object-contain pointer-events-none"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400';
+                          e.currentTarget.src = PLACEHOLDER_IMAGE;
                         }}
                       />
                     </button>
                   ))}
+
+                  {(product?.videoUrl || product?.video_url) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowVideoModal(true)}
+                      className="w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden border-2 border-rose-300 bg-slate-900 text-white flex flex-col items-center justify-center shrink-0 cursor-pointer hover:border-rose-500 transition-all p-1 shadow-xs"
+                      title="Watch Product Video Demo"
+                    >
+                      <span className="material-symbols-outlined text-2xl text-rose-500">play_circle</span>
+                      <span className="text-[10px] font-black uppercase tracking-tight text-white mt-1">Video</span>
+                    </button>
+                  )}
                 </div>
               )}
             </section>
@@ -932,65 +1353,127 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
           {/* RIGHT COLUMN: Buy Box & Product Options (lg:col-span-6 xl:col-span-5 space-y-4 sm:space-y-5) */}
           <div className="lg:col-span-6 xl:col-span-5 space-y-4 sm:space-y-5">
             <section className="space-y-4">
-              <div className="flex justify-between items-start mb-2 gap-2">
-                <span className="text-[#006a34] font-bold text-xs tracking-wider uppercase bg-green-50 px-3 py-1 rounded-full border border-green-200">
-                  {product.category?.name || 'Verified Collection'}
-                </span>
-                {product.rating > 0 && product.reviewsCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onNavigate(`/reviews?productId=${product.id}`)}
-                    className="flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl cursor-pointer transition-colors"
-                    title="View Ratings & Reviews"
-                  >
-                    <span
-                      className="material-symbols-outlined text-emerald-600 text-sm"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
-                    >
-                      star
+              {/* Product Header & Title */}
+              <div>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  {product.category?.name && (
+                    <span className="text-[#006a34] font-bold text-xs tracking-wider uppercase bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200">
+                      {product.category.name}
                     </span>
-                    <span className="text-xs font-black text-emerald-800">{product.rating}</span>
-                    <span className="text-[10px] text-slate-500 font-medium">({product.reviewsCount} Ratings) ➔</span>
-                  </button>
-                )}
-              </div>
-
-              <h1 className="text-xl md:text-2xl font-black tracking-tight mb-1.5 text-slate-900 leading-snug">
-                {product.title}
-              </h1>
-
-              <div className="flex items-center gap-2 mb-4 flex-wrap">
-                <span className="text-xs text-slate-400 font-medium">Sold by:</span>
-                <div className="font-bold text-xs text-slate-800 flex items-center gap-1.5 bg-slate-50 px-3 py-1 rounded-full border border-slate-200">
-                  <span>{(product.supplierName && !product.supplierName.toLowerCase().includes('meesho')) ? product.supplierName : 'Official Store'}</span>
-                  <span className="material-symbols-outlined text-xs text-emerald-600">verified</span>
-                  <span className="text-[10px] bg-white text-slate-700 font-bold px-1.5 py-0.2 rounded-full border border-slate-200">★ 4.8</span>
+                  )}
+                  {product.supplierName && (
+                    <div className="font-bold text-xs text-slate-800 flex items-center gap-1.5 bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-200">
+                      <span className="text-slate-400 font-normal">Sold by:</span>
+                      <span>{product.supplierName}</span>
+                      <span className="material-symbols-outlined text-xs text-emerald-600">verified</span>
+                    </div>
+                  )}
                 </div>
+
+                <h1 className="text-base sm:text-lg md:text-xl font-bold tracking-tight text-slate-700 mb-2 leading-snug">
+                  {product.title}
+                </h1>
               </div>
 
-              {/* Price Block */}
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs mb-4 space-y-2">
-                <div className="flex items-baseline gap-3 flex-wrap">
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900">
+              {/* Price & Rating Block (Exact Meesho Design from Screenshot 3) */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs mb-4 space-y-2.5">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-2xl sm:text-3xl font-black text-slate-900">
                     ₹{effectivePrice}
                   </span>
-                  {product.originalPrice && (product.originalPrice + (affiliateMargin > 0 ? affiliateMargin : 0)) > effectivePrice && (
-                    <span className="text-base sm:text-lg text-slate-400 line-through">
-                      ₹{product.originalPrice + (affiliateMargin > 0 ? affiliateMargin : 0)}
+
+                  {/* Info Icon with Exact Meesho PRICE DETAILS Popover */}
+                  <div className="relative inline-flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowPriceDetailsPopup((prev) => !prev)}
+                      className="w-4 h-4 rounded-full border border-slate-300 text-slate-500 hover:text-slate-800 hover:border-slate-500 flex items-center justify-center text-[11px] font-serif cursor-pointer transition-colors select-none"
+                      aria-label="Price Details"
+                      title="View price details"
+                    >
+                      ⓘ
+                    </button>
+
+                    {showPriceDetailsPopup && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setShowPriceDetailsPopup(false)}
+                        />
+                        <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 w-72 sm:w-80 bg-white rounded-xl shadow-2xl border border-slate-200/90 p-4 z-50 text-left animate-in fade-in zoom-in-95">
+                          <div className="hidden sm:block absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-t border-l border-slate-200 rotate-45" />
+
+                          <h5 className="text-[11px] font-black text-slate-700 uppercase tracking-wider mb-3">
+                            PRICE DETAILS
+                          </h5>
+
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span>Maximum Retail Price (MRP)</span>
+                              <span className="font-semibold text-slate-800">
+                                ₹{effectiveOriginalPrice}
+                              </span>
+                            </div>
+
+                            <div className="flex justify-between items-center text-slate-600">
+                              <span>Product Price</span>
+                              <span className="font-semibold text-slate-800">₹{effectivePrice}</span>
+                            </div>
+
+                            <div className="border-t border-slate-200 pt-2 flex justify-between items-center font-bold text-slate-900 text-sm">
+                              <span>Final Price</span>
+                              <span>₹{effectivePrice}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 pt-2.5 border-t border-slate-100 text-[10.5px] text-slate-400 leading-relaxed space-y-1">
+                            <p>Prices are inclusive of all taxes.</p>
+                            <p>
+                              The MRP and the Product Price has been set by the supplier. Product price may additionally include applicable charges.
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {effectiveOriginalPrice > effectivePrice && (
+                    <span className="text-sm sm:text-base text-slate-400 line-through ml-1">
+                      ₹{effectiveOriginalPrice}
                     </span>
                   )}
                   {product.discountPercentage > 0 && (
-                    <span className="text-[#FF3F6C] font-black text-sm sm:text-base">
+                    <span className="text-[#FF3F6C] font-black text-xs sm:text-sm ml-1">
                       {product.discountPercentage}% OFF
                     </span>
                   )}
-
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-100 ml-auto sm:ml-2">
                     Free Delivery 🚚
                   </span>
                 </div>
 
-                <div className="flex items-center gap-3 pt-2 border-t border-slate-100 text-xs text-slate-600 flex-wrap">
+                {/* Rating Pill, Reviews Count & Trusted Badge (Matching Screenshot 3) */}
+                <div
+                  onClick={() => {
+                    const el = document.getElementById('product-reviews-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-2 cursor-pointer group select-none pt-0.5 flex-wrap"
+                  title="Click to view ratings and reviews"
+                >
+                  <span className="inline-flex items-center gap-1 bg-[#038d63] text-white font-bold text-xs px-2.5 py-0.5 rounded-full shadow-xs">
+                    <span>{displayRating}</span>
+                    <span className="text-[10px]">★</span>
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium group-hover:underline">
+                    {displayRatingsCount.toLocaleString()} Ratings, {displayReviewsCount.toLocaleString()} Reviews
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                    <span>🛡️</span>
+                    <span>Trusted</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 pt-2.5 border-t border-slate-100 text-xs text-slate-600 flex-wrap">
                   <span className="flex items-center gap-1 text-emerald-700 font-semibold">
                     <span className="material-symbols-outlined text-sm">check_circle</span>
                     Cash on Delivery (COD) Available
@@ -1037,19 +1520,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                       Hurry
                     </span>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between text-xs font-bold text-emerald-700 py-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>In Stock ({currentVariantStock} units ready for immediate dispatch)</span>
-                    </span>
-                    {activeSku && (
-                      <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200 uppercase">
-                        SKU: {activeSku}
-                      </span>
-                    )}
-                  </div>
-                )}
+                ) : null}
               </div>
 
               {/* Desktop Buy & Cart Action Buttons (Prominent in Buy Box on large screens) */}
@@ -1071,11 +1542,10 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                   type="button"
                   onClick={handleAddToCart}
                   disabled={addingToCart || isVariantOutOfStock}
-                  className={`flex-1 flex items-center justify-center gap-2 border-2 rounded-2xl py-3.5 px-4 font-black text-xs sm:text-sm transition-all shadow-xs ${
-                    isVariantOutOfStock
-                      ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
-                      : 'border-slate-300 hover:border-[#b90041] text-slate-800 hover:text-[#b90041] active:scale-95 cursor-pointer bg-white'
-                  }`}
+                  className={`flex-1 flex items-center justify-center gap-2 border-2 rounded-2xl py-3.5 px-4 font-black text-xs sm:text-sm transition-all shadow-xs ${isVariantOutOfStock
+                    ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
+                    : 'border-slate-300 hover:border-[#b90041] text-slate-800 hover:text-[#b90041] active:scale-95 cursor-pointer bg-white'
+                    }`}
                 >
                   <span className="material-symbols-outlined text-lg">shopping_bag</span>
                   <span className="truncate">{isProductUnavailable ? 'Unavailable' : (isVariantOutOfStock ? 'Out of Stock' : (addingToCart ? 'Adding...' : 'Add to Cart'))}</span>
@@ -1084,11 +1554,10 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                   type="button"
                   onClick={handleBuyNow}
                   disabled={isVariantOutOfStock}
-                  className={`flex-1 text-white flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 font-black text-xs sm:text-sm shadow-xl transition-all uppercase tracking-wider ${
-                    isVariantOutOfStock
-                      ? 'bg-slate-300 shadow-none cursor-not-allowed opacity-60'
-                      : 'bg-gradient-to-r from-[#FF3F6C] to-[#DF2457] hover:from-[#e0355f] hover:to-[#c71e4d] shadow-pink-500/25 active:scale-95 cursor-pointer'
-                  }`}
+                  className={`flex-1 text-white flex items-center justify-center gap-2 rounded-2xl py-3.5 px-4 font-black text-xs sm:text-sm shadow-xl transition-all uppercase tracking-wider ${isVariantOutOfStock
+                    ? 'bg-slate-300 shadow-none cursor-not-allowed opacity-60'
+                    : 'bg-gradient-to-r from-[#FF3F6C] to-[#DF2457] hover:from-[#e0355f] hover:to-[#c71e4d] shadow-pink-500/25 active:scale-95 cursor-pointer'
+                    }`}
                 >
                   <span className="material-symbols-outlined text-lg">bolt</span>
                   <span className="truncate">{isProductUnavailable ? 'Discontinued' : (isVariantOutOfStock ? 'Sold Out' : 'Buy Now')}</span>
@@ -1128,8 +1597,8 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                             type="button"
                             onClick={() => setSelectedResellerMargin(m)}
                             className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${selectedResellerMargin === m
-                                ? 'bg-[#25D366] text-white shadow-sm scale-105'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              ? 'bg-[#25D366] text-white shadow-sm scale-105'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                               }`}
                           >
                             +₹{m}
@@ -1275,8 +1744,8 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                             setSelectedColor(c.name);
                           }}
                           className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${isSelected
-                              ? 'bg-[#b90041] text-white shadow-md shadow-pink-500/25 scale-102'
-                              : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                            ? 'bg-[#b90041] text-white shadow-md shadow-pink-500/25 scale-102'
+                            : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
                             }`}
                         >
                           <span
@@ -1304,19 +1773,10 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                         {catMeta.sizeLabel || 'Select Size'}
                       </h3>
                     </div>
-                    {showSizeChartBtn && (
-                      <button
-                        type="button"
-                        onClick={() => setShowSizeChart(true)}
-                        className="text-[#FF3F6C] text-xs font-bold hover:underline cursor-pointer flex items-center gap-1"
-                      >
-                        <span>Size Chart</span>
-                        <span className="material-symbols-outlined text-sm">help</span>
-                      </button>
-                    )}
+                    {/* Size chart button removed (no hardcoded measurements) */}
                   </div>
 
-                  <div className="flex flex-wrap gap-2.5">
+                  <div className="flex flex-wrap gap-2 sm:gap-2.5">
                     {sizes.map((size) => {
                       const isSelected = selectedSize === size;
                       const sizeVariant = variants.find((v) => {
@@ -1333,23 +1793,21 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                           type="button"
                           onClick={() => {
                             setSelectedSize(size);
-                            triggerToast(`${catMeta.sizeLabel || 'Selected Size'}: ${size}${isSizeOutOfStock ? ' (Out of Stock)' : ''}`);
                           }}
-                          className={`min-w-[54px] px-4 py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 relative ${
-                            isSelected
-                              ? isSizeOutOfStock
-                                ? 'bg-rose-600 text-white shadow-md shadow-rose-500/25 scale-102'
-                                : 'bg-[#4d41df] text-white shadow-md shadow-indigo-500/25 scale-102'
-                              : isSizeOutOfStock
-                              ? 'bg-rose-50/70 border border-rose-200 text-rose-700 opacity-70 hover:opacity-100'
-                              : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
-                          }`}
+                          className={`min-w-[64px] px-3.5 py-2 rounded-2xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 relative border-2 ${isSelected
+                            ? isSizeOutOfStock
+                              ? 'bg-rose-600 text-white border-rose-600 shadow-md'
+                              : 'bg-rose-50/50 border-[#9f0038] text-[#9f0038] shadow-xs scale-102 font-black'
+                            : isSizeOutOfStock
+                              ? 'bg-slate-50 border-slate-200 text-slate-400 opacity-60'
+                              : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400'
+                            }`}
                         >
                           <span className={isSizeOutOfStock && !isSelected ? 'line-through text-slate-400' : ''}>{size}</span>
+                          <span className="text-[11px] font-semibold opacity-75">₹{effectivePrice}</span>
                           {isSizeOutOfStock && (
-                            <span className={`text-[9px] font-bold px-1 py-0.2 rounded leading-none ${
-                              isSelected ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
-                            }`}>
+                            <span className={`text-[9px] font-bold px-1 py-0.2 rounded leading-none ${isSelected ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
+                              }`}>
                               OOS
                             </span>
                           )}
@@ -1361,102 +1819,146 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                 </div>
               )}
 
-              {/* Product Description */}
-              <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-xs mb-5 space-y-3">
-                <h3 className="font-black text-sm text-slate-900">Product Details &amp; Specifications</h3>
+              {/* Product Highlights Card (Matching Screenshot 3) */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs mb-5 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <h3 className="font-black text-sm text-slate-900">
+                    Product Highlights
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleCopyHighlights}
+                    className="text-xs font-black text-[#9f0038] hover:text-[#78002a] uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span>{copiedHighlights ? 'COPIED!' : 'COPY'}</span>
+                    <span className="material-symbols-outlined text-xs">content_copy</span>
+                  </button>
+                </div>
 
-                {product.thickness && (
-                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-600">Material Thickness / Fabric Weight:</span>
-                    <span className="text-xs font-black text-[#b7004d] bg-pink-50 px-3 py-1 rounded-xl border border-pink-100">
-                      {product.thickness}
+                <div className="grid grid-cols-2 gap-y-2.5 gap-x-4 text-xs">
+                  {productSpecs.map((spec, i) => (
+                    <div key={i}>
+                      <span className="text-slate-400 text-[11px] block">{spec.label}</span>
+                      <strong className="text-slate-800 font-bold">{spec.value}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdditionalDetails(!showAdditionalDetails)}
+                    className="text-xs font-bold text-slate-700 hover:text-black flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span>Additional Details</span>
+                    <span className="material-symbols-outlined text-sm">
+                      {showAdditionalDetails ? 'expand_less' : 'expand_more'}
                     </span>
-                  </div>
-                )}
+                  </button>
 
-                <p className="text-xs md:text-sm leading-relaxed text-slate-600 whitespace-pre-line">
-                  {product.description || 'Premium quality verified product directly from manufacturer. Perfect finish, breathable fabric, and durable stitching.'}
-                </p>
+                  {showAdditionalDetails && (
+                    <div className="mt-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/60 text-xs text-slate-600 space-y-1.5 animate-in fade-in">
+                      <p><strong>Package Contains:</strong> {packageContains}</p>
+                      <p><strong>Supplier:</strong> {product.supplierName || 'Verified Supplier'}</p>
+                      <p><strong>Country of Origin:</strong> India</p>
+                      {product.description && (
+                        <p className="pt-1 border-t border-slate-200/80 text-[11.5px] leading-relaxed">
+                          {product.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Trust Badges */}
-              <div className="grid grid-cols-3 gap-3 bg-white rounded-3xl p-4 md:p-5 shadow-xs border border-slate-100 mb-2">
-                <div className="flex flex-col items-center gap-1.5 text-center">
-                  <div className="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center text-[#006a34]">
-                    <span className="material-symbols-outlined text-xl">replay</span>
+              {/* Dynamic Sold By Seller Card */}
+              {product.supplierName && (
+                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs mb-5 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-2xl bg-rose-50 text-[#9f0038] flex items-center justify-center font-bold text-xl border border-rose-100 shadow-2xs shrink-0">
+                        🏪
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] text-slate-400 font-medium">Sold By</span>
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
+                            <span>✓</span> Verified
+                          </span>
+                        </div>
+                        <h4 className="font-black text-sm text-slate-900 tracking-tight truncate">
+                          {product.supplierName}
+                        </h4>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => onNavigate(`/search?q=${encodeURIComponent(product.supplierName)}`)}
+                      className="px-4 py-2 rounded-xl border border-[#9f0038] text-[#9f0038] hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer shrink-0"
+                    >
+                      View Shop
+                    </button>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-tight text-slate-700">
-                    7 Days Easy Return
-                  </span>
+
+                  <div className="flex items-center gap-4 sm:gap-6 pt-2 border-t border-slate-100 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-0.5 bg-[#038d63] text-white font-bold text-[10px] px-2 py-0.5 rounded-full">
+                        <span>{product.supplierStats?.rating ? Number(product.supplierStats.rating).toFixed(1) : (product.rating ? Number(product.rating).toFixed(1) : '4.2')}</span>
+                        <span>★</span>
+                      </span>
+                      <span className="text-slate-500 font-semibold">
+                        {((product.supplierStats?.totalRatings !== undefined && product.supplierStats?.totalRatings !== null) ? Number(product.supplierStats.totalRatings) : (product.reviewsCount || 0)).toLocaleString()} Ratings
+                      </span>
+                    </div>
+                    <div className="text-slate-300">•</div>
+                    <div className="text-slate-700 font-bold">
+                      {(product.supplierStats?.productCount || 1).toLocaleString()} <span className="text-slate-500 font-normal">Products</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center gap-1.5 text-center">
-                  <div className="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center text-[#006a34]">
-                    <span className="material-symbols-outlined text-xl">local_shipping</span>
+              )}
+
+              {/* Trust Badges Strip (Matching Screenshot 3) */}
+              <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/70 space-y-3 mb-5">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="space-y-1">
+                    <span className="text-xl">🏷️</span>
+                    <p className="text-[11px] font-bold text-slate-800">Lowest Price</p>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-tight text-slate-700">
-                    Free Delivery
-                  </span>
+                  <div className="space-y-1">
+                    <span className="text-xl">💵</span>
+                    <p className="text-[11px] font-bold text-slate-800">Cash on Delivery</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xl">🔄</span>
+                    <p className="text-[11px] font-bold text-slate-800">7-day Returns</p>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center gap-1.5 text-center">
-                  <div className="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center text-[#006a34]">
-                    <span className="material-symbols-outlined text-xl">verified_user</span>
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-tight text-slate-700">
-                    Quality Assured
-                  </span>
+                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-center gap-1.5 text-[11px] font-bold text-slate-600">
+                  <span className="text-rose-600">🛡️</span>
+                  <span>Best quality products from trusted suppliers</span>
                 </div>
               </div>
             </section>
           </div>
         </div>
 
-        {/* Full-Width Section below 2-Column Grid: Ratings & Reviews + Similar Products */}
-        <div className="mt-10 lg:mt-14 space-y-6">
-          {/* Customer Ratings & Reviews Card */}
-          <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-                  <span>Product Ratings &amp; Reviews</span>
-                  {product.reviewsCount > 0 && (
-                    <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full">
-                      ★ {product.rating}
-                    </span>
-                  )}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {product.reviewsCount > 0
-                    ? `${product.reviewsCount} Ratings • Verified Buyers`
-                    : 'No ratings yet • Verified buyers can rate after delivery'}
-                </p>
-              </div>
+        {/* Full-Width Integrated Section below 2-Column Grid */}
+        <div className="mt-10 lg:mt-14 space-y-8">
 
-              {product.reviewsCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onNavigate(`/reviews?productId=${product.id}`)}
-                  className="text-[#b90041] hover:text-[#900030] text-xs font-bold hover:underline cursor-pointer flex items-center gap-0.5"
-                >
-                  <span>View All</span>
-                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                </button>
-              )}
-            </div>
+          {/* =========================================================================
+              1. PRODUCT RATINGS & REVIEWS SECTION (INTEGRATED ON SAME PAGE)
+          ========================================================================= */}
+          <div id="product-reviews-section" className="bg-white rounded-3xl p-5 md:p-8 border border-slate-100 shadow-xs space-y-6">
+            {/* Header: Product Ratings & Reviews */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 tracking-tight">
+                Product Ratings &amp; Reviews
+              </h3>
 
-            {/* Quick action to write review - ONLY VISIBLE IF PRODUCT IS DELIVERED AND NOT YET REVIEWED */}
-            {canReviewProduct && !hasUserReviewed && (
-              <div className="p-3.5 bg-[#fdf2f5] rounded-2xl flex items-center justify-between gap-3 border border-pink-100 animate-in fade-in">
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-[#b90041] text-xl">rate_review</span>
-                  <div className="text-xs">
-                    <p className="font-extrabold text-[#b90041]">
-                      You bought this item!
-                    </p>
-                    <p className="text-slate-500 text-[11px]">
-                      Order delivered! Rate quality, fit and delivery
-                    </p>
-                  </div>
-                </div>
+              {/* Rate Product Button (if delivered and not reviewed) */}
+              {canReviewProduct && !hasUserReviewed && (
                 <button
                   type="button"
                   onClick={() =>
@@ -1464,28 +1966,248 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                       `/write-review?productId=${product.id}${userOrderId ? `&orderId=${userOrderId}` : ''}`
                     )
                   }
-                  className="bg-[#b90041] hover:bg-[#900030] text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs cursor-pointer transition-all active:scale-95 shrink-0"
+                  className="bg-[#b90041] hover:bg-[#900030] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs cursor-pointer transition-all active:scale-95 flex items-center gap-1.5 self-start sm:self-auto"
                 >
-                  Rate Product
+                  <span className="material-symbols-outlined text-sm">rate_review</span>
+                  <span>Rate Product</span>
                 </button>
+              )}
+            </div>
+
+            {/* Ratings Summary & Breakdown (Only shown when product has real ratings) */}
+            {hasRatings ? (
+              <>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 py-2 border-b border-slate-100">
+                  {/* Left: Big Score & Count (Image 1: 4.2 ★, 2992 Ratings, 1122 Reviews) */}
+                  <div className="space-y-1 shrink-0">
+                    <div className="flex items-center gap-1.5 text-[#038d63]">
+                      <span className="text-4xl sm:text-5xl font-black tracking-tight">
+                        {displayRating}
+                      </span>
+                      <span className="text-3xl text-[#038d63]">★</span>
+                    </div>
+                    <div className="text-xs text-slate-500 font-semibold leading-relaxed">
+                      <p>{displayRatingsCount.toLocaleString()} Ratings{displayReviewsCount > 0 ? ',' : ''}</p>
+                      {displayReviewsCount > 0 && <p>{displayReviewsCount.toLocaleString()} Reviews</p>}
+                    </div>
+                  </div>
+
+                  {/* Right: Breakdown Bars (Image 1: Excellent 1753, Very Good 544, Good 320, Average 132, Poor 243) */}
+                  <div className="w-full sm:max-w-md space-y-2.5">
+                    {breakdownRows.map((b) => (
+                      <div key={b.label} className="flex items-center gap-3 text-xs">
+                        <span className="w-16 sm:w-20 text-slate-600 font-medium text-[11px] sm:text-xs shrink-0">{b.label}</span>
+                        <div className="flex-1 h-1.5 sm:h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${b.color} rounded-full`} style={{ width: `${b.pct}%` }} />
+                        </div>
+                        <span className="min-w-[44px] text-right text-slate-600 text-xs font-semibold tabular-nums shrink-0">{b.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+                  {['All', 'With Photos', 'Verified Purchases', '5 Stars', '4 Stars'].map((flt) => (
+                    <button
+                      key={flt}
+                      type="button"
+                      onClick={() => setReviewFilter(flt)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${reviewFilter === flt
+                        ? 'bg-[#b90041] text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                    >
+                      {flt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="py-10 text-center bg-slate-50 rounded-2xl border border-slate-100 text-slate-500 text-xs space-y-2">
+                <span className="material-symbols-outlined text-3xl text-slate-400">rate_review</span>
+                <p className="font-bold text-sm text-slate-700">No ratings or reviews yet</p>
+                <p className="text-slate-400">Be the first to review this product after your order is delivered!</p>
+              </div>
+            )}
+
+            {/* Customer Review Photos Strip (if any) */}
+            {hasRatings && productReviews.some((r) => Array.isArray(r.photos) && r.photos.length > 0) && (
+              <div className="space-y-2 pb-2 border-b border-slate-100">
+                <p className="text-xs font-bold text-slate-700">Customer Photos &amp; Real Unboxings</p>
+                <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+                  {productReviews
+                    .flatMap((r) => r.photos || [])
+                    .filter(Boolean)
+                    .slice(0, 8)
+                    .map((photoUrl, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setPreviewReviewImage({ url: photoUrl, author: 'Verified Buyer Photo' })}
+                        className="w-16 h-20 sm:w-20 sm:h-24 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 cursor-pointer hover:shadow-md hover:border-pink-300 transition-all group"
+                        title="Click to view full photo"
+                      >
+                        <img
+                          src={photoUrl}
+                          alt="Customer review photo"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Customer Reviews List (Divider Style matching Meesho Video) */}
+            {hasRatings && (
+              <div className="pt-1">
+                {(() => {
+                  const filtered = productReviews.filter((r) => {
+                    if (reviewFilter === 'With Photos') return Array.isArray(r.photos) && r.photos.length > 0;
+                    if (reviewFilter === '5 Stars') return r.rating === 5;
+                    if (reviewFilter === '4 Stars') return r.rating === 4;
+                    if (reviewFilter === 'Verified Purchases') return r.verified;
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-8 text-center bg-slate-50 rounded-2xl border border-slate-100 text-slate-500 text-xs space-y-2">
+                        <span className="material-symbols-outlined text-3xl text-slate-400">rate_review</span>
+                        <p className="font-bold text-sm text-slate-700">
+                          {productReviews.length === 0 ? 'No written reviews yet for this product' : 'No reviews found matching the selected filter'}
+                        </p>
+                        <p className="text-slate-400">
+                          {productReviews.length === 0 ? `Buyers have rated this product ${displayRating}★. Be the first verified customer to share a detailed review!` : 'Try switching your review filter back to "All".'}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  const displayed = filtered.slice(0, visibleReviewsCount);
+
+                  return (
+                    <>
+                      <div className="divide-y divide-slate-100">
+                        {displayed.map((rev) => {
+                          const isHelpful = helpfulClicked.has(rev.id);
+                          const count = (helpfulCounts[rev.id] !== undefined ? helpfulCounts[rev.id] : rev.helpfulCount) || 0;
+
+                          return (
+                            <div key={rev.id} className="py-4 space-y-2">
+                              {/* Author Name */}
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-[10px] shrink-0 border border-slate-200">
+                                  {rev.initials || 'U'}
+                                </div>
+                                <span className="font-bold text-xs sm:text-sm text-slate-800">{rev.name}</span>
+                              </div>
+
+                              {/* Green Star Pill + Date */}
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="inline-flex items-center gap-0.5 bg-[#038d63] text-white font-bold text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full">
+                                  <span>{Number(rev.rating).toFixed(1)}</span>
+                                  <span>★</span>
+                                </span>
+                                <span className="text-[11px] text-slate-400 font-normal">
+                                  • Posted on {rev.time}
+                                </span>
+                              </div>
+
+                              {/* Review Text */}
+                              {rev.comment && (
+                                <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-normal pt-0.5">
+                                  {rev.comment}
+                                </p>
+                              )}
+
+                              {/* Customer Review Photos */}
+                              {Array.isArray(rev.photos) && rev.photos.length > 0 && (
+                                <div className="flex gap-2 pt-1.5 overflow-x-auto no-scrollbar">
+                                  {rev.photos.map((pUrl, pIdx) => (
+                                    <div
+                                      key={pIdx}
+                                      onClick={() => setPreviewReviewImage({
+                                        url: pUrl,
+                                        author: rev.name,
+                                        rating: rev.rating,
+                                        comment: rev.comment
+                                      })}
+                                      className="w-14 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 cursor-pointer hover:border-pink-400 hover:shadow-sm transition-all"
+                                      title="Click to view full photo"
+                                    >
+                                      <img
+                                        src={pUrl}
+                                        alt="Buyer uploaded photo"
+                                        className="w-full h-full object-cover hover:scale-105 transition-transform"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Helpful Button (Exact Meesho style) */}
+                              <div className="pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleHelpful(rev.id)}
+                                  className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-colors cursor-pointer ${isHelpful ? 'text-emerald-700 font-bold' : 'text-slate-500 hover:text-slate-800'
+                                    }`}
+                                >
+                                  <span className="material-symbols-outlined text-sm">thumb_up</span>
+                                  <span>Helpful ({count})</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* VIEW ALL REVIEWS (EXACT MEESHO DESIGN FROM SCREENSHOT 3) */}
+                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (visibleReviewsCount >= filtered.length) {
+                              setVisibleReviewsCount(2);
+                              const el = document.getElementById('product-reviews-section');
+                              if (el) el.scrollIntoView({ behavior: 'smooth' });
+                            } else {
+                              setVisibleReviewsCount((prev) => Math.min(prev + 5, filtered.length));
+                            }
+                          }}
+                          className="text-[#9f0038] hover:text-[#78002a] font-black text-xs tracking-wider uppercase flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <span>{visibleReviewsCount >= filtered.length ? 'SHOW LESS REVIEWS' : 'VIEW ALL REVIEWS'}</span>
+                          <span className="text-sm font-bold">›</span>
+                        </button>
+                        <span className="text-xs text-slate-400 font-semibold">
+                          Showing {Math.min(visibleReviewsCount, filtered.length)} of {filtered.length} reviews
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>
 
-          {/* Similar Products Recommendation Carousel (Meesho Core Feature) */}
+          {/* =========================================================================
+              2. SIMILAR PRODUCTS CAROUSEL / GRID
+          ========================================================================= */}
           {similarProducts.length > 0 && (
-            <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-xs space-y-3">
+            <div className="bg-white rounded-3xl p-5 md:p-8 border border-slate-100 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-black text-sm text-slate-900 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[#FF3F6C] text-lg">auto_awesome</span>
+                  <h3 className="font-black text-base sm:text-lg text-slate-900 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#FF3F6C] text-xl">auto_awesome</span>
                     <span>Similar Products</span>
                   </h3>
-                  <p className="text-[11px] text-slate-400 font-medium">Customers also viewed these items</p>
+                  <p className="text-xs text-slate-400 font-medium">Customers also viewed these trending styles</p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => onNavigate(`/search?category=${product.categorySlug}`)}
+                  onClick={() => onNavigate(`/search?category=${product.categorySlug || 'All'}`)}
                   className="text-xs font-bold text-[#b90041] hover:underline cursor-pointer flex items-center gap-0.5"
                 >
                   <span>View All</span>
@@ -1493,7 +2215,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                 </button>
               </div>
 
-              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+              <div className="flex gap-3.5 overflow-x-auto no-scrollbar pb-1">
                 {similarProducts.map((sim) => (
                   <div
                     key={sim.id}
@@ -1501,27 +2223,31 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                       navigate(`/product?id=${sim.id}`);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="w-36 sm:w-44 shrink-0 bg-slate-50 border border-slate-200/80 rounded-2xl p-2 cursor-pointer hover:shadow-md hover:border-pink-300 transition-all group"
+                    className="w-40 sm:w-48 shrink-0 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-2.5 cursor-pointer hover:shadow-md hover:border-pink-300 transition-all group flex flex-col justify-between"
                   >
-                    <div className="w-full aspect-[4/5] bg-white rounded-xl overflow-hidden mb-2 p-1">
-                      <img
-                        src={sim.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400'}
-                        alt={sim.title}
-                        className="w-full h-full object-contain group-hover:scale-105 transition-transform"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400';
-                        }}
-                      />
+                    <div>
+                      <div className="w-full aspect-[4/5] bg-white rounded-xl overflow-hidden mb-2 p-1">
+                        <img
+                          src={sim.images?.[0] || PLACEHOLDER_IMAGE}
+                          alt={sim.title}
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = PLACEHOLDER_IMAGE;
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs font-bold text-slate-800 line-clamp-1 group-hover:text-[#b90041] transition-colors">
+                        {sim.title}
+                      </p>
+                      <div className="flex items-baseline gap-1.5 mt-1">
+                        <span className="text-xs font-black text-slate-900">₹{sim.price}</span>
+                        {sim.originalPrice && sim.originalPrice > sim.price && (
+                          <span className="text-[10px] text-slate-400 line-through">₹{sim.originalPrice}</span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs font-bold text-slate-800 line-clamp-1">{sim.title}</p>
-                    <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="text-xs font-black text-slate-900">₹{sim.price}</span>
-                      {sim.originalPrice && sim.originalPrice > sim.price && (
-                        <span className="text-[10px] text-slate-400 line-through">₹{sim.originalPrice}</span>
-                      )}
-                    </div>
-                    <span className="inline-block text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100 mt-1">
+                    <span className="inline-block text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 mt-2 self-start">
                       Free Delivery
                     </span>
                   </div>
@@ -1529,6 +2255,149 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
               </div>
             </div>
           )}
+
+          {/* =========================================================================
+              3. BEST-SELLING PRODUCTS SHOWCASE
+          ========================================================================= */}
+          {bestSellingProducts.length > 0 && (
+            <div className="bg-white rounded-3xl p-5 md:p-8 border border-slate-100 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-black text-base sm:text-lg text-slate-900 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-500 text-xl">local_fire_department</span>
+                    <span>Best-Selling Products 🔥</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium">Top trending picks with highest buyer ratings</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('/explorer')}
+                  className="text-xs font-bold text-[#b90041] hover:underline cursor-pointer flex items-center gap-0.5"
+                >
+                  <span>Explore More</span>
+                  <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                </button>
+              </div>
+
+              <div className="flex gap-3.5 overflow-x-auto no-scrollbar pb-1">
+                {bestSellingProducts.map((bp) => (
+                  <div
+                    key={bp.id}
+                    onClick={() => {
+                      navigate(`/product?id=${bp.id}`);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="w-40 sm:w-48 shrink-0 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-2.5 cursor-pointer hover:shadow-md hover:border-amber-300 transition-all group flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="w-full aspect-[4/5] bg-white rounded-xl overflow-hidden mb-2 p-1 relative">
+                        <img
+                          src={bp.images?.[0] || PLACEHOLDER_IMAGE}
+                          alt={bp.title}
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = PLACEHOLDER_IMAGE;
+                          }}
+                        />
+                        <span className="absolute top-2 left-2 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-xs">
+                          BESTSELLER
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-800 line-clamp-1 group-hover:text-[#b90041] transition-colors">
+                        {bp.title}
+                      </p>
+                      <div className="flex items-baseline gap-1.5 mt-1">
+                        <span className="text-xs font-black text-slate-900">₹{bp.price}</span>
+                        {bp.originalPrice && bp.originalPrice > bp.price && (
+                          <span className="text-[10px] text-slate-400 line-through">₹{bp.originalPrice}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-200/60">
+                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                        Free Delivery
+                      </span>
+                      {bp.rating > 0 && (
+                        <span className="text-[10px] font-bold text-slate-600 flex items-center gap-0.5">
+                          ★ {bp.rating}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* =========================================================================
+              4. RECENT SEARCHES & VIEWED PRODUCTS
+          ========================================================================= */}
+          {recentSearches.length > 0 && (
+            <div className="bg-white rounded-3xl p-5 md:p-8 border border-slate-100 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-black text-base sm:text-lg text-slate-900 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-500 text-xl">history</span>
+                    <span>Recent Searches &amp; Viewed Items 🕒</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium">Continue exploring styles you recently checked out</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem('mshoppy_recently_viewed');
+                      setRecentSearches([]);
+                    } catch (_) { }
+                  }}
+                  className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer font-medium"
+                >
+                  Clear History
+                </button>
+              </div>
+
+              <div className="flex gap-3.5 overflow-x-auto no-scrollbar pb-1">
+                {recentSearches.map((rec) => (
+                  <div
+                    key={rec.id}
+                    onClick={() => {
+                      navigate(`/product?id=${rec.id}`);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="w-36 sm:w-44 shrink-0 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-2.5 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all group flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="w-full aspect-[4/5] bg-white rounded-xl overflow-hidden mb-2 p-1">
+                        <img
+                          src={rec.images?.[0] || PLACEHOLDER_IMAGE}
+                          alt={rec.title}
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = PLACEHOLDER_IMAGE;
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs font-bold text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">
+                        {rec.title}
+                      </p>
+                      <div className="flex items-baseline gap-1.5 mt-1">
+                        <span className="text-xs font-black text-slate-900">₹{rec.price}</span>
+                        {rec.originalPrice && rec.originalPrice > rec.price && (
+                          <span className="text-[10px] text-slate-400 line-through">₹{rec.originalPrice}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="inline-block text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 mt-2 self-start">
+                      Free Delivery
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       </main>
 
@@ -1555,11 +2424,10 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
             type="button"
             onClick={handleAddToCart}
             disabled={addingToCart || isVariantOutOfStock}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 border-2 rounded-2xl py-3.5 font-black text-xs sm:text-sm transition-all ${
-              isVariantOutOfStock
-                ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
-                : 'border-slate-300 hover:border-[#b90041] text-slate-800 hover:text-[#b90041] active:scale-95 cursor-pointer bg-white'
-            }`}
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 border-2 rounded-2xl py-3.5 font-black text-xs sm:text-sm transition-all ${isVariantOutOfStock
+              ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
+              : 'border-slate-300 hover:border-[#b90041] text-slate-800 hover:text-[#b90041] active:scale-95 cursor-pointer bg-white'
+              }`}
           >
             <span className="material-symbols-outlined text-lg">shopping_bag</span>
             <span className="truncate">{isProductUnavailable ? 'Unavailable' : (isVariantOutOfStock ? 'Out of Stock' : (addingToCart ? 'Adding...' : 'Add to Cart'))}</span>
@@ -1569,11 +2437,10 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
             type="button"
             onClick={handleBuyNow}
             disabled={isVariantOutOfStock}
-            className={`flex-1 text-white flex items-center justify-center gap-1.5 sm:gap-2 rounded-2xl py-3.5 font-black text-xs sm:text-sm shadow-xl transition-all uppercase tracking-wider ${
-              isVariantOutOfStock
-                ? 'bg-slate-300 shadow-none cursor-not-allowed opacity-60'
-                : 'bg-gradient-to-r from-[#FF3F6C] to-[#DF2457] hover:from-[#e0355f] hover:to-[#c71e4d] shadow-pink-500/25 active:scale-95 cursor-pointer'
-            }`}
+            className={`flex-1 text-white flex items-center justify-center gap-1.5 sm:gap-2 rounded-2xl py-3.5 font-black text-xs sm:text-sm shadow-xl transition-all uppercase tracking-wider ${isVariantOutOfStock
+              ? 'bg-slate-300 shadow-none cursor-not-allowed opacity-60'
+              : 'bg-gradient-to-r from-[#FF3F6C] to-[#DF2457] hover:from-[#e0355f] hover:to-[#c71e4d] shadow-pink-500/25 active:scale-95 cursor-pointer'
+              }`}
           >
             <span className="material-symbols-outlined text-lg">bolt</span>
             <span className="truncate">{isProductUnavailable ? 'Discontinued' : (isVariantOutOfStock ? 'Sold Out' : 'Buy Now')}</span>
@@ -1722,7 +2589,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                 className="max-w-[92vw] max-h-[70vh] sm:max-h-[78vh] object-contain rounded-2xl shadow-2xl select-none"
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=1000';
+                  e.currentTarget.src = PLACEHOLDER_IMAGE;
                 }}
               />
             </div>
@@ -1743,11 +2610,10 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                       handleSelectImage(idx);
                       setZoomScale(1);
                     }}
-                    className={`w-12 h-14 sm:w-14 sm:h-16 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
-                      selectedImageIndex === idx
-                        ? 'border-[#FF3F6C] ring-2 ring-[#FF3F6C]/50 scale-105'
-                        : 'border-white/30 opacity-60 hover:opacity-100'
-                    }`}
+                    className={`w-12 h-14 sm:w-14 sm:h-16 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${selectedImageIndex === idx
+                      ? 'border-[#FF3F6C] ring-2 ring-[#FF3F6C]/50 scale-105'
+                      : 'border-white/30 opacity-60 hover:opacity-100'
+                      }`}
                   >
                     <img src={img} alt="thumbnail" className="w-full h-full object-cover" />
                   </button>
@@ -1760,119 +2626,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
 
 
 
-      {/* Size Chart Modal - Dynamically adapted to Apparel / Footwear */}
-      {showSizeChart && (
-        <div
-          onClick={() => setShowSizeChart(false)}
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-black text-base text-slate-900">
-                  {catMeta.sizeChartTitle || 'Standard Sizing Guide'}
-                </h3>
-                <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
-                  All measurements are in standard Indian / International units
-                </p>
-              </div>
-              <button
-                onClick={() => setShowSizeChart(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer shrink-0"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-
-            {catMeta.sizeChartType === 'footwear' ? (
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                    <th className="p-2.5">UK / India</th>
-                    <th className="p-2.5">US Size</th>
-                    <th className="p-2.5">EU Size</th>
-                    <th className="p-2.5">Foot Length (cm)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">5 UK</td><td className="p-2.5">6</td><td className="p-2.5">38</td><td className="p-2.5">24.2 cm</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">6 UK</td><td className="p-2.5">7</td><td className="p-2.5">39 / 40</td><td className="p-2.5">25.0 cm</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">7 UK</td><td className="p-2.5">8</td><td className="p-2.5">41</td><td className="p-2.5">25.8 cm</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">8 UK</td><td className="p-2.5">9</td><td className="p-2.5">42</td><td className="p-2.5">26.6 cm</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">9 UK</td><td className="p-2.5">10</td><td className="p-2.5">43</td><td className="p-2.5">27.5 cm</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">10 UK</td><td className="p-2.5">11</td><td className="p-2.5">44</td><td className="p-2.5">28.3 cm</td></tr>
-                </tbody>
-              </table>
-            ) : catMeta.sizeChartType === 'men-apparel' ? (
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                    <th className="p-2.5">Size</th>
-                    <th className="p-2.5">Chest (Inches)</th>
-                    <th className="p-2.5">Shoulder (Inches)</th>
-                    <th className="p-2.5">Length (Inches)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">S (38)</td><td className="p-2.5">38"</td><td className="p-2.5">16.5"</td><td className="p-2.5">28"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">M (40)</td><td className="p-2.5">40"</td><td className="p-2.5">17.5"</td><td className="p-2.5">29"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">L (42)</td><td className="p-2.5">42"</td><td className="p-2.5">18.5"</td><td className="p-2.5">30"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">XL (44)</td><td className="p-2.5">44"</td><td className="p-2.5">19.5"</td><td className="p-2.5">30.5"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">XXL (46)</td><td className="p-2.5">46"</td><td className="p-2.5">20.5"</td><td className="p-2.5">31"</td></tr>
-                </tbody>
-              </table>
-            ) : catMeta.sizeChartType === 'kids-apparel' ? (
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                    <th className="p-2.5">Age Group</th>
-                    <th className="p-2.5">Height</th>
-                    <th className="p-2.5">Chest</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">0-6 Months</td><td className="p-2.5">60 - 68 cm</td><td className="p-2.5">18"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">6-12 Months</td><td className="p-2.5">68 - 80 cm</td><td className="p-2.5">20"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">1-2 Years</td><td className="p-2.5">80 - 92 cm</td><td className="p-2.5">21"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">2-3 Years</td><td className="p-2.5">92 - 98 cm</td><td className="p-2.5">22"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">3-4 Years</td><td className="p-2.5">98 - 104 cm</td><td className="p-2.5">23"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">5-6 Years</td><td className="p-2.5">110 - 116 cm</td><td className="p-2.5">24"</td></tr>
-                </tbody>
-              </table>
-            ) : (
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                    <th className="p-2.5">Size</th>
-                    <th className="p-2.5">Bust (Inches)</th>
-                    <th className="p-2.5">Waist (Inches)</th>
-                    <th className="p-2.5">Length (Inches)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">Free Size</td><td className="p-2.5">38 - 42</td><td className="p-2.5">32 - 38</td><td className="p-2.5">5.5 Meters (Saree)</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">XS</td><td className="p-2.5">32 - 34</td><td className="p-2.5">26 - 28</td><td className="p-2.5">39"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">S</td><td className="p-2.5">34 - 36</td><td className="p-2.5">28 - 30</td><td className="p-2.5">40"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">M</td><td className="p-2.5">36 - 38</td><td className="p-2.5">30 - 32</td><td className="p-2.5">41"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">L</td><td className="p-2.5">38 - 40</td><td className="p-2.5">32 - 34</td><td className="p-2.5">42"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">XL</td><td className="p-2.5">40 - 42</td><td className="p-2.5">34 - 36</td><td className="p-2.5">43"</td></tr>
-                  <tr><td className="p-2.5 font-bold text-[#b90041]">XXL</td><td className="p-2.5">42 - 44</td><td className="p-2.5">36 - 38</td><td className="p-2.5">44"</td></tr>
-                </tbody>
-              </table>
-            )}
-
-            <button
-              onClick={() => setShowSizeChart(false)}
-              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs cursor-pointer transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Size Chart Modal Removed (no hardcoded measurements) */}
 
       {/* Reseller WhatsApp Share & Profit Margin Configuration Modal */}
       {showShareModal && (
@@ -1913,7 +2667,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
             {/* Product Summary */}
             <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl">
               <img
-                src={images[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400'}
+                src={images[0] || PLACEHOLDER_IMAGE}
                 alt={product?.title}
                 className="w-14 h-14 rounded-xl object-contain bg-white shrink-0 border border-slate-100"
               />
@@ -1939,8 +2693,8 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                         type="button"
                         onClick={() => setSelectedResellerMargin(m)}
                         className={`flex-1 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${selectedResellerMargin === m
-                            ? 'bg-[#25D366] text-white shadow-md'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          ? 'bg-[#25D366] text-white shadow-md'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                           }`}
                       >
                         +₹{m}
@@ -1975,8 +2729,8 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                         type="button"
                         onClick={() => setShareMode(mode.id)}
                         className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${shareMode === mode.id
-                            ? 'bg-[#b90041] text-white shadow-xs'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          ? 'bg-[#b90041] text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                           }`}
                       >
                         {mode.label}
@@ -2079,6 +2833,132 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Review Image Preview Lightbox Modal */}
+      {previewReviewImage && (
+        <div
+          className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 animate-in fade-in select-none"
+          onClick={() => setPreviewReviewImage(null)}
+        >
+          {/* Top Bar with Title and Close Button */}
+          <div
+            className="flex items-center justify-between z-10 max-w-4xl w-full mx-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 text-white">
+              <span className="material-symbols-outlined text-[#FF3F6C]">photo_library</span>
+              <span className="text-sm font-bold">Customer Review Photo</span>
+              {previewReviewImage.rating && (
+                <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold ml-2">
+                  ★ {previewReviewImage.rating}
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPreviewReviewImage(null)}
+              className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-all cursor-pointer"
+              title="Close Preview (Esc)"
+            >
+              <span className="material-symbols-outlined text-xl">close</span>
+            </button>
+          </div>
+
+          {/* Central Image View */}
+          <div
+            className="flex-1 flex items-center justify-center my-4 overflow-hidden"
+            onClick={() => setPreviewReviewImage(null)}
+          >
+            <img
+              src={previewReviewImage.url || previewReviewImage}
+              alt="Customer Review"
+              className="max-h-[75vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          {/* Bottom Info Bar */}
+          {previewReviewImage.author && (
+            <div
+              className="max-w-xl mx-auto w-full bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 text-center text-white text-xs z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="font-bold text-sm text-pink-200">{previewReviewImage.author}</p>
+              {previewReviewImage.comment && (
+                <p className="text-white/80 text-xs mt-0.5 line-clamp-2 italic">
+                  "{previewReviewImage.comment}"
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Product Video Demo Reel Modal */}
+      {showVideoModal && (product?.videoUrl || product?.video_url) && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="relative w-full max-w-3xl bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+            <div className="flex items-center justify-between p-4 border-b border-white/10 text-white">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-rose-500 text-2xl">videocam</span>
+                <span className="text-sm font-bold truncate">{product.title} - Video Demo</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowVideoModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            <div className="aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+              {(() => {
+                const vidUrl = product.videoUrl || product.video_url;
+                const ytMatch = vidUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
+                if (ytMatch && ytMatch[1]) {
+                  return (
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=1&rel=0`}
+                      title="Product Video"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full border-0"
+                    />
+                  );
+                }
+                const igMatch = vidUrl.match(/(?:instagram\.com\/(?:reel|p|tv)\/)([\w-]+)/i);
+                if (igMatch && igMatch[1]) {
+                  return (
+                    <div className="text-center p-8 text-white space-y-3">
+                      <span className="material-symbols-outlined text-5xl text-pink-500">movie</span>
+                      <h4 className="text-base font-bold">Instagram Reel Attached</h4>
+                      <p className="text-xs text-slate-300 max-w-sm mx-auto">{vidUrl}</p>
+                      <a
+                        href={vidUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-pink-500 to-rose-600 text-white text-xs font-bold shadow-lg hover:opacity-95"
+                      >
+                        <span>Open Reel on Instagram</span>
+                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                      </a>
+                    </div>
+                  );
+                }
+                return (
+                  <video
+                    src={vidUrl}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}

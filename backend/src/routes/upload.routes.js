@@ -10,7 +10,7 @@ import {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max per file
+    fileSize: 50 * 1024 * 1024, // 50MB max per file (supporting images & product videos)
     files: 8 // Max 8 files per batch
   }
 });

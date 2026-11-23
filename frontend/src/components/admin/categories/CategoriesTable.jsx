@@ -10,6 +10,9 @@ import {
   GitBranch,
   CornerDownRight,
   AlertTriangle,
+  Check,
+  XCircle,
+  Clock,
 } from 'lucide-react';
 
 export default function CategoriesTable({
@@ -17,6 +20,8 @@ export default function CategoriesTable({
   loading = false,
   onEdit,
   onDelete,
+  onApprove,
+  onReject,
 }) {
   const formatDate = (dateString) => {
     if (!dateString) return '—';
@@ -73,6 +78,51 @@ export default function CategoriesTable({
               )}
             </div>
           </div>
+        );
+      },
+    },
+    {
+      header: 'Approval Status',
+      render: (cat) => {
+        const status = (cat.status || 'APPROVED').toUpperCase();
+        if (status === 'PENDING') {
+          return (
+            <div className="space-y-1">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <Clock size={12} className="text-amber-600" />
+                Pending Review
+              </span>
+              {cat.requestedBySupplierId && (
+                <div className="text-[10px] text-slate-500 font-medium font-mono">
+                  Supplier: {cat.requestedBySupplierId.slice(0, 10)}...
+                </div>
+              )}
+            </div>
+          );
+        }
+        if (status === 'REJECTED') {
+          return (
+            <div className="space-y-0.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                <XCircle size={12} className="text-rose-600" />
+                Rejected
+              </span>
+              {cat.rejectionReason && (
+                <p className="text-[10px] text-rose-600 line-clamp-1 max-w-[140px]" title={cat.rejectionReason}>
+                  {cat.rejectionReason}
+                </p>
+              )}
+            </div>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <Check size={12} className="text-emerald-600" />
+            Approved & Active
+          </span>
         );
       },
     },
@@ -139,9 +189,33 @@ export default function CategoriesTable({
         const productCount = cat._count?.products ?? 0;
         const subcategoryCount = cat._count?.subcategories ?? 0;
         const cannotDelete = productCount > 0 || subcategoryCount > 0;
+        const isPending = cat.status === 'PENDING';
 
         return (
-          <div className="flex items-center justify-end gap-1">
+          <div className="flex items-center justify-end gap-1.5">
+            {isPending && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onApprove?.(cat)}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1 transition shadow-xs cursor-pointer active:scale-95"
+                  title="Approve this category to activate in catalog"
+                >
+                  <Check size={13} />
+                  <span>Approve</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onReject?.(cat)}
+                  className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer active:scale-95"
+                  title="Reject category request"
+                >
+                  <XCircle size={13} />
+                  <span>Reject</span>
+                </button>
+              </>
+            )}
+
             <button
               type="button"
               onClick={() => onEdit?.(cat)}

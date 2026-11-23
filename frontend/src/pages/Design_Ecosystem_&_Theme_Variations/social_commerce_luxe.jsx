@@ -362,6 +362,11 @@ export default function SocialCommerceLuxe({ onNavigate }) {
                     alt={prod.title}
                     src={prod.imageUrl}
                     loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80';
+                    }}
                   />
                   {/* Resell Margin Badge */}
                   <div className="absolute top-2.5 left-2.5 bg-emerald-700/90 backdrop-blur-sm text-white text-[9px] sm:text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow-md">

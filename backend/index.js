@@ -107,18 +107,10 @@ app.use('/api/v1', apiRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Start the server (standalone & Docker; in Vercel serverless the exported app is invoked)
-const isVercelServerless = Boolean(
-  process.env.VERCEL && 
-  process.env.VERCEL !== '0' && 
-  process.env.VERCEL !== 'false' && 
-  process.env.DOCKER !== 'true' && 
-  process.env.IS_DOCKER !== 'true'
-);
-
-if (!isVercelServerless) {
-  app.listen(port, () => {
-    console.log(`🚀 Backend server is running on http://localhost:${port}`);
+// Start the server (standalone only; in Vercel serverless the exported app is invoked)
+if (!process.env.VERCEL) {
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Backend server is running on http://0.0.0.0:${port}`);
   });
 }
 

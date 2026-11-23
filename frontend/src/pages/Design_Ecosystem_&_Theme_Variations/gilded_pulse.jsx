@@ -7,7 +7,7 @@ const MARKETING_BANNERS = [
     category: 'Fashion',
     title: "Summer Essentials '24",
     tagColor: 'bg-[#ff6c95]/90 text-white',
-    link: 'https://meesho.com/c/summer-fashion?ref=MEESHO500',
+    link: 'https://app.mshoppy.com/category/fashion',
     imageUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuCJBu2Q0VHbgQcCdjY9oKLJTtMW9mnbg56JY2XvO2mPM7uJ7LM4K-Q_BAyfcIflU5Nw4UStZ5p8dBDgvVcVIeP6IRTow2G-cEVJjkNfMagoj8tp6cDJ0CBIs58ck8Nns2LEpRm4dnudeY9mheaR6h8_rNoyUG0NDcGuQvimcDp0xfs_mMQOK9Mz_F1mNxCFPXigHyU1Icegk54RiNs7igqXiDR7WMwQZ_Ap8D54rFksf8hLzAiBFTluSfWUE1LUXGrLYrDM2UNJSXU',
   },
@@ -16,7 +16,7 @@ const MARKETING_BANNERS = [
     category: 'Home Decor',
     title: 'Artisan Interiors',
     tagColor: 'bg-[#d384f2]/90 text-white',
-    link: 'https://meesho.com/c/home-decor?ref=MEESHO500',
+    link: 'https://app.mshoppy.com/category/home-decor',
     imageUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuDHqKClIM-SdwJTWo2EKQbZ5UcZLq50pmwHKw_Rj8hQiuPwDrHomg_bIfFz__z3jhw8C0Y5fZWuGPIGz2EFgxWC4oS33OUGNynw8DK4ViJmqkd53YtPRcEdRnkKEMvNEHFfCCS9UPOycYszZ3GdPP04O6o0-tWPfCIGVhH5nY0ADvwnE9-dSVAu8x6F1Ca_GIAeNSrFXM4aGp0OHYB6Jjk_eO1n2Frf2Qpt5PfkN_ferdZmZ4HFpAhFKrJvkC6buR5a_hso3WVyeJs',
   },
@@ -25,7 +25,7 @@ const MARKETING_BANNERS = [
     category: 'Electronics',
     title: 'The Tech Edit',
     tagColor: 'bg-[#f6b630]/90 text-[#513800]',
-    link: 'https://meesho.com/c/electronics?ref=MEESHO500',
+    link: 'https://app.mshoppy.com/category/electronics',
     imageUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuCpdgQyV7Ci5uKJv3HZuZ1PSS0q_93YL7dC6T4s3QiqfMjNaJcDRyNya8jnKNMaNhLmNwQUpz1Ow8PmiT6SFKFEpq5dI68S8aEH9iAOv07QWDjRhf-BDpiiBQVfBVb7538jvwYtsGl0hkTEknRYkX47bzlvK4atuyTXC1GI4mNcrQG42SpmKOQDOgvfvzLwkutQ3dXDkveY3yq9RXf8Qgt1WTHDZKNP1M0mL0M7jVyrofDtENV2jqwNf-yoLnTb65sUOZ0dGzs7Jo8',
   },
@@ -73,7 +73,12 @@ export default function GildedPulse({ onNavigate }) {
   const [timeRange, setTimeRange] = useState('thisMonth');
   const [showAllActivities, setShowAllActivities] = useState(false);
 
-  const referralCode = 'MEESHO500';
+  const storedUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('mshoppy_customer_user') || localStorage.getItem('mshoppy_affiliate_user') || localStorage.getItem('user') || '{}');
+    } catch (_) { return {}; }
+  })();
+  const referralCode = storedUser?.storeName || (storedUser?.phone ? `MSHOPPY${storedUser.phone.slice(-4)}` : 'MSHOPPYVIP');
 
   const showToast = (msg) => {
     setToastMsg(msg);

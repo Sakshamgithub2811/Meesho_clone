@@ -6,7 +6,13 @@ import supplierApiService, { clearAuthSession, getCurrentSupplier } from '../../
 import { auth } from '../../utils/firebase';
 import { signOut } from 'firebase/auth';
 import { toast } from 'sonner';
-import { SUPPLIER_MENU } from './supplierNavConfig';
+import {
+  SUPPLIER_MENU,
+  SUPPLIER_ROLES,
+  getStoredSupplierSubRole,
+  getSupplierMenuForRole,
+  isTabAllowedForRole,
+} from './supplierNavConfig';
 import {
   ShoppingCart,
   Search,
@@ -34,11 +40,15 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import OrderPrintSlipModal from '../../components/admin/orders/OrderPrintSlipModal';
+import SupplierPickupManifestModal from '../../components/supplier/orders/SupplierPickupManifestModal';
+import OrderDetailModal from '../../components/supplier/orders/OrderDetailModal';
 import {
   playOrderChime,
   playTestChime,
+  stopOrderChime,
   isSoundAlertEnabled,
-  setSoundAlertEnabled
+  setSoundAlertEnabled,
+  subscribeChimeState,
 } from '../../utils/orderSoundChime';
 import { exportOrdersToCsv } from '../../utils/csvExport';
 
@@ -66,19 +76,38 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [profile, setProfile] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [currentSubRole, setCurrentSubRole] = useState(getStoredSupplierSubRole);
+
+  useEffect(() => {
+    const handleRole = (e) => setCurrentSubRole(e?.detail || getStoredSupplierSubRole());
+    window.addEventListener('supplier_subrole_changed', handleRole);
+    return () => window.removeEventListener('supplier_subrole_changed', handleRole);
+  }, []);
+
+  const isAllowed = isTabAllowedForRole('orders', currentSubRole);
+  const currentRoleCfg = SUPPLIER_ROLES[currentSubRole] || SUPPLIER_ROLES.OWNER;
 
   // Selected Order for Detail Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [printOrder, setPrintOrder] = useState(null);
+  const [manifestModalOpen, setManifestModalOpen] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Real-Time Radar & Sound Chime Alert States
   const [soundEnabled, setSoundEnabled] = useState(isSoundAlertEnabled);
+  const [isChimeRinging, setIsChimeRinging] = useState(false);
   const [radarActive, setRadarActive] = useState(true);
   const [lastRadarPing, setLastRadarPing] = useState(null);
   const [newlyArrivedIds, setNewlyArrivedIds] = useState(new Set());
   const knownOrderIdsRef = useRef(new Set());
   const isFirstLoadRef = useRef(true);
+
+  // Subscribe to chime ringing state (turns ON on order receive, auto-shuts OFF in 3-4s)
+  useEffect(() => {
+    return subscribeChimeState((state) => {
+      setIsChimeRinging(state);
+    });
+  }, []);
 
   // Load real orders from backend (supports manual refresh & silent radar polling)
   const loadOrders = useCallback(async (isRefresh = false, isSilentRadar = false) => {
@@ -168,24 +197,51 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
     loadOrders();
   }, [loadOrders]);
 
-  // Real-Time Background Radar Polling (Every 15 seconds)
+  // Real-Time Background Radar Polling (Every 8 seconds)
   useEffect(() => {
     if (!radarActive) return;
 
     const interval = setInterval(() => {
       loadOrders(false, true); // silent radar ping
-    }, 15000);
+    }, 8000);
 
     return () => clearInterval(interval);
   }, [radarActive, loadOrders]);
 
+  // Real-Time 0ms Cross-Tab Broadcast for Orders Placed in Same Browser
+  useEffect(() => {
+    let bc;
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        bc = new BroadcastChannel('mshoppy_order_events');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'ORDER_PLACED') {
+            playOrderChime();
+            toast.info(`🔔 New incoming order placed! (#${event.data?.orderId || 'Live'})`);
+            loadOrders(false, true);
+          }
+        };
+      }
+    } catch (_) {}
+
+    return () => {
+      try {
+        if (bc) bc.close();
+      } catch (_) {}
+    };
+  }, [loadOrders]);
+
   const toggleSoundAlert = () => {
+    if (isChimeRinging) {
+      stopOrderChime();
+      return;
+    }
     const nextState = !soundEnabled;
     setSoundEnabled(nextState);
     setSoundAlertEnabled(nextState);
     if (nextState) {
       playTestChime();
-      toast.success('🔔 Order Sound Chime Enabled! Test chime played.');
+      toast.success('🔔 Order Sound Chime Enabled! Test chime playing (turns off in 3.5s).');
     } else {
       toast.info('🔕 Order Sound Chime Muted');
     }
@@ -280,6 +336,18 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
     }
   };
 
+  // Batch Handover Handler (Marks all ready orders in manifest as SHIPPED)
+  const handleBatchHandover = async (orderIds = []) => {
+    try {
+      await Promise.all(
+        orderIds.map((id) => supplierApiService.updateOrderStatus(id, 'SHIPPED').catch(() => {}))
+      );
+      loadOrders(true);
+    } catch (err) {
+      console.warn('Batch handover error:', err);
+    }
+  };
+
   // Filter orders dynamically
   const filteredOrders = orders.filter((order) => {
     const status = (order.orderStatus || order.status || '').toUpperCase();
@@ -354,7 +422,7 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
                 ></span>
               </span>
               <Radio className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{radarActive ? 'Live Radar (15s)' : 'Radar Paused'}</span>
+              <span className="hidden sm:inline">{radarActive ? 'Live Radar (8s)' : 'Radar Paused'}</span>
               <span className="sm:hidden">{radarActive ? 'Radar' : 'Off'}</span>
             </button>
 
@@ -363,23 +431,38 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
               type="button"
               onClick={toggleSoundAlert}
               className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition active:scale-95 cursor-pointer ${
-                soundEnabled
-                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                isChimeRinging
+                  ? 'bg-rose-500 border-rose-600 text-white animate-pulse shadow-md shadow-rose-500/30'
+                  : soundEnabled
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
                   : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'
               }`}
               title={
-                soundEnabled
+                isChimeRinging
+                  ? 'Chime Ringing Now! (Click to stop immediately, or auto-stops in 3-4s)'
+                  : soundEnabled
                   ? 'Sound Chime is ON: Melodic bell rings on incoming orders (Click to test/mute)'
                   : 'Sound Chime is MUTED (Click to enable)'
               }
             >
-              {soundEnabled ? (
-                <Volume2 className="w-4 h-4 text-indigo-600 animate-pulse" />
+              {isChimeRinging ? (
+                <>
+                  <Volume2 className="w-4 h-4 text-white animate-bounce" />
+                  <span className="font-extrabold">Ringing (3s)... Stop</span>
+                </>
+              ) : soundEnabled ? (
+                <>
+                  <Volume2 className="w-4 h-4 text-indigo-600" />
+                  <span className="hidden sm:inline">Chime ON (3.5s)</span>
+                  <span className="sm:hidden">Chime ON</span>
+                </>
               ) : (
-                <VolumeX className="w-4 h-4 text-slate-400" />
+                <>
+                  <VolumeX className="w-4 h-4 text-slate-400" />
+                  <span className="hidden sm:inline">Chime Muted</span>
+                  <span className="sm:hidden">Muted</span>
+                </>
               )}
-              <span className="hidden sm:inline">{soundEnabled ? 'Chime ON' : 'Chime Off'}</span>
-              <span className="sm:hidden">{soundEnabled ? 'Sound' : 'Muted'}</span>
             </button>
 
             {/* Export CSV Button */}
@@ -391,6 +474,17 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
             >
               <Download className="w-4 h-4 text-indigo-600" />
               <span className="hidden sm:inline">Export CSV</span>
+            </button>
+
+            {/* Logistics Pickup Manifest (Step 4 Handover) */}
+            <button
+              type="button"
+              onClick={() => setManifestModalOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 font-bold text-xs transition active:scale-95 cursor-pointer shadow-2xs"
+              title="Generate and print logistics courier pickup manifest handover sheet"
+            >
+              <Truck className="w-4 h-4 text-emerald-600" />
+              <span>Pickup Manifest</span>
             </button>
 
             {/* Manual Sync Button */}
@@ -675,149 +769,97 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
         </div>
 
         {/* Detailed Order Modal */}
-        {selectedOrder && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div>
-                  <span className="text-[11px] font-bold text-indigo-600 uppercase">Order Details</span>
-                  <h3 className="text-lg font-black text-slate-900">
-                    #{String(selectedOrder.id).slice(-8).toUpperCase()}
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setSelectedOrder(null)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+        <OrderDetailModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          handleStatusChange={handleStatusChange}
+          isUpdatingStatus={isUpdatingStatus}
+          onPrintSlip={(ord) => {
+            setSelectedOrder(null);
+            setPrintOrder(ord);
+          }}
+        />
 
-              <div className="space-y-4 pt-4 text-xs">
-                {/* Customer Details */}
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
-                  <div className="flex items-center gap-2 font-bold text-slate-900">
-                    <User className="w-4 h-4 text-slate-500" />
-                    <span>Customer Information</span>
-                  </div>
-                  <p className="text-slate-700 font-semibold">{selectedOrder.user?.fullName || selectedOrder.customerName || 'N/A'}</p>
-                  <p className="text-slate-500">Phone: {selectedOrder.user?.phone || 'N/A'}</p>
-                  <p className="text-slate-500">Email: {selectedOrder.user?.email || 'N/A'}</p>
-                  {selectedOrder.shippingAddress && (
-                    <div className="pt-1 flex items-start gap-1.5 text-slate-600">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                      <span>{typeof selectedOrder.shippingAddress === 'string' ? selectedOrder.shippingAddress : JSON.stringify(selectedOrder.shippingAddress)}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Items in Order (with Per-Item Status Control) */}
-                <div>
-                  <h4 className="font-bold text-slate-900 mb-2">Ordered Catalog Items</h4>
-                  <div className="space-y-2.5">
-                    {(selectedOrder.items || []).map((item, idx) => {
-                      const iStatus = (item.itemStatus || selectedOrder.orderStatus || 'ORDERED').toUpperCase();
-                      return (
-                        <div key={item.id || idx} className="p-3 rounded-xl border border-slate-200 bg-white space-y-2">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-800 truncate">{item.product?.title || item.productTitle || 'Product'}</p>
-                              <p className="text-[11px] text-slate-400">
-                                Qty: {item.quantity || 1} • Unit: ₹{Number(item.price || 0).toLocaleString('en-IN')}
-                              </p>
-                            </div>
-                            <span className="font-black text-slate-900 text-sm shrink-0">
-                              ₹{Number((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                              Item Stage: {iStatus}
-                            </span>
-                            {item.id && (
-                              <select
-                                value={iStatus}
-                                onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value, item.id)}
-                                disabled={isUpdatingStatus}
-                                className="h-7 px-2 rounded-lg border border-slate-200 bg-slate-50 font-bold text-slate-700 text-[11px]"
-                              >
-                                <option value="ORDERED">ORDERED</option>
-                                <option value="CONFIRMED">CONFIRMED</option>
-                                <option value="SHIPPED">SHIPPED</option>
-                                <option value="OUT_FOR_DELIVERY">OUT_FOR_DELIVERY</option>
-                                <option value="DELIVERED">DELIVERED</option>
-                                <option value="CANCELLED">CANCELLED</option>
-                              </select>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Batch Status Update Dropdown (All Supplier Items in this Order) */}
-                <div className="p-4 rounded-2xl border border-indigo-100 bg-indigo-50/40">
-                  <label className="font-bold text-slate-800 block mb-1.5">Update All Your Items in Order</label>
-                  <div className="flex gap-2">
-                    <select
-                      value={selectedOrder.orderStatus || selectedOrder.status || 'ORDERED'}
-                      onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
-                      disabled={isUpdatingStatus}
-                      className="flex-1 h-10 px-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-700 text-xs"
-                    >
-                      <option value="ORDERED">ORDERED (New)</option>
-                      <option value="CONFIRMED">CONFIRMED</option>
-                      <option value="SHIPPED">SHIPPED</option>
-                      <option value="OUT_FOR_DELIVERY">OUT FOR DELIVERY</option>
-                      <option value="DELIVERED">DELIVERED</option>
-                      <option value="CANCELLED">CANCELLED</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Print Shipping Label CTA */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const ord = selectedOrder;
-                    setSelectedOrder(null);
-                    setPrintOrder(ord);
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-[#b7004d] hover:bg-[#92003d] text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>Print 4x6 Shipping Label & AWB Barcode</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Printable Shipping Label & Barcode Modal */}
+        {/* Printable Shipping Label & Barcode Modal (Step 3) */}
         {printOrder && (
           <OrderPrintSlipModal
             order={printOrder}
             onClose={() => setPrintOrder(null)}
           />
         )}
+
+        {/* Logistics Pickup Manifest Handover Modal (Step 4) */}
+        <SupplierPickupManifestModal
+          isOpen={manifestModalOpen}
+          onClose={() => setManifestModalOpen(false)}
+          orders={orders}
+          supplierProfile={profile}
+          onConfirmHandover={handleBatchHandover}
+        />
       </div>
   );
 
   if (embedded) {
+    if (!isAllowed) {
+      return (
+        <div className="max-w-2xl mx-auto my-10 bg-white rounded-2xl border border-rose-200 p-8 shadow-lg text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-2xl">
+            🛡️
+          </div>
+          <h3 className="text-xl font-black text-slate-900">
+            Access Restricted: Orders & Dispatch Desk
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            Your role <strong className="text-slate-900 font-bold">{currentRoleCfg.label}</strong> does not have permission to view customer orders, print shipping labels, or perform courier handovers.
+          </p>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => onNavigateTab ? onNavigateTab('staff') : handleNav('/seller-web-dashboard1?tab=staff')}
+              className="px-5 py-2.5 rounded-xl bg-[#b7004d] text-white font-bold text-xs hover:bg-[#92003d] transition cursor-pointer shadow-xs"
+            >
+              Open RBAC & Staff Management
+            </button>
+          </div>
+        </div>
+      );
+    }
     return mainContent;
   }
 
   return (
     <DashboardLayout
-      menuItems={SUPPLIER_MENU}
+      menuItems={getSupplierMenuForRole(currentSubRole)}
       activeTab="orders"
       onTabChange={handleTabChange}
-      roleName="SUPPLIER"
+      roleName={`SUPPLIER • ${currentRoleCfg.shortLabel}`}
       userName={supplierDisplayName}
       onLogout={() => setShowLogoutConfirm(true)}
     >
-      {mainContent}
+      {!isAllowed ? (
+        <div className="max-w-2xl mx-auto my-10 bg-white rounded-2xl border border-rose-200 p-8 shadow-lg text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-2xl">
+            🛡️
+          </div>
+          <h3 className="text-xl font-black text-slate-900">
+            Access Restricted: Orders & Dispatch Desk
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            Your role <strong className="text-slate-900 font-bold">{currentRoleCfg.label}</strong> does not have permission to view customer orders, print shipping labels, or perform courier handovers.
+          </p>
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleNav('/seller-web-dashboard1?tab=staff')}
+              className="px-5 py-2.5 rounded-xl bg-[#b7004d] text-white font-bold text-xs hover:bg-[#92003d] transition cursor-pointer shadow-xs"
+            >
+              Open RBAC & Staff Management
+            </button>
+          </div>
+        </div>
+      ) : (
+        mainContent
+      )}
 
       <LogoutConfirmDialog
         isOpen={showLogoutConfirm}

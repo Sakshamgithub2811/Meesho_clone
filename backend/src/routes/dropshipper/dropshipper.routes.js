@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { getDropshipperLandingMetrics } from '../../controllers/dropshipper/dropshipperLanding.controller.js';
 import { registerDropshipper, loginDropshipper } from '../../controllers/dropshipper/dropshipperAuth.controller.js';
 import { 
   getDropshipperProfile, 
@@ -66,7 +67,10 @@ import {
 
 const router = Router();
 
-// 0. Master Executive Dashboard Overview
+// 0. Public Dynamic Landing Page Metrics & Wholesale Preview
+router.get('/landing-metrics', getDropshipperLandingMetrics);
+
+// 0.1 Master Executive Dashboard Overview
 router.get('/dashboard/overview/:firebaseUid', getDropshipperDashboardOverview);
 
 // 1. Authentication Endpoints

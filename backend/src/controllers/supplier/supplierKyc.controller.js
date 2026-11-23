@@ -5,9 +5,6 @@ import supabase from '../../config/supabaseClient.js';
 import { getUploadDir } from '../../middlewares/upload.middleware.js';
 import { uploadFileToSupabase } from '../../services/supabaseStorage.service.js';
 
-// In-memory fallback store for offline resiliency
-const fallbackKycStore = new Map();
-
 // Helper to save base64 data URLs as cloud files in Supabase Storage
 const saveBase64Image = async (base64Str, baseUrl) => {
   try {
@@ -55,40 +52,32 @@ const saveBase64Image = async (base64Str, baseUrl) => {
  */
 export const getSupplierKyc = async (req, res, next) => {
   try {
-    const supplierId = req.supplierId || req.user?.id || 'supplier_demo_001';
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Supplier authentication required',
+      });
+    }
 
-    let kyc = null;
-    try {
-      kyc = await prisma.kYCApplication.findFirst({
+    const [kyc, profile] = await Promise.all([
+      prisma.kYCApplication.findFirst({
         where: {
           userId: supplierId,
           type: 'supplier',
         },
         orderBy: { createdAt: 'desc' },
-      });
-    } catch (err) {
-      console.warn('Prisma getSupplierKyc fallback:', err.message);
-    }
-
-    // Check memory fallback
-    if (!kyc) {
-      kyc = fallbackKycStore.get(supplierId) || null;
-    }
-
-    // If still null, check if profile has verified GST/PAN
-    let profile = null;
-    try {
-      profile = await prisma.profile.findUnique({
+      }),
+      prisma.profile.findUnique({
         where: { id: supplierId },
-      });
-    } catch (_) {}
+      }),
+    ]);
 
     const isVerified = Boolean(
       kyc?.status === 'APPROVED' ||
-      profile?.tierLabel?.toLowerCase().includes('verified') ||
-      (profile?.gstin && profile?.bankDetails)
+      profile?.tierLabel?.toLowerCase().includes('verified')
     );
-    const resolvedStatus = kyc?.status || (isVerified ? 'APPROVED' : 'PENDING');
+    const resolvedStatus = isVerified ? 'APPROVED' : (kyc?.status || 'NOT_SUBMITTED');
 
     return res.status(200).json({
       success: true,
@@ -113,7 +102,13 @@ export const getSupplierKyc = async (req, res, next) => {
  */
 export const submitSupplierKyc = async (req, res, next) => {
   try {
-    const supplierId = req.supplierId || req.user?.id || 'supplier_demo_001';
+    const supplierId = req.supplierId || req.user?.id;
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Supplier authentication required',
+      });
+    }
     const hostBaseUrl = `${req.protocol}://${req.get('host')}`;
 
     const {
@@ -205,8 +200,7 @@ export const submitSupplierKyc = async (req, res, next) => {
     };
 
     let kycApplication = null;
-    try {
-      // Ensure user profile exists
+    // Ensure user profile exists
       await prisma.profile.upsert({
         where: { id: supplierId },
         update: {
@@ -235,12 +229,13 @@ export const submitSupplierKyc = async (req, res, next) => {
       });
 
       if (existingApp) {
+        const preserveApproved = existingApp.status === 'APPROVED';
         kycApplication = await prisma.kYCApplication.update({
           where: { id: existingApp.id },
           data: {
-            status: 'PENDING',
+            status: preserveApproved ? 'APPROVED' : 'PENDING',
             documents,
-            adminNotes: null,
+            adminNotes: preserveApproved ? existingApp.adminNotes : null,
           },
           include: {
             user: {
@@ -276,21 +271,6 @@ export const submitSupplierKyc = async (req, res, next) => {
           },
         });
       }
-    } catch (dbErr) {
-      console.warn('Prisma submitSupplierKyc fallback:', dbErr.message);
-      kycApplication = {
-        id: `kyc_app_${Date.now()}`,
-        userId: supplierId,
-        type: 'supplier',
-        status: 'PENDING',
-        documents,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    }
-
-    // Persist in fallback store
-    fallbackKycStore.set(supplierId, kycApplication);
 
     // Sync to Supabase if configured
     try {

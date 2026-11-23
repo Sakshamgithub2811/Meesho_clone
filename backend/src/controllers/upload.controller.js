@@ -6,7 +6,11 @@ const ALLOWED_IMAGE_TYPES = [
   'image/png',
   'image/webp',
   'image/svg+xml',
-  'image/gif'
+  'image/gif',
+  'video/mp4',
+  'video/webm',
+  'video/ogg',
+  'video/quicktime'
 ];
 
 /**

@@ -50,11 +50,14 @@ export default function MultiVariantMatrix({
   const [bulkStockVal, setBulkStockVal] = useState('15');
 
   // Compute canonical variant key
-  const getKey = (color, size) => `${color.trim().toLowerCase()}__${size.trim().toLowerCase()}`;
+  const getKey = (color, size) => `${(color || 'def').trim().toLowerCase()}__${(size || 'std').trim().toLowerCase()}`;
 
   // Synchronize or generate combinations whenever colors, sizes, or base inputs change
   useEffect(() => {
-    if (!selectedColors.length || !selectedSizes.length) {
+    const hasColors = Array.isArray(selectedColors) && selectedColors.length > 0;
+    const hasSizes = Array.isArray(selectedSizes) && selectedSizes.length > 0;
+
+    if (!hasColors && !hasSizes) {
       if (variants.length > 0 && onChangeVariants) {
         onChangeVariants([]);
       }
@@ -63,38 +66,75 @@ export default function MultiVariantMatrix({
 
     const existingMap = new Map();
     variants.forEach((v) => {
-      if (v.color && v.size) {
-        existingMap.set(getKey(v.color, v.size), v);
-      }
+      existingMap.set(getKey(v.color, v.size), v);
     });
 
     const cleanBaseSku = (baseSku || 'MSH').toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'MSH';
     const numBasePrice = parseFloat(basePrice) || 0;
 
     const newVariants = [];
-    selectedColors.forEach((color) => {
+
+    if (hasColors && hasSizes) {
+      // Color × Size Matrix
+      selectedColors.forEach((color) => {
+        selectedSizes.forEach((size) => {
+          const key = getKey(color, size);
+          if (existingMap.has(key)) {
+            newVariants.push(existingMap.get(key));
+          } else {
+            const colCode = color.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || 'CLR';
+            const sizeCode = size.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || 'FS';
+            newVariants.push({
+              id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              color,
+              size,
+              sku: `${cleanBaseSku}-${colCode}-${sizeCode}`,
+              stock: 15,
+              price: numBasePrice,
+              status: 'IN_STOCK',
+            });
+          }
+        });
+      });
+    } else if (hasSizes) {
+      // Sizes / Volume Only (e.g. Facewash 50ml, 100ml, 200ml)
       selectedSizes.forEach((size) => {
-        const key = getKey(color, size);
+        const key = getKey('Default', size);
         if (existingMap.has(key)) {
           newVariants.push(existingMap.get(key));
         } else {
-          // Generate realistic default SKU: e.g. KURTI-RED-S
-          const colCode = color.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || 'CLR';
-          const sizeCode = size.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || 'FS';
-          const autoSku = `${cleanBaseSku}-${colCode}-${sizeCode}`;
-
+          const sizeCode = size.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || 'STD';
           newVariants.push({
             id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-            color,
+            color: 'Default',
             size,
-            sku: autoSku,
-            stock: 15,
+            sku: `${cleanBaseSku}-${sizeCode}`,
+            stock: 25,
             price: numBasePrice,
             status: 'IN_STOCK',
           });
         }
       });
-    });
+    } else if (hasColors) {
+      // Colors Only (e.g. Lipstick, Phone Case)
+      selectedColors.forEach((color) => {
+        const key = getKey(color, 'Standard');
+        if (existingMap.has(key)) {
+          newVariants.push(existingMap.get(key));
+        } else {
+          const colCode = color.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || 'CLR';
+          newVariants.push({
+            id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            color,
+            size: 'Standard',
+            sku: `${cleanBaseSku}-${colCode}`,
+            stock: 20,
+            price: numBasePrice,
+            status: 'IN_STOCK',
+          });
+        }
+      });
+    }
 
     // Check if newVariants is different from current variants
     const isDifferent =
@@ -166,14 +206,27 @@ export default function MultiVariantMatrix({
     return { totalStock: tStock, inStockCount: inCount, outOfStockCount: outCount };
   }, [variants]);
 
-  if (!selectedColors.length || !selectedSizes.length) {
+  if (!variants.length) {
     return (
-      <div className="p-6 rounded-3xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-2">
-        <Layers className="w-8 h-8 text-slate-300 mx-auto" />
-        <h4 className="text-xs font-bold text-slate-700">Multi-Variant Inventory Matrix Inactive</h4>
-        <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-          Please select at least one color and one size above to automatically generate your Color × Size SKU inventory table.
-        </p>
+      <div className="p-4 sm:p-5 rounded-3xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide">
+              Single Item Inventory (No Variations)
+            </h4>
+            <p className="text-[11px] text-slate-500">
+              Stock is managed directly via the primary "Available Stock Units" field above. Enable sizes or colors if you need variant-level inventory.
+            </p>
+          </div>
+        </div>
+        <div className="hidden sm:block text-right">
+          <span className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2.5 py-1 rounded-xl border border-slate-200">
+            SKU: {(baseSku || 'MSH').toUpperCase()}-STD
+          </span>
+        </div>
       </div>
     );
   }
@@ -189,10 +242,14 @@ export default function MultiVariantMatrix({
             <span>Real Inventory Management</span>
           </div>
           <h3 className="text-sm font-black text-slate-900 tracking-tight">
-            Multi-Variant Matrix ({selectedColors.length} Colors × {selectedSizes.length} Sizes = {variants.length} SKU Combinations)
+            {selectedColors.length > 0 && selectedSizes.length > 0
+              ? `Multi-Variant Matrix (${selectedColors.length} Colors × ${selectedSizes.length} Sizes = ${variants.length} Combinations)`
+              : selectedSizes.length > 0
+              ? `Size / Volume Variants (${variants.length} Options)`
+              : `Color Variants (${variants.length} Options)`}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Configure individual warehouse stock per color and size. Prevent Out-of-Stock (OOS) penalty by specifying exact variant units.
+            Configure individual warehouse stock per variant. Prevent Out-of-Stock (OOS) penalty by specifying exact units.
           </p>
         </div>
 
@@ -295,15 +352,26 @@ export default function MultiVariantMatrix({
                     {/* Color × Size Preview */}
                     <td className="py-2.5 px-3">
                       <div className="flex items-center gap-2">
-                        <span
-                          className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0 shadow-2xs"
-                          style={{ backgroundColor: hex }}
-                        />
-                        <span className="font-black text-slate-900">{v.color}</span>
-                        <span className="text-slate-300">/</span>
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-black text-[11px]">
-                          {v.size}
-                        </span>
+                        {v.color && v.color !== 'Default' && (
+                          <>
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0 shadow-2xs"
+                              style={{ backgroundColor: hex }}
+                            />
+                            <span className="font-black text-slate-900">{v.color}</span>
+                          </>
+                        )}
+                        {v.color && v.color !== 'Default' && v.size && v.size !== 'Standard' && (
+                          <span className="text-slate-300">/</span>
+                        )}
+                        {v.size && v.size !== 'Standard' && (
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-black text-[11px]">
+                            {v.size}
+                          </span>
+                        )}
+                        {(!v.color || v.color === 'Default') && (!v.size || v.size === 'Standard') && (
+                          <span className="font-bold text-slate-500 text-xs">Standard Item</span>
+                        )}
                       </div>
                     </td>
 

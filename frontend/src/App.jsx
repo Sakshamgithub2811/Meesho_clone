@@ -30,6 +30,7 @@ import DropshipperSupportDesk from './pages/dropshipper/DropshipperSupportDesk';
 import DropshipperOrdersPush from './pages/dropshipper/DropshipperOrdersPush';
 import DropshipperIntegrations from './pages/dropshipper/DropshipperIntegrations';
 import DropshipperWholesaleCatalog from './pages/dropshipper/DropshipperWholesaleCatalog';
+import DropshipperLandingPage from './pages/dropshipper/DropshipperLandingPage';
 
 // Customer & Reseller Shopping Pages
 import HomeUserCustomer from './pages/customer & Reseller/HomeUserCustomer';
@@ -52,6 +53,8 @@ import CustomerOrders from './pages/customer & Reseller/CustomerOrders';
 import ReturnRequest from './pages/customer & Reseller/ReturnRequest';
 import AffiliateKYC from './pages/customer & Reseller/AffiliateKYC';
 import AffiliateKycStatus from './pages/customer & Reseller/AffiliateKycStatus';
+import InviteEarn from './pages/customer & Reseller/InviteEarn';
+import InviteLanding from './pages/customer & Reseller/InviteLanding';
 import PolicyPage from './pages/customer & Reseller/PolicyPage';
 import { getAffiliateMarginFromParams } from './utils/affiliateLinkHelper';
 
@@ -84,6 +87,7 @@ import SupplierRotLedger from './pages/supplier/SupplierRotLedger';
 import CustomerOrderSupplierFulfilment from './pages/supplier/CustomerOrderSupplierFulfilment';
 import SupplierLogin from './pages/supplier/SupplierLogin';
 import SupplierRegister from './pages/supplier/SupplierRegister';
+import SupplierLandingPage from './pages/supplier/SupplierLandingPage';
 
 // Admin Panel & Auth Pages
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -108,6 +112,7 @@ import StructureFlow from './pages/Design_Ecosystem_&_Theme_Variations/structure
 // Screen Catalog for Floating Navigator
 const screenCatalog = [
   // 1. Dropshipper Portal Screens
+  { path: '/dropshipper', name: 'Dropshipper Landing Page', icon: '🌐', group: 'Dropshipper' },
   { path: '/dropshipper-dashboard', name: 'Dropshipper Dashboard', icon: '📊', group: 'Dropshipper' },
   { path: '/dropshipper-wholesale-catalog', name: 'Wholesale Sourcing Hub', icon: '📦', group: 'Dropshipper' },
   { path: '/dropshipper-orders-push', name: 'Push Customer Orders', icon: '📤', group: 'Dropshipper' },
@@ -154,6 +159,7 @@ const screenCatalog = [
   { path: '/reviews', name: 'Ratings & Reviews', icon: '⭐', group: 'Shopping' },
   { path: '/write-review', name: 'Write a Review', icon: '✍️', group: 'Shopping' },
   { path: '/user-dashboard1', name: 'User Dashboard (Live Theme)', icon: '🛍️', group: 'Shopping' },
+  { path: '/invite-earn', name: 'Invite & Earn Cash', icon: '🎁', group: 'Shopping' },
   { path: '/user-dashboard1?tab=profile', name: 'Account Profile & Settings', icon: '👤', group: 'Shopping' },
   { path: '/orders', name: 'Customer My Orders', icon: '📦', group: 'Shopping' },
   { path: '/return-request', name: 'Return / Exchange Flow', icon: '🔄', group: 'Shopping' },
@@ -196,6 +202,7 @@ const screenCatalog = [
   { path: '/supplier-returns', name: 'Returns, RTO & Claims Hub', icon: '🔄', group: 'Supplier' },
   { path: '/supplier-rot-ledger', name: 'Supplier ROT & Freight Ledger', icon: '🧾', group: 'Supplier' },
   { path: '/dropship-fulfilment', name: 'Customer Order & Supplier Fulfilment', icon: '📦🔄', group: 'Supplier' },
+  { path: '/supplier', name: 'Become a Supplier (Landing)', icon: '🏬', group: 'Supplier' },
   { path: '/supplier-login', name: 'Supplier Login', icon: '🔐', group: 'Supplier' },
   { path: '/supplier-register', name: 'Supplier Registration', icon: '📝', group: 'Supplier' },
 
@@ -556,6 +563,12 @@ function AppRoutes() {
       '/profile': '/user-dashboard1?tab=profile',
       'account-profile': '/user-dashboard1?tab=profile',
       '/account-profile': '/user-dashboard1?tab=profile',
+      wallet: '/user-dashboard1?tab=wallet',
+      'wallet': '/user-dashboard1?tab=wallet',
+      '/wallet': '/user-dashboard1?tab=wallet',
+      'user-wallet': '/user-dashboard1?tab=wallet',
+      '/user-wallet': '/user-dashboard1?tab=wallet',
+      userWallet: '/user-dashboard1?tab=wallet',
       orders: '/orders',
       'my-orders': '/orders',
       return_request: '/return-request',
@@ -606,7 +619,8 @@ function AppRoutes() {
       'withdraw_earnings': '/withdraw-earnings',
       'payout-settings': '/payout-settings',
       'payout-confirmation': '/payout-confirmation',
-      'refer-earn': '/reseller-home',
+      'invite-earn': '/invite-earn',
+      'refer-earn': '/invite-earn',
       'affiliate-program': '/affiliate-program',
       'affiliate-panel': '/affiliate-panel',
 
@@ -686,6 +700,9 @@ function AppRoutes() {
       supplierLogin: '/supplier-login',
       'supplier-register': '/supplier-register',
       supplierRegister: '/supplier-register',
+      supplier: '/supplier',
+      'become-supplier': '/supplier',
+      'supplier-landing': '/supplier',
       returns: '/supplier-returns',
 
       // Admin & Community
@@ -715,6 +732,9 @@ function AppRoutes() {
       '/analytics': '/admin-panel',
       'admin-dropshipper-kyc': '/admin-panel',
       adminDropshipperKyc: '/admin-panel',
+      dropshipper: '/dropshipper',
+      'dropshipper-landing': '/dropshipper',
+      dropshipperLanding: '/dropshipper',
       'dropshipper-register': '/dropshipper-register',
       dropshipperRegister: '/dropshipper-register',
       'dropshipper-kyc': '/dropshipper-register',
@@ -765,12 +785,15 @@ function AppRoutes() {
         <Route path="/dropshipper-products" element={<SupplierProductAccess onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/supplier-product" element={<SupplierProductAccess onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/share-earn-config" element={<ShareEarnConfig />} />
-        <Route path="/resell-earn" element={<ResellEarn />} />
+        <Route path="/resell-earn" element={<Navigate to="/user-dashboard1?tab=affiliate" replace />} />
         <Route path="/earnings" element={<EarningsDashboard1 onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/earnings-dashboard" element={<EarningsDashboard1 onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/earnings-dashboard-1" element={<EarningsDashboard1 onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/earnings-dashboard-2" element={<Navigate to="/earnings" replace />} />
-        <Route path="/refer-earn" element={<Navigate to="/reseller-home" replace />} />
+        <Route path="/invite-earn" element={<InviteEarn onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/refer-earn" element={<InviteEarn onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/invite/:code" element={<InviteLanding />} />
+        <Route path="/invite" element={<InviteLanding />} />
         <Route path="/affiliate-program" element={<AffiliateProgram />} />
         <Route
           path="/affiliate-panel"
@@ -784,6 +807,8 @@ function AppRoutes() {
         <Route path="/become-affiliate" element={<AffiliateKYC onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/affiliate-kyc-status" element={<AffiliateKycStatus onNavigate={handleNav} onBack={handleBack} />} />
         <Route path="/affiliate-status" element={<AffiliateKycStatus onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/wallet" element={<Navigate to="/user-dashboard1?tab=wallet" replace />} />
+        <Route path="/user-wallet" element={<Navigate to="/user-dashboard1?tab=wallet" replace />} />
         <Route path="/my-wallet" element={<Navigate to="/reseller-wallet" replace />} />
         <Route path="/reseller-wallet" element={<ResellerWallet />} />
         <Route path="/reseller-returns" element={<ResellerReturnsLedger onNavigate={handleNav} onBack={handleBack} />} />
@@ -1389,6 +1414,34 @@ function AppRoutes() {
         <Route
           path="/customer-order-supplier-fulfilment"
           element={<CustomerOrderSupplierFulfilment onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/dropshipper"
+          element={<DropshipperLandingPage onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/dropship"
+          element={<DropshipperLandingPage onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/join-dropshipper"
+          element={<DropshipperLandingPage onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/dropshipper-landing"
+          element={<DropshipperLandingPage onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/supplier"
+          element={<SupplierLandingPage onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/become-supplier"
+          element={<SupplierLandingPage onNavigate={handleNav} onBack={handleBack} />}
+        />
+        <Route
+          path="/supplier-landing"
+          element={<SupplierLandingPage onNavigate={handleNav} onBack={handleBack} />}
         />
         <Route
           path="/supplier-login"

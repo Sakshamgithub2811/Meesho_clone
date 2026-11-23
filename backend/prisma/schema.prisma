@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -139,11 +140,15 @@ model Category {
   imageUrl      String?    @map("image_url")
   parentId      String?    @map("parent_id")
   parent        Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  subcategories Category[] @relation("CategoryHierarchy")
-  products      Product[]
-  createdAt     DateTime   @default(now()) @map("created_at")
+  subcategories         Category[] @relation("CategoryHierarchy")
+  products              Product[]
+  status                String     @default("APPROVED")
+  requestedBySupplierId String?    @map("requested_by_supplier_id")
+  rejectionReason       String?    @map("rejection_reason")
+  createdAt             DateTime   @default(now()) @map("created_at")
 
   @@index([parentId])
+  @@index([status])
   @@map("categories")
 }
 
@@ -162,12 +167,14 @@ model Product {
   category           Category @relation(fields: [categorySlug], references: [slug])
   subCategory        String?  @map("sub_category")
   images             String[]
-  sizes              String[] @default(["S", "M", "L", "XL", "Free Size"])
+  sizes              String[] @default([])
   colors             String[] @default([])
   thickness          String?
   thicknesses        String[] @default([])
   sku                String?
   variants           Json?    @default("[]")
+  videoUrl           String?  @map("video_url")
+  videoType          String?  @map("video_type")
   stock              Int      @default(50)
   isFreeDelivery     Boolean  @default(true) @map("is_free_delivery")
   supplierName       String   @default("Verified Supplier") @map("supplier_name")

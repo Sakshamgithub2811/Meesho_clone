@@ -179,8 +179,8 @@ export default function HomeUserReseller() {
 
   const [products, setProducts] = useState(() => {
     try {
-      const cached = JSON.parse(sessionStorage.getItem('mshoppy_cached_reseller_prods') || localStorage.getItem('mshoppy_cached_catalog_prods') || '[]');
-      if (Array.isArray(cached) && cached.length > 0) return cached;
+      const cached = JSON.parse(sessionStorage.getItem('mshoppy_cached_reseller_prods_v3') || '[]');
+      if (Array.isArray(cached) && cached.length > 24) return cached;
     } catch (_) {}
     return [];
   });
@@ -192,7 +192,7 @@ export default function HomeUserReseller() {
     let isMounted = true;
     if (products.length === 0) setLoading(true);
 
-    getProducts({ limit: 48, sort: 'popular' })
+    getProducts({ all: true, sort: 'popular' })
       .then((data) => {
         if (!isMounted) return;
         if (Array.isArray(data) && data.length > 0) {
@@ -202,6 +202,34 @@ export default function HomeUserReseller() {
             const originalPrice = Number(item.originalPrice) || Math.round(basePrice * 1.8);
             const discount = item.discount || (item.discountPercentage ? `${item.discountPercentage}% OFF` : '45% OFF');
             const defaultMargin = Number(item.margin) || Math.max(50, Math.round(basePrice * 0.2));
+
+            // Extract all image options with normalization
+            let rawImages = [];
+            if (Array.isArray(item.images)) {
+              rawImages = item.images;
+            } else if (typeof item.images === 'string') {
+              try {
+                const parsed = JSON.parse(item.images);
+                if (Array.isArray(parsed)) rawImages = parsed;
+                else if (parsed) rawImages = [parsed];
+              } catch {
+                rawImages = [item.images];
+              }
+            }
+            if (item.image && !rawImages.includes(item.image)) {
+              rawImages.unshift(item.image);
+            }
+
+            const cleanedImages = rawImages
+              .map((url) => {
+                if (!url || typeof url !== 'string') return '';
+                let clean = url.trim();
+                if (clean.startsWith('//')) clean = `https:${clean}`;
+                return clean;
+              })
+              .filter(Boolean);
+
+            const primaryImage = cleanedImages[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80';
 
             return {
               id: item.id || idx + 1,
@@ -213,13 +241,14 @@ export default function HomeUserReseller() {
               discount: discount,
               margin: defaultMargin,
               tag: item.tag || (idx % 3 === 0 ? 'BESTSELLER' : idx % 3 === 1 ? 'HOT' : 'TRENDING'),
-              image: (Array.isArray(item.images) && item.images[0]) || item.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80'
+              image: primaryImage,
+              images: cleanedImages.length > 0 ? cleanedImages : [primaryImage]
             };
           });
           setProducts(mapped);
           try {
-            sessionStorage.setItem('mshoppy_cached_reseller_prods', JSON.stringify(mapped));
-            localStorage.setItem('mshoppy_cached_catalog_prods', JSON.stringify(mapped.slice(0, 24)));
+            sessionStorage.setItem('mshoppy_cached_reseller_prods_v3', JSON.stringify(mapped));
+            localStorage.setItem('mshoppy_cached_catalog_prods_v3', JSON.stringify(mapped));
           } catch (_) {}
         }
       })
@@ -414,7 +443,13 @@ export default function HomeUserReseller() {
                           <img
                             src={item.image}
                             alt={item.title}
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
                             className="w-10 h-10 rounded-lg object-cover bg-slate-100 shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=200';
+                            }}
                           />
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-[#FF3F6C]">
@@ -560,6 +595,12 @@ export default function HomeUserReseller() {
                           className="w-full h-full object-cover rounded-l-full" 
                           alt={banner.title || "Banner"} 
                           src={banner.imageUrl || banner.image}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
                       </div>
                     )}
@@ -701,7 +742,19 @@ export default function HomeUserReseller() {
                         <img 
                           src={p.image} 
                           alt={p.title} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            const nextImg = p.images?.find(url => url && url !== e.currentTarget.src);
+                            if (nextImg && !e.currentTarget.dataset.fallbackTried) {
+                              e.currentTarget.dataset.fallbackTried = '1';
+                              e.currentTarget.src = nextImg;
+                              return;
+                            }
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80';
+                          }}
                         />
                         {p.tag && (
                           <span className="absolute top-2 left-2 max-w-[calc(100%-44px)] truncate whitespace-nowrap bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider text-on-surface">
@@ -899,7 +952,19 @@ export default function HomeUserReseller() {
               <img 
                 src={quickShareProduct.image} 
                 alt={quickShareProduct.title}
+                loading="lazy"
+                referrerPolicy="no-referrer"
                 className="w-14 h-14 rounded-xl object-cover shrink-0" 
+                onError={(e) => {
+                  const nextImg = quickShareProduct.images?.find(url => url && url !== e.currentTarget.src);
+                  if (nextImg && !e.currentTarget.dataset.fallbackTried) {
+                    e.currentTarget.dataset.fallbackTried = '1';
+                    e.currentTarget.src = nextImg;
+                    return;
+                  }
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&auto=format&fit=crop&q=80';
+                }}
               />
               <div className="min-w-0 flex-1">
                 <h4 className="font-bold text-xs text-slate-800 dark:text-slate-100 line-clamp-1">{quickShareProduct.title}</h4>

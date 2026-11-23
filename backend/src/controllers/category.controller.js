@@ -2,8 +2,11 @@ import prisma from '../config/prisma.js';
 
 export const getCategories = async (req, res) => {
   try {
-    // 1. Fetch all categories and counts
+    // 1. Fetch all approved categories and counts
     const categories = await prisma.category.findMany({
+      where: {
+        status: 'APPROVED'
+      },
       include: {
         _count: {
           select: { products: true }
@@ -80,10 +83,10 @@ export const getCategoryBySlug = async (req, res) => {
       }
     });
 
-    if (!category) {
+    if (!category || category.status !== 'APPROVED') {
       return res.status(404).json({
         success: false,
-        message: 'Category not found'
+        message: 'Category not found or pending admin approval'
       });
     }
 

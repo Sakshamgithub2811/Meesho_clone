@@ -1,9 +1,9 @@
-FROM node:20-alpine
+FROM node:22-slim
 
 WORKDIR /app
 
-# Install OpenSSL & libc required by Prisma on Alpine Linux
-RUN apk add --no-cache openssl libc6-compat
+# Install OpenSSL required by Prisma query engine
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Copy package descriptors & Prisma schema
 COPY package*.json ./

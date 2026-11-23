@@ -21,6 +21,7 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
   const [newAddress, setNewAddress] = useState({
     fullName: '',
     phone: '',
+    email: '',
     pincode: '',
     houseNo: '',
     street: '',
@@ -61,6 +62,7 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
           id: selected.id,
           name: selected.fullName,
           phone: selected.phone,
+          email: selected.email || undefined,
           pincode: selected.pincode,
           details: `${selected.addressLine}, ${selected.city}, ${selected.state}`
         }));
@@ -182,6 +184,7 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
     const payload = {
       fullName: newAddress.fullName.trim(),
       phone: cleanPhone,
+      email: (newAddress.email || '').trim().toLowerCase() || undefined,
       pincode: cleanPin,
       addressLine: combinedAddressLine,
       city: newAddress.city.trim(),
@@ -199,6 +202,7 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
         id: savedData.id || 'addr_' + Date.now(),
         name: savedData.fullName,
         phone: savedData.phone,
+        email: savedData.email || (newAddress.email || '').trim().toLowerCase() || undefined,
         pincode: savedData.pincode,
         details: `${savedData.addressLine}, ${savedData.city}, ${savedData.state}`
       }));
@@ -514,6 +518,23 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
                     ) : (
                       <p className="text-[10px] text-slate-400 mt-1">For delivery updates &amp; OTP</p>
                     )}
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Email Address <span className="text-slate-400 font-normal">(for automated invoice, tracking updates &amp; OTP alerts)</span>
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="e.g. yourname@gmail.com"
+                      value={newAddress.email || ''}
+                      onChange={(e) => {
+                        setNewAddress({ ...newAddress, email: e.target.value });
+                        if (formErrors.email) setFormErrors({ ...formErrors, email: null });
+                      }}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Order invoice, live tracking link &amp; delivery OTP will be sent to this email</p>
                   </div>
                 </div>
               </div>

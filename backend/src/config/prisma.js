@@ -15,13 +15,24 @@ dotenv.config();
  * Factory function to create a new PrismaClient instance
  * with error/warning logging and explicit connection URL from environment.
  */
+const getDatasourceUrl = () => {
+  let url = process.env.DATABASE_URL;
+  if (!url) return undefined;
+  if (!url.includes("connection_limit=")) {
+    const separator = url.includes("?") ? "&" : "?";
+    url = `${url}${separator}connection_limit=5&pool_timeout=20`;
+  }
+  return url;
+};
+
 const createPrismaClient = () => {
+  const dbUrl = getDatasourceUrl();
   return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
-    ...(process.env.DATABASE_URL && {
+    ...(dbUrl && {
       datasources: {
         db: {
-          url: process.env.DATABASE_URL,
+          url: dbUrl,
         },
       },
     }),

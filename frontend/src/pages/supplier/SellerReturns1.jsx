@@ -57,7 +57,9 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
   const [selectedClaim, setSelectedClaim] = useState(null);
   const [activePhotoPreview, setActivePhotoPreview] = useState(null);
   const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+  const [disputeType, setDisputeType] = useState('WRONG_ITEM');
   const [disputeReason, setDisputeReason] = useState('');
+  const [unboxingProof, setUnboxingProof] = useState('');
   const [disputeSubmitting, setDisputeSubmitting] = useState(false);
 
   const loadReturnsData = useCallback(async (isRefresh = false) => {
@@ -153,23 +155,30 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
 
     const targetId = selectedClaim.returnRequestId || selectedClaim.id || selectedClaim.orderId;
     setDisputeSubmitting(true);
+    const combinedReason = `[SPF Claim: ${disputeType}] ${disputeReason.trim()}${
+      unboxingProof.trim() ? ` | Unboxing Proof: ${unboxingProof.trim()}` : ''
+    }`;
+
     try {
       await supplierApiService.updateReturnStatus(targetId, 'disputed', {
-        disputeReason: disputeReason.trim(),
+        disputeReason: combinedReason,
+        claimType: 'WRONG_ITEM_SAFETY_CLAIM',
+        unboxingProof: unboxingProof.trim(),
       });
       setReturnOrders((prev) =>
         prev.map((o) =>
           o.id === targetId || o.orderId === targetId || o.returnRequestId === targetId
-            ? { ...o, rtoStatus: 'DISPUTED', orderStatus: 'DISPUTED' }
+            ? { ...o, rtoStatus: 'DISPUTED', orderStatus: 'DISPUTED', reason: combinedReason }
             : o
         )
       );
       if (selectedClaim) {
-        setSelectedClaim((prev) => (prev ? { ...prev, rtoStatus: 'DISPUTED', orderStatus: 'DISPUTED' } : null));
+        setSelectedClaim((prev) => (prev ? { ...prev, rtoStatus: 'DISPUTED', orderStatus: 'DISPUTED', reason: combinedReason } : null));
       }
-      toast.success('Dispute raised successfully. MShoppy Trust & Safety team is reviewing evidence.');
+      toast.success('🛡️ Wrong Return Safety Claim submitted! MShoppy Trust & Safety desk is reviewing unboxing evidence.');
       setDisputeModalOpen(false);
       setDisputeReason('');
+      setUnboxingProof('');
     } catch (err) {
       toast.error('Failed to submit dispute');
     } finally {
@@ -333,7 +342,8 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
                     const prod = ord.product || ord.items?.[0]?.product || {};
                     const displayId = String(ord.orderId || ord.id || '').slice(-8).toUpperCase();
                     const targetId = ord.returnRequestId || ord.id || ord.orderId;
-                    const proofCount = ord.proofImages?.length || 0;
+                    const validProofs = (ord.proofImages || []).filter((u) => u && typeof u === 'string' && !u.startsWith('blob:'));
+                    const proofCount = validProofs.length;
 
                     return (
                       <tr key={ord.id} className="hover:bg-slate-50/60 transition-colors">
@@ -389,11 +399,15 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
                                   <span>{proofCount} Photo{proofCount > 1 ? 's' : ''}</span>
                                 </button>
                                 <div className="flex items-center -space-x-1.5">
-                                  {ord.proofImages.slice(0, 3).map((img, idx) => (
+                                  {validProofs.slice(0, 3).map((img, idx) => (
                                     <img
                                       key={idx}
                                       src={img}
                                       alt="Proof thumbnail"
+                                      onError={(e) => {
+                                        e.currentTarget.onerror = null;
+                                        e.currentTarget.style.display = 'none';
+                                      }}
                                       onClick={() => {
                                         setSelectedClaim(ord);
                                         setActivePhotoPreview(img);
@@ -576,47 +590,58 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
               </div>
 
               {/* Customer Defect Proof Photos */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <Camera className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Customer Defect Proof Evidence ({selectedClaim.proofImages?.length || 0})</span>
-                  </label>
-                  {selectedClaim.proofImages?.length > 0 && (
-                    <span className="text-[11px] text-slate-400">Click photo to view high-resolution</span>
-                  )}
-                </div>
+              {(() => {
+                const modalValidProofs = (selectedClaim.proofImages || []).filter(
+                  (u) => u && typeof u === 'string' && !u.startsWith('blob:')
+                );
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Customer Defect Proof Evidence ({modalValidProofs.length})</span>
+                      </label>
+                      {modalValidProofs.length > 0 && (
+                        <span className="text-[11px] text-slate-400">Click photo to view high-resolution</span>
+                      )}
+                    </div>
 
-                {selectedClaim.proofImages && selectedClaim.proofImages.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {selectedClaim.proofImages.map((imgUrl, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => setActivePhotoPreview(imgUrl)}
-                        className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square cursor-pointer hover:shadow-md transition"
-                      >
-                        <img
-                          src={imgUrl}
-                          alt={`Proof evidence #${idx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
-                        />
-                        <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1">
-                          <Eye className="w-4 h-4" />
-                          <span>View Full</span>
-                        </div>
+                    {modalValidProofs.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {modalValidProofs.map((imgUrl, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => setActivePhotoPreview(imgUrl)}
+                            className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square cursor-pointer hover:shadow-md transition"
+                          >
+                            <img
+                              src={imgUrl}
+                              alt={`Proof evidence #${idx + 1}`}
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5'><rect width='20' height='20' x='2' y='2' rx='4'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='m21 15-5-5L5 21'/></svg>";
+                              }}
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                            />
+                            <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1">
+                              <Eye className="w-4 h-4" />
+                              <span>View Full</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="p-6 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-1">
+                        <ImageIcon className="w-6 h-6 text-slate-300 mx-auto" />
+                        <p className="text-xs font-semibold text-slate-700">No Customer Proof Photos Attached</p>
+                        <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                          This return is classified as a Courier RTO or parcel refusal at doorstep before package delivery.
+                        </p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="p-6 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-1">
-                    <ImageIcon className="w-6 h-6 text-slate-300 mx-auto" />
-                    <p className="text-xs font-semibold text-slate-700">No Customer Proof Photos Attached</p>
-                    <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                      This return is classified as a Courier RTO or parcel refusal at doorstep before package delivery.
-                    </p>
-                  </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Modal Footer Actions */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
@@ -682,25 +707,62 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
               </div>
 
               <p className="text-xs text-slate-500">
-                Submit an operational dispute if the customer sent a wrong item, counterfeit product, damaged merchandise, or an empty parcel.
+                Submit a safety claim if the customer returned a wrong item, counterfeit product, severely damaged piece, or an empty parcel.
               </p>
 
-              <form onSubmit={handleDisputeSubmit} className="space-y-4">
+              <form onSubmit={handleDisputeSubmit} className="space-y-3.5">
+                {/* Claim Type */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 mb-1.5 block">
-                    Dispute Explanation & Evidence Summary *
+                    Claim Issue Type *
+                  </label>
+                  <select
+                    value={disputeType}
+                    onChange={(e) => setDisputeType(e.target.value)}
+                    className="w-full h-10 px-3 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-purple-500 focus:bg-white transition"
+                  >
+                    <option value="WRONG_ITEM">Wrong Item Received (Different item inside box)</option>
+                    <option value="EMPTY_BOX">Empty Parcel Received (Outer box empty / torn seal)</option>
+                    <option value="DAMAGED_USED">Damaged / Heavily Used Merchandise Returned</option>
+                    <option value="COUNTERFEIT_SUBSTITUTION">Counterfeit / Fake Item Substituted</option>
+                    <option value="MISSING_PARTS">Missing Critical Accessories / Blouse / Dupatta</option>
+                  </select>
+                </div>
+
+                {/* Evidence Summary */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                    Dispute Explanation &amp; Remarks *
                   </label>
                   <textarea
-                    rows={4}
+                    rows={3}
                     required
                     value={disputeReason}
                     onChange={(e) => setDisputeReason(e.target.value)}
                     placeholder="e.g. Received empty outer box with torn security tape; item serial number does not match original shipment..."
-                    className="w-full p-3.5 text-xs rounded-2xl border border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition"
+                    className="w-full p-3 text-xs rounded-2xl border border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2">
+                {/* Unboxing Video / Photo Link */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                    <span>Unboxing Video / Photos Link (Proof)</span>
+                    <span className="text-[10px] text-purple-600 font-semibold">Drive / Imgur / Cloud URL</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={unboxingProof}
+                    onChange={(e) => setUnboxingProof(e.target.value)}
+                    placeholder="https://drive.google.com/... or https://imgur.com/..."
+                    className="w-full h-10 px-3.5 text-xs rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Upload unboxing video or parcel photos within 72 hrs of delivery to claim 100% Safety Compensation.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setDisputeModalOpen(false)}
@@ -713,7 +775,7 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
                     disabled={disputeSubmitting || !disputeReason.trim()}
                     className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
                   >
-                    {disputeSubmitting ? 'Submitting...' : 'Submit Dispute'}
+                    {disputeSubmitting ? 'Submitting...' : 'Submit Safety Claim'}
                   </button>
                 </div>
               </form>
@@ -741,6 +803,10 @@ export default function SellerReturns1({ onNavigate, embedded = false, onNavigat
               <img
                 src={activePhotoPreview}
                 alt="High-resolution customer return proof"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5'><rect width='20' height='20' x='2' y='2' rx='4'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='m21 15-5-5L5 21'/></svg>";
+                }}
                 className="max-h-[80vh] w-auto object-contain rounded-2xl"
               />
               <div className="p-3 text-center text-xs text-slate-300 font-medium">

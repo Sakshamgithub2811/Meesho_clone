@@ -22,7 +22,7 @@ function notifyListeners() {
 /**
  * Affiliate Partner Login via Mobile / OTP / Email
  */
-export async function loginAffiliate({ phone, email, fullName, referralCode, otp = '123456' }) {
+export async function loginAffiliate({ phone, email, fullName, referralCode, otp }) {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/affiliate-login`, {
       method: 'POST',
@@ -51,51 +51,8 @@ export async function loginAffiliate({ phone, email, fullName, referralCode, otp
     notifyListeners();
     return data;
   } catch (error) {
-    console.warn('Affiliate login API fallback mode:', error.message);
-
-    const cleanPhone = phone ? phone.toString().replace(/\D/g, '').slice(-10) : '';
-    const generatedCode = referralCode || (cleanPhone ? `MSHOPPY${cleanPhone.slice(-4)}` : 'MEESHO500');
-
-    // Check if there is an existing KYC application
-    const existingKyc = getAffiliateApp();
-
-    const fallbackUser = {
-      id: cleanPhone ? `affiliate_${cleanPhone}` : `affiliate_${Date.now()}`,
-      phone: cleanPhone,
-      email: email || (cleanPhone ? `${cleanPhone}@affiliate.meesho` : 'partner@meesho.com'),
-      fullName: fullName || existingKyc?.fullName || (cleanPhone ? `Affiliate Partner +91 ${cleanPhone.slice(-4)}` : 'Sovereign Partner'),
-      role: 'AFFILIATE',
-      referralCode: generatedCode,
-      kycStatus: existingKyc?.status || 'APPROVED',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-      isOfflineFallback: true,
-    };
-
-    const fallbackStats = {
-      totalCommission: 0,
-      pendingCommission: 0,
-      withdrawnAmount: 0,
-      clicks: 0,
-      convertedOrders: 0,
-      conversionRate: '0%',
-      recentOrders: [],
-      dailyCommissions: { MON: 0, TUE: 0, WED: 0, THU: 0, FRI: 0, SAT: 0, SUN: 0 }
-    };
-
-    const mockToken = 'mock_aff_token_' + Date.now();
-    localStorage.setItem(TOKEN_KEY, mockToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(fallbackUser));
-    localStorage.setItem(STATS_KEY, JSON.stringify(fallbackStats));
-
-    notifyListeners();
-
-    return {
-      success: true,
-      user: fallbackUser,
-      stats: fallbackStats,
-      token: mockToken,
-      isOfflineFallback: true,
-    };
+    console.error('Affiliate login API error:', error);
+    throw new Error(error.message || 'Affiliate authentication failed. Please check credentials or network connection.');
   }
 }
 
