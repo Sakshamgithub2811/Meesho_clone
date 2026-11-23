@@ -201,7 +201,9 @@ export const createOrder = async (req, res) => {
 
     const allowedPaymentMethods = ['COD', 'UPI', 'CARD', 'NETBANKING', 'WALLET'];
     const normalizedMethod = String(paymentMethod || 'COD').toUpperCase().trim();
-    const validPaymentMethod = allowedPaymentMethods.includes(normalizedMethod) ? normalizedMethod : 'COD';
+    if (allowedPaymentMethods.includes(normalizedMethod)) {
+      validPaymentMethod = normalizedMethod;
+    }
 
     // Atomic transaction: Decrement stock, create order, clear user cart with extended timeout for cloud DB
     const order = await prisma.$transaction(async (tx) => {
