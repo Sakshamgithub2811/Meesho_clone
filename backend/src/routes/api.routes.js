@@ -44,6 +44,7 @@ import paymentRoutes from './payment.routes.js';
 import walletRoutes from './wallet.routes.js';
 import bannerRoutes from './banner.routes.js';
 import uploadRoutes from './upload.routes.js';
+import logisticsRoutes from './logistics/logistics.routes.js';
 
 const apiRouter = Router();
 
@@ -112,5 +113,6 @@ apiRouter.use('/wallet', walletRoutes);
 apiRouter.use('/wallets', walletRoutes);
 apiRouter.use('/banners', bannerRoutes);
 apiRouter.use('/upload', uploadRoutes);
+apiRouter.use('/logistics', logisticsRoutes);
 
 export default apiRouter;
