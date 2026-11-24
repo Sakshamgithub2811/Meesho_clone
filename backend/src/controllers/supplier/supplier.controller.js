@@ -283,6 +283,7 @@ export const addProduct = async (req, res, next) => {
       variants,
       videoUrl,
       videoType,
+      specifications,
       isFreeDelivery,
       supplierName = supplierProfile.storeName || supplierProfile.fullName || 'Verified Supplier',
     } = req.body;
@@ -457,6 +458,20 @@ export const addProduct = async (req, res, next) => {
       finalStock = parsedVariants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0);
     }
 
+    // Parse specifications/highlights from supplier
+    let parsedSpecifications = [];
+    if (specifications) {
+      if (typeof specifications === 'string') {
+        try {
+          parsedSpecifications = JSON.parse(specifications);
+        } catch {
+          parsedSpecifications = [];
+        }
+      } else if (Array.isArray(specifications)) {
+        parsedSpecifications = specifications;
+      }
+    }
+
     // Authoritative Database Persistence (Strict - NO FAKE FALLBACKS)
     const newProduct = await prisma.product.create({
       data: {
@@ -473,6 +488,7 @@ export const addProduct = async (req, res, next) => {
         thicknesses: parsedThicknesses,
         sku: (sku || '').trim() || null,
         variants: parsedVariants,
+        specifications: parsedSpecifications,
         videoUrl: (videoUrl || '').trim() || null,
         videoType: (videoType || '').trim() || null,
         stock: finalStock,
@@ -656,6 +672,13 @@ export const updateProduct = async (req, res, next) => {
         updateData.colors = JSON.parse(updateData.colors);
       } catch {
         updateData.colors = updateData.colors.split(',').map((c) => c.trim()).filter(Boolean);
+      }
+    }
+    if (updateData.specifications && typeof updateData.specifications === 'string') {
+      try {
+        updateData.specifications = JSON.parse(updateData.specifications);
+      } catch {
+        updateData.specifications = [];
       }
     }
     if (updateData.thickness !== undefined) {

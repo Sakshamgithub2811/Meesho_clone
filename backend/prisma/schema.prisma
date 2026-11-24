@@ -172,6 +172,7 @@ model Product {
   thicknesses        String[] @default([])
   sku                String?
   variants           Json?    @default("[]")
+  specifications     Json?    @default("[]")
   videoUrl           String?  @map("video_url")
   videoType          String?  @map("video_type")
   stock              Int      @default(50)
