@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function CustomerFooter({ onNavigate }) {
   const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(() => {
-    try {
-      return Boolean(localStorage.getItem('mshoppy_newsletter_code'));
-    } catch (_) {
-      return false;
-    }
-  });
+  const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState('');
+
+  // Clear any global legacy flag on load so guests always see the input box
+  useEffect(() => {
+    try {
+      localStorage.removeItem('mshoppy_newsletter_code');
+    } catch (_) {}
+  }, []);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -32,7 +33,6 @@ export default function CustomerFooter({ onNavigate }) {
         existing.push(cleanEmail);
         localStorage.setItem('mshoppy_newsletter_subscribers', JSON.stringify(existing));
       }
-      localStorage.setItem('mshoppy_newsletter_code', 'WELCOME10');
       setSubscribed(true);
       showToast('🎉 Subscribed! Use code WELCOME10 for 10% off.');
     } catch (_) {
