@@ -94,7 +94,7 @@ export default function UserWishlist({ onNavigate, onBack }) {
 
   const handleMoveToCart = async (item) => {
     try {
-      await addToCart(item.productId, 1, item.product?.sizes?.[0] || 'Free Size', item.product);
+      await addToCart(item.productId, 1, item.product?.sizes?.[0] || '', item.product);
       await toggleWishlist(item.productId);
       setWishlistItems(prev => prev.filter(w => w.productId !== item.productId && w.id !== item.productId));
       setCartCount(c => c + 1);

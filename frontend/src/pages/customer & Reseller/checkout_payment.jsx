@@ -125,7 +125,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                   id: 'buynow_' + p.id,
                   productId: p.id,
                   quantity: 1,
-                  size: urlSize || 'Free Size',
+                  size: urlSize || '',
                   product: p
                 };
                 items = [freshBuynow];
@@ -345,7 +345,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
         items: cartItems.map(item => ({
           productId: item.productId,
           quantity: item.quantity,
-          size: item.size || 'Free Size',
+          size: item.size || '',
           price: (item.product?.price || 0) + (affiliateMargin > 0 ? affiliateMargin : 0)
         })),
         shippingAddress: address,
@@ -525,7 +525,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                     items: cartItems.map(item => ({
                       productId: item.productId,
                       quantity: item.quantity,
-                      size: item.size || 'Free Size',
+                      size: item.size || '',
                       price: (item.product?.price || 0) + (affiliateMargin > 0 ? affiliateMargin : 0)
                     })),
                     shippingAddress: address,
@@ -1177,21 +1177,13 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-bold text-slate-700 ml-1">Enter 6-Digit Bank OTP</label>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentProcessing(prev => ({ ...prev, userOtp: '748291' }))}
-                      className="text-[10px] text-[#FF3F6C] font-bold hover:underline cursor-pointer flex items-center gap-0.5"
-                    >
-                      <span className="material-symbols-outlined text-xs">sms</span>
-                      Auto-detect OTP
-                    </button>
                   </div>
                   <input
                     type="text"
                     maxLength={6}
                     value={paymentProcessing.userOtp || ''}
                     onChange={(e) => setPaymentProcessing(prev => ({ ...prev, userOtp: e.target.value.replace(/\D/g, '') }))}
-                    placeholder="748291"
+                    placeholder="• • • • • •"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center text-lg font-mono font-black tracking-widest text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FF3F6C]"
                     autoFocus
                   />

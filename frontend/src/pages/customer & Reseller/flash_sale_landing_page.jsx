@@ -226,14 +226,14 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
               title: p.title,
               category: p.category?.name || 'Flash Deals',
               price: p.price,
-              originalPrice: p.originalPrice || Math.round(p.price * 1.8),
+              originalPrice: p.originalPrice || p.price,
               discount: p.discountPercentage,
-              rating: p.rating > 0 ? p.rating : 4.6,
-              reviewsCount: p.reviewsCount > 0 ? `${p.reviewsCount}` : `${120 + idx * 45}`,
-              margin: Math.round(p.price * 0.3),
-              stockTag: idx % 3 === 0 ? 'Only 3 left' : 'Lightning Deal',
-              claimedPct: 75 + (idx % 22),
-              image: p.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600'
+              rating: p.rating !== undefined && Number(p.rating) > 0 ? Number(p.rating) : 0,
+              reviewsCount: p.reviewsCount !== undefined && Number(p.reviewsCount) > 0 ? `${p.reviewsCount}` : '0',
+              margin: Math.round(Number(p.price) * 0.15) || 50,
+              stockTag: p.stock && p.stock < 10 ? `Only ${p.stock} left` : 'Flash Deal',
+              claimedPct: Math.min(95, Math.max(10, Math.round(((100 - (p.stock || 50)) / 100) * 100))),
+              image: p.images?.[0] || p.image || ''
             }));
             setDbProducts(mapped);
           }
@@ -258,7 +258,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     try {
-      await addToCart(product.id, 1, 'Free Size', product);
+      await addToCart(product.id, 1, Array.isArray(product.sizes) && product.sizes.length > 0 ? product.sizes[0] : '', product);
       setCartCount((c) => c + 1);
       triggerToast(`Added "${product.title.slice(0, 25)}..." to Cart! 🛒`);
     } catch (err) {
@@ -277,7 +277,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
     }
   };
 
-  const productSource = dbProducts.length > 0 ? dbProducts : initialProducts;
+  const productSource = dbProducts;
 
   const filteredProducts = productSource
     .filter((p) => {

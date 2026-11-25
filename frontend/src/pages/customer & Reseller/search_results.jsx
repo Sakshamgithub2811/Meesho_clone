@@ -220,7 +220,7 @@ export default function SearchResults({ onNavigate, onBack }) {
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     try {
-      await addToCart(product.id, 1, product.sizes?.[0] || 'Free Size', product);
+      await addToCart(product.id, 1, product.sizes?.[0] || '', product);
       setCartCount(c => c + 1);
       triggerToast(`Added "${product.title.slice(0, 20)}..." to Cart! 🛒`);
     } catch (err) {

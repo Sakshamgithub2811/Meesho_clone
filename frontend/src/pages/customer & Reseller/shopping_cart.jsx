@@ -675,9 +675,11 @@ export default function ShoppingCart({ onNavigate, onBack }) {
                             </h3>
 
                             <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-slate-500">
-                              <span className="bg-slate-100 px-2 py-0.5 rounded-md font-semibold">
-                                Size: <strong className="text-slate-800">{item.size || 'Free Size'}</strong>
-                              </span>
+                              {item.size && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded-md font-semibold">
+                                  Size: <strong className="text-slate-800">{item.size}</strong>
+                                </span>
+                              )}
                               {prod.supplierName && (
                                 <span className="text-[11px] text-slate-400">
                                   Seller: <strong className="text-slate-600">{prod.supplierName.toLowerCase().includes('meesho') ? 'Official Store' : prod.supplierName}</strong>

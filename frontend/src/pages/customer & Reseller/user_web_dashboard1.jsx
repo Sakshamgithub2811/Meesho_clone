@@ -1191,7 +1191,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   const handleMoveToCart = async (item) => {
     const prodId = item.productId || item.id;
     try {
-      await addToCart(prodId, 1, item.product?.sizes?.[0] || 'Free Size');
+      await addToCart(prodId, 1, item.product?.sizes?.[0] || '');
       await toggleWishlist(prodId);
       setWishlistItems((prev) => prev.filter((w) => (w.productId || w.id) !== prodId));
       toast.success(`Moved "${item.product?.title?.slice(0, 24) || 'Product'}" to Cart! 🛒`);
@@ -2905,7 +2905,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                                 <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                                   <span>Qty: {item.quantity || 1}</span>
                                   <span>•</span>
-                                  <span>Size: {item.size || 'Free Size'}</span>
+                                  <span>{item.size ? `Size: ${item.size}` : 'Standard'}</span>
                                   <span>•</span>
                                   <span className="font-bold text-slate-900">₹{item.price || p.price || 0}</span>
                                 </div>

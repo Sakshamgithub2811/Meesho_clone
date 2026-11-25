@@ -873,7 +873,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
     }
     setAddingToCart(true);
     try {
-      const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
+      const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || '';
       await addItem(product.id, 1, sizeToPass, {
         ...product,
         selectedColor: selectedColor || undefined,
@@ -936,7 +936,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
       triggerToast(`Selected variant is Out of Stock! ⚠️`);
       return;
     }
-    const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
+    const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || '';
     const buynowItem = {
       id: 'buynow_' + product.id,
       productId: product.id,
@@ -1027,11 +1027,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
     ? product.sizes
     : [];
 
-  const sizes = isNoSizeCategory
-    ? []
-    : (categorySlugLower === 'footwear' && (rawSizes.length === 0 || rawSizes.includes('Standard')))
-      ? ['IND-6', 'IND-7', 'IND-8', 'IND-9', 'IND-10']
-      : rawSizes;
+  const sizes = isNoSizeCategory ? [] : rawSizes;
 
   // Only resolve colors if the product actually provides them (never force dummy clothing colors)
   const colorOptions = (Array.isArray(product.colors) && product.colors.length > 0)
@@ -1057,9 +1053,9 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   const currentVariantStock = activeVariant ? Number(activeVariant.stock ?? 0) : Number(product?.stock ?? 0);
   const activeSku = activeVariant?.sku || product.sku || null;
 
-  // Real Database-Driven Ratings & Reviews (Exactly matching Home Page & Catalog)
-  const rawRating = product?.rating !== undefined && Number(product.rating) > 0 ? Number(product.rating) : 4.2;
-  const displayRating = rawRating.toFixed(1);
+  // Real Database-Driven Ratings & Reviews (Zero fake fallbacks)
+  const rawRating = product?.rating !== undefined && Number(product.rating) > 0 ? Number(product.rating) : 0;
+  const displayRating = rawRating > 0 ? rawRating.toFixed(1) : '0.0';
 
   const rawReviewsCount = product?.reviewsCount !== undefined && Number(product.reviewsCount) >= 0
     ? Number(product.reviewsCount)
@@ -1068,10 +1064,13 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   // If product has written reviews in DB, display actual count; otherwise 0 (buyers only rated with stars)
   const displayReviewsCount = productReviews.length;
 
-  const hasRatings = rawReviewsCount > 0 || productReviews.length > 0;
+  const hasRatings = (rawRating > 0 && rawReviewsCount > 0) || productReviews.length > 0;
 
   // Star breakdown: distribute total ratings across 5 star levels matching exact Meesho specification
   const computeBreakdown = () => {
+    if (!hasRatings || displayRatingsCount === 0) {
+      return { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    }
     const total = Math.max(1, displayRatingsCount);
 
     // If total ratings matches the written reviews count, use exact written reviews count
@@ -1560,13 +1559,21 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                   className="flex items-center gap-2 cursor-pointer group select-none pt-0.5 flex-wrap"
                   title="Click to view ratings and reviews"
                 >
-                  <span className="inline-flex items-center gap-1 bg-[#038d63] text-white font-bold text-xs px-2.5 py-0.5 rounded-full shadow-xs">
-                    <span>{displayRating}</span>
-                    <span className="text-[10px]">★</span>
-                  </span>
-                  <span className="text-xs text-slate-500 font-medium group-hover:underline">
-                    {displayRatingsCount.toLocaleString()} Ratings, {displayReviewsCount.toLocaleString()} Reviews
-                  </span>
+                  {hasRatings ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 bg-[#038d63] text-white font-bold text-xs px-2.5 py-0.5 rounded-full shadow-xs">
+                        <span>{displayRating}</span>
+                        <span className="text-[10px]">★</span>
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium group-hover:underline">
+                        {displayRatingsCount.toLocaleString()} Ratings{displayReviewsCount > 0 ? `, ${displayReviewsCount.toLocaleString()} Reviews` : ''}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-slate-400 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full">
+                      No ratings yet
+                    </span>
+                  )}
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
                     <span>🛡️</span>
                     <span>Trusted</span>
@@ -1959,7 +1966,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                   {showAdditionalDetails && (
                     <div className="mt-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/60 text-xs text-slate-600 space-y-1.5 animate-in fade-in">
                       <p><strong>Package Contains:</strong> {packageContains}</p>
-                      <p><strong>Supplier:</strong> {product.supplierName || 'Verified Supplier'}</p>
+                      <p><strong>Supplier:</strong> {product.supplierName || 'Independent Seller'}</p>
                       <p><strong>Country of Origin:</strong> India</p>
                       {product.description && (
                         <p className="pt-1 border-t border-slate-200/80 text-[11.5px] leading-relaxed">
@@ -2004,7 +2011,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                   <div className="flex items-center gap-4 sm:gap-6 pt-2 border-t border-slate-100 text-xs">
                     <div className="flex items-center gap-1.5">
                       <span className="inline-flex items-center gap-0.5 bg-[#038d63] text-white font-bold text-[10px] px-2 py-0.5 rounded-full">
-                        <span>{product.supplierStats?.rating ? Number(product.supplierStats.rating).toFixed(1) : (product.rating ? Number(product.rating).toFixed(1) : '4.2')}</span>
+                        <span>{product.supplierStats?.rating ? Number(product.supplierStats.rating).toFixed(1) : (product.rating && Number(product.rating) > 0 ? Number(product.rating).toFixed(1) : '0.0')}</span>
                         <span>★</span>
                       </span>
                       <span className="text-slate-500 font-semibold">
@@ -2078,7 +2085,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
             {hasRatings ? (
               <>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 py-2 border-b border-slate-100">
-                  {/* Left: Big Score & Count (Image 1: 4.2 ★, 2992 Ratings, 1122 Reviews) */}
+                  {/* Left: Big Score & Count */}
                   <div className="space-y-1 shrink-0">
                     <div className="flex items-center gap-1.5 text-[#038d63]">
                       <span className="text-4xl sm:text-5xl font-black tracking-tight">

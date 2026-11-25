@@ -1878,13 +1878,19 @@ export default function HomeUserCustomer() {
 
                             {/* Star Rating & Review Count */}
                             <div className="flex items-center gap-1.5 pt-0.5">
-                              <span className="inline-flex items-center gap-0.5 bg-[#038d63] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
-                                <span>{p.rating !== undefined && Number(p.rating) > 0 ? Number(p.rating).toFixed(1) : '4.2'}</span>
-                                <span className="text-[9px]">★</span>
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-medium truncate">
-                                {p.reviewsCount !== undefined && Number(p.reviewsCount) > 0 ? `${Number(p.reviewsCount).toLocaleString()} Reviews` : (Number(p.rating) > 0 ? `${Math.round(Number(p.rating) * 5)} Reviews` : 'No reviews')}
-                              </span>
+                              {p.rating !== undefined && Number(p.rating) > 0 ? (
+                                <>
+                                  <span className="inline-flex items-center gap-0.5 bg-[#038d63] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                                    <span>{Number(p.rating).toFixed(1)}</span>
+                                    <span className="text-[9px]">★</span>
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-medium truncate">
+                                    {p.reviewsCount !== undefined && Number(p.reviewsCount) > 0 ? `${Number(p.reviewsCount).toLocaleString()} Reviews` : 'Ratings only'}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 font-medium">No ratings yet</span>
+                              )}
                             </div>
 
                             {/* Delivery Info */}

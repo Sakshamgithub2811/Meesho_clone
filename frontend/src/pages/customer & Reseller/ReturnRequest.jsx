@@ -108,7 +108,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
 
   // Deterministic 4-digit Pickup OTP based on Order ID
   const pickupOtp = React.useMemo(() => {
-    const seed = (orderIdParam || 'return-sample').split('').reduce((acc, char) => (acc * 41 + char.charCodeAt(0)) % 9000, 1000);
+    const seed = (orderIdParam || 'return-order').split('').reduce((acc, char) => (acc * 41 + char.charCodeAt(0)) % 9000, 1000);
     return Math.abs(seed) + 1000;
   }, [orderIdParam]);
 
@@ -521,7 +521,7 @@ export default function ReturnRequest({ onNavigate, onBack }) {
               <section className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 space-y-2.5 sm:space-y-3">
                 <h3 className="font-black text-xs sm:text-sm text-slate-900 flex items-center gap-1.5 flex-wrap">
                   <span>Select New Size you want</span>
-                  <span className="text-[11px] text-slate-400 font-normal">(Current: Free Size)</span>
+                  <span className="text-[11px] text-slate-400 font-normal">{sizeParam ? `(Current: ${sizeParam})` : ''}</span>
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {[
