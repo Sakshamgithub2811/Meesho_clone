@@ -1579,6 +1579,12 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     Add multiple high-resolution photos (Front, Back, Close-up, Lifestyle).
                   </p>
+                  <div className="mt-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60 text-[11px] text-amber-900 flex items-start gap-2">
+                    <span className="material-symbols-outlined text-sm text-amber-600 shrink-0 mt-0.5">verified_user</span>
+                    <p className="leading-relaxed">
+                      <strong>Image Ownership & Licensing:</strong> Upload only original photography, royalty-free stock with commercial license, or commercial AI-generated images matching the product. External hotlinks are prohibited; all photos are self-hosted securely on our platform.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Upload & Quick Action Buttons */}
