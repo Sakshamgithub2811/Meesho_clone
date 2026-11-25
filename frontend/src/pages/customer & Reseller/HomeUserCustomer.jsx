@@ -1338,7 +1338,7 @@ export default function HomeUserCustomer() {
               onScroll={checkBrandScroll}
               className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-2 scroll-smooth"
             >
-              {(dbCategories.length > 0 ? dbCategories : []).map((cat) => (
+              {(dbCategories || []).filter(c => c.imageUrl || c.image).map((cat) => (
                 <div
                   key={cat.id || cat.slug}
                   onClick={() => {
@@ -1350,19 +1350,13 @@ export default function HomeUserCustomer() {
                   className="flex-shrink-0 w-28 sm:w-36 md:w-40 rounded-2xl sm:rounded-3xl bg-[#f0f3ff] dark:bg-slate-800/80 border border-indigo-100/70 dark:border-indigo-900/40 p-2 sm:p-2.5 flex flex-col items-center justify-between cursor-pointer hover:shadow-lg hover:border-indigo-300 transition-all duration-300 group/card"
                 >
                   <div className="w-full aspect-[4/5] rounded-xl overflow-hidden flex items-center justify-center mb-2 bg-white dark:bg-slate-700/50">
-                    {cat.image ? (
-                      <img
-                        src={cat.image}
-                        alt={cat.name}
-                        className="w-full h-full object-contain group-hover/card:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    ) : (
-                      <span className="material-symbols-outlined text-3xl sm:text-4xl text-indigo-500">
-                        {cat.icon || 'category'}
-                      </span>
-                    )}
+                    <img
+                      src={cat.imageUrl || cat.image}
+                      alt={cat.name}
+                      className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
                   </div>
                   <div className="w-full bg-[#5838fc] group-hover/card:bg-[#461fe0] text-white text-center py-1.5 sm:py-2 px-2 rounded-xl sm:rounded-2xl shadow-xs transition-colors">
                     <span className="text-[11px] sm:text-xs font-bold tracking-tight block truncate">
@@ -1646,7 +1640,7 @@ export default function HomeUserCustomer() {
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                   {displayedProducts.map((p, idx) => {
                     const isFav = favorites.includes(p.id);
-                    const mainImg = (Array.isArray(p.images) && p.images[0]) || p.image || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' width='400' height='400'%3E%3Crect width='400' height='400' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' font-weight='600' fill='%2394a3b8'%3ENo Image%3C/text%3E%3C/svg%3E";
+                    const mainImg = (Array.isArray(p.images) && p.images[0]) || p.image || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 500' width='400' height='500'%3E%3Crect width='400' height='500' fill='%23f8fafc'/%3E%3Cpath d='M160 180v-30c0-22.1 17.9-40 40-40s40 17.9 40 40v30h30l20 180H110l20-180h30zm20 0h40v-30c0-11-9-20-20-20s-20 9-20 20v30z' fill='%23cbd5e1'/%3E%3C/svg%3E";
                     const hasOffer = Boolean(Number(p.discountPercentage) >= 40);
                     const isMall = Boolean(p.isMall || (Number(p.discountPercentage) >= 35));
 
@@ -1668,7 +1662,7 @@ export default function HomeUserCustomer() {
                               loading="lazy"
                               onError={(e) => {
                                 e.currentTarget.onerror = null;
-                                e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' width='400' height='400'%3E%3Crect width='400' height='400' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' font-weight='600' fill='%2394a3b8'%3ENo Image%3C/text%3E%3C/svg%3E";
+                                e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 500' width='400' height='500'%3E%3Crect width='400' height='500' fill='%23f8fafc'/%3E%3Cpath d='M160 180v-30c0-22.1 17.9-40 40-40s40 17.9 40 40v30h30l20 180H110l20-180h30zm20 0h40v-30c0-11-9-20-20-20s-20 9-20 20v30z' fill='%23cbd5e1'/%3E%3C/svg%3E";
                               }}
                             />
                             
