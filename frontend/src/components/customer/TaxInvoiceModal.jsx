@@ -14,7 +14,7 @@ export default function TaxInvoiceModal({ order, onClose }) {
     : [{
         quantity: 1,
         price: order.totalAmount || order.price || 0,
-        size: order.size || 'Free Size',
+        size: order.size || '',
         product: { title: order.productName || 'Catalog Product' }
       }];
 
@@ -148,7 +148,7 @@ export default function TaxInvoiceModal({ order, onClose }) {
                   <tr key={idx} className="hover:bg-slate-50/50">
                     <td className="py-2.5 px-3 font-mono text-slate-400">{idx + 1}</td>
                     <td className="py-2.5 px-3 font-semibold text-slate-900 max-w-xs">{title}</td>
-                    <td className="py-2.5 px-3 text-slate-500">{it.size || 'Free Size'}</td>
+                    <td className="py-2.5 px-3 text-slate-500">{it.size || '—'}</td>
                     <td className="py-2.5 px-3 text-center font-bold text-slate-800">{qty}</td>
                     <td className="py-2.5 px-3 text-right font-mono text-slate-700">₹{price}</td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">₹{lineTotal}</td>

@@ -266,8 +266,8 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
             {products.map((product) => {
               const isFav = wishlist[product.id];
               const displayImage = product.images?.[0] || product.image || '';
-              const margin = Math.round((Number(product.price) || 0) * 0.15) || 50;
-              const originalPrice = product.originalPrice || Math.round((Number(product.price) || 0) * 1.5);
+              const margin = Math.round((Number(product.price) || 0) * 0.15);
+              const originalPrice = product.originalPrice ? Number(product.originalPrice) : null;
               const discount = product.discountPercentage ? `${product.discountPercentage}% OFF` : '';
               return (
                 <div

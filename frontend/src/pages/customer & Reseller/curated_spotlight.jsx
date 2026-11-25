@@ -76,23 +76,23 @@ export default function CuratedSpotlight({ onNavigate = () => {}, onBack }) {
       title: 'Modern Ethnic Revival',
       subtitle: 'Festive Banarasi Silks & Designer Georgette Sarees.',
       pieces: `${ethnicProducts.length || products.length} Pieces`,
-      image: ethnicProducts[0]?.images?.[0] || products[0]?.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600',
+      image: ethnicProducts[0]?.images?.[0] || products[0]?.images?.[0] || '',
       categoryTarget: 'women-ethnic',
     },
     {
       id: 'beauty_radiance',
       title: 'Radiance & Glamour',
       subtitle: 'Nude liquid lipsticks and Vitamin C skin brighten serums.',
-      pieces: `${beautyProducts.length || 2} Pieces`,
-      image: beautyProducts[0]?.images?.[0] || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600',
+      pieces: `${beautyProducts.length || 0} Pieces`,
+      image: beautyProducts[0]?.images?.[0] || '',
       categoryTarget: 'beauty-health',
     },
     {
       id: 'jewel_accents',
       title: 'Royal Heritage Accents',
       subtitle: 'Handcrafted silver chokers and traditional artisanal jewellery.',
-      pieces: `${jewelleryProducts.length || 1} Pieces`,
-      image: jewelleryProducts[0]?.images?.[0] || 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600',
+      pieces: `${jewelleryProducts.length || 0} Pieces`,
+      image: jewelleryProducts[0]?.images?.[0] || '',
       categoryTarget: 'jewellery',
     },
   ];
@@ -147,12 +147,11 @@ export default function CuratedSpotlight({ onNavigate = () => {}, onBack }) {
                   alt={heroProduct?.title || 'Editorial Fashion Spotlight'}
                   className="max-h-[580px] w-auto max-w-full object-contain rounded-2xl shadow-2xl select-none"
                   src={
-                    heroProduct?.images?.[0] ||
-                    'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=1200&auto=format&fit=crop&q=80'
+                    heroProduct?.images?.[0] || heroProduct?.image || ''
                   }
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=1200';
+                    e.currentTarget.src = '';
                   }}
                 />
 
@@ -337,12 +336,12 @@ export default function CuratedSpotlight({ onNavigate = () => {}, onBack }) {
                   <div>
                     <div className="relative aspect-square rounded-xl overflow-hidden mb-2.5 bg-slate-50 p-1">
                       <img
-                        src={p.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400'}
+                        src={p.images?.[0] || p.image || ''}
                         alt={p.title}
                         className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400';
+                          e.currentTarget.src = '';
                         }}
                       />
                       {p.discountPercentage > 0 && (

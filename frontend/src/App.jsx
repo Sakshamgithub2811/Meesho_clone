@@ -505,12 +505,19 @@ function AppRoutes() {
       const customMargin = getAffiliateMarginFromParams(searchParams);
       if (refCode && refCode.trim()) {
         const cleanRef = refCode.trim().toUpperCase();
-        localStorage.setItem('mshoppy_referral_code', cleanRef);
-        localStorage.setItem('mshoppy_referral_timestamp', Date.now().toString());
-        if (customMargin > 0) {
-          localStorage.setItem('mshoppy_affiliate_margin', customMargin.toString());
+        if (!cleanRef.startsWith('KYC-')) {
+          localStorage.setItem('mshoppy_referral_code', cleanRef);
+          localStorage.setItem('mshoppy_referral_timestamp', Date.now().toString());
+          if (customMargin > 0) {
+            localStorage.setItem('mshoppy_affiliate_margin', customMargin.toString());
+          }
+          recordAffiliateClick(cleanRef);
         }
-        recordAffiliateClick(cleanRef);
+      }
+      // Safety cleanup: purge any non-referral KYC reference numbers from referral storage
+      const savedRef = localStorage.getItem('mshoppy_referral_code');
+      if (savedRef && savedRef.startsWith('KYC-')) {
+        localStorage.removeItem('mshoppy_referral_code');
       }
     } catch (e) {}
   }, [location.search]);

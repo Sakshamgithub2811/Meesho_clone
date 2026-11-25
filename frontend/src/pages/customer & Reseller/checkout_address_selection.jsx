@@ -224,28 +224,8 @@ export default function CheckoutAddressSelection({ onNavigate, onBack }) {
       setPincodeStatus(null);
       triggerToast('Delivery address saved successfully! 📍');
     } catch (err) {
-      console.warn('API saveAddress notice:', err);
-      const fallbackSaved = {
-        id: 'local_addr_' + Date.now(),
-        fullName: payload.fullName,
-        phone: payload.phone,
-        pincode: payload.pincode,
-        addressLine: payload.addressLine,
-        city: payload.city,
-        state: payload.state,
-        isDefault: payload.isDefault
-      };
-      setAddresses(prev => [fallbackSaved, ...prev]);
-      setSelectedAddressId(fallbackSaved.id);
-      localStorage.setItem('mshoppy_selected_address', JSON.stringify({
-        id: fallbackSaved.id,
-        name: fallbackSaved.fullName,
-        phone: fallbackSaved.phone,
-        pincode: fallbackSaved.pincode,
-        details: `${fallbackSaved.addressLine}, ${fallbackSaved.city}, ${fallbackSaved.state}`
-      }));
-      setShowAddAddressModal(false);
-      triggerToast('Delivery address saved! 📍');
+      console.error('API saveAddress error:', err);
+      triggerToast(err.message || 'Failed to save delivery address. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

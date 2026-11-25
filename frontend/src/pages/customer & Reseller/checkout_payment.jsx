@@ -1037,7 +1037,7 @@ export default function CheckoutPayment({ onNavigate, onBack }) {
                     {cartItems.map((it) => (
                       <div key={it.id} className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                         <img
-                          src={it.product?.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=200'}
+                          src={it.product?.images?.[0] || it.product?.image || ''}
                           alt={it.product?.title}
                           className="w-10 h-10 rounded-lg object-cover"
                         />

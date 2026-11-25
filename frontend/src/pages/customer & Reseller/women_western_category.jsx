@@ -168,7 +168,7 @@ export default function WomenWesternCategory({ onNavigate, onBack }) {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {filtered.map((product) => {
               const isFav = wishlist.has(product.id);
-              const img = product.images?.[0] || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600';
+              const img = product.images?.[0] || product.image || '';
 
               return (
                 <div

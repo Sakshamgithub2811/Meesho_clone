@@ -186,7 +186,7 @@ export default function UserWishlist({ onNavigate, onBack }) {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {filteredItems.map((item) => {
                 const prod = item.product || {};
-                const img = prod.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400';
+                const img = prod.images?.[0] || prod.image || '';
 
                 return (
                   <div

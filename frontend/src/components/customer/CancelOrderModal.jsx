@@ -13,9 +13,9 @@ export default function CancelOrderModal({
 
   const primaryItem = order.items?.[0] || {};
   const prod = primaryItem.product || {};
-  const image = order.image || prod.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=200';
+  const image = order.image || prod.images?.[0] || prod.image || '';
   const productName = order.productName || prod.title || (order.items?.length > 1 ? `${order.items.length} Order Items` : 'Catalog Order');
-  const size = order.size || primaryItem.size || 'Free Size';
+  const size = order.size || primaryItem.size || '';
   const price = Number(order.price ?? order.totalAmount ?? 0);
   const paymentMethod = (order.paymentMethod || 'COD').toUpperCase();
 
@@ -62,7 +62,7 @@ export default function CancelOrderModal({
             <p className="text-xs font-bold text-slate-800 line-clamp-1">{productName}</p>
             <p className="text-[11px] text-slate-500 mt-0.5">
               {order.items?.length > 1 ? `${order.items.length} items • ` : ''}
-              Size: {size} • <strong className="text-slate-900">₹{price.toLocaleString('en-IN')}</strong>
+              {size ? `Size: ${size} • ` : ''}<strong className="text-slate-900">₹{price.toLocaleString('en-IN')}</strong>
             </p>
           </div>
         </div>

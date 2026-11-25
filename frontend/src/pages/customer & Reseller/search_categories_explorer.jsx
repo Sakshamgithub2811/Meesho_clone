@@ -221,7 +221,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
   const bannerImage =
     currentCategory?.imageUrl ||
     (products[0]?.images && products[0].images[0]) ||
-    'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80';
+    '';
 
   // 100% Dynamic Subcategories extracted directly from PostgreSQL Category & Products
   const dynamicSubcategories = useMemo(() => {
@@ -515,7 +515,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {filteredProducts.map((prod) => {
                   const isFav = wishlist.has(prod.id);
-                  const image = (prod.images && prod.images[0]) || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
+                  const image = (prod.images && prod.images[0]) || prod.image || '';
                   const discount = prod.discountPercentage || Math.round(((prod.originalPrice - prod.price) / (prod.originalPrice || prod.price)) * 100) || 0;
 
                   return (
