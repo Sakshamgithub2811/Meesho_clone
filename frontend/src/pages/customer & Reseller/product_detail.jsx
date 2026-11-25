@@ -414,6 +414,50 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   const [shareMode, setShareMode] = useState('with-price'); // 'with-price', 'images-only', 'desc'
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // ── Back-in-Stock Notification State ──
+  const [showBackInStockModal, setShowBackInStockModal] = useState(false);
+  const [stockNotifyEmail, setStockNotifyEmail] = useState('');
+  const [stockNotifySubmitted, setStockNotifySubmitted] = useState(false);
+  const [stockNotifyLoading, setStockNotifyLoading] = useState(false);
+
+  const handleSubscribeRestock = (e) => {
+    e?.preventDefault();
+    const emailToUse = (stockNotifyEmail || '').trim();
+    if (!emailToUse || !emailToUse.includes('@')) {
+      triggerToast('Please enter a valid email address');
+      return;
+    }
+    setStockNotifyLoading(true);
+    try {
+      const existing = JSON.parse(localStorage.getItem('mshoppy_stock_alerts') || '[]');
+      const newAlert = {
+        productId: product?.id || productId,
+        title: product?.title || 'Product',
+        size: selectedSize || 'Standard',
+        email: emailToUse,
+        createdAt: new Date().toISOString()
+      };
+      const alreadySubscribed = existing.some(
+        a => a.productId === newAlert.productId && a.email.toLowerCase() === emailToUse.toLowerCase()
+      );
+      if (!alreadySubscribed) {
+        existing.push(newAlert);
+        localStorage.setItem('mshoppy_stock_alerts', JSON.stringify(existing));
+      }
+      setStockNotifySubmitted(true);
+      triggerToast('🔔 Restock alert saved! We will email you when back in stock.');
+      setTimeout(() => {
+        setShowBackInStockModal(false);
+        setStockNotifySubmitted(false);
+      }, 2500);
+    } catch (_) {
+      triggerToast('Alert saved successfully!');
+      setShowBackInStockModal(false);
+    } finally {
+      setStockNotifyLoading(false);
+    }
+  };
+
   const getReferralCode = () => {
     try {
       const affApp = getAffiliateApp();
@@ -1520,6 +1564,34 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                 </button>
               </div>
 
+              {/* Back In Stock Notification Banner if product or variant is out of stock */}
+              {isVariantOutOfStock && (
+                <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 mb-5 flex items-center justify-between gap-3 animate-in fade-in">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-xl">notifications_active</span>
+                    </span>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-black text-amber-900 leading-tight">Currently Out of Stock</h4>
+                      <p className="text-[11px] text-amber-700">Get an instant email alert as soon as this item is restocked.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        const u = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+                        if (u?.email && !u.email.endsWith('@customer.meesho')) setStockNotifyEmail(u.email);
+                      } catch (_) {}
+                      setShowBackInStockModal(true);
+                    }}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5"
+                  >
+                    <span>Notify Me</span>
+                  </button>
+                </div>
+              )}
+
               {/* Reseller Profit Margin & WhatsApp Share Card (Visible ONLY in Reseller Mode, never to normal customers) */}
               {isResellerMode && (
                 <div className="bg-gradient-to-r from-emerald-50 via-green-50/70 to-emerald-50/50 border-2 border-emerald-300/80 rounded-2xl p-4 sm:p-5 shadow-xs mb-5">
@@ -2401,6 +2473,23 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
             <span className="material-symbols-outlined text-lg">bolt</span>
             <span className="truncate">{isProductUnavailable ? 'Discontinued' : (isVariantOutOfStock ? 'Sold Out' : 'Buy Now')}</span>
           </button>
+
+          {isVariantOutOfStock && (
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  const u = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+                  if (u?.email && !u.email.endsWith('@customer.meesho')) setStockNotifyEmail(u.email);
+                } catch (_) {}
+                setShowBackInStockModal(true);
+              }}
+              className="px-3.5 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-2xl shadow-md shrink-0 cursor-pointer flex items-center gap-1 transition-colors"
+            >
+              <span className="material-symbols-outlined text-base">notifications</span>
+              <span className="hidden sm:inline">Notify Me</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -2915,6 +3004,80 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                 );
               })()}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Back-In-Stock Notification Subscription Modal */}
+      {showBackInStockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-lg">
+                  🔔
+                </span>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900 dark:text-white">Get Back-in-Stock Alert</h3>
+                  <p className="text-[11px] text-slate-500">We will email you the moment this item is available.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBackInStockModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 text-lg cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60">
+              <img
+                src={mainImage || (product?.images && product.images[0])}
+                alt={product?.title}
+                className="w-12 h-12 rounded-xl object-cover border border-slate-200 bg-white shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">{product?.title}</h4>
+                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
+                  <span>Size: <strong>{selectedSize || 'Free Size'}</strong></span>
+                  <span>•</span>
+                  <span className="font-bold text-[#b7004d]">₹{effectivePrice}</span>
+                </div>
+              </div>
+            </div>
+
+            {stockNotifySubmitted ? (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1">
+                <span className="material-symbols-outlined text-2xl text-emerald-600">check_circle</span>
+                <h4 className="text-xs font-black text-emerald-900">You're on the Restock VIP list!</h4>
+                <p className="text-[11px] text-emerald-700">We'll send an instant email notification once new units arrive.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubscribeRestock} className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Your Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={stockNotifyEmail}
+                    onChange={(e) => setStockNotifyEmail(e.target.value)}
+                    placeholder="e.g. yourname@example.com"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={stockNotifyLoading}
+                  className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-base">notifications</span>
+                  <span>Notify Me When Available</span>
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

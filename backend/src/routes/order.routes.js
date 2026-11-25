@@ -8,7 +8,9 @@ import {
   sendOtpEmail,
   submitReturnRequest,
   resendDispatchEmail,
-  resendDeliveryOtpEmail
+  resendDeliveryOtpEmail,
+  sendCodOtp,
+  verifyCodOtp
 } from '../controllers/order.controller.js';
 
 const router = Router();
@@ -16,6 +18,8 @@ const router = Router();
 router.get('/', getOrders);
 router.post('/', createOrder);
 router.post('/send-otp-email', sendOtpEmail);
+router.post('/send-cod-otp', sendCodOtp);
+router.post('/verify-cod-otp', verifyCodOtp);
 router.post('/return-request', submitReturnRequest);
 router.post('/return', submitReturnRequest);
 router.get('/:id', getOrderById);

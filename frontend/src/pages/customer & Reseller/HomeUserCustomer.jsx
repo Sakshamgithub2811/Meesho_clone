@@ -96,6 +96,39 @@ export default function HomeUserCustomer() {
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [showAppDownloadModal, setShowAppDownloadModal] = useState(false);
 
+  // ── Newsletter Subscription State ──
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem('mshoppy_newsletter_code'));
+    } catch (_) { return false; }
+  });
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
+  const [copiedCoupon, setCopiedCoupon] = useState(false);
+
+  const handleSubscribeNewsletter = (e) => {
+    e?.preventDefault();
+    const cleanEmail = (newsletterEmail || '').trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+    setNewsletterLoading(true);
+    try {
+      const existing = JSON.parse(localStorage.getItem('mshoppy_newsletter_subscribers') || '[]');
+      if (!existing.includes(cleanEmail)) {
+        existing.push(cleanEmail);
+        localStorage.setItem('mshoppy_newsletter_subscribers', JSON.stringify(existing));
+      }
+      localStorage.setItem('mshoppy_newsletter_code', 'WELCOME10');
+      setNewsletterSubscribed(true);
+    } catch (_) {
+      setNewsletterSubscribed(true);
+    } finally {
+      setNewsletterLoading(false);
+    }
+  };
+
   // Lock body scroll when App Download Modal is open
   useEffect(() => {
     if (showAppDownloadModal) {
@@ -1774,6 +1807,73 @@ export default function HomeUserCustomer() {
                 )}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* ── Newsletter & VIP Member Discounts Banner ── */}
+        <section className="mt-12 mb-8 bg-gradient-to-r from-pink-900 via-[#800033] to-[#40001a] rounded-3xl p-6 sm:p-10 text-white relative overflow-hidden shadow-2xl">
+          <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-pink-500/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute left-1/3 -top-10 w-48 h-48 bg-rose-400/10 rounded-full blur-2xl pointer-events-none" />
+
+          <div className="relative z-10 max-w-2xl mx-auto text-center space-y-4">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-pink-200">
+              <span className="material-symbols-outlined text-sm">mark_email_read</span>
+              <span>MShoppy VIP Newsletter</span>
+            </div>
+
+            <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              Get 10% OFF Your First Order &amp; Weekly Deals
+            </h3>
+
+            <p className="text-xs sm:text-sm text-pink-100/80 max-w-xl mx-auto leading-relaxed">
+              Subscribe to receive instant flash sale alerts, weekend price-drops, and handpicked member collections directly to your inbox.
+            </p>
+
+            {newsletterSubscribed ? (
+              <div className="p-4 sm:p-5 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl max-w-md mx-auto text-center space-y-2 animate-in zoom-in-95">
+                <span className="material-symbols-outlined text-3xl text-emerald-400">verified</span>
+                <h4 className="text-sm font-black text-white">You're Subscribed! 🎉</h4>
+                <p className="text-xs text-pink-100">Use your exclusive 10% discount code at checkout:</p>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <span className="px-4 py-2 bg-white text-[#800033] font-mono font-black text-base rounded-xl tracking-wider">
+                    WELCOME10
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText('WELCOME10');
+                      setCopiedCoupon(true);
+                      setTimeout(() => setCopiedCoupon(false), 2000);
+                    }}
+                    className="px-3.5 py-2 bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                  >
+                    {copiedCoupon ? 'COPIED!' : 'COPY CODE'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSubscribeNewsletter} className="flex flex-col sm:flex-row gap-2.5 max-w-md mx-auto pt-2">
+                <input
+                  type="email"
+                  required
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  placeholder="Enter your email address"
+                  className="flex-1 bg-white/15 focus:bg-white text-white focus:text-slate-900 placeholder:text-pink-200/70 focus:placeholder:text-slate-400 border border-white/30 rounded-2xl px-4 py-3.5 text-xs sm:text-sm focus:outline-none transition-all shadow-inner"
+                />
+                <button
+                  type="submit"
+                  disabled={newsletterLoading}
+                  className="px-6 py-3.5 bg-white text-[#800033] hover:bg-pink-50 font-black text-xs sm:text-sm rounded-2xl shadow-lg transition-transform active:scale-95 cursor-pointer uppercase tracking-wider shrink-0"
+                >
+                  {newsletterLoading ? 'Subscribing...' : 'Subscribe'}
+                </button>
+              </form>
+            )}
+
+            <p className="text-[10px] text-pink-200/60 pt-1">
+              Zero spam. Unsubscribe anytime with a single click.
+            </p>
           </div>
         </section>
       </main>
