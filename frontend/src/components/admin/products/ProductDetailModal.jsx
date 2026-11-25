@@ -20,6 +20,8 @@ export default function ProductDetailModal({
   onClose,
   onUpdateStock,
   onDeleteProduct,
+  onApproveProduct,
+  onRejectProduct,
   actionLoading,
   formatCurrency
 }) {
@@ -42,6 +44,10 @@ export default function ProductDetailModal({
     setIsEditingStock(false);
   };
 
+  const isPending = product.approvalStatus === 'PENDING';
+  const isRejected = product.approvalStatus === 'REJECTED';
+  const isApproved = product.approvalStatus === 'APPROVED' || (product.isActive && !isRejected);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 p-6 space-y-6 animate-in fade-in zoom-in-95 duration-150">
@@ -54,6 +60,21 @@ export default function ProductDetailModal({
                 {product.title}
               </h3>
               <ProductStockBadge stock={product.stock} />
+              {isPending && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                  Pending Review ⏳
+                </span>
+              )}
+              {isRejected && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                  Rejected ❌
+                </span>
+              )}
+              {isApproved && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Live & Approved ✅
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-500 mt-1">
               Category: <span className="font-semibold text-gray-700">{product.category?.name || product.categorySlug}</span>
@@ -61,6 +82,11 @@ export default function ProductDetailModal({
                 <span> • Supplier: <strong className="text-gray-800">{product.supplierName}</strong></span>
               )}
             </p>
+            {product.rejectionReason && (
+              <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
+                <strong>Rejection Reason:</strong> {product.rejectionReason}
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -185,29 +211,58 @@ export default function ProductDetailModal({
           </div>
         </div>
 
-        {/* ── 4. FOOTER & DELETE ACTIONS ─────────────────────────────── */}
-        <div className="border-t pt-4 flex justify-between items-center">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onDeleteProduct(product.id, product.title)}
-            disabled={actionLoading}
-            className="text-xs text-red-600 border-red-200 hover:bg-red-50 cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5 mr-1" />
-            Delete Product
-          </Button>
+        {/* ── 4. FOOTER & APPROVAL / DELETE ACTIONS ─────────────────────────────── */}
+        <div className="border-t pt-4 flex flex-wrap justify-between items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onDeleteProduct(product.id, product.title)}
+              disabled={actionLoading}
+              className="text-xs text-red-600 border-red-200 hover:bg-red-50 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              Delete Product
+            </Button>
+          </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            className="text-xs cursor-pointer"
-          >
-            Close
-          </Button>
+          <div className="flex items-center gap-2">
+            {!isApproved && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => onApproveProduct?.(product.id)}
+                disabled={actionLoading}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-8 px-3 rounded-xl cursor-pointer shadow-xs flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                Approve & Publish
+              </Button>
+            )}
+            {!isRejected && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onRejectProduct?.(product.id)}
+                disabled={actionLoading}
+                className="text-rose-600 border-rose-200 hover:bg-rose-50 text-xs font-bold h-8 px-3 rounded-xl cursor-pointer flex items-center gap-1.5"
+              >
+                <X className="w-4 h-4" />
+                Reject
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              className="text-xs cursor-pointer h-8 px-3 rounded-xl"
+            >
+              Close
+            </Button>
+          </div>
         </div>
 
       </div>

@@ -12,11 +12,18 @@ import ProductsTable from './ProductsTable';
 import ProductDetailModal from './ProductDetailModal';
 import BulkActionBar from './BulkActionBar';
 
-const STOCK_TABS = [
-  { id: 'ALL', label: 'All Inventory 📦' },
-  { id: 'in_stock', label: 'In Stock ✅' },
-  { id: 'low_stock', label: 'Low Stock ⚠️' },
-  { id: 'out_of_stock', label: 'Out of Stock ❌' }
+const STATUS_TABS = [
+  { id: 'ALL', label: 'All Products 📦' },
+  { id: 'PENDING', label: 'Pending Approval ⏳' },
+  { id: 'APPROVED', label: 'Live / Approved ✅' },
+  { id: 'REJECTED', label: 'Rejected ❌' }
+];
+
+const STOCK_OPTIONS = [
+  { value: 'ALL', label: 'All Stock Levels' },
+  { value: 'in_stock', label: 'In Stock (>10)' },
+  { value: 'low_stock', label: 'Low Stock (1-10)' },
+  { value: 'out_of_stock', label: 'Out of Stock (0)' }
 ];
 
 export default function AdminProductsManagement() {
@@ -29,13 +36,15 @@ export default function AdminProductsManagement() {
     inStock: 0,
     lowStock: 0,
     outOfStock: 0,
-    totalCategories: 0
+    totalCategories: 0,
+    pendingApprovals: 0
   });
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Filters
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [stockFilter, setStockFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,11 +78,19 @@ export default function AdminProductsManagement() {
   const handleBulkAction = async (action) => {
     if (selectedIds.length === 0) return;
 
+    let reason = '';
     if (action === 'DELETE') {
       const confirmed = window.confirm(
         `Are you sure you want to permanently delete ${selectedIds.length} selected products? This will also remove them from active carts and wishlists.`
       );
       if (!confirmed) return;
+    } else if (action === 'REJECT') {
+      const enteredReason = window.prompt(
+        `Enter rejection reason for ${selectedIds.length} products:`,
+        'Batch rejected by compliance team.'
+      );
+      if (!enteredReason || !enteredReason.trim()) return;
+      reason = enteredReason.trim();
     }
 
     try {
@@ -81,7 +98,7 @@ export default function AdminProductsManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
       const res = await axios.patch(
         `${API_V1_BASE}/admin-products/bulk-status`,
-        { productIds: selectedIds, action },
+        { productIds: selectedIds, action, reason },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -122,6 +139,7 @@ export default function AdminProductsManagement() {
       const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
       const params = new URLSearchParams();
 
+      if (statusFilter !== 'ALL') params.append('approvalStatus', statusFilter);
       if (categoryFilter !== 'ALL') params.append('category', categoryFilter);
       if (stockFilter !== 'ALL') params.append('stockStatus', stockFilter);
       if (searchTerm.trim()) params.append('search', searchTerm.trim());
@@ -169,7 +187,7 @@ export default function AdminProductsManagement() {
       }
     });
     return () => unsubscribe();
-  }, [categoryFilter, stockFilter]);
+  }, [categoryFilter, stockFilter, statusFilter]);
 
   // Debounced search trigger
   useEffect(() => {
@@ -178,6 +196,76 @@ export default function AdminProductsManagement() {
     }, 350);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Handler: Approve Product
+  const handleApproveProduct = async (productId) => {
+    try {
+      setActionLoading(true);
+      const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      const res = await axios.post(
+        `${API_V1_BASE}/admin-products/${productId}/approve`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (res.data?.success) {
+        toast.success("Product Approved! 🚀", {
+          description: res.data.message || "Product is now live on customer catalog."
+        });
+        setSelectedProduct(null);
+        fetchProducts();
+      }
+    } catch (err) {
+      console.error("Failed to approve product:", err);
+      toast.error("Approval Failed", {
+        description: err.response?.data?.message || "Could not approve product."
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handler: Reject Product
+  const handleRejectProduct = async (productId, defaultReason = '') => {
+    const reason = window.prompt(
+      'Enter reason for product rejection (visible to supplier):',
+      defaultReason || 'Product details or images do not comply with marketplace standards.'
+    );
+    if (!reason || !reason.trim()) return;
+
+    try {
+      setActionLoading(true);
+      const token = (await auth.currentUser?.getIdToken()) || currentUser?.id;
+      const res = await axios.post(
+        `${API_V1_BASE}/admin-products/${productId}/reject`,
+        { reason: reason.trim() },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (res.data?.success) {
+        toast.info("Product Rejected", {
+          description: res.data.message || "Product marked as rejected."
+        });
+        setSelectedProduct(null);
+        fetchProducts();
+      }
+    } catch (err) {
+      console.error("Failed to reject product:", err);
+      toast.error("Rejection Failed", {
+        description: err.response?.data?.message || "Could not reject product."
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // Handler: Update Stock
   const handleUpdateStock = async (productId, newStock) => {
@@ -200,17 +288,14 @@ export default function AdminProductsManagement() {
           description: `Inventory updated to ${newStock} units.`
         });
 
-        // Update product in local state
         setProducts((prev) =>
           prev.map((p) => (p.id === productId ? { ...p, stock: Number(newStock) } : p))
         );
 
-        // Update selected product in modal
         if (selectedProduct && selectedProduct.id === productId) {
           setSelectedProduct((prev) => ({ ...prev, stock: Number(newStock) }));
         }
 
-        // Re-fetch stats quietly
         fetchProducts();
       }
     } catch (err) {
@@ -259,18 +344,18 @@ export default function AdminProductsManagement() {
     }
   };
 
-  // ── 5. EXPORT PRODUCTS CATALOG TO CSV ───────────────────────────────
+  // Export Products Catalog to CSV
   const handleExportProducts = () => {
     exportToCsv({
       data: products,
-      filename: `products_catalog_${stockFilter.toLowerCase()}`,
+      filename: `products_catalog_${statusFilter.toLowerCase()}`,
       columns: [
         { key: 'id', label: 'Product ID' },
         { key: 'title', label: 'Product Title' },
+        { key: 'approvalStatus', label: 'Approval Status' },
         { key: 'category.name', label: 'Category' },
-        { key: 'supplier.storeName', label: 'Supplier Store' },
+        { key: 'supplierName', label: 'Supplier Store' },
         { key: 'price', label: 'Customer Price (₹)' },
-        { key: 'supplierPrice', label: 'Wholesale Price (₹)' },
         { key: 'stock', label: 'Inventory Stock' },
         { key: 'rating', label: 'Rating' }
       ]
@@ -296,14 +381,19 @@ export default function AdminProductsManagement() {
         searchPlaceholder="Search by product name, supplier, or category..."
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
-        tabs={STOCK_TABS}
-        activeTab={stockFilter}
-        onTabChange={setStockFilter}
+        tabs={STATUS_TABS}
+        activeTab={statusFilter}
+        onTabChange={setStatusFilter}
         dropdowns={[
           {
             value: categoryFilter,
             onChange: setCategoryFilter,
             options: categoryOptions
+          },
+          {
+            value: stockFilter,
+            onChange: setStockFilter,
+            options: STOCK_OPTIONS
           }
         ]}
         totalCount={products.length}
@@ -319,6 +409,8 @@ export default function AdminProductsManagement() {
         products={products}
         loading={loading}
         onInspectProduct={setSelectedProduct}
+        onApproveProduct={handleApproveProduct}
+        onRejectProduct={handleRejectProduct}
         formatCurrency={formatCurrency}
         selectedIds={selectedIds}
         onToggleSelect={handleToggleSelect}
@@ -330,6 +422,8 @@ export default function AdminProductsManagement() {
         selectedCount={selectedIds.length}
         totalCount={products.length}
         onClearSelection={handleClearSelection}
+        onBulkApprove={() => handleBulkAction('APPROVE')}
+        onBulkReject={() => handleBulkAction('REJECT')}
         onBulkActivate={() => handleBulkAction('ACTIVATE')}
         onBulkDeactivate={() => handleBulkAction('DEACTIVATE')}
         onBulkDelete={() => handleBulkAction('DELETE')}
@@ -343,6 +437,8 @@ export default function AdminProductsManagement() {
           onClose={() => setSelectedProduct(null)}
           onUpdateStock={handleUpdateStock}
           onDeleteProduct={handleDeleteProduct}
+          onApproveProduct={handleApproveProduct}
+          onRejectProduct={handleRejectProduct}
           actionLoading={actionLoading}
           formatCurrency={formatCurrency}
         />

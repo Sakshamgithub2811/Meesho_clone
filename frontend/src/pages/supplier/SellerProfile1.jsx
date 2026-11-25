@@ -169,7 +169,7 @@ export default function SellerProfile1({ onNavigate, embedded = false, onNavigat
     } finally {
       clearAuthSession();
       toast.success('Logged out successfully');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 

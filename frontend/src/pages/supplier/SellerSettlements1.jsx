@@ -116,7 +116,7 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
     } finally {
       clearAuthSession();
       toast.success('Successfully logged out of Supplier portal');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 

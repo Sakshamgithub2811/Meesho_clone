@@ -1,5 +1,38 @@
 [
   {
+    "id": "log_1795620951129_j69m",
+    "adminEmail": "sakshamshrivastava2811@gmail.com",
+    "adminName": "Saksham Shrivastava ",
+    "action": "CATEGORY_APPROVED",
+    "targetType": "CATALOG",
+    "targetId": "9265a371-eb30-4777-905a-d10e67a0ae0a",
+    "details": "Approved category \"Food\" (Slug: food) and activated 1 pending product(s) into live catalog",
+    "ipAddress": "127.0.0.1",
+    "timestamp": "2026-11-25T15:35:51.129Z"
+  },
+  {
+    "id": "log_1795620887205_759z",
+    "adminEmail": "sakshamshrivastava2811@gmail.com",
+    "adminName": "Saksham Shrivastava ",
+    "action": "REJECT_PRODUCT",
+    "targetType": "PRODUCT",
+    "targetId": "291458ff-30f0-43f2-afc1-5e2f368266fe",
+    "details": "Rejected product \"laptop\" (291458ff-30f0-43f2-afc1-5e2f368266fe). Reason: product image is not appropriate",
+    "ipAddress": "127.0.0.1",
+    "timestamp": "2026-11-25T15:34:47.205Z"
+  },
+  {
+    "id": "log_1795620866472_gogu",
+    "adminEmail": "sakshamshrivastava2811@gmail.com",
+    "adminName": "Saksham Shrivastava ",
+    "action": "APPROVE_PRODUCT",
+    "targetType": "PRODUCT",
+    "targetId": "e6366981-b263-4be7-9c0e-b813bad1a8de",
+    "details": "Approved product \"LAY'S AMERICAN STYLE CREAM & ONION\" (e6366981-b263-4be7-9c0e-b813bad1a8de) for live catalog.",
+    "ipAddress": "127.0.0.1",
+    "timestamp": "2026-11-25T15:34:26.472Z"
+  },
+  {
     "id": "log_1794470640902_wlyp",
     "adminEmail": "admin@meesho.com",
     "adminName": "Super Admin",

@@ -110,7 +110,7 @@ export default function SellerAnalytics1({ onNavigate, embedded = false, onNavig
     } finally {
       clearAuthSession();
       toast.success('Successfully logged out of Supplier portal');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 

@@ -885,12 +885,24 @@ function AppRoutes() {
         <Route path="/" element={<HomeUserCustomer />} />
         <Route path="/login" element={<LoginSignup />} />
         <Route path="/logout" element={<LogoutPage />} />
-        <Route path="/supplier/logout" element={<SupplierLogoutPage />} />
-        <Route path="/supplier-logout" element={<SupplierLogoutPage />} />
+        
+        {/* Supplier Auth Routes (Clean Nested URLs) */}
+        <Route path="/supplier/auth/login" element={<SupplierLogin defaultTab="login" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/auth/register" element={<SupplierLogin defaultTab="register" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/auth/logout" element={<SupplierLogoutPage />} />
+        <Route path="/supplier/logout" element={<Navigate to="/supplier/auth/logout" replace />} />
+        <Route path="/supplier-logout" element={<Navigate to="/supplier/auth/logout" replace />} />
+        <Route path="/supplier-login" element={<Navigate to="/supplier/auth/login" replace />} />
+        <Route path="/supplier-register" element={<Navigate to="/supplier/auth/register" replace />} />
+
+        {/* Admin Auth Routes (Clean Nested URLs) */}
+        <Route path="/admin/auth/login" element={<AdminLogin />} />
+        <Route path="/admin/login" element={<Navigate to="/admin/auth/login" replace />} />
+        <Route path="/admin-login" element={<Navigate to="/admin/auth/login" replace />} />
+
         <Route path="/user/login" element={<UserLogin />} />
         <Route path="/user-login" element={<Navigate to="/user/login" replace />} />
         <Route path="/affiliate/login" element={<AffiliateLogin />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/dropshipper-login" element={<DropshipperLogin />} />
         <Route 
           path="/dropshipper-dashboard" 
@@ -1075,341 +1087,70 @@ function AppRoutes() {
             />
           }
         />
-        {/* Unified Supplier SPA Console (Persistent Layout - Zero Unmount / Zero Flickering) */}
-        <Route
-          path="/supplier-dashboard-2"
-          element={
-            <SellerWebDashboard1
-              initialTab="overview"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-dashboard-1"
-          element={
-            <SellerWebDashboard1
-              initialTab="overview"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-inventory"
-          element={
-            <SellerWebDashboard1
-              initialTab="inventory"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-orders"
-          element={
-            <SellerWebDashboard1
-              initialTab="orders"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/add-product"
-          element={
-            <SellerWebDashboard1
-              initialTab="add-product"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/add-category"
-          element={<AddCategorySupplier onBack={handleBack} onSaveCategory={() => handleNav('/supplier-inventory1')} />}
-        />
-        <Route
-          path="/supplier-profile"
-          element={
-            <SellerWebDashboard1
-              initialTab="profile"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-web-dashboard1"
-          element={
-            <SellerWebDashboard1
-              initialTab="overview"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-dashboard1"
-          element={
-            <SellerWebDashboard1
-              initialTab="overview"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-inventory1"
-          element={
-            <SellerWebDashboard1
-              initialTab="inventory"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-inventory1"
-          element={
-            <SellerWebDashboard1
-              initialTab="inventory"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-orders1"
-          element={
-            <SellerWebDashboard1
-              initialTab="orders"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-orders1"
-          element={
-            <SellerWebDashboard1
-              initialTab="orders"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-dropship1"
-          element={
-            <SellerWebDashboard1
-              initialTab="dropship"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-dropship1"
-          element={
-            <SellerWebDashboard1
-              initialTab="dropship"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-returns1"
-          element={
-            <SellerWebDashboard1
-              initialTab="returns"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-returns1"
-          element={
-            <SellerWebDashboard1
-              initialTab="returns"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-reviews1"
-          element={
-            <SellerWebDashboard1
-              initialTab="reviews"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-reviews"
-          element={
-            <SellerWebDashboard1
-              initialTab="reviews"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-reviews1"
-          element={
-            <SellerWebDashboard1
-              initialTab="reviews"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-add-product1"
-          element={
-            <SellerWebDashboard1
-              initialTab="add-product"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-add-product1"
-          element={
-            <SellerWebDashboard1
-              initialTab="add-product"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-profile1"
-          element={
-            <SellerWebDashboard1
-              initialTab="profile"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-profile1"
-          element={
-            <SellerWebDashboard1
-              initialTab="profile"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-kyc1"
-          element={
-            <SellerWebDashboard1
-              initialTab="kyc"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-kyc1"
-          element={
-            <SellerWebDashboard1
-              initialTab="kyc"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-settlements1"
-          element={
-            <SellerWebDashboard1
-              initialTab="finance"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-settlements1"
-          element={
-            <SellerWebDashboard1
-              initialTab="finance"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-analytics1"
-          element={
-            <SellerWebDashboard1
-              initialTab="analytics"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-analytics1"
-          element={
-            <SellerWebDashboard1
-              initialTab="analytics"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller-dashboard"
-          element={
-            <SellerWebDashboard1
-              initialTab="overview"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/sellers"
-          element={
-            <SellerWebDashboard1
-              initialTab="overview"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/seller"
-          element={
-            <SellerWebDashboard1
-              initialTab="overview"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
-        <Route
-          path="/supplier-returns"
-          element={
-            <SellerWebDashboard1
-              initialTab="returns"
-              onNavigate={handleNav}
-              onBack={handleBack}
-            />
-          }
-        />
+        {/* ======================================================== */}
+        {/* ── CLEAN SUPPLIER PORTAL ROUTES (SLASH-BASED) ──────────── */}
+        {/* ======================================================== */}
+        <Route path="/supplier/dashboard" element={<SellerWebDashboard1 initialTab="overview" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/inventory" element={<SellerWebDashboard1 initialTab="inventory" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/orders" element={<SellerWebDashboard1 initialTab="orders" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/products/add" element={<SellerWebDashboard1 initialTab="add-product" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/settlements" element={<SellerWebDashboard1 initialTab="finance" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/dropship" element={<SellerWebDashboard1 initialTab="dropship" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/returns" element={<SellerWebDashboard1 initialTab="returns" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/reviews" element={<SellerWebDashboard1 initialTab="reviews" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/kyc" element={<SellerWebDashboard1 initialTab="kyc" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/analytics" element={<SellerWebDashboard1 initialTab="analytics" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/profile" element={<SellerWebDashboard1 initialTab="profile" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/supplier/staff" element={<SellerWebDashboard1 initialTab="staff" onNavigate={handleNav} onBack={handleBack} />} />
+        <Route path="/add-category" element={<AddCategorySupplier onBack={handleBack} onSaveCategory={() => handleNav('/supplier/inventory')} />} />
+
+        {/* ── LEGACY SUPPLIER HYPHENATED ROUTE REDIRECTS (FOR ZERO BROKEN LINKS) ── */}
+        <Route path="/seller-web-dashboard1" element={<Navigate to="/supplier/dashboard" replace />} />
+        <Route path="/seller-dashboard1" element={<Navigate to="/supplier/dashboard" replace />} />
+        <Route path="/seller-dashboard" element={<Navigate to="/supplier/dashboard" replace />} />
+        <Route path="/supplier-dashboard-1" element={<Navigate to="/supplier/dashboard" replace />} />
+        <Route path="/supplier-dashboard-2" element={<Navigate to="/supplier/dashboard" replace />} />
+        <Route path="/sellers" element={<Navigate to="/supplier/dashboard" replace />} />
+        <Route path="/seller" element={<Navigate to="/supplier/dashboard" replace />} />
+
+        <Route path="/supplier-inventory" element={<Navigate to="/supplier/inventory" replace />} />
+        <Route path="/supplier-inventory1" element={<Navigate to="/supplier/inventory" replace />} />
+        <Route path="/seller-inventory1" element={<Navigate to="/supplier/inventory" replace />} />
+
+        <Route path="/supplier-orders" element={<Navigate to="/supplier/orders" replace />} />
+        <Route path="/supplier-orders1" element={<Navigate to="/supplier/orders" replace />} />
+        <Route path="/seller-orders1" element={<Navigate to="/supplier/orders" replace />} />
+
+        <Route path="/add-product" element={<Navigate to="/supplier/products/add" replace />} />
+        <Route path="/supplier-add-product1" element={<Navigate to="/supplier/products/add" replace />} />
+        <Route path="/seller-add-product1" element={<Navigate to="/supplier/products/add" replace />} />
+        <Route path="/seller/add-product" element={<Navigate to="/supplier/products/add" replace />} />
+        <Route path="/supplier/add-product" element={<Navigate to="/supplier/products/add" replace />} />
+        <Route path="/seller/products/add" element={<Navigate to="/supplier/products/add" replace />} />
+
+        <Route path="/supplier-kyc1" element={<Navigate to="/supplier/kyc" replace />} />
+        <Route path="/seller-kyc1" element={<Navigate to="/supplier/kyc" replace />} />
+
+        <Route path="/supplier-settlements1" element={<Navigate to="/supplier/settlements" replace />} />
+        <Route path="/seller-settlements1" element={<Navigate to="/supplier/settlements" replace />} />
+
+        <Route path="/supplier-dropship1" element={<Navigate to="/supplier/dropship" replace />} />
+        <Route path="/seller-dropship1" element={<Navigate to="/supplier/dropship" replace />} />
+
+        <Route path="/supplier-returns1" element={<Navigate to="/supplier/returns" replace />} />
+        <Route path="/seller-returns1" element={<Navigate to="/supplier/returns" replace />} />
+        <Route path="/supplier-returns" element={<Navigate to="/supplier/returns" replace />} />
+
+        <Route path="/supplier-reviews1" element={<Navigate to="/supplier/reviews" replace />} />
+        <Route path="/supplier-reviews" element={<Navigate to="/supplier/reviews" replace />} />
+        <Route path="/seller-reviews1" element={<Navigate to="/supplier/reviews" replace />} />
+
+        <Route path="/supplier-analytics1" element={<Navigate to="/supplier/analytics" replace />} />
+        <Route path="/seller-analytics1" element={<Navigate to="/supplier/analytics" replace />} />
+
+        <Route path="/supplier-profile" element={<Navigate to="/supplier/profile" replace />} />
+        <Route path="/supplier-profile1" element={<Navigate to="/supplier/profile" replace />} />
+        <Route path="/seller-profile1" element={<Navigate to="/supplier/profile" replace />} />
         <Route
           path="/supplier-rot-ledger"
           element={<SupplierRotLedger onNavigate={handleNav} onBack={handleBack} />}
@@ -1462,19 +1203,21 @@ function AppRoutes() {
         {/* Admin Panel Routes (Protected) */}
 
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-          <Route path="/admin-panel" element={<AdminWebPanel />} />
-          <Route path="/admin-panel1" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/admin-support" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/support" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/admin-rot-rules" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/admin-dropshipper-kyc" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/admin-kyc" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/admin-affiliate-kyc" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/admin-returns" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/admin-catalog" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/campaign-flow" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/admin-analytics" element={<Navigate to="/admin-panel" replace />} />
-          <Route path="/analytics" element={<Navigate to="/admin-panel" replace />} />
+          <Route path="/admin" element={<AdminWebPanel />} />
+          <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-panel" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-panel1" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-support" element={<Navigate to="/admin" replace />} />
+          <Route path="/support" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-rot-rules" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-dropshipper-kyc" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-kyc" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-affiliate-kyc" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-returns" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-catalog" element={<Navigate to="/admin" replace />} />
+          <Route path="/campaign-flow" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin-analytics" element={<Navigate to="/admin" replace />} />
+          <Route path="/analytics" element={<Navigate to="/admin" replace />} />
         </Route>
         <Route
           path="/support-center"

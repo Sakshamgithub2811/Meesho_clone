@@ -145,6 +145,7 @@ model Category {
   status                String     @default("APPROVED")
   requestedBySupplierId String?    @map("requested_by_supplier_id")
   rejectionReason       String?    @map("rejection_reason")
+  attributeSchema       Json?      @map("attribute_schema")
   createdAt             DateTime   @default(now()) @map("created_at")
 
   @@index([parentId])
@@ -193,6 +194,11 @@ model Product {
   isDeleted Boolean   @default(false) @map("is_deleted")
   deletedAt DateTime? @map("deleted_at")
   isActive  Boolean   @default(true) @map("is_active")
+
+  // Admin Approval & Moderation
+  approvalStatus  String    @default("APPROVED") @map("approval_status") // PENDING, APPROVED, REJECTED
+  rejectionReason String?   @map("rejection_reason")
+  approvedAt      DateTime? @map("approved_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

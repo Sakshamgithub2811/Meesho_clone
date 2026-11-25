@@ -1,47 +1,57 @@
 import React from 'react';
 import StatCard from '../../common/StatCard';
-import { Package, CheckCircle2, AlertTriangle, Layers } from 'lucide-react';
+import { Package, CheckCircle2, AlertTriangle, Layers, Clock } from 'lucide-react';
 
 export default function ProductsStatsGrid({ stats = {} }) {
   const {
     totalProducts = 0,
     inStock = 0,
     lowStock = 0,
-    totalCategories = 0
+    totalCategories = 0,
+    pendingApprovals = 0
   } = stats;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       {/* 1. Total Catalog Products */}
       <StatCard
-        title="Total Catalog Products"
+        title="Total Products"
         value={totalProducts}
         icon={Package}
         color="purple"
-        subtitle="Active items across all sellers"
+        subtitle="All catalog listings"
       />
 
-      {/* 2. In Stock */}
+      {/* 2. Pending Approvals */}
       <StatCard
-        title="Healthy Inventory"
+        title="Pending Approval"
+        value={pendingApprovals}
+        icon={Clock}
+        color="amber"
+        subtitle={pendingApprovals > 0 ? "⚠️ Requires admin review" : "Queue is clear"}
+      />
+
+      {/* 3. In Stock */}
+      <StatCard
+        title="Live & Healthy"
         value={inStock}
         icon={CheckCircle2}
         color="emerald"
         subtitle="Stock count > 10 units"
       />
 
-      {/* 3. Low Stock Alerts */}
+      {/* 4. Low Stock Alerts */}
       <StatCard
         title="Low / Out of Stock"
         value={lowStock}
         icon={AlertTriangle}
-        color="amber"
+        color="rose"
         subtitle="Requires supplier re-stock"
       />
 
-      {/* 4. Active Categories */}
+      {/* 5. Active Categories */}
       <StatCard
-        title="Product Categories"
+        title="Categories"
         value={totalCategories}
         icon={Layers}
         color="blue"

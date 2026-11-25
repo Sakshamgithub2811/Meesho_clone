@@ -495,43 +495,22 @@ export const addProduct = async (req, res, next) => {
         isFreeDelivery: isFreeDelivery === 'false' ? false : Boolean(isFreeDelivery),
         supplierName,
         supplierId,
-        isActive: !isCategoryPending, // Product is Held Under Review until Admin approves custom category
+        isActive: false, // Strict Admin Gate: Must be approved by Admin before going live
+        approvalStatus: 'PENDING',
+        rejectionReason: null,
       },
       include: {
         category: true,
       },
     });
 
-    // Also sync to Supabase if available (Only sync to public live catalog if category is approved)
-    try {
-      if (supabase && newProduct && !isCategoryPending) {
-        await supabase.from('products').insert([
-          {
-            id: newProduct.id,
-            title: newProduct.title,
-            description: newProduct.description,
-            price: newProduct.price,
-            stock: newProduct.stock,
-            images: newProduct.images,
-            category_slug: newProduct.categorySlug,
-            supplier_id: supplierId,
-            supplier_name: supplierName,
-            video_url: newProduct.videoUrl,
-            video_type: newProduct.videoType,
-          }
-        ]).select().catch(() => {});
-      }
-    } catch (_) {}
-
-    const responseMsg = isCategoryPending
-      ? `Product "${newProduct.title}" submitted! It is currently UNDER REVIEW pending Admin approval for category "${category?.name || finalCategorySlug}".`
-      : 'Product created and published successfully to live catalog!';
+    const responseMsg = `Product "${newProduct.title}" submitted successfully! It is currently UNDER REVIEW pending Admin approval before going live to customers.`;
 
     return res.status(201).json({
       success: true,
       message: responseMsg,
       data: newProduct,
-      isUnderReview: isCategoryPending,
+      isUnderReview: true,
     });
   } catch (error) {
     console.error('Error in addProduct:', error);
@@ -750,6 +729,13 @@ export const updateProduct = async (req, res, next) => {
       }
     }
     delete updateData.categoryName;
+
+    // If product was previously rejected and supplier updates it, reset to PENDING for re-review
+    if (existing.approvalStatus === 'REJECTED') {
+      updateData.approvalStatus = 'PENDING';
+      updateData.isActive = false;
+      updateData.rejectionReason = null;
+    }
 
     const updated = await prisma.product.update({
       where: { id },

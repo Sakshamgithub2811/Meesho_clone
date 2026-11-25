@@ -126,7 +126,7 @@ export default function AdminWebPanel() {
   const adminName = user?.fullName || user?.email?.split('@')[0] || "Admin";
 
   // Custom Firebase Logout Hook call
-  const handleLogout = useLogout('/admin/login');
+  const handleLogout = useLogout('/admin/auth/login');
 
   useEffect(() => {
     const fetchCurrentStaffPermissions = async () => {

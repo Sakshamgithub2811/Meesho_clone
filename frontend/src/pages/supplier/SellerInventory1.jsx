@@ -156,7 +156,7 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
     } finally {
       clearAuthSession();
       toast.success('Logged out successfully');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 
@@ -278,13 +278,18 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
     }
   };
 
-  // Helper to determine if product is under review (e.g. custom category pending admin approval)
+  // Helper to determine if product is under review (e.g. pending admin approval)
   const isProductUnderReview = (prod) => {
     return (
-      prod?.isActive === false ||
+      prod?.approvalStatus === 'PENDING' ||
+      (!prod?.isActive && prod?.approvalStatus !== 'REJECTED') ||
       prod?.category?.status === 'PENDING' ||
       prod?.category_status === 'PENDING'
     );
+  };
+
+  const isProductRejected = (prod) => {
+    return prod?.approvalStatus === 'REJECTED';
   };
 
   // Filtered products list (Pure Dynamic Logic)
@@ -298,28 +303,31 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                      (prod.category?.slug === selectedCategory);
 
     const underReview = isProductUnderReview(prod);
+    const rejected = isProductRejected(prod);
     let stockMatch = true;
     const stock = Number(prod.stock || 0);
 
-    if (stockFilter === 'UNDER_REVIEW') stockMatch = underReview;
-    else if (stockFilter === 'LIVE') stockMatch = !underReview;
-    else if (stockFilter === 'IN_STOCK') stockMatch = stock > 0 && !underReview;
-    else if (stockFilter === 'LOW_STOCK') stockMatch = stock > 0 && stock < 10 && !underReview;
-    else if (stockFilter === 'OUT_OF_STOCK') stockMatch = stock === 0 && !underReview;
+    if (stockFilter === 'UNDER_REVIEW') stockMatch = underReview && !rejected;
+    else if (stockFilter === 'LIVE') stockMatch = !underReview && !rejected;
+    else if (stockFilter === 'REJECTED') stockMatch = rejected;
+    else if (stockFilter === 'IN_STOCK') stockMatch = stock > 0 && !underReview && !rejected;
+    else if (stockFilter === 'LOW_STOCK') stockMatch = stock > 0 && stock < 10 && !underReview && !rejected;
+    else if (stockFilter === 'OUT_OF_STOCK') stockMatch = stock === 0 && !underReview && !rejected;
 
     return titleMatch && catMatch && stockMatch;
   });
 
   // Calculate real inventory statistics
   const totalItems = products.length;
-  const underReviewItems = products.filter(isProductUnderReview).length;
-  const liveItems = products.filter((p) => !isProductUnderReview(p)).length;
-  const inStockItems = products.filter((p) => Number(p.stock) > 0 && !isProductUnderReview(p)).length;
+  const underReviewItems = products.filter((p) => isProductUnderReview(p) && !isProductRejected(p)).length;
+  const rejectedItems = products.filter(isProductRejected).length;
+  const liveItems = products.filter((p) => !isProductUnderReview(p) && !isProductRejected(p)).length;
+  const inStockItems = products.filter((p) => Number(p.stock) > 0 && !isProductUnderReview(p) && !isProductRejected(p)).length;
   const lowStockItems = products.filter((p) => {
     const s = Number(p.stock || 0);
-    return s > 0 && s < 10 && !isProductUnderReview(p);
+    return s > 0 && s < 10 && !isProductUnderReview(p) && !isProductRejected(p);
   }).length;
-  const outOfStockItems = products.filter((p) => Number(p.stock) === 0 && !isProductUnderReview(p)).length;
+  const outOfStockItems = products.filter((p) => Number(p.stock) === 0 && !isProductUnderReview(p) && !isProductRejected(p)).length;
 
   const supplierDisplayName = profile?.storeName || profile?.fullName || profile?.name || 'Verified Supplier';
 
@@ -647,6 +655,10 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                   id: 'UNDER_REVIEW',
                   label: underReviewItems > 0 ? `⏳ Under Review (${underReviewItems})` : 'Under Review ⏳',
                 },
+                {
+                  id: 'REJECTED',
+                  label: rejectedItems > 0 ? `❌ Rejected (${rejectedItems})` : 'Rejected ❌',
+                },
                 { id: 'LIVE', label: 'Live Catalog ✅' },
                 { id: 'IN_STOCK', label: 'In Stock' },
                 { id: 'LOW_STOCK', label: 'Low Stock' },
@@ -660,6 +672,8 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                     stockFilter === pill.id
                       ? pill.id === 'UNDER_REVIEW'
                         ? 'bg-amber-500 text-white shadow-xs'
+                        : pill.id === 'REJECTED'
+                        ? 'bg-rose-600 text-white shadow-xs'
                         : 'bg-white text-[#b7004d] shadow-xs'
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
@@ -839,12 +853,26 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                             <span className="text-slate-800 font-semibold">
                               {prod.category?.name || prod.categorySlug || 'General'}
                             </span>
-                            {Boolean(prod.category?.status === 'PENDING' || !prod.isActive) && (
+                            {prod.approvalStatus === 'REJECTED' ? (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-rose-100 text-rose-800 border border-rose-200"
+                                title={`Rejection Reason: ${prod.rejectionReason || 'Violated catalog guidelines'}`}
+                              >
+                                ❌ Rejected {prod.rejectionReason ? `(${prod.rejectionReason})` : ''}
+                              </span>
+                            ) : Boolean(isProductUnderReview(prod)) ? (
                               <span
                                 className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-100 text-amber-800 border border-amber-200"
-                                title="Custom category is currently waiting for Admin approval"
+                                title="Product is waiting for Admin approval before going live to customers"
                               >
                                 ⏳ Review Pending
+                              </span>
+                            ) : (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                title="Product is live for customers to purchase"
+                              >
+                                ✅ Live
                               </span>
                             )}
                           </div>

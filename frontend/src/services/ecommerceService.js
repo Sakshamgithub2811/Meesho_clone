@@ -232,6 +232,25 @@ export async function getCategoryBySlug(slug) {
   }
 }
 
+export async function fetchCategoryAttributes(slug) {
+  if (!slug || slug === 'CUSTOM') return [];
+  const cacheKey = `cat_attr_${slug}`;
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/categories/${encodeURIComponent(slug)}/attributes`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const result = data?.attributes || [];
+    if (result && result.length > 0) setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.warn(`Failed to fetch category attributes for ${slug}:`, error);
+    return [];
+  }
+}
+
 export async function getBanners() {
   const cacheKey = 'banners';
   const cached = getCachedData(cacheKey);

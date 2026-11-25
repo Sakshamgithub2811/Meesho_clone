@@ -244,7 +244,7 @@ export default function SellerKyc1({ onNavigate, embedded = false, onNavigateTab
     } finally {
       clearAuthSession();
       toast.success('Logged out successfully');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 

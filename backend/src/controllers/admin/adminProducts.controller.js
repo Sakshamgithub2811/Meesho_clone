@@ -7,9 +7,14 @@ import { logAdminAction } from '../../utils/auditLogger.js';
  */
 export const getAllProducts = async (req, res) => {
   try {
-    const { category, stockStatus, search } = req.query;
+    const { category, stockStatus, search, approvalStatus } = req.query;
 
-    const where = {};
+    const where = { isDeleted: false };
+
+    // 0. Approval Status Filter (PENDING, APPROVED, REJECTED)
+    if (approvalStatus && approvalStatus.toUpperCase() !== 'ALL') {
+      where.approvalStatus = approvalStatus.toUpperCase();
+    }
 
     // 1. Category Filter (by slug)
     if (category && category.toUpperCase() !== 'ALL') {
@@ -45,7 +50,8 @@ export const getAllProducts = async (req, res) => {
       totalCount,
       outOfStockCount,
       lowStockCount,
-      inStockCount
+      inStockCount,
+      pendingApprovalCount
     ] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -70,10 +76,11 @@ export const getAllProducts = async (req, res) => {
         orderBy: { name: 'asc' },
         select: { id: true, name: true, slug: true }
       }),
-      prisma.product.count(),
-      prisma.product.count({ where: { stock: { lte: 0 } } }),
-      prisma.product.count({ where: { stock: { gt: 0, lte: 10 } } }),
-      prisma.product.count({ where: { stock: { gt: 10 } } })
+      prisma.product.count({ where: { isDeleted: false } }),
+      prisma.product.count({ where: { isDeleted: false, stock: { lte: 0 } } }),
+      prisma.product.count({ where: { isDeleted: false, stock: { gt: 0, lte: 10 } } }),
+      prisma.product.count({ where: { isDeleted: false, stock: { gt: 10 } } }),
+      prisma.product.count({ where: { isDeleted: false, approvalStatus: 'PENDING' } })
     ]);
 
     const stats = {
@@ -81,7 +88,8 @@ export const getAllProducts = async (req, res) => {
       inStock: inStockCount,
       lowStock: lowStockCount,
       outOfStock: outOfStockCount,
-      totalCategories: categories.length
+      totalCategories: categories.length,
+      pendingApprovals: pendingApprovalCount
     };
 
     return res.status(200).json({
@@ -254,12 +262,121 @@ export const deleteProduct = async (req, res) => {
 };
 
 /**
- * 5. BULK ACTION ON MULTIPLE PRODUCTS (ACTIVATE / DEACTIVATE / DELETE)
+ * 5. APPROVE A PRODUCT TO GO LIVE
+ * Route: POST /api/v1/admin-products/:id/approve
+ */
+export const approveProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.product.findUnique({
+      where: { id },
+      include: { category: true }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: {
+        approvalStatus: 'APPROVED',
+        isActive: true,
+        approvedAt: new Date(),
+        rejectionReason: null
+      },
+      include: { category: true }
+    });
+
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'APPROVE_PRODUCT',
+      targetType: 'PRODUCT',
+      targetId: id,
+      details: `Approved product "${existing.title}" (${existing.id}) for live catalog.`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Product "${existing.title}" approved and published to live catalog!`,
+      product: updatedProduct
+    });
+  } catch (error) {
+    console.error('Error approving product:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to approve product',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * 6. REJECT A PRODUCT
+ * Route: POST /api/v1/admin-products/:id/reject
+ */
+export const rejectProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const existing = await prisma.product.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: {
+        approvalStatus: 'REJECTED',
+        isActive: false,
+        rejectionReason: reason || 'Product did not meet catalog quality or pricing guidelines.'
+      },
+      include: { category: true }
+    });
+
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'REJECT_PRODUCT',
+      targetType: 'PRODUCT',
+      targetId: id,
+      details: `Rejected product "${existing.title}" (${existing.id}). Reason: ${reason || 'Guidelines violation'}`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Product "${existing.title}" rejected.`,
+      product: updatedProduct
+    });
+  } catch (error) {
+    console.error('Error rejecting product:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reject product',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * 7. BULK ACTION ON MULTIPLE PRODUCTS (ACTIVATE / DEACTIVATE / DELETE / APPROVE / REJECT)
  * Route: PATCH /api/v1/admin-products/bulk-status
  */
 export const bulkUpdateProductStatus = async (req, res) => {
   try {
-    const { productIds, action } = req.body;
+    const { productIds, action, reason } = req.body;
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       return res.status(400).json({
@@ -268,21 +385,38 @@ export const bulkUpdateProductStatus = async (req, res) => {
       });
     }
 
-    if (!['ACTIVATE', 'DEACTIVATE', 'DELETE'].includes(action)) {
+    if (!['ACTIVATE', 'DEACTIVATE', 'DELETE', 'APPROVE', 'REJECT'].includes(action)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid action. Must be ACTIVATE, DEACTIVATE, or DELETE.'
+        message: 'Invalid action. Must be ACTIVATE, DEACTIVATE, DELETE, APPROVE, or REJECT.'
       });
     }
 
     let resultMessage = '';
 
-    if (action === 'ACTIVATE') {
+    if (action === 'APPROVE' || action === 'ACTIVATE') {
       const updateResult = await prisma.product.updateMany({
         where: { id: { in: productIds } },
-        data: { isActive: true, isDeleted: false }
+        data: {
+          approvalStatus: 'APPROVED',
+          isActive: true,
+          isDeleted: false,
+          approvedAt: new Date(),
+          rejectionReason: null
+        }
       });
-      resultMessage = `Successfully activated ${updateResult.count} products!`;
+      resultMessage = `Successfully approved & activated ${updateResult.count} products!`;
+
+    } else if (action === 'REJECT') {
+      const updateResult = await prisma.product.updateMany({
+        where: { id: { in: productIds } },
+        data: {
+          approvalStatus: 'REJECTED',
+          isActive: false,
+          rejectionReason: reason || 'Bulk rejected by admin.'
+        }
+      });
+      resultMessage = `Successfully rejected ${updateResult.count} products!`;
 
     } else if (action === 'DEACTIVATE') {
       const updateResult = await prisma.product.updateMany({

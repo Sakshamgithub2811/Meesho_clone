@@ -224,68 +224,126 @@ const detectCategoryDefaults = (categorySlug = '') => {
   };
 };
 
-// Helper: Category-adaptive Key Specifications & Highlights Presets
+// Helper: Category-adaptive Key Specifications & Highlights Presets (Enterprise Taxonomy)
 const getCategorySpecPresets = (categorySlug = '') => {
   const s = (categorySlug || '').toLowerCase();
-  const isBeauty = s.includes('beauty') || s.includes('care') || s.includes('face') || s.includes('skin') || s.includes('wash') || s.includes('lotion') || s.includes('cream') || s.includes('oil') || s.includes('shampoo') || s.includes('serum') || s.includes('perfume') || s.includes('cosmetic');
-  const isApparel = s.includes('ethnic') || s.includes('western') || s.includes('apparel') || s.includes('kurti') || s.includes('saree') || s.includes('shirt') || s.includes('men') || s.includes('women') || s.includes('kid') || s.includes('cloth') || s.includes('dress') || s.includes('jeans') || s.includes('pant');
-  const isFootwear = s.includes('footwear') || s.includes('shoe') || s.includes('sandal') || s.includes('slipper') || s.includes('heel');
-  const isElectronics = s.includes('electronic') || s.includes('gadget') || s.includes('mobile');
-  const isHome = s.includes('home') || s.includes('kitchen');
-  const isJewellery = s.includes('jewel') || s.includes('access');
 
-  if (isApparel) {
+  // 1. Laptops, Computers & Tablets
+  if (s.includes('laptop') || s.includes('computer') || s.includes('notebook') || s.includes('pc') || s.includes('macbook')) {
     return [
-      { label: 'Fabric', value: '' },
-      { label: 'Pattern', value: '' },
-      { label: 'Fit / Shape', value: '' },
-      { label: 'Occasion', value: '' },
+      { id: 'processor', label: 'Processor', type: 'select', options: ['Intel Core i3', 'Intel Core i5', 'Intel Core i7', 'Intel Core i9', 'AMD Ryzen 3', 'AMD Ryzen 5', 'AMD Ryzen 7', 'Apple M1', 'Apple M2', 'Apple M3'], value: '' },
+      { id: 'ram', label: 'RAM Capacity', type: 'select', options: ['4 GB', '8 GB', '16 GB', '32 GB', '64 GB'], value: '' },
+      { id: 'storage', label: 'Storage (SSD/HDD)', type: 'select', options: ['256 GB SSD', '512 GB SSD', '1 TB SSD', '2 TB SSD', '1 TB HDD + 256 GB SSD'], value: '' },
+      { id: 'screen_size', label: 'Display Size', type: 'select', options: ['13.3 inch', '14.0 inch', '15.6 inch', '16.0 inch', '17.3 inch'], value: '' },
+      { id: 'os', label: 'Operating System', type: 'select', options: ['Windows 11 Home', 'Windows 11 Pro', 'macOS Sonoma', 'Chrome OS', 'DOS / Linux'], value: '' },
+      { id: 'graphics', label: 'Graphics Card', type: 'select', options: ['Integrated Intel UHD / Iris Xe', 'Integrated AMD Radeon', 'NVIDIA GeForce RTX 2050', 'NVIDIA GeForce RTX 3050', 'NVIDIA GeForce RTX 4060', 'Apple M-Series GPU'], value: '' },
+      { id: 'warranty', label: 'Warranty Period', type: 'select', options: ['1 Year Manufacturer Warranty', '2 Years Extended Warranty', '3 Years Onsite Warranty'], value: '' },
     ];
   }
-  if (isBeauty) {
+
+  // 2. Smartphones & Mobiles
+  if (s.includes('mobile') || s.includes('phone') || s.includes('smartphone') || s.includes('tablet') || s.includes('ipad')) {
     return [
-      { label: 'Type / Finish', value: '' },
-      { label: 'Skin Type', value: '' },
-      { label: 'SPF / Protection', value: '' },
-      { label: 'Formulation', value: '' },
+      { id: 'ram', label: 'RAM Capacity', type: 'select', options: ['4 GB', '6 GB', '8 GB', '12 GB', '16 GB'], value: '' },
+      { id: 'storage', label: 'Internal Storage', type: 'select', options: ['64 GB', '128 GB', '256 GB', '512 GB', '1 TB'], value: '' },
+      { id: 'battery', label: 'Battery Capacity', type: 'select', options: ['4000 mAh', '4500 mAh', '5000 mAh', '6000 mAh'], value: '' },
+      { id: 'camera', label: 'Primary Rear Camera', type: 'select', options: ['12 MP Dual', '50 MP AI Triple', '64 MP Quad', '108 MP OIS', '200 MP Ultra'], value: '' },
+      { id: 'network', label: 'Network / 5G', type: 'select', options: ['5G Supported (Dual SIM)', '4G VoLTE (Dual SIM)'], value: '' },
+      { id: 'screen_type', label: 'Display Type', type: 'select', options: ['6.5" 90Hz IPS LCD', '6.67" 120Hz FHD+ AMOLED', '6.7" Super Retina XDR OLED'], value: '' },
     ];
   }
-  if (isElectronics) {
+
+  // 3. Audio & Consumer Electronics
+  if (s.includes('electronic') || s.includes('gadget') || s.includes('audio') || s.includes('earphone') || s.includes('headphone') || s.includes('earbud') || s.includes('smartwatch') || s.includes('speaker')) {
     return [
-      { label: 'Connectivity', value: '' },
-      { label: 'Warranty', value: '' },
-      { label: 'Compatibility', value: '' },
-      { label: 'Battery / Power', value: '' },
+      { id: 'connectivity', label: 'Connectivity Type', type: 'select', options: ['Bluetooth 5.3 Wireless', 'True Wireless Stereo (TWS)', 'Type-C Wired', '3.5mm Aux Audio Jack'], value: '' },
+      { id: 'battery_life', label: 'Playtime / Battery Life', type: 'select', options: ['Up to 15 Hours', 'Up to 30 Hours', 'Up to 45 Hours', 'Up to 60+ Hours'], value: '' },
+      { id: 'anc', label: 'Noise Cancellation', type: 'select', options: ['Active Noise Cancellation (ANC)', 'Environmental Noise Cancellation (ENC)', 'Passive Noise Isolation'], value: '' },
+      { id: 'water_resistance', label: 'Water / Sweat Rating', type: 'select', options: ['IPX4 Splashproof', 'IPX5 Sweatproof', 'IP67 Dust & Water Resistant', 'IP68 Waterproof'], value: '' },
+      { id: 'warranty', label: 'Warranty', type: 'select', options: ['6 Months Brand Warranty', '1 Year Replacement Warranty'], value: '' },
     ];
   }
-  if (isHome) {
+
+  // 4. Sarees & Indian Ethnic Wear
+  if (s.includes('ethnic') || s.includes('saree') || s.includes('sari') || s.includes('kurti') || s.includes('lehenga') || s.includes('dupatta') || s.includes('suit') || s.includes('salwar')) {
     return [
-      { label: 'Material', value: '' },
-      { label: 'Pattern', value: '' },
-      { label: 'Care Instructions', value: '' },
-      { label: 'Country of Origin', value: 'India' },
+      { id: 'fabric', label: 'Fabric / Material', type: 'select', options: ['Pure Cotton', 'Banarasi Silk', 'Kanjeevaram Art Silk', 'Georgette', 'Chiffon', 'Organza', 'Chanderi Silk', 'Net with Zari'], value: '' },
+      { id: 'length', label: 'Saree Length', type: 'select', options: ['5.5 Meters', '6.0 Meters (With Blouse)'], value: '' },
+      { id: 'blouse', label: 'Blouse Piece', type: 'select', options: ['Included - 0.8m Unstitched', 'Included - Stitched Standard', 'Running Blouse Piece', 'Without Blouse Piece'], value: '' },
+      { id: 'pattern', label: 'Pattern / Work', type: 'select', options: ['Zari Woven Border', 'Bandhani / Bandhej Printed', 'Floral Digital Printed', 'Heavy Embroidered / Resham Work', 'Plain Solid with Lace'], value: '' },
+      { id: 'occasion', label: 'Occasion', type: 'select', options: ['Festive & Traditional Puja', 'Wedding & Bridal', 'Party & Cocktail', 'Daily Casual Wear'], value: '' },
+      { id: 'wash_care', label: 'Wash Care', type: 'select', options: ['Dry Clean Only', 'Gentle Hand Wash', 'Machine Washable'], value: '' },
     ];
   }
-  if (isFootwear) {
+
+  // 5. Women Western Wear
+  if (s.includes('women-western') || s.includes('western') || s.includes('dress') || s.includes('skirt') || s.includes('gown') || s.includes('top') || s.includes('tunic')) {
     return [
-      { label: 'Material', value: '' },
-      { label: 'Fastening', value: '' },
-      { label: 'Sole Material', value: '' },
-      { label: 'Ideal For', value: 'Unisex' },
+      { id: 'fabric', label: 'Fabric', type: 'select', options: ['100% Pure Cotton', 'Cotton Blend', 'Rayon', 'Georgette', 'Polyester Spandex', 'Denim'], value: '' },
+      { id: 'fit', label: 'Fit / Silhouette', type: 'select', options: ['Regular Fit', 'Slim Fit', 'A-Line', 'Bodycon', 'Oversized / Loose', 'Flared'], value: '' },
+      { id: 'neck', label: 'Neckline', type: 'select', options: ['Round Neck', 'V-Neck', 'Square Neck', 'Collar Neck', 'Sweetheart Neck', 'Off-Shoulder'], value: '' },
+      { id: 'sleeve', label: 'Sleeve Length', type: 'select', options: ['Full Sleeves', 'Three-Quarter Sleeves', 'Short Sleeves', 'Sleeveless'], value: '' },
+      { id: 'pattern', label: 'Pattern', type: 'select', options: ['Solid Plain', 'Floral Printed', 'Striped', 'Checkered', 'Colorblocked'], value: '' },
     ];
   }
-  if (isJewellery) {
+
+  // 6. Men Western & Wear
+  if (s.includes('men') || s.includes('menswear') || s.includes('shirt') || s.includes('tshirt') || s.includes('jeans') || s.includes('pant') || s.includes('trouser')) {
     return [
-      { label: 'Base Metal', value: '' },
-      { label: 'Plating', value: '' },
-      { label: 'Occasion', value: '' },
-      { label: 'Ideal For', value: 'Women' },
+      { id: 'fabric', label: 'Fabric', type: 'select', options: ['100% Pure Cotton', 'Cotton Lycra Stretch', 'Denim', 'Linen Blend', 'Polyester Blend'], value: '' },
+      { id: 'fit', label: 'Fit Type', type: 'select', options: ['Slim Fit', 'Regular Fit', 'Oversized / Drop Shoulder', 'Relaxed Comfort Fit'], value: '' },
+      { id: 'collar', label: 'Collar / Neck', type: 'select', options: ['Spread Collar', 'Mandarin / Chinese Collar', 'Button-Down Collar', 'Crew / Round Neck', 'Polo Collar with Buttons'], value: '' },
+      { id: 'sleeve', label: 'Sleeve Type', type: 'select', options: ['Full Sleeves', 'Half Sleeves', 'Sleeveless'], value: '' },
+      { id: 'occasion', label: 'Ideal For', type: 'select', options: ['Casual Everyday', 'Formal Office Wear', 'Party & Evening', 'Sports & Gym'], value: '' },
     ];
   }
+
+  // 7. Footwear
+  if (s.includes('footwear') || s.includes('shoe') || s.includes('sneaker') || s.includes('sandal') || s.includes('slipper') || s.includes('heel') || s.includes('boot')) {
+    return [
+      { id: 'outer_material', label: 'Upper / Outer Material', type: 'select', options: ['Synthetic PU Leather', 'Mesh / Breathable Knit', 'Genuine Leather', 'Canvas', 'EVA Foam'], value: '' },
+      { id: 'sole_material', label: 'Sole Material', type: 'select', options: ['Air Mix', 'TPR / Rubber', 'EVA Lightweight', 'PU Anti-Slip', 'Phylon'], value: '' },
+      { id: 'fastening', label: 'Closure / Fastening', type: 'select', options: ['Lace-Up', 'Slip-On', 'Velcro Strap', 'Buckle / Ankle Strap'], value: '' },
+      { id: 'toe_shape', label: 'Toe Shape', type: 'select', options: ['Round Toe', 'Pointed Toe', 'Square Toe', 'Open Toe'], value: '' },
+      { id: 'heel_type', label: 'Heel Type', type: 'select', options: ['Flat (< 1 inch)', 'Low Heel (1-2 inch)', 'Block Heel (2-3 inch)', 'Platform Heel'], value: '' },
+    ];
+  }
+
+  // 8. Beauty, Skincare & Health
+  if (s.includes('beauty') || s.includes('skin') || s.includes('care') || s.includes('cosmetic') || s.includes('hair') || s.includes('serum') || s.includes('cream') || s.includes('makeup')) {
+    return [
+      { id: 'skin_type', label: 'Skin / Hair Type', type: 'select', options: ['All Skin Types', 'Oily & Acne Prone', 'Dry & Flaky Skin', 'Combination Skin', 'Sensitive Skin'], value: '' },
+      { id: 'formulation', label: 'Formulation / Texture', type: 'select', options: ['Lightweight Serum', 'Hydrating Cream', 'Oil-Free Gel', 'Foaming Wash', 'Lotion'], value: '' },
+      { id: 'volume', label: 'Net Volume / Weight', type: 'select', options: ['30 ml', '50 ml', '100 ml', '200 ml', '100 g', '250 g', '500 ml'], value: '' },
+      { id: 'spf', label: 'SPF Protection', type: 'select', options: ['SPF 50+ PA++++ Broad Spectrum', 'SPF 30 PA+++', 'No SPF / Night Treatment'], value: '' },
+    ];
+  }
+
+  // 9. Home & Kitchen
+  if (s.includes('home') || s.includes('kitchen') || s.includes('bed') || s.includes('curtain') || s.includes('cookware') || s.includes('dining')) {
+    return [
+      { id: 'material', label: 'Primary Material', type: 'select', options: ['Food Grade Stainless Steel', '100% Glace Cotton', 'Ceramic / Bone China', 'Virgin Plastic BPA-Free', 'Cast Iron', 'Engineered Wood'], value: '' },
+      { id: 'dimensions', label: 'Dimensions / Capacity', type: 'text', placeholder: 'e.g. Double Bed King (90x100 inch) OR 3 Litres OR 50x30 cm', value: '' },
+      { id: 'safe_features', label: 'Safety & Care Features', type: 'select', options: ['Dishwasher & Microwave Safe', 'Machine Washable (300 TC)', 'Induction Base Compatible', 'Wipe Clean with Dry Cloth'], value: '' },
+      { id: 'package_contents', label: 'Package Contents', type: 'text', placeholder: 'e.g. 1 Bedsheet with 2 Pillow Covers OR Set of 6 Glasses', value: '' },
+    ];
+  }
+
+  // 10. Jewellery & Accessories
+  if (s.includes('jewel') || s.includes('access') || s.includes('watch') || s.includes('necklace') || s.includes('earring') || s.includes('ring')) {
+    return [
+      { id: 'base_metal', label: 'Base Metal', type: 'select', options: ['Brass', 'Alloy', 'Stainless Steel', 'Silver Plated Metal', 'Copper'], value: '' },
+      { id: 'plating', label: 'Plating / Finish', type: 'select', options: ['18K Micron Gold Plated', 'Oxidised Silver Vintage', 'Rhodium / Silver Plated', 'Rose Gold Plated'], value: '' },
+      { id: 'stone_type', label: 'Stone / Beads Used', type: 'select', options: ['American Diamond (AD)', 'Kundan & Fresh Water Pearls', 'Cubic Zirconia (CZ)', 'Artificial Beads & Stones', 'No Stone / Plain Metal'], value: '' },
+      { id: 'occasion', label: 'Occasion', type: 'select', options: ['Wedding & Bridal Heavy', 'Festive & Puja Celebration', 'Daily Office & College Wear', 'Party & Cocktail'], value: '' },
+    ];
+  }
+
+  // 11. General Default
   return [
-    { label: 'Material / Type', value: '' },
-    { label: 'Country of Origin', value: 'India' },
-    { label: 'Ideal For', value: 'Unisex' },
+    { id: 'material', label: 'Primary Material', type: 'text', placeholder: 'e.g. Cotton, Steel, Plastic, Leather', value: '' },
+    { id: 'country_origin', label: 'Country of Origin', type: 'select', options: ['India', 'Imported'], value: 'India' },
+    { id: 'warranty', label: 'Manufacturer Warranty', type: 'select', options: ['No Warranty', '6 Months Replacement', '1 Year Warranty'], value: '' },
   ];
 };
 
@@ -382,7 +440,7 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
 
   // Dynamic Product Specifications & Highlights State
-  const [specifications, setSpecifications] = useState(() => getCategorySpecPresets(''));
+  const [specifications, setSpecifications] = useState([]);
   const [newSpecKey, setNewSpecKey] = useState('');
   const [newSpecVal, setNewSpecVal] = useState('');
 
@@ -571,18 +629,6 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
         if (cats.status === 'fulfilled' && cats.value) {
           const list = Array.isArray(cats.value) ? cats.value : [];
           setCategories(list);
-          if (list.length > 0) {
-            const firstSlug = list[0].slug || list[0].name;
-            setFormData((prev) => ({ ...prev, categorySlug: firstSlug }));
-            const defaults = detectCategoryDefaults(firstSlug);
-            setEnableSizes(defaults.enableSizes);
-            setEnableColors(defaults.enableColors);
-            setEnableThickness(defaults.enableThickness);
-            setSelectedSizes(defaults.defaultSizes);
-            setSelectedColors(defaults.defaultColors);
-            setSelectedThickness(defaults.defaultThickness);
-            setSpecifications(getCategorySpecPresets(firstSlug));
-          }
         }
 
         if (prof.status === 'fulfilled' && prof.value) {
@@ -615,7 +661,28 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
       setSelectedSizes(defaults.defaultSizes);
       setSelectedColors(defaults.defaultColors);
       setSelectedThickness(defaults.defaultThickness);
+
+      // 1. Instant local presets (Zero delay)
       setSpecifications(getCategorySpecPresets(slug));
+
+      // 2. Fetch dynamic DB / Taxonomy attributes asynchronously
+      supplierApiService.fetchCategoryAttributes(slug).then((dynamicAttrs) => {
+        if (Array.isArray(dynamicAttrs) && dynamicAttrs.length > 0) {
+          setSpecifications(
+            dynamicAttrs.map((attr) => ({
+              id: attr.id || attr.key || attr.label.toLowerCase().replace(/\s+/g, '_'),
+              label: attr.label,
+              value: attr.defaultValue || attr.default || '',
+              type: attr.type || (attr.options?.length ? 'select' : 'text'),
+              options: attr.options || [],
+              placeholder: attr.placeholder || `Enter ${attr.label}...`,
+              required: attr.required || false,
+            }))
+          );
+        }
+      }).catch((err) => {
+        console.warn('Could not fetch live category attributes:', err);
+      });
     }
   };
 
@@ -719,7 +786,7 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
     } finally {
       clearAuthSession();
       toast.success('Logged out successfully');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 
@@ -1055,16 +1122,12 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
                   onChange={handleCategoryChange}
                   className="w-full h-11 px-3 text-xs font-semibold rounded-2xl border border-slate-200 bg-white text-slate-700 outline-none cursor-pointer"
                 >
+                  <option value="">-- Select Product Category --</option>
                   {categories.map((c) => (
                     <option key={c.id || c.slug} value={c.slug || c.name}>
                       {c.name} {c.status === 'PENDING' ? '⏳ (Pending Admin Approval)' : ''}
                     </option>
                   ))}
-                  <option value="ethnic-wear">Ethnic Wear</option>
-                  <option value="western-wear">Western Wear</option>
-                  <option value="accessories">Jewellery & Accessories</option>
-                  <option value="footwear">Footwear & Bags</option>
-                  <option value="home-kitchen">Home & Kitchen</option>
                   <option value="CUSTOM">+ Add Custom Category (Requires Admin Review)</option>
                 </select>
 
@@ -1103,6 +1166,29 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
                 />
               </div>
             </div>
+
+            {/* Instant Real-Time Active Category Specifications Pill Strip (Full Width) */}
+            {formData.categorySlug && specifications.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-pink-50/80 via-pink-50/40 to-slate-50 border border-pink-100/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2 overflow-hidden flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#b7004d] shrink-0 flex items-center gap-1.5 bg-pink-100/70 px-2 py-0.5 rounded-md">
+                    <Sparkles className="w-3.5 h-3.5 text-[#b7004d]" />
+                    Active Category Attributes:
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {specifications.map((s, idx) => (
+                      <span key={idx} className="text-[11px] font-semibold px-2.5 py-0.5 rounded-lg bg-white border border-pink-200 text-slate-700 shadow-2xs flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-pink-500"></span>
+                        {s.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <a href="#specifications-section" className="text-[11px] font-bold text-[#b7004d] hover:underline shrink-0 flex items-center gap-1 bg-white px-2.5 py-1 rounded-xl border border-pink-200 shadow-2xs">
+                  Fill Values Below ➔
+                </a>
+              </div>
+            )}
 
             {/* 3. Pricing & Stock */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2112,7 +2198,7 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
             </div>
 
             {/* 5. Product Highlights & Key Specifications */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+            <div id="specifications-section" className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4 scroll-mt-20">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-xl bg-pink-50 text-[#b7004d] flex items-center justify-center font-bold text-xs">
@@ -2139,16 +2225,52 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
                     <div className="w-2/5 shrink-0">
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block truncate" title={spec.label}>
                         {spec.label}
+                        {spec.required && <span className="text-rose-500 ml-0.5">*</span>}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <input
-                        type="text"
-                        value={spec.value}
-                        onChange={(e) => handleSpecChange(index, 'value', e.target.value)}
-                        placeholder={`Enter ${spec.label}...`}
-                        className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-200 focus:border-[#d82a62] outline-none transition"
-                      />
+                      {spec.options && spec.options.length > 0 ? (
+                        <div className="space-y-1">
+                          <select
+                            value={spec.options.includes(spec.value) ? spec.value : (spec.value ? '__custom__' : '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '__custom__') {
+                                handleSpecChange(index, 'isCustomInput', true);
+                                handleSpecChange(index, 'value', '');
+                              } else {
+                                handleSpecChange(index, 'isCustomInput', false);
+                                handleSpecChange(index, 'value', val);
+                              }
+                            }}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-200 focus:border-[#d82a62] outline-none transition"
+                          >
+                            <option value="">Select {spec.label}...</option>
+                            {spec.options.map((opt, oIdx) => (
+                              <option key={oIdx} value={opt}>{opt}</option>
+                            ))}
+                            <option value="__custom__">+ Other / Custom Value</option>
+                          </select>
+                          {(spec.isCustomInput || (spec.value && !spec.options.includes(spec.value))) && (
+                            <input
+                              type="text"
+                              value={spec.value || ''}
+                              onChange={(e) => handleSpecChange(index, 'value', e.target.value)}
+                              placeholder={`Type custom ${spec.label}...`}
+                              className="w-full px-2.5 py-1 text-xs font-semibold rounded-xl bg-white border border-pink-200 focus:border-[#d82a62] outline-none"
+                              autoFocus
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <input
+                          type={spec.type === 'number' ? 'number' : 'text'}
+                          value={spec.value || ''}
+                          onChange={(e) => handleSpecChange(index, 'value', e.target.value)}
+                          placeholder={spec.placeholder || `Enter ${spec.label}...`}
+                          className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-200 focus:border-[#d82a62] outline-none transition"
+                        />
+                      )}
                     </div>
                     <button
                       type="button"

@@ -2,12 +2,14 @@ import React from 'react';
 import DataTable from '../../common/DataTable';
 import ProductStockBadge from './ProductStockBadge';
 import { Button } from '../../ui/button';
-import { Package, Eye, Star, Truck } from 'lucide-react';
+import { Package, Eye, Star, Truck, Check, X, Clock, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function ProductsTable({
   products = [],
   loading = false,
   onInspectProduct,
+  onApproveProduct,
+  onRejectProduct,
   formatCurrency,
   selectedIds = [],
   onToggleSelect,
@@ -107,23 +109,34 @@ export default function ProductsTable({
       render: (product) => <ProductStockBadge stock={product.stock} />
     },
     {
-      header: 'Listing Status',
+      header: 'Moderation Status',
       headerClassName: 'py-3.5 px-4 font-semibold text-center',
       cellClassName: 'py-3.5 px-4 text-center',
       render: (product) => {
-        const isActive = product.isActive !== false;
-        return (
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-              isActive
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                : 'bg-amber-50 text-amber-700 border border-amber-200'
-            }`}
-          >
+        const approval = product.approvalStatus || (product.isActive ? 'APPROVED' : 'PENDING');
+        if (approval === 'PENDING') {
+          return (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+              <Clock className="w-3 h-3 text-amber-500 animate-pulse" />
+              Pending Review
+            </span>
+          );
+        }
+        if (approval === 'REJECTED') {
+          return (
             <span
-              className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-amber-500'}`}
-            ></span>
-            {isActive ? 'Active' : 'Delisted'}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 cursor-help"
+              title={product.rejectionReason || 'Rejected by admin'}
+            >
+              <XCircle className="w-3 h-3 text-rose-500" />
+              Rejected
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+            Live / Approved
           </span>
         );
       }
@@ -149,37 +162,50 @@ export default function ProductsTable({
       )
     },
     {
-      header: 'Performance',
-      render: (product) => (
-        <div>
-          <div className="flex items-center gap-1 text-xs font-semibold text-amber-600">
-            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            <span>{product.rating || '4.0'}</span>
-            <span className="text-gray-400 font-normal text-[11px]">
-              ({product._count?.reviews || 0})
-            </span>
-          </div>
-          <span className="text-[11px] text-gray-500 block mt-0.5">
-            {product._count?.orderItems || 0} orders
-          </span>
-        </div>
-      )
-    },
-    {
       header: 'Action',
       headerClassName: 'py-3.5 px-4 font-semibold text-right',
       cellClassName: 'py-3.5 px-4 text-right',
-      render: (product) => (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => onInspectProduct?.(product)}
-          className="text-xs h-8 border-gray-300 hover:border-[#b7004d] hover:text-[#b7004d] cursor-pointer"
-        >
-          <Eye className="w-3.5 h-3.5 mr-1 text-[#b7004d]" />
-          Inspect
-        </Button>
-      )
+      render: (product) => {
+        const isPending = product.approvalStatus === 'PENDING';
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            {isPending && (
+              <>
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={() => onApproveProduct?.(product.id)}
+                  title="Approve & Publish to Customers"
+                  className="h-7 px-2 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs cursor-pointer"
+                >
+                  <Check className="w-3 h-3 mr-0.5" />
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  onClick={() => onRejectProduct?.(product.id)}
+                  title="Reject Product"
+                  className="h-7 px-2 text-[11px] font-bold text-rose-600 border-rose-200 hover:bg-rose-50 rounded-lg cursor-pointer"
+                >
+                  <X className="w-3 h-3 mr-0.5" />
+                  Reject
+                </Button>
+              </>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              type="button"
+              onClick={() => onInspectProduct?.(product)}
+              className="text-xs h-7 px-2.5 border-gray-300 hover:border-[#b7004d] hover:text-[#b7004d] cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5 text-[#b7004d]" />
+            </Button>
+          </div>
+        );
+      }
     }
   ];
 

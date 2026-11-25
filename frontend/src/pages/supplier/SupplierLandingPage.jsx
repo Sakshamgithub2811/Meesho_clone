@@ -96,7 +96,7 @@ export default function SupplierLandingPage({ onNavigate }) {
         sessionStorage.setItem('mshoppy_supplier_prefill_phone', cleanPhone);
       } catch (_) {}
     }
-    handleNav('/supplier-register');
+    handleNav('/supplier/auth/register');
   };
 
   // Real-time calculation logic
@@ -172,7 +172,7 @@ export default function SupplierLandingPage({ onNavigate }) {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => handleNav('/supplier-login')}
+              onClick={() => handleNav('/supplier/auth/login')}
               className="px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-700 hover:text-[#b7004d] hover:bg-pink-50/60 border border-slate-200 transition-all cursor-pointer"
             >
               Login
@@ -555,7 +555,7 @@ export default function SupplierLandingPage({ onNavigate }) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleNav('/supplier-register')}
+                    onClick={() => handleNav('/supplier/auth/register')}
                     className="px-4 py-2.5 rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 font-black text-xs transition active:scale-95 cursor-pointer shrink-0 shadow-sm"
                   >
                     Claim Profit ➔
@@ -835,7 +835,7 @@ export default function SupplierLandingPage({ onNavigate }) {
           <div className="pt-2">
             <button
               type="button"
-              onClick={() => handleNav('/supplier-register')}
+              onClick={() => handleNav('/supplier/auth/register')}
               className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-white text-[#b7004d] hover:bg-pink-50 font-black text-sm shadow-xl transition-all active:scale-95 cursor-pointer"
             >
               <span>Start Selling Now (0% Commission)</span>
@@ -866,14 +866,14 @@ export default function SupplierLandingPage({ onNavigate }) {
                 <li><a href="#why-sell" className="hover:text-white transition">Why MShoppy</a></li>
                 <li><a href="#calculator" className="hover:text-white transition">Profit Calculator</a></li>
                 <li><a href="#how-it-works" className="hover:text-white transition">How It Works</a></li>
-                <li><button onClick={() => handleNav('/supplier-register')} className="hover:text-white transition">Register as Supplier</button></li>
+                <li><button onClick={() => handleNav('/supplier/auth/register')} className="hover:text-white transition">Register as Supplier</button></li>
               </ul>
             </div>
             <div>
               <h5 className="text-white font-bold mb-3 uppercase tracking-wider text-[11px]">Supplier Hub</h5>
               <ul className="space-y-2">
-                <li><button onClick={() => handleNav('/supplier-login')} className="hover:text-white transition">Supplier Login</button></li>
-                <li><button onClick={() => handleNav('/seller-web-dashboard1')} className="hover:text-white transition">Seller Operations Dashboard</button></li>
+                <li><button onClick={() => handleNav('/supplier/auth/login')} className="hover:text-white transition">Supplier Login</button></li>
+                <li><button onClick={() => handleNav('/supplier/dashboard')} className="hover:text-white transition">Seller Operations Dashboard</button></li>
                 <li><button onClick={() => handleNav('/support-center')} className="hover:text-white transition">Supplier Support Desk</button></li>
               </ul>
             </div>

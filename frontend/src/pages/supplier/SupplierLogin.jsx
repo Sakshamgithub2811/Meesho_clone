@@ -39,7 +39,7 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
     if (onBack) {
       onBack();
     } else {
-      handleNav('/seller-web-dashboard1');
+      handleNav('/supplier/dashboard');
     }
   };
 
@@ -48,7 +48,7 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
     setErrorMessage('');
     setSuccessMessage('');
     try {
-      window.history.replaceState(null, '', tab === 'register' ? '/supplier-register' : '/supplier-login');
+      window.history.replaceState(null, '', tab === 'register' ? '/supplier/auth/register' : '/supplier/auth/login');
     } catch {
       // Fallback
     }
@@ -95,7 +95,7 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
 
       setSuccessMessage(`Welcome back, ${res.user?.fullName || res.user?.storeName || 'Supplier'}! Redirecting...`);
       setTimeout(() => {
-        handleNav('/seller-web-dashboard1');
+        handleNav('/supplier/dashboard');
       }, 700);
     } catch (err) {
       console.error('Supplier login error:', err);
@@ -194,7 +194,7 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
 
       setSuccessMessage('🎉 Congratulations! Your supplier account has been registered successfully. Redirecting...');
       setTimeout(() => {
-        handleNav('/seller-web-dashboard1');
+        handleNav('/supplier/dashboard');
       }, 1000);
     } catch (err) {
       console.error('Supplier registration error:', err);
@@ -338,7 +338,7 @@ export default function SupplierLogin({ onNavigate, onBack, defaultTab }) {
                       if (onNavigate) {
                         onNavigate('/forgot-password');
                       } else {
-                        navigate('/forgot-password', { state: { from: '/supplier-login' } });
+                        navigate('/forgot-password', { state: { from: '/supplier/auth/login' } });
                       }
                     }}
                     className="text-xs text-[#9e003f] hover:text-[#7e0032] font-semibold hover:underline cursor-pointer transition"

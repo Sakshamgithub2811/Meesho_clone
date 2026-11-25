@@ -37,9 +37,9 @@ export default function SupplierLogout({
       sessionStorage.clear();
 
       if (onNavigate) {
-        onNavigate('/supplier-login');
+        onNavigate('/supplier/auth/login');
       } else {
-        navigate('/supplier-login');
+        navigate('/supplier/auth/login');
       }
     }
   };
