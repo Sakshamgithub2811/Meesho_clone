@@ -17,162 +17,7 @@ import { getUnreadCount, subscribeNotifications } from "../../services/notificat
 import GuestWelcomeModal from "../../components/customer/GuestWelcomeModal";
 import ProductFilterSidebar from "../../components/customer/ProductFilterSidebar";
 import CountdownTimer from "../../components/customer/CountdownTimer";
-
-const REAL_DATABASE_BANNERS = [
-  {
-    id: "a60f4f58-a862-4256-8067-c7e3b9218109",
-    title: "Mega Blockbuster Festive Sale",
-    subtitle: "Flat 70% Off on Sarees, Kurtis & Ethnic Sets",
-    imageUrl: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=80",
-    targetUrl: "/category/women-ethnic",
-    badgeText: "MEGA SALE",
-    badgeColor: "bg-rose-500 text-white",
-    displayOrder: 1,
-    isActive: true,
-    gradient: "from-rose-700 via-pink-600 to-amber-600",
-    accentColor: "text-rose-600"
-  },
-  {
-    id: "cfccdceb-478e-4588-b303-0251a7d961e1",
-    title: "Trending Men Fashion & Streetwear",
-    subtitle: "Casual Shirts, Denim & Oversized Tees from ?199",
-    imageUrl: "https://images.unsplash.com/photo-1516826957135-700dedea698c?auto=format&fit=crop&w=1200&q=80",
-    targetUrl: "/category/men-western",
-    badgeText: "TRENDING",
-    badgeColor: "bg-indigo-500 text-white",
-    displayOrder: 2,
-    isActive: true,
-    gradient: "from-indigo-700 via-blue-600 to-cyan-600",
-    accentColor: "text-indigo-700"
-  },
-  {
-    id: "9b76bb94-5cfe-4cab-9874-5fa5977682db",
-    title: "Smart Electronics & Audio Accessories",
-    subtitle: "TWS Earbuds, Smartwatches & Chargers at Factory Prices",
-    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
-    targetUrl: "/category/electronics",
-    badgeText: "BESTSELLER",
-    badgeColor: "bg-amber-500 text-white",
-    displayOrder: 3,
-    isActive: true,
-    gradient: "from-amber-600 via-orange-600 to-yellow-600",
-    accentColor: "text-amber-600"
-  },
-  {
-    id: "5c16330f-9da8-477c-8884-718fe1388975",
-    title: "Home Makeover & Kitchen Essentials",
-    subtitle: "Bedsheets, Curtains & Storage Boxes under ?299",
-    imageUrl: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
-    targetUrl: "/category/home-kitchen",
-    badgeText: "HOT DEAL",
-    badgeColor: "bg-emerald-500 text-white",
-    displayOrder: 4,
-    isActive: true,
-    gradient: "from-emerald-700 via-teal-600 to-cyan-700",
-    accentColor: "text-emerald-700"
-  }
-];
-
-const ORIGINAL_BRAND_CATEGORIES = [
-  {
-    id: 'personal_care',
-    name: 'Personal Care',
-    image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Beauty & Health',
-    searchQuery: 'Care',
-  },
-  {
-    id: 'electronics',
-    name: 'Electronics',
-    image: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Electronics & Gadgets',
-    searchQuery: '',
-  },
-  {
-    id: 'makeup',
-    name: 'Makeup',
-    image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Beauty & Health',
-    searchQuery: 'Lipstick',
-  },
-  {
-    id: 'men_perfume',
-    name: 'Men Perfume',
-    image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Beauty & Health',
-    searchQuery: 'Perfume',
-  },
-  {
-    id: 'bags',
-    name: 'Bags',
-    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'All',
-    searchQuery: 'Bag',
-  },
-  {
-    id: 'footwear',
-    name: 'Footwear',
-    image: 'https://images.unsplash.com/photo-1603808033192-082d6919d3e1?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Footwear',
-    searchQuery: '',
-  },
-  {
-    id: 'books',
-    name: 'Books',
-    image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'All',
-    searchQuery: 'Book',
-  },
-  {
-    id: 'smart_watches',
-    name: 'Smart Watches',
-    image: 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'All',
-    searchQuery: 'Watch',
-  },
-  {
-    id: 'jewellery',
-    name: 'Jewellery',
-    image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Jewellery & Accessories',
-    searchQuery: '',
-  },
-  {
-    id: 'kitchen_appliances',
-    name: 'Kitchen',
-    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Home & Kitchen',
-    searchQuery: '',
-  },
-  {
-    id: 'home_decor',
-    name: 'Home Decor',
-    image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Home & Kitchen',
-    searchQuery: '',
-  },
-  {
-    id: 'kids_wear',
-    name: 'Kids Wear',
-    image: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Kids',
-    searchQuery: '',
-  },
-  {
-    id: 'women_western',
-    name: 'Women Western',
-    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Women Western',
-    searchQuery: '',
-  },
-  {
-    id: 'sports_fitness',
-    name: 'Sports & Fitness',
-    image: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&auto=format&fit=crop&q=80',
-    targetCategory: 'Men',
-    searchQuery: '',
-  },
-];
+import CustomerFooter from "../../components/customer/CustomerFooter";
 
 const FEATURED_BRAND_LOGOS = [
   { name: 'mamaearth', display: 'mamaearth', color: 'text-emerald-600', icon: '🌿' },
@@ -189,26 +34,30 @@ const CURATED_OFFER_TILES = [
   {
     id: 'trending',
     title: 'Trending Now',
-    image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=500&auto=format&fit=crop&q=80',
+    icon: 'trending_up',
     filterTag: 'Trending',
+    gradient: 'from-pink-500 to-rose-600',
   },
   {
     id: 'budget',
     title: 'Budget Buys',
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
+    icon: 'savings',
     filterTag: 'Under ₹349',
+    gradient: 'from-amber-500 to-orange-600',
   },
   {
     id: 'top_rated',
     title: 'Top Rated Picks',
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
+    icon: 'hotel_class',
     filterTag: '4★ & Above',
+    gradient: 'from-purple-500 to-indigo-600',
   },
   {
     id: 'daily_essentials',
     title: 'Daily Essentials',
-    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&auto=format&fit=crop&q=80',
+    icon: 'shopping_bag',
     filterTag: 'Essentials',
+    gradient: 'from-emerald-500 to-teal-600',
   },
 ];
 
@@ -226,7 +75,7 @@ export default function HomeUserCustomer() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
-    return REAL_DATABASE_BANNERS;
+    return [];
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -247,6 +96,39 @@ export default function HomeUserCustomer() {
   const [sortBy, setSortBy] = useState('relevance');
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [showAppDownloadModal, setShowAppDownloadModal] = useState(false);
+
+  // ── Newsletter Subscription State ──
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem('mshoppy_newsletter_code'));
+    } catch (_) { return false; }
+  });
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
+  const [copiedCoupon, setCopiedCoupon] = useState(false);
+
+  const handleSubscribeNewsletter = (e) => {
+    e?.preventDefault();
+    const cleanEmail = (newsletterEmail || '').trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+    setNewsletterLoading(true);
+    try {
+      const existing = JSON.parse(localStorage.getItem('mshoppy_newsletter_subscribers') || '[]');
+      if (!existing.includes(cleanEmail)) {
+        existing.push(cleanEmail);
+        localStorage.setItem('mshoppy_newsletter_subscribers', JSON.stringify(existing));
+      }
+      localStorage.setItem('mshoppy_newsletter_code', 'WELCOME10');
+      setNewsletterSubscribed(true);
+    } catch (_) {
+      setNewsletterSubscribed(true);
+    } finally {
+      setNewsletterLoading(false);
+    }
+  };
 
   // Lock body scroll when App Download Modal is open
   useEffect(() => {
@@ -377,7 +259,7 @@ export default function HomeUserCustomer() {
     );
   }, [registeredUser]);
 
-  // Guest Welcome / Login Prompt Modal State
+  // Guest Welcome / Login Prompt Modal State (Automatically prompts guest visitors after exploration)
   const [showGuestModal, setShowGuestModal] = useState(false);
 
   // Helper to check whether visitor has an active authenticated customer session
@@ -409,7 +291,6 @@ export default function HomeUserCustomer() {
     }
 
     // 3. Fire after 4.2 seconds of exploring the homepage
-    // Mount timer runs smoothly without being cancelled by fluctuating state re-renders
     const timer = setTimeout(() => {
       if (!checkIsCustomerLoggedIn()) {
         setShowGuestModal(true);
@@ -430,7 +311,7 @@ export default function HomeUserCustomer() {
     setShowGuestModal(false);
     navigate('/user/login?redirect=' + encodeURIComponent(window.location.pathname || '/'));
   }, [navigate]);
-  
+
   // Real Meesho Infinite Scroll State & Stable Refs
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -460,7 +341,12 @@ export default function HomeUserCustomer() {
     try {
       const dismissed = localStorage.getItem('mshoppy_referral_banner_dismissed');
       if (dismissed === 'true') return null;
-      return localStorage.getItem('mshoppy_referral_code');
+      const code = localStorage.getItem('mshoppy_referral_code');
+      if (code && (code.startsWith('KYC-') || !code.startsWith('MSHOPPY'))) {
+        if (code.startsWith('KYC-')) localStorage.removeItem('mshoppy_referral_code');
+        return null;
+      }
+      return code || null;
     } catch {
       return null;
     }
@@ -631,16 +517,20 @@ export default function HomeUserCustomer() {
       observer = new IntersectionObserver(
         (entries) => {
           if (entries[0].isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) {
-            loadMoreProducts();
+            // Auto-load up to page 2, then let customer click "Load More" so Footer is easily accessible
+            if (pageRef.current < 2) {
+              loadMoreProducts();
+            }
           }
         },
-        { rootMargin: '450px' }
+        { rootMargin: '300px' }
       );
       observer.observe(sentinel);
     }
 
     const handleWindowScroll = () => {
       if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+      if (pageRef.current >= 2) return; // Allow customer to easily reach the Footer without endless loop
       const scrollY = window.scrollY || window.pageYOffset;
       const visibleHeight = window.innerHeight;
       const totalHeight = document.documentElement.scrollHeight;
@@ -1096,12 +986,12 @@ export default function HomeUserCustomer() {
                           className="flex items-center gap-3 p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors group"
                         >
                           <img
-                            src={item.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=200'}
+                            src={item.images?.[0] || item.image || ''}
                             alt={item.title}
                             className="w-10 h-10 rounded-lg object-cover bg-slate-100 shrink-0"
                             onError={(e) => {
                               e.currentTarget.onerror = null;
-                              e.currentTarget.src = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=200';
+                              e.currentTarget.style.display = 'none';
                             }}
                           />
                           <div className="min-w-0 flex-1">
@@ -1485,28 +1375,24 @@ export default function HomeUserCustomer() {
               onScroll={checkBrandScroll}
               className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-2 scroll-smooth"
             >
-              {ORIGINAL_BRAND_CATEGORIES.map((cat) => (
+              {(dbCategories || []).filter(c => c.imageUrl || c.image).map((cat) => (
                 <div
-                  key={cat.id}
+                  key={cat.id || cat.slug}
                   onClick={() => {
-                    if (cat.searchQuery) {
-                      setSearchQuery(cat.searchQuery);
-                    } else {
-                      setSearchQuery('');
-                    }
-                    setSelectedCategory(cat.targetCategory || 'All');
+                    setSelectedCategory(cat.name || cat.slug);
                     setSelectedSubcat('All');
                     const el = document.getElementById('products-grid-section');
                     if (el) el.scrollIntoView({ behavior: 'smooth' });
                   }}
                   className="flex-shrink-0 w-28 sm:w-36 md:w-40 rounded-2xl sm:rounded-3xl bg-[#f0f3ff] dark:bg-slate-800/80 border border-indigo-100/70 dark:border-indigo-900/40 p-2 sm:p-2.5 flex flex-col items-center justify-between cursor-pointer hover:shadow-lg hover:border-indigo-300 transition-all duration-300 group/card"
                 >
-                  <div className="w-full aspect-[4/5] rounded-xl overflow-hidden flex items-center justify-center mb-2">
+                  <div className="w-full aspect-[4/5] rounded-xl overflow-hidden flex items-center justify-center mb-2 bg-white dark:bg-slate-700/50">
                     <img
-                      src={cat.image}
+                      src={cat.imageUrl || cat.image}
                       alt={cat.name}
-                      className="w-full h-full object-contain group-hover/card:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-300"
                       loading="lazy"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   </div>
                   <div className="w-full bg-[#5838fc] group-hover/card:bg-[#461fe0] text-white text-center py-1.5 sm:py-2 px-2 rounded-xl sm:rounded-2xl shadow-xs transition-colors">
@@ -1611,13 +1497,10 @@ export default function HomeUserCustomer() {
                       curatedFilter === tile.filterTag ? 'border-amber-300 ring-2 ring-amber-300/50' : 'border-amber-200/50'
                     } rounded-2xl p-2 flex flex-col items-center justify-between cursor-pointer transition-all duration-300 hover:scale-[1.02] group/tile`}
                   >
-                    <div className="w-full aspect-[4/5] rounded-xl overflow-hidden mb-2 relative bg-purple-950/40">
-                      <img
-                        src={tile.image}
-                        alt={tile.title}
-                        className="w-full h-full object-cover group-hover/tile:scale-105 transition-transform duration-500"
-                        loading="lazy"
-                      />
+                    <div className={`w-full aspect-[4/5] rounded-xl overflow-hidden mb-2 relative bg-gradient-to-br ${tile.gradient || 'from-purple-600 to-indigo-800'} flex items-center justify-center`}>
+                      <span className="material-symbols-outlined text-3xl sm:text-4xl text-white/90 group-hover/tile:scale-110 transition-transform duration-300">
+                        {tile.icon || 'stars'}
+                      </span>
                     </div>
                     <div className="w-full bg-white text-slate-900 text-center py-1.5 px-1.5 rounded-xl shadow-xs">
                       <span className="text-[10px] sm:text-xs font-black tracking-tight block truncate">
@@ -1794,7 +1677,7 @@ export default function HomeUserCustomer() {
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                   {displayedProducts.map((p, idx) => {
                     const isFav = favorites.includes(p.id);
-                    const mainImg = p.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
+                    const mainImg = (Array.isArray(p.images) && p.images[0]) || p.image || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 500' width='400' height='500'%3E%3Crect width='400' height='500' fill='%23f8fafc'/%3E%3Cpath d='M160 180v-30c0-22.1 17.9-40 40-40s40 17.9 40 40v30h30l20 180H110l20-180h30zm20 0h40v-30c0-11-9-20-20-20s-20 9-20 20v30z' fill='%23cbd5e1'/%3E%3C/svg%3E";
                     const hasOffer = Boolean(Number(p.discountPercentage) >= 40);
                     const isMall = Boolean(p.isMall || (Number(p.discountPercentage) >= 35));
 
@@ -1816,7 +1699,7 @@ export default function HomeUserCustomer() {
                               loading="lazy"
                               onError={(e) => {
                                 e.currentTarget.onerror = null;
-                                e.currentTarget.src = 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
+                                e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 500' width='400' height='500'%3E%3Crect width='400' height='500' fill='%23f8fafc'/%3E%3Cpath d='M160 180v-30c0-22.1 17.9-40 40-40s40 17.9 40 40v30h30l20 180H110l20-180h30zm20 0h40v-30c0-11-9-20-20-20s-20 9-20 20v30z' fill='%23cbd5e1'/%3E%3C/svg%3E";
                               }}
                             />
                             
@@ -1878,13 +1761,19 @@ export default function HomeUserCustomer() {
 
                             {/* Star Rating & Review Count */}
                             <div className="flex items-center gap-1.5 pt-0.5">
-                              <span className="inline-flex items-center gap-0.5 bg-[#038d63] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
-                                <span>{p.rating !== undefined && Number(p.rating) > 0 ? Number(p.rating).toFixed(1) : '4.2'}</span>
-                                <span className="text-[9px]">★</span>
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-medium truncate">
-                                {p.reviewsCount !== undefined && Number(p.reviewsCount) > 0 ? `${Number(p.reviewsCount).toLocaleString()} Reviews` : (Number(p.rating) > 0 ? `${Math.round(Number(p.rating) * 5)} Reviews` : 'No reviews')}
-                              </span>
+                              {p.rating !== undefined && Number(p.rating) > 0 ? (
+                                <>
+                                  <span className="inline-flex items-center gap-0.5 bg-[#038d63] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                                    <span>{Number(p.rating).toFixed(1)}</span>
+                                    <span className="text-[9px]">★</span>
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-medium truncate">
+                                    {p.reviewsCount !== undefined && Number(p.reviewsCount) > 0 ? `${Number(p.reviewsCount).toLocaleString()} Reviews` : 'Ratings only'}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 font-medium">No ratings yet</span>
+                              )}
                             </div>
 
                             {/* Delivery Info */}
@@ -1912,19 +1801,48 @@ export default function HomeUserCustomer() {
                 </div>
               )}
 
-              {/* Real Meesho Infinite Scroll Sentinel & Loader */}
-              <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[90px]">
-                {loadingMore && (
-                  <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-extrabold text-[#b90041] animate-pulse">
-                    <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
-                    <span>Loading more trending products for you...</span>
-                  </div>
-                )}
-              </div>
+              {/* Controlled Infinite Scroll: 2 pages (56 products) auto-stream, then explicit Load More button so Footer is easily accessible */}
+              {hasMore && page >= 2 ? (
+                <div className="w-full py-8 flex flex-col items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => loadMoreProducts()}
+                    disabled={loadingMore}
+                    className="px-8 py-3.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-[#b7004d] dark:text-rose-400 border-2 border-[#b7004d] dark:border-rose-500 rounded-full font-black text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-[#b7004d] border-t-transparent rounded-full animate-spin"></span>
+                        <span>Loading Trending Products...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-base">expand_more</span>
+                        <span>Load More Products</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-slate-400 mt-2 font-medium">
+                    Showing {products.length} of {totalProducts || '1,000+'} products
+                  </p>
+                </div>
+              ) : (
+                <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[90px]">
+                  {loadingMore && (
+                    <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-extrabold text-[#b90041] animate-pulse">
+                      <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
+                      <span>Loading more trending products for you...</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </section>
       </main>
+
+      {/* Customer Footer with Newsletter Management */}
+      <CustomerFooter onNavigate={navigate} />
 
       {/* Customer Bottom Navigation */}
       <AppBottomNav activeNav="home" role="customer" homePath="/" />
@@ -1937,64 +1855,7 @@ export default function HomeUserCustomer() {
         onLogin={handleModalLogin}
       />
 
-      {/* App Download Modal for 35% OFF First Order with QR Code (Exact Replica of Meesho Web) */}
-      {showAppDownloadModal && (
-        <div
-          onClick={() => setShowAppDownloadModal(false)}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full shadow-2xl relative border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 overflow-hidden"
-          >
-            {/* Modal Header Matching Meesho */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-base sm:text-lg font-bold text-[#5c0632] dark:text-rose-400">
-                Shop Now on App to get Upto 35% off on 1st Order
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowAppDownloadModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-lg font-bold"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Content: 2-Column Banner & QR Code Matching Frame 303 */}
-            <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-              {/* Left Column: 35% OFF Promotional Banner */}
-              <div className="w-full md:w-[62%] rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 bg-[#5c0632]">
-                <img
-                  src="/meesho_app_modal_banner.jpg"
-                  alt="Shop Now on App to get Upto 35% off on 1st Order"
-                  className="w-full h-auto object-cover rounded-2xl block"
-                />
-              </div>
-
-              {/* Right Column: Scan Now to download App + Crisp QR Code */}
-              <div className="w-full md:w-[38%] flex flex-col items-center justify-center text-center px-2">
-                <h4 className="text-sm sm:text-base font-extrabold text-[#5c0632] dark:text-rose-400 mb-3">
-                  Scan Now to download App!
-                </h4>
-                <div className="bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-sm inline-block">
-                  <QRCodeSVG
-                    value="https://play.google.com/store/apps"
-                    size={180}
-                    bgColor="#ffffff"
-                    fgColor="#000000"
-                    level="Q"
-                    includeMargin={false}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* App Download Modal for 35% OFF First Order with QR Code (Exact Replica of Meesho Web) */}
+      {/* App Download Modal for 35% OFF First Order with QR Code (Replica of Meesho Web) */}
       {showAppDownloadModal && (
         <div
           onClick={() => setShowAppDownloadModal(false)}

@@ -697,6 +697,34 @@ export async function createOrder({ items, shippingAddress, paymentMethod, total
   }
 }
 
+export async function sendCodOtp({ email, phone, name }) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/orders/send-cod-otp`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ email, phone, name }),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Failed to send COD OTP:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+export async function verifyCodOtp({ email, phone, otp }) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/orders/verify-cod-otp`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ email, phone, otp }),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Failed to verify COD OTP:', error);
+    return { success: false, message: error.message };
+  }
+}
+
 export async function cancelOrder(orderId, reason = '') {
   try {
     const res = await fetch(`${API_BASE_URL}/orders/${orderId}/cancel`, {

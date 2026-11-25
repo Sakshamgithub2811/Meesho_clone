@@ -167,11 +167,11 @@ export default function InviteLanding() {
 
             {/* Trust Proof */}
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2 text-xs text-slate-500 font-semibold">
-              <span className="flex items-center gap-1 text-amber-500 font-bold">
-                ★★★★★ <span className="text-slate-700 ml-1">4.8/5 App Rating</span>
+              <span className="flex items-center gap-1 text-emerald-600 font-bold">
+                ✓ <span className="text-slate-700 ml-1">Verified Community</span>
               </span>
               <span>•</span>
-              <span>🇮🇳 Trusted by 1 Crore+ Happy Shoppers</span>
+              <span>Direct from Verified Suppliers</span>
             </div>
           </div>
 

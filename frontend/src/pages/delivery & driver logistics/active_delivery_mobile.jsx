@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
+import SecureCallModal from '../../components/delivery/SecureCallModal';
 
 export default function ActiveDeliveryMobile({ onNavigate = () => {}, onBack }) {
   const [isDelivered, setIsDelivered] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [driverOtp, setDriverOtp] = useState('');
   const [otpError, setOtpError] = useState('');
 
@@ -232,11 +234,12 @@ export default function ActiveDeliveryMobile({ onNavigate = () => {}, onBack }) 
               {/* Quick Communication Actions */}
               <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <button
-                  onClick={() => triggerToast('Calling customer Ananya (+91 98765 43210)... 📞')}
+                  onClick={() => setIsCallModalOpen(true)}
                   className="py-3 bg-slate-100 hover:bg-slate-200 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  title="MShoppy Cloud Telephony (Virtual Bridge)"
                 >
-                  <span className="material-symbols-outlined text-base text-[#b90041]">call</span>
-                  <span>Call Customer</span>
+                  <span className="material-symbols-outlined text-base text-[#b90041]">shield</span>
+                  <span>Secure Call</span>
                 </button>
                 <button
                   onClick={() => onNavigate('order_driver')}
@@ -353,6 +356,15 @@ export default function ActiveDeliveryMobile({ onNavigate = () => {}, onBack }) 
 
       {/* Bottom Navigation */}
       <AppBottomNav activeNav="home" onNavigate={onNavigate} />
+
+      {/* Cloud Telephony Secure Calling Modal */}
+      <SecureCallModal
+        isOpen={isCallModalOpen}
+        onClose={() => setIsCallModalOpen(false)}
+        customerName="Ananya"
+        orderId={activeOrderId}
+        maskedPhone="+91 98765 XXXXX"
+      />
     </div>
   );
 }

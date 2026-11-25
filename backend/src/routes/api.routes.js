@@ -45,6 +45,7 @@ import walletRoutes from './wallet.routes.js';
 import bannerRoutes from './banner.routes.js';
 import uploadRoutes from './upload.routes.js';
 import referralRoutes from './referral.routes.js';
+import telephonyRoutes from './telephony.routes.js';
 import logisticsRoutes from './logistics/logistics.routes.js';
 
 const apiRouter = Router();
@@ -115,6 +116,7 @@ apiRouter.use('/wallets', walletRoutes);
 apiRouter.use('/referrals', referralRoutes);
 apiRouter.use('/banners', bannerRoutes);
 apiRouter.use('/upload', uploadRoutes);
+apiRouter.use('/telephony', telephonyRoutes);
 apiRouter.use('/logistics', logisticsRoutes);
 
 export default apiRouter;

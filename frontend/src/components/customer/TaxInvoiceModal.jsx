@@ -14,7 +14,7 @@ export default function TaxInvoiceModal({ order, onClose }) {
     : [{
         quantity: 1,
         price: order.totalAmount || order.price || 0,
-        size: order.size || 'Free Size',
+        size: order.size || '',
         product: { title: order.productName || 'Catalog Product' }
       }];
 
@@ -97,7 +97,12 @@ export default function TaxInvoiceModal({ order, onClose }) {
               {address.addressLine || address.street || 'Address on file'}<br />
               {address.city ? `${address.city}, ` : ''}{address.state ? `${address.state} - ` : ''}<strong>{address.pincode || ''}</strong>
             </p>
-            <p className="text-slate-500 mt-1">Phone: <strong>{address.phone || order.user?.phone || 'On File'}</strong></p>
+            <p className="text-slate-500 mt-1">
+              Phone: <strong>{address.phone || order.user?.phone ? `${String(address.phone || order.user?.phone).replace(/[\s-]/g, '').slice(0, 5)} XXXXX (Protected)` : 'On File'}</strong>
+            </p>
+            <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+              🛡️ Virtual Helpline: +91 80 4712 3456
+            </p>
           </div>
           <div className="sm:text-right">
             <p className="font-extrabold uppercase text-[10px] text-slate-400 tracking-wider mb-1">
@@ -143,7 +148,7 @@ export default function TaxInvoiceModal({ order, onClose }) {
                   <tr key={idx} className="hover:bg-slate-50/50">
                     <td className="py-2.5 px-3 font-mono text-slate-400">{idx + 1}</td>
                     <td className="py-2.5 px-3 font-semibold text-slate-900 max-w-xs">{title}</td>
-                    <td className="py-2.5 px-3 text-slate-500">{it.size || 'Free Size'}</td>
+                    <td className="py-2.5 px-3 text-slate-500">{it.size || '—'}</td>
                     <td className="py-2.5 px-3 text-center font-bold text-slate-800">{qty}</td>
                     <td className="py-2.5 px-3 text-right font-mono text-slate-700">₹{price}</td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">₹{lineTotal}</td>

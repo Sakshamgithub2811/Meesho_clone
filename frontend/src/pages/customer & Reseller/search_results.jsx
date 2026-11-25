@@ -220,7 +220,7 @@ export default function SearchResults({ onNavigate, onBack }) {
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     try {
-      await addToCart(product.id, 1, product.sizes?.[0] || 'Free Size', product);
+      await addToCart(product.id, 1, product.sizes?.[0] || '', product);
       setCartCount(c => c + 1);
       triggerToast(`Added "${product.title.slice(0, 20)}..." to Cart! 🛒`);
     } catch (err) {
@@ -348,7 +348,7 @@ export default function SearchResults({ onNavigate, onBack }) {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {products.map((p) => {
               const isFav = wishlist.has(p.id);
-              const img = p.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400';
+              const img = p.images?.[0] || p.image || '';
 
               return (
                 <div

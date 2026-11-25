@@ -224,6 +224,71 @@ const detectCategoryDefaults = (categorySlug = '') => {
   };
 };
 
+// Helper: Category-adaptive Key Specifications & Highlights Presets
+const getCategorySpecPresets = (categorySlug = '') => {
+  const s = (categorySlug || '').toLowerCase();
+  const isBeauty = s.includes('beauty') || s.includes('care') || s.includes('face') || s.includes('skin') || s.includes('wash') || s.includes('lotion') || s.includes('cream') || s.includes('oil') || s.includes('shampoo') || s.includes('serum') || s.includes('perfume') || s.includes('cosmetic');
+  const isApparel = s.includes('ethnic') || s.includes('western') || s.includes('apparel') || s.includes('kurti') || s.includes('saree') || s.includes('shirt') || s.includes('men') || s.includes('women') || s.includes('kid') || s.includes('cloth') || s.includes('dress') || s.includes('jeans') || s.includes('pant');
+  const isFootwear = s.includes('footwear') || s.includes('shoe') || s.includes('sandal') || s.includes('slipper') || s.includes('heel');
+  const isElectronics = s.includes('electronic') || s.includes('gadget') || s.includes('mobile');
+  const isHome = s.includes('home') || s.includes('kitchen');
+  const isJewellery = s.includes('jewel') || s.includes('access');
+
+  if (isApparel) {
+    return [
+      { label: 'Fabric', value: '' },
+      { label: 'Pattern', value: '' },
+      { label: 'Fit / Shape', value: '' },
+      { label: 'Occasion', value: '' },
+    ];
+  }
+  if (isBeauty) {
+    return [
+      { label: 'Type / Finish', value: '' },
+      { label: 'Skin Type', value: '' },
+      { label: 'SPF / Protection', value: '' },
+      { label: 'Formulation', value: '' },
+    ];
+  }
+  if (isElectronics) {
+    return [
+      { label: 'Connectivity', value: '' },
+      { label: 'Warranty', value: '' },
+      { label: 'Compatibility', value: '' },
+      { label: 'Battery / Power', value: '' },
+    ];
+  }
+  if (isHome) {
+    return [
+      { label: 'Material', value: '' },
+      { label: 'Pattern', value: '' },
+      { label: 'Care Instructions', value: '' },
+      { label: 'Country of Origin', value: 'India' },
+    ];
+  }
+  if (isFootwear) {
+    return [
+      { label: 'Material', value: '' },
+      { label: 'Fastening', value: '' },
+      { label: 'Sole Material', value: '' },
+      { label: 'Ideal For', value: 'Unisex' },
+    ];
+  }
+  if (isJewellery) {
+    return [
+      { label: 'Base Metal', value: '' },
+      { label: 'Plating', value: '' },
+      { label: 'Occasion', value: '' },
+      { label: 'Ideal For', value: 'Women' },
+    ];
+  }
+  return [
+    { label: 'Material / Type', value: '' },
+    { label: 'Country of Origin', value: 'India' },
+    { label: 'Ideal For', value: 'Unisex' },
+  ];
+};
+
 // Client-side image compressor: Resizes device images to max 1280px & 0.75 JPEG quality (~90-150KB)
 const compressImageFile = (file) => {
   return new Promise((resolve) => {
@@ -315,6 +380,37 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
   // Multiple Images State: array of URLs or base64 strings
   const [images, setImages] = useState(['']);
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
+
+  // Dynamic Product Specifications & Highlights State
+  const [specifications, setSpecifications] = useState(() => getCategorySpecPresets(''));
+  const [newSpecKey, setNewSpecKey] = useState('');
+  const [newSpecVal, setNewSpecVal] = useState('');
+
+  const handleSpecChange = (index, field, value) => {
+    setSpecifications((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const handleAddCustomSpec = () => {
+    if (!newSpecKey.trim()) {
+      toast.error('Please enter a specification name (e.g. Skin Type, Material, etc.)');
+      return;
+    }
+    setSpecifications((prev) => [
+      ...prev,
+      { label: newSpecKey.trim(), value: newSpecVal.trim() }
+    ]);
+    setNewSpecKey('');
+    setNewSpecVal('');
+    toast.success(`Added "${newSpecKey.trim()}" specification!`);
+  };
+
+  const handleRemoveSpec = (index) => {
+    setSpecifications((prev) => prev.filter((_, idx) => idx !== index));
+  };
 
   // ==========================================
   // --- PRODUCT VIDEO STATE (3 MODES) ---
@@ -485,6 +581,7 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
             setSelectedSizes(defaults.defaultSizes);
             setSelectedColors(defaults.defaultColors);
             setSelectedThickness(defaults.defaultThickness);
+            setSpecifications(getCategorySpecPresets(firstSlug));
           }
         }
 
@@ -518,6 +615,7 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
       setSelectedSizes(defaults.defaultSizes);
       setSelectedColors(defaults.defaultColors);
       setSelectedThickness(defaults.defaultThickness);
+      setSpecifications(getCategorySpecPresets(slug));
     }
   };
 
@@ -790,6 +888,7 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
         imageUrl: finalImages[0] || '',
         videoUrl: videoUrl ? videoUrl.trim() : null,
         videoType: videoUrl ? videoSourceType : null,
+        specifications: specifications.filter(s => s.label && s.value && s.value.trim()),
       };
 
       // 1. Submit product to backend API (handles file writing and deduplication)
@@ -1480,6 +1579,12 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     Add multiple high-resolution photos (Front, Back, Close-up, Lifestyle).
                   </p>
+                  <div className="mt-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60 text-[11px] text-amber-900 flex items-start gap-2">
+                    <span className="material-symbols-outlined text-sm text-amber-600 shrink-0 mt-0.5">verified_user</span>
+                    <p className="leading-relaxed">
+                      <strong>Image Ownership & Licensing:</strong> Upload only original photography, royalty-free stock with commercial license, or commercial AI-generated images matching the product. External hotlinks are prohibited; all photos are self-hosted securely on our platform.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Upload & Quick Action Buttons */}
@@ -2006,7 +2111,89 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
               )}
             </div>
 
-            {/* 5. Description */}
+            {/* 5. Product Highlights & Key Specifications */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-pink-50 text-[#b7004d] flex items-center justify-center font-bold text-xs">
+                    ✦
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Product Highlights & Key Specifications
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Category-specific attributes shown on customer product page (e.g. Fabric for clothing, Skin Type for skincare)
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                  {specifications.filter((s) => s.label && s.value?.trim()).length} Set
+                </span>
+              </div>
+
+              {/* Dynamic Preset Attributes Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {specifications.map((spec, index) => (
+                  <div key={index} className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
+                    <div className="w-2/5 shrink-0">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block truncate" title={spec.label}>
+                        {spec.label}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={spec.value}
+                        onChange={(e) => handleSpecChange(index, 'value', e.target.value)}
+                        placeholder={`Enter ${spec.label}...`}
+                        className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-200 focus:border-[#d82a62] outline-none transition"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSpec(index)}
+                      className="w-6 h-6 rounded-full hover:bg-slate-200 text-slate-400 hover:text-rose-600 flex items-center justify-center text-xs transition cursor-pointer shrink-0"
+                      title="Remove specification"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Custom Specification Row */}
+              <div className="pt-2 border-t border-dashed border-slate-200">
+                <span className="text-[11px] font-bold text-slate-700 block mb-2">
+                  + Add Custom Specification / Key-Value:
+                </span>
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  <input
+                    type="text"
+                    value={newSpecKey}
+                    onChange={(e) => setNewSpecKey(e.target.value)}
+                    placeholder="Attribute Name (e.g. SPF, Battery, Volume, Fit)"
+                    className="flex-1 min-w-[140px] px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 focus:border-[#d82a62] outline-none transition"
+                  />
+                  <input
+                    type="text"
+                    value={newSpecVal}
+                    onChange={(e) => setNewSpecVal(e.target.value)}
+                    placeholder="Value (e.g. SPF 50 PA+++, 40 Hrs, 100ml)"
+                    className="flex-1 min-w-[140px] px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 focus:border-[#d82a62] outline-none transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomSpec}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 6. Description */}
             <div>
               <label className="text-xs font-bold text-slate-800 block mb-1">
                 Product Description & Specifications
@@ -2271,6 +2458,26 @@ export default function SellerAddProduct1({ onNavigate, embedded = false, onNavi
                       <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
                         {formData.stock || 0} Units Available
                       </span>
+                    </div>
+                  )}
+
+                  {/* Live Product Highlights Preview */}
+                  {specifications.filter((s) => s.label && s.value?.trim()).length > 0 && (
+                    <div className="pt-2.5 border-t border-slate-100 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-800">
+                        <span>Product Highlights</span>
+                        <span className="text-[9px] uppercase font-bold text-[#b7004d] bg-pink-50 px-2 py-0.5 rounded-full">
+                          Live Customer View
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5 text-[10.5px]">
+                        {specifications.filter((s) => s.label && s.value?.trim()).map((sp, idx) => (
+                          <div key={idx} className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                            <span className="text-slate-400 block text-[9.5px]">{sp.label}</span>
+                            <span className="font-bold text-slate-800 truncate block">{sp.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 

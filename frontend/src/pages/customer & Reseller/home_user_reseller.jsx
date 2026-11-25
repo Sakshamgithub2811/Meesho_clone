@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getWishlist, toggleWishlist as apiToggleWishlist } from '../../services/ecommerceService';
+import { getWishlist, toggleWishlist as apiToggleWishlist, getProducts, getCart } from '../../services/ecommerceService';
 import AppBottomNav from '../../components/AppBottomNav';
 
 export default function HomeUserReseller({ onNavigate = () => {} }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [wishlist, setWishlist] = useState({});
+  const [products, setProducts] = useState([]);
+  const [cartCount, setCartCount] = useState(0);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
@@ -15,9 +17,13 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
   };
 
   useEffect(() => {
-    async function loadWish() {
+    async function loadData() {
       try {
-        const wish = await getWishlist();
+        const [wish, prods, cart] = await Promise.all([
+          getWishlist().catch(() => []),
+          getProducts({ limit: 8 }).catch(() => []),
+          getCart().catch(() => [])
+        ]);
         if (Array.isArray(wish)) {
           const map = {};
           wish.forEach(w => {
@@ -26,9 +32,19 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
           });
           setWishlist(map);
         }
+        if (Array.isArray(prods)) {
+          setProducts(prods);
+        } else if (Array.isArray(prods?.products)) {
+          setProducts(prods.products);
+        }
+        if (Array.isArray(cart)) {
+          setCartCount(cart.reduce((sum, it) => sum + (it.quantity || 1), 0));
+        } else if (Array.isArray(cart?.items)) {
+          setCartCount(cart.items.reduce((sum, it) => sum + (it.quantity || 1), 0));
+        }
       } catch (e) {}
     }
-    loadWish();
+    loadData();
   }, []);
 
   const toggleWishlist = async (e, id) => {
@@ -61,47 +77,6 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
     { id: 'kids', name: 'Kids', icon: 'child_care', target: 'explorer' },
     { id: 'jewelry', name: 'Jewelry', icon: 'diamond', target: 'explorer' },
     { id: 'brands', name: 'Brands', icon: 'verified', target: 'explorer' },
-  ];
-
-  const products = [
-    {
-      id: 1,
-      title: 'Premium Floral Embroidered Kurti',
-      price: 459,
-      originalPrice: 1299,
-      discount: '64% OFF',
-      margin: 65,
-      tag: 'NEW',
-      image: 'https://images.unsplash.com/photo-1609357605129-26f69add5d6e?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 2,
-      title: "Men's Vintage Denim Jacket",
-      price: 899,
-      originalPrice: 2499,
-      discount: '64% OFF',
-      margin: 120,
-      image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 3,
-      title: 'Retro Square Sunglasses',
-      price: 249,
-      originalPrice: 999,
-      discount: '75% OFF',
-      margin: 35,
-      tag: 'BESTSELLER',
-      image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 4,
-      title: 'Air Cushion Sneakers',
-      price: 1249,
-      originalPrice: 3499,
-      discount: '64% OFF',
-      margin: 180,
-      image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80',
-    },
   ];
 
   return (
@@ -160,9 +135,11 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
             className="text-[#191C1E] active:scale-95 duration-200 hover:text-[#FF3F6C] p-1 cursor-pointer relative"
           >
             <span className="material-symbols-outlined">shopping_bag</span>
-            <span className="absolute -top-1 -right-1 bg-[#FF3F6C] text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-              2
-            </span>
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-[#FF3F6C] text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                {cartCount}
+              </span>
+            )}
           </button>
         </div>
       </header>
@@ -288,23 +265,27 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
             {products.map((product) => {
               const isFav = wishlist[product.id];
+              const displayImage = product.images?.[0] || product.image || '';
+              const margin = Math.round((Number(product.price) || 0) * 0.15);
+              const originalPrice = product.originalPrice ? Number(product.originalPrice) : null;
+              const discount = product.discountPercentage ? `${product.discountPercentage}% OFF` : '';
               return (
                 <div
                   key={product.id}
-                  onClick={() => onNavigate('product')}
+                  onClick={() => onNavigate(`/product?id=${product.id}`)}
                   className="group cursor-pointer flex flex-col justify-between"
                 >
                   <div className="relative overflow-hidden rounded-3xl aspect-3/4 mb-3 bg-gray-100">
                     <img
-                      src={product.image}
+                      src={displayImage}
                       alt={product.title}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
 
-                    {product.tag && (
+                    {discount && (
                       <div className="absolute top-3 left-3 max-w-[calc(100%-44px)]">
                         <span className="bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-[#191c1e] shadow-sm truncate whitespace-nowrap block">
-                          {product.tag}
+                          {discount}
                         </span>
                       </div>
                     )}
@@ -332,13 +313,17 @@ export default function HomeUserReseller({ onNavigate = () => {} }) {
 
                     <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2">
                       <span className="text-sm sm:text-base font-black text-[#191c1e]">₹{product.price}</span>
-                      <span className="text-[11px] sm:text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
-                      <span className="text-[11px] sm:text-xs font-bold text-[#FF3F6C] whitespace-nowrap">{product.discount}</span>
+                      {originalPrice > product.price && (
+                        <span className="text-[11px] sm:text-xs text-gray-400 line-through">₹{originalPrice}</span>
+                      )}
+                      {discount && (
+                        <span className="text-[11px] sm:text-xs font-bold text-[#FF3F6C] whitespace-nowrap">{discount}</span>
+                      )}
                     </div>
 
                     <div className="bg-emerald-50 border border-emerald-200/60 rounded-xl px-3 py-1.5 flex items-center justify-between mt-2">
                       <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
-                        Earn ₹{product.margin}
+                        Earn ₹{margin}
                       </span>
                       <span className="material-symbols-outlined text-[16px] text-emerald-800">
                         share

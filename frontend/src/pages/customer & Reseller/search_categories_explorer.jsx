@@ -184,7 +184,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
   const handleQuickAddToCart = async (e, prod) => {
     e.stopPropagation();
     try {
-      const sizeToUse = (prod.sizes && prod.sizes[0]) || 'Free Size';
+      const sizeToUse = (Array.isArray(prod.sizes) && prod.sizes[0]) || '';
       await addItem(prod.id, 1, sizeToUse);
       triggerToast(`Added ${prod.title.slice(0, 20)}... to Cart! 🛍️`);
     } catch (err) {
@@ -221,7 +221,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
   const bannerImage =
     currentCategory?.imageUrl ||
     (products[0]?.images && products[0].images[0]) ||
-    'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80';
+    '';
 
   // 100% Dynamic Subcategories extracted directly from PostgreSQL Category & Products
   const dynamicSubcategories = useMemo(() => {
@@ -451,8 +451,8 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
                   alt={currentCategory.name}
                   className="w-full h-full object-cover object-top transition-all duration-300"
                   onError={(e) => {
-                    const fallback = (products[0]?.images && products[0].images[0]) || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=800&auto=format&fit=crop&q=80';
-                    if (e.target.src !== fallback) {
+                    const fallback = (products[0]?.images && products[0].images[0]) || '';
+                    if (fallback && e.target.src !== fallback) {
                       e.target.src = fallback;
                     }
                   }}
@@ -515,7 +515,7 @@ export default function SearchCategoriesExplorer({ onNavigate = () => {}, onBack
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {filteredProducts.map((prod) => {
                   const isFav = wishlist.has(prod.id);
-                  const image = (prod.images && prod.images[0]) || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600';
+                  const image = (prod.images && prod.images[0]) || prod.image || '';
                   const discount = prod.discountPercentage || Math.round(((prod.originalPrice - prod.price) / (prod.originalPrice || prod.price)) * 100) || 0;
 
                   return (

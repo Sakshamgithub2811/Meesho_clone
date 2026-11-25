@@ -441,7 +441,8 @@ export const createProduct = async (req, res) => {
       isFreeDelivery = true,
       supplierName = 'Verified Supplier',
       rating = 0,
-      reviewsCount = 0
+      reviewsCount = 0,
+      specifications
     } = req.body;
 
     if (!title || price === undefined || price === null || price === '') {
@@ -521,6 +522,7 @@ export const createProduct = async (req, res) => {
         colors: productColors,
         videoUrl: (videoUrl || '').trim() || null,
         videoType: (videoType || '').trim() || null,
+        specifications: Array.isArray(specifications) ? specifications : (typeof specifications === 'string' ? JSON.parse(specifications || '[]') : []),
         stock: parseInt(stock, 10) || 50,
         isFreeDelivery: Boolean(isFreeDelivery),
         supplierName: supplierName || 'Verified Supplier'

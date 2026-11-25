@@ -78,7 +78,7 @@ export default function WomenWesternCategory({ onNavigate, onBack }) {
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     try {
-      await addToCart(product.id, 1, product.sizes?.[0] || 'Free Size', product);
+      await addToCart(product.id, 1, product.sizes?.[0] || '', product);
       setCartCount((c) => c + 1);
       triggerToast(`Added ${product.title.slice(0, 20)}... to Cart! 🛍️`);
     } catch (e) {
@@ -168,7 +168,7 @@ export default function WomenWesternCategory({ onNavigate, onBack }) {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {filtered.map((product) => {
               const isFav = wishlist.has(product.id);
-              const img = product.images?.[0] || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600';
+              const img = product.images?.[0] || product.image || '';
 
               return (
                 <div

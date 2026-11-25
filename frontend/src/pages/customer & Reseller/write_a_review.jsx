@@ -242,7 +242,7 @@ export default function WriteAReview({ onNavigate = () => {}, onBack }) {
                   <img
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     alt={productData?.title || 'Product'}
-                    src={productData?.images?.[0] || 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400&auto=format&fit=crop&q=80'}
+                    src={productData?.images?.[0] || productData?.image || ''}
                   />
                 </div>
                 <div className="flex-1 flex flex-col justify-between py-1">
@@ -257,7 +257,7 @@ export default function WriteAReview({ onNavigate = () => {}, onBack }) {
                     </h2>
                   </div>
                   <p className="text-slate-400 text-[11px] font-semibold">
-                    {orderId ? `Order #${orderId.slice(0, 8)} • ` : ''}₹{productData?.price?.toLocaleString() || '450'}
+                    {orderId ? `Order #${orderId.slice(0, 8)} • ` : ''}{productData?.price ? `₹${productData.price.toLocaleString()}` : ''}
                   </p>
                 </div>
               </div>

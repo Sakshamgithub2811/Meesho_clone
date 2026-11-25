@@ -170,17 +170,17 @@ export default function CustomerOrders({ onNavigate, onBack }) {
       orderDate,
       productId: firstItem.productId || prod.id,
       productName: prod.title || 'Ordered Product',
-      image: prod.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400',
-      size: firstItem.size || 'Free Size',
-      color: prod.colors?.[0] || 'Black',
+      image: prod.images?.[0] || prod.image || '',
+      size: firstItem.size || '',
+      color: prod.colors?.[0] || prod.color || '',
       qty: o.items?.reduce((sum, it) => sum + it.quantity, 0) || 1,
       price: o.totalAmount,
-      originalPrice: Math.round(o.totalAmount * 1.6),
+      originalPrice: prod.originalPrice || o.totalAmount,
       status: uiStatus,
       statusLabel,
       paymentMethod: o.paymentMethod || 'COD',
-      deliveryAddress: addr.details ? `${addr.name || ''}, ${addr.details} - ${addr.pincode || ''}` : 'Home Address',
-      sellerName: prod.supplierName || 'Verified Supplier',
+      deliveryAddress: addr.details ? `${addr.name || ''}, ${addr.details} - ${addr.pincode || ''}` : (addr.addressLine || 'Home Address'),
+      sellerName: prod.supplierName || 'Independent Seller',
       itemsCount: o.items?.length || 1,
       items: o.items || [],
       returnRequest: o.returnRequest || null
@@ -868,7 +868,7 @@ export default function CustomerOrders({ onNavigate, onBack }) {
                               )}&price=${order.price}&image=${encodeURIComponent(
                                 order.image || ''
                               )}&size=${encodeURIComponent(
-                                order.size || 'Free Size'
+                                order.size || ''
                               )}&deliveredDate=${encodeURIComponent(
                                 order.deliveryDate || order.orderDate || 'Recently'
                               )}`
@@ -891,7 +891,7 @@ export default function CustomerOrders({ onNavigate, onBack }) {
                               )}&price=${order.price}&image=${encodeURIComponent(
                                 order.image || ''
                               )}&size=${encodeURIComponent(
-                                order.size || 'Free Size'
+                                order.size || ''
                               )}&step=5`
                             )
                           }
