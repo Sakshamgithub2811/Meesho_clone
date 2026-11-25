@@ -17,6 +17,7 @@ import { getUnreadCount, subscribeNotifications } from "../../services/notificat
 import GuestWelcomeModal from "../../components/customer/GuestWelcomeModal";
 import ProductFilterSidebar from "../../components/customer/ProductFilterSidebar";
 import CountdownTimer from "../../components/customer/CountdownTimer";
+import CustomerFooter from "../../components/customer/CustomerFooter";
 
 const FEATURED_BRAND_LOGOS = [
   { name: 'mamaearth', display: 'mamaearth', color: 'text-emerald-600', icon: '🌿' },
@@ -517,16 +518,20 @@ export default function HomeUserCustomer() {
       observer = new IntersectionObserver(
         (entries) => {
           if (entries[0].isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) {
-            loadMoreProducts();
+            // Auto-load up to page 2, then let customer click "Load More" so Footer is easily accessible
+            if (pageRef.current < 2) {
+              loadMoreProducts();
+            }
           }
         },
-        { rootMargin: '450px' }
+        { rootMargin: '300px' }
       );
       observer.observe(sentinel);
     }
 
     const handleWindowScroll = () => {
       if (loadingMoreRef.current || !hasMoreRef.current || loadingRef.current) return;
+      if (pageRef.current >= 2) return; // Allow customer to easily reach the Footer without endless loop
       const scrollY = window.scrollY || window.pageYOffset;
       const visibleHeight = window.innerHeight;
       const totalHeight = document.documentElement.scrollHeight;
@@ -1565,73 +1570,6 @@ export default function HomeUserCustomer() {
 
         </section>
 
-        {/* ── Newsletter & VIP Member Discounts Banner (Placed above products to avoid infinite scroll push) ── */}
-        <section className="mt-8 mb-4 bg-gradient-to-r from-pink-900 via-[#800033] to-[#40001a] rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl">
-          <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-pink-500/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute left-1/3 -top-10 w-48 h-48 bg-rose-400/10 rounded-full blur-2xl pointer-events-none" />
-
-          <div className="relative z-10 max-w-2xl mx-auto text-center space-y-3.5">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-pink-200">
-              <span className="material-symbols-outlined text-sm">mark_email_read</span>
-              <span>MShoppy VIP Newsletter</span>
-            </div>
-
-            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              Get 10% OFF Your Order &amp; VIP Price Drops
-            </h3>
-
-            <p className="text-xs text-pink-100/80 max-w-lg mx-auto leading-relaxed">
-              Subscribe before you shop to unlock instant discount code <strong className="text-white underline">WELCOME10</strong> on your entire bag.
-            </p>
-
-            {newsletterSubscribed ? (
-              <div className="p-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl max-w-md mx-auto text-center space-y-2 animate-in zoom-in-95">
-                <span className="material-symbols-outlined text-2xl text-emerald-400">verified</span>
-                <h4 className="text-sm font-black text-white">You're Subscribed! 🎉</h4>
-                <p className="text-xs text-pink-100">Use this exclusive code at checkout for 10% off:</p>
-                <div className="flex items-center justify-center gap-2 pt-1">
-                  <span className="px-4 py-2 bg-white text-[#800033] font-mono font-black text-base rounded-xl tracking-wider shadow-xs">
-                    WELCOME10
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard?.writeText('WELCOME10');
-                      setCopiedCoupon(true);
-                      setTimeout(() => setCopiedCoupon(false), 2000);
-                    }}
-                    className="px-3.5 py-2 bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                  >
-                    {copiedCoupon ? 'COPIED!' : 'COPY CODE'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSubscribeNewsletter} className="flex flex-col sm:flex-row gap-2.5 max-w-md mx-auto pt-1">
-                <input
-                  type="email"
-                  required
-                  value={newsletterEmail}
-                  onChange={(e) => setNewsletterEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  className="flex-1 bg-white/15 focus:bg-white text-white focus:text-slate-900 placeholder:text-pink-200/70 focus:placeholder:text-slate-400 border border-white/30 rounded-2xl px-4 py-3 text-xs focus:outline-none transition-all shadow-inner"
-                />
-                <button
-                  type="submit"
-                  disabled={newsletterLoading}
-                  className="px-6 py-3 bg-white text-[#800033] hover:bg-pink-50 font-black text-xs rounded-2xl shadow-lg transition-transform active:scale-95 cursor-pointer uppercase tracking-wider shrink-0"
-                >
-                  {newsletterLoading ? 'Subscribing...' : 'Get 10% Off'}
-                </button>
-              </form>
-            )}
-
-            <p className="text-[10px] text-pink-200/60 pt-0.5">
-              Zero spam. Verified discounts and restock alerts only.
-            </p>
-          </div>
-        </section>
-
         {/* =========================================================================
             SECTION 2: PRODUCT LISTING ENHANCEMENTS WITH SIDEBAR FILTERS & COUNTDOWN (Matching Screenshot 2)
         ========================================================================= */}
@@ -1864,19 +1802,48 @@ export default function HomeUserCustomer() {
                 </div>
               )}
 
-              {/* Real Meesho Infinite Scroll Sentinel & Loader */}
-              <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[90px]">
-                {loadingMore && (
-                  <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-extrabold text-[#b90041] animate-pulse">
-                    <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
-                    <span>Loading more trending products for you...</span>
-                  </div>
-                )}
-              </div>
+              {/* Controlled Infinite Scroll: 2 pages (56 products) auto-stream, then explicit Load More button so Footer is easily accessible */}
+              {hasMore && page >= 2 ? (
+                <div className="w-full py-8 flex flex-col items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => loadMoreProducts()}
+                    disabled={loadingMore}
+                    className="px-8 py-3.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-[#b7004d] dark:text-rose-400 border-2 border-[#b7004d] dark:border-rose-500 rounded-full font-black text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-[#b7004d] border-t-transparent rounded-full animate-spin"></span>
+                        <span>Loading Trending Products...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-base">expand_more</span>
+                        <span>Load More Products</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-slate-400 mt-2 font-medium">
+                    Showing {products.length} of {totalProducts || '1,000+'} products
+                  </p>
+                </div>
+              ) : (
+                <div ref={sentinelRef} className="w-full py-8 flex flex-col items-center justify-center min-h-[90px]">
+                  {loadingMore && (
+                    <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-xs font-extrabold text-[#b90041] animate-pulse">
+                      <span className="material-symbols-outlined text-lg animate-spin text-[#FF3F6C]">progress_activity</span>
+                      <span>Loading more trending products for you...</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </section>
       </main>
+
+      {/* Customer Footer with Newsletter Management */}
+      <CustomerFooter onNavigate={navigate} />
 
       {/* Customer Bottom Navigation */}
       <AppBottomNav activeNav="home" role="customer" homePath="/" />

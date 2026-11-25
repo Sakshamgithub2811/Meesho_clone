@@ -14,6 +14,7 @@ import { useCart } from '../../hooks/useCart';
 import { getAffiliateApp } from '../../services/affiliateSessionStore';
 import { buildAffiliateProductUrl, getAffiliateMarginFromParams } from '../../utils/affiliateLinkHelper';
 import QuickEmailOtpModal from '../../components/auth/QuickEmailOtpModal';
+import CustomerFooter from '../../components/customer/CustomerFooter';
 import { toast } from 'sonner';
 
 // Category-specific variant configuration & labels
@@ -2428,6 +2429,9 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
 
         </div>
       </main>
+
+      {/* Customer Footer with Newsletter Subscription & Policies */}
+      <CustomerFooter onNavigate={onNavigate} />
 
       {/* Sticky Bottom Actions Bar (Mobile Only: hidden on desktop screens) */}
       <div className="lg:hidden fixed bottom-0 left-0 w-full z-40 bg-white/95 backdrop-blur-xl shadow-[0_-8px_30px_rgba(0,0,0,0.08)] px-3 sm:px-4 py-3 border-t border-slate-100">
