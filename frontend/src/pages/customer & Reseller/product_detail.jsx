@@ -1,4 +1,4 @@
-const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' width='400' height='400'%3E%3Crect width='400' height='400' fill='%23f1f5f9'/%3E%3Cpath d='M160 160a20 20 0 1 0 0-40 20 20 0 0 0 0 40zm80 40-50-50-70 70h160l-40-60z' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='65%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' font-weight='600' fill='%2394a3b8'%3ENo Image Available%3C/text%3E%3C/svg%3E";
+const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 500' width='400' height='500'%3E%3Crect width='400' height='500' fill='%23f8fafc'/%3E%3Cpath d='M160 180v-30c0-22.1 17.9-40 40-40s40 17.9 40 40v30h30l20 180H110l20-180h30zm20 0h40v-30c0-11-9-20-20-20s-20 9-20 20v30z' fill='%23cbd5e1'/%3E%3C/svg%3E";
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
