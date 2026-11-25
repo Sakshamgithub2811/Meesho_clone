@@ -14,7 +14,6 @@ import {
 } from "../../services/ecommerceService";
 import { useCart } from "../../hooks/useCart";
 import { getUnreadCount, subscribeNotifications } from "../../services/notificationService";
-import GuestWelcomeModal from "../../components/customer/GuestWelcomeModal";
 import ProductFilterSidebar from "../../components/customer/ProductFilterSidebar";
 import CountdownTimer from "../../components/customer/CountdownTimer";
 import CustomerFooter from "../../components/customer/CustomerFooter";
@@ -259,60 +258,6 @@ export default function HomeUserCustomer() {
     );
   }, [registeredUser]);
 
-  // Guest Welcome / Login Prompt Modal State
-  const [showGuestModal, setShowGuestModal] = useState(false);
-
-  // Helper to check whether visitor has an active authenticated customer session
-  const checkIsCustomerLoggedIn = useCallback(() => {
-    try {
-      const token = localStorage.getItem('mshoppy_customer_token');
-      const userStr = localStorage.getItem('mshoppy_customer_user');
-      if (token && userStr) {
-        const u = JSON.parse(userStr);
-        if (u && (u.id || u.uid || u.email || u.phone)) {
-          return true;
-        }
-      }
-    } catch (_) {}
-    return false;
-  }, []);
-
-  // Delayed Guest / Login Prompt (Triggers after 4-5 seconds of exploring the homepage)
-  useEffect(() => {
-    // 1. If actively logged in as a verified customer, never show modal
-    if (checkIsCustomerLoggedIn()) {
-      return;
-    }
-
-    // 2. Check if already dismissed in this browsing session
-    const isDismissed = sessionStorage.getItem('mshoppy_guest_prompt_dismissed') === 'true';
-    if (isDismissed) {
-      return;
-    }
-
-    // 3. Fire after 4.2 seconds of exploring the homepage
-    // Mount timer runs smoothly without being cancelled by fluctuating state re-renders
-    const timer = setTimeout(() => {
-      if (!checkIsCustomerLoggedIn()) {
-        setShowGuestModal(true);
-      }
-    }, 4200);
-
-    return () => clearTimeout(timer);
-  }, [checkIsCustomerLoggedIn]);
-
-  const handleContinueAsGuest = useCallback(() => {
-    sessionStorage.setItem('mshoppy_guest_prompt_dismissed', 'true');
-    localStorage.setItem('mshoppy_guest_mode', 'true');
-    setShowGuestModal(false);
-  }, []);
-
-  const handleModalLogin = useCallback(() => {
-    sessionStorage.setItem('mshoppy_guest_prompt_dismissed', 'true');
-    setShowGuestModal(false);
-    navigate('/user/login?redirect=' + encodeURIComponent(window.location.pathname || '/'));
-  }, [navigate]);
-  
   // Real Meesho Infinite Scroll State & Stable Refs
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -1848,72 +1793,7 @@ export default function HomeUserCustomer() {
       {/* Customer Bottom Navigation */}
       <AppBottomNav activeNav="home" role="customer" homePath="/" />
 
-      {/* Guest Welcome & Login Prompt Modal (Shown after 4-5 seconds for guest exploration) */}
-      <GuestWelcomeModal
-        isOpen={showGuestModal}
-        onClose={handleContinueAsGuest}
-        onContinueAsGuest={handleContinueAsGuest}
-        onLogin={handleModalLogin}
-      />
-
-      {/* App Download Modal for 35% OFF First Order with QR Code (Exact Replica of Meesho Web) */}
-      {showAppDownloadModal && (
-        <div
-          onClick={() => setShowAppDownloadModal(false)}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full shadow-2xl relative border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 overflow-hidden"
-          >
-            {/* Modal Header Matching Meesho */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-base sm:text-lg font-bold text-[#5c0632] dark:text-rose-400">
-                Shop Now on App to get Upto 35% off on 1st Order
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowAppDownloadModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-lg font-bold"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Content: 2-Column Banner & QR Code Matching Frame 303 */}
-            <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-              {/* Left Column: 35% OFF Promotional Banner */}
-              <div className="w-full md:w-[62%] rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 bg-[#5c0632]">
-                <img
-                  src="/meesho_app_modal_banner.jpg"
-                  alt="Shop Now on App to get Upto 35% off on 1st Order"
-                  className="w-full h-auto object-cover rounded-2xl block"
-                />
-              </div>
-
-              {/* Right Column: Scan Now to download App + Crisp QR Code */}
-              <div className="w-full md:w-[38%] flex flex-col items-center justify-center text-center px-2">
-                <h4 className="text-sm sm:text-base font-extrabold text-[#5c0632] dark:text-rose-400 mb-3">
-                  Scan Now to download App!
-                </h4>
-                <div className="bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-sm inline-block">
-                  <QRCodeSVG
-                    value="https://play.google.com/store/apps"
-                    size={180}
-                    bgColor="#ffffff"
-                    fgColor="#000000"
-                    level="Q"
-                    includeMargin={false}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* App Download Modal for 35% OFF First Order with QR Code (Exact Replica of Meesho Web) */}
+      {/* App Download Modal for 35% OFF First Order with QR Code (Replica of Meesho Web) */}
       {showAppDownloadModal && (
         <div
           onClick={() => setShowAppDownloadModal(false)}
