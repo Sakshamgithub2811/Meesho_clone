@@ -16,8 +16,7 @@ import {
   updateDropshipperKycStatus,
   deactivateDropshipperAccountApi,
   clearDropshipperSession,
-  getDropshipperDashboardOverviewApi,
-  sendTestDropshipperEmailApi
+  getDropshipperDashboardOverviewApi
 } from '../../services/dropshipperService';
 import { 
   getDropshipperApp, 
@@ -65,8 +64,7 @@ import {
   Headphones,
   Settings,
   Layers,
-  Activity,
-  Send
+  Activity
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -183,44 +181,6 @@ export default function DropshipperDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [isRefreshingDashboard, setIsRefreshingDashboard] = useState(false);
-
-  // Live Email Hub & Live SMTP Testing States
-  const [testEmailRecipient, setTestEmailRecipient] = useState(() => currentUser?.email || 'kunal07sikarwar@gmail.com');
-  const [testEmailTemplate, setTestEmailTemplate] = useState('ORDER_PUSH');
-  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
-
-  const handleSendTestEmail = async (e) => {
-    e.preventDefault();
-    if (!testEmailRecipient || !testEmailRecipient.includes('@')) {
-      toast.error('Invalid Email Address', { description: 'Please enter a valid recipient email.' });
-      return;
-    }
-
-    try {
-      setIsSendingTestEmail(true);
-      const res = await sendTestDropshipperEmailApi({
-        to: testEmailRecipient,
-        templateType: testEmailTemplate,
-        partnerName: profileForm.fullName || currentUser?.fullName || 'Kunal Sikarwar',
-        storeName: profileForm.storeName || currentUser?.storeName || 'Kunal Retail'
-      });
-
-      if (res?.success) {
-        toast.success('Live Email Delivered! 📧', {
-          description: `Template "${testEmailTemplate}" sent to ${testEmailRecipient}. Check your inbox!`
-        });
-      } else {
-        toast.error('Email Dispatch Failed', { description: res?.message });
-      }
-    } catch (err) {
-      console.error('Test email error:', err);
-      toast.error('Failed to Dispatch Email', {
-        description: err?.response?.data?.message || err.message
-      });
-    } finally {
-      setIsSendingTestEmail(false);
-    }
-  };
 
   // Active user / dropshipper UID helper
   const currentUid = currentUser?.uid || currentUser?.id || (() => {
@@ -1360,146 +1320,6 @@ export default function DropshipperDashboard() {
 
                     </form>
                   )}
-                </div>
-              </div>
-            </div>
-
-            {/* ======================================================== */}
-            {/* AUTOMATED EMAIL NOTIFICATION HUB & LIVE SMTP TESTING */}
-            {/* ======================================================== */}
-            <div className="mt-8 rounded-3xl border border-gray-100 bg-white p-6 sm:p-8 shadow-sm space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-lg font-black text-gray-900 tracking-tight">
-                      Automated Email Notification & White-Label Hub
-                    </h4>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> SMTP Live
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Enterprise notification engine: delivers white-label customer receipts and instant dropshipper profit alerts.
-                  </p>
-                </div>
-                <div className="shrink-0">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-mono font-medium">
-                    <Mail className="w-3.5 h-3.5 text-[#b7004d]" />
-                    <span>Nodemailer + Gmail SSL</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* 1. Live Email Testing & Template Preview Desk */}
-              <div className="p-5 rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50/40 via-white to-pink-50/30 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#b7004d]" />
-                    <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                      Test Live Email Dispatch & Template Design
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-gray-500">Instant delivery to your inbox</span>
-                </div>
-
-                <form onSubmit={handleSendTestEmail} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                  <div className="md:col-span-5 space-y-1.5">
-                    <Label htmlFor="testTemplate" className="text-[11px] font-bold text-gray-600 uppercase">
-                      Select Email Template
-                    </Label>
-                    <select
-                      id="testTemplate"
-                      value={testEmailTemplate}
-                      onChange={(e) => setTestEmailTemplate(e.target.value)}
-                      className="w-full h-11 rounded-2xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-800 focus:border-[#b7004d] focus:outline-none cursor-pointer"
-                    >
-                      <option value="ORDER_PUSH">🚀 Order Push & Margin Lock (To Dropshipper)</option>
-                      <option value="CUSTOMER_CONFIRMATION">🛍️ White-Label Customer Receipt (Brand: {profileForm.storeName || 'Kunal Retail'})</option>
-                      <option value="DISPATCH">🚚 Courier Dispatch & Live AWB Tracking</option>
-                      <option value="DELIVERED">💰 Delivered & Margin Released to Wallet</option>
-                      <option value="ROT_WAIVER">🛡️ ROT Return Waiver (100% Reverse Freight Zero Loss)</option>
-                      <option value="TICKET">🎧 Support Desk Dispute Response Alert</option>
-                      <option value="KYC">✅ Verified Dropshipper Partner Account Approval</option>
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-5 space-y-1.5">
-                    <Label htmlFor="testEmailInput" className="text-[11px] font-bold text-gray-600 uppercase">
-                      Recipient Email Address
-                    </Label>
-                    <Input
-                      id="testEmailInput"
-                      type="email"
-                      value={testEmailRecipient}
-                      onChange={(e) => setTestEmailRecipient(e.target.value)}
-                      placeholder="your-email@gmail.com"
-                      className="h-11 rounded-2xl border-gray-200 bg-white text-xs font-medium focus:border-[#b7004d]"
-                      required
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <Button
-                      type="submit"
-                      disabled={isSendingTestEmail}
-                      className="w-full h-11 rounded-2xl bg-[#b7004d] hover:bg-[#96003f] text-white text-xs font-bold shadow-md shadow-[#b7004d]/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      {isSendingTestEmail ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Sending...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3.5 h-3.5" />
-                          <span>Send Test</span>
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              </div>
-
-              {/* 2. Active Lifecycle Triggers Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-2">
-                <div className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-900">White-Label Branding</span>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  </div>
-                  <p className="text-[11px] text-gray-500 leading-relaxed">
-                    Customer receipts use your Store Name (<strong className="text-gray-700">{profileForm.storeName || 'Kunal Retail'}</strong>) with zero supplier or Meesho mention.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-900">Escrow & Payouts</span>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  </div>
-                  <p className="text-[11px] text-gray-500 leading-relaxed">
-                    Instant alerts when order delivers and resell margin unlocks directly into your wallet balance.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-900">ROT Reverse Waiver</span>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  </div>
-                  <p className="text-[11px] text-gray-500 leading-relaxed">
-                    Proof notice confirming ₹0 reverse freight fee deducted on customer RTO returns under 100% ROT coverage.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-900">Support Chat Sync</span>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  </div>
-                  <p className="text-[11px] text-gray-500 leading-relaxed">
-                    Never miss a dispute update: agent responses are sent with a 1-click portal link to reply immediately.
-                  </p>
                 </div>
               </div>
             </div>
