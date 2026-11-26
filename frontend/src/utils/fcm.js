@@ -115,13 +115,12 @@ export const requestNotificationPermission = async (firebaseUid) => {
       currentToken = await getToken(messaging, tokenOptions);
       console.log('[FCM] Native Firebase WebPush token generated:', currentToken ? `${currentToken.slice(0, 15)}...` : '');
     } catch (fcmErr) {
-      console.warn('[FCM] Native getToken fallback (VAPID key or SW):', fcmErr.message);
-      // Fallback token: enables in-app alerts, Web Audio chimes, and DB notification center
-      currentToken = `web_device_${(firebaseUid || 'partner').slice(0, 8)}_${Date.now()}`;
+      console.error('[FCM] Native getToken failed:', fcmErr.message);
+      return null;
     }
 
     if (!currentToken) {
-      currentToken = `web_device_${Date.now()}`;
+      return null;
     }
 
     // 4. Save to local storage

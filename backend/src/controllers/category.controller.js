@@ -2,8 +2,11 @@ import prisma from '../config/prisma.js';
 
 export const getCategories = async (req, res) => {
   try {
-    // 1. Fetch all categories and counts
+    // 1. Fetch all approved categories and counts
     const categories = await prisma.category.findMany({
+      where: {
+        status: 'APPROVED'
+      },
       include: {
         _count: {
           select: { products: true }
@@ -80,10 +83,10 @@ export const getCategoryBySlug = async (req, res) => {
       }
     });
 
-    if (!category) {
+    if (!category || category.status !== 'APPROVED') {
       return res.status(404).json({
         success: false,
-        message: 'Category not found'
+        message: 'Category not found or pending admin approval'
       });
     }
 
@@ -113,6 +116,53 @@ export const getCategoryBySlug = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch category details',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * 3. GET DYNAMIC CATEGORY ATTRIBUTES SCHEMA
+ * Returns custom database attribute schema if defined by admin,
+ * or standard category-adaptive taxonomy attributes (for Laptop, Saree, Footwear, etc.)
+ * GET /api/v1/categories/:slug/attributes
+ */
+export const getCategoryAttributes = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { getStandardCategoryAttributes } = await import('../utils/categoryTaxonomy.js');
+
+    // 1. Check if category exists and has a custom attributeSchema in database
+    const category = await prisma.category.findUnique({
+      where: { slug },
+      select: { id: true, name: true, slug: true, attributeSchema: true }
+    });
+
+    if (category?.attributeSchema && Array.isArray(category.attributeSchema) && category.attributeSchema.length > 0) {
+      return res.status(200).json({
+        success: true,
+        category: category.name,
+        slug: category.slug,
+        isCustom: true,
+        attributes: category.attributeSchema
+      });
+    }
+
+    // 2. Fall back to standard enterprise category taxonomy
+    const standardAttrs = getStandardCategoryAttributes(slug);
+
+    return res.status(200).json({
+      success: true,
+      category: category?.name || slug,
+      slug,
+      isCustom: false,
+      attributes: standardAttrs
+    });
+  } catch (error) {
+    console.error('Error fetching category attributes:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch category attributes',
       error: error.message
     });
   }

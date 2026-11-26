@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import AppBottomNav from '../../components/AppBottomNav';
+import SecureCallModal from '../../components/delivery/SecureCallModal';
 
 export default function OrderDetailsDriver({ onNavigate = () => {}, onBack }) {
   const [isDelivered, setIsDelivered] = useState(false);
@@ -7,6 +8,7 @@ export default function OrderDetailsDriver({ onNavigate = () => {}, onBack }) {
   const [otpCode, setOtpCode] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [isCallModalOpen, setIsCallModalOpen] = useState(false);
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
@@ -143,17 +145,22 @@ export default function OrderDetailsDriver({ onNavigate = () => {}, onBack }) {
                       <span className="text-amber-500 font-bold">★ 4.9 Rating</span>
                       <span>• Verified MShoppy Shopper</span>
                     </p>
+                    <p className="text-[11px] font-semibold text-slate-400 mt-1 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs text-emerald-600">lock</span>
+                      <span>Phone: +91 98765 XXXXX (Masked)</span>
+                    </p>
                   </div>
                 </div>
 
                 {/* Call & Chat Buttons */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => triggerToast('Dialing customer Priya (+91 98765 43210)... 📞')}
+                    onClick={() => setIsCallModalOpen(true)}
                     className="h-11 px-4 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center justify-center gap-1.5 font-bold text-xs transition-colors cursor-pointer"
+                    title="MShoppy Cloud Telephony (Virtual Bridge)"
                   >
-                    <span className="material-symbols-outlined text-lg">call</span>
-                    <span className="hidden sm:inline">Call</span>
+                    <span className="material-symbols-outlined text-lg">shield</span>
+                    <span className="hidden sm:inline">Secure Call</span>
                   </button>
                   <button
                     onClick={() => triggerToast('Opening live chat with customer... 💬')}
@@ -324,6 +331,15 @@ export default function OrderDetailsDriver({ onNavigate = () => {}, onBack }) {
 
       {/* Bottom Navigation */}
       <AppBottomNav activeNav="home" onNavigate={onNavigate} />
+
+      {/* Cloud Telephony Secure Calling Modal */}
+      <SecureCallModal
+        isOpen={isCallModalOpen}
+        onClose={() => setIsCallModalOpen(false)}
+        customerName="Priya Sharma"
+        orderId="#MS-99210-A"
+        maskedPhone="+91 98765 XXXXX"
+      />
     </div>
   );
 }

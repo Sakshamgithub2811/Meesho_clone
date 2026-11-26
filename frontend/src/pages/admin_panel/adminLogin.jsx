@@ -57,7 +57,7 @@ export default function AdminLogin() {
       });
 
       dispatch(loginSuccess(response.data.user));
-      navigate('/admin-panel1'); // Routing to the new dashboard panel
+      navigate('/admin'); // Clean standard admin routing
 
     } catch (err) {
       console.error(err);

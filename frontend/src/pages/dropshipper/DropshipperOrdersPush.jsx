@@ -1970,7 +1970,12 @@ export default function DropshipperOrdersPush() {
                     <div className="text-[9px] sm:text-[10px] leading-tight text-slate-700 mt-0.5 break-words">
                       {singleOrder.address || 'Flat 402, Royal Palms, Near Shani Mandir, MG Road'}, {singleOrder.city || 'Jaipur'}, {singleOrder.pincode || '302001'}
                     </div>
-                    <div className="text-[9px] sm:text-[10px] font-bold mt-1">TEL: {singleOrder.customerPhone || '+91 98234 11029'}</div>
+                    <div className="text-[9px] sm:text-[10px] font-bold mt-1">
+                      TEL: {singleOrder.customerPhone ? `${String(singleOrder.customerPhone).replace(/[\s-]/g, '').slice(0, 5)} XXXXX` : '+91 98234 XXXXX'} (Masked)
+                    </div>
+                    <div className="text-[8px] sm:text-[9px] font-bold text-emerald-800">
+                      HELPLINE: +91 80 4712 3456
+                    </div>
                   </div>
 
                   <div className="pl-1.5">
@@ -3082,7 +3087,12 @@ export default function DropshipperOrdersPush() {
                   <div className="text-[9px] leading-tight text-slate-700 mt-0.5 break-words">
                     {labelModalOrder.address || labelModalOrder.city}, {labelModalOrder.city}, {labelModalOrder.pincode}
                   </div>
-                  <div className="text-[9px] font-bold mt-1">TEL: {labelModalOrder.customerPhone}</div>
+                  <div className="text-[9px] font-bold mt-1">
+                    TEL: {labelModalOrder.customerPhone ? `${String(labelModalOrder.customerPhone).replace(/[\s-]/g, '').slice(0, 5)} XXXXX` : '+91 98765 XXXXX'} (Masked)
+                  </div>
+                  <div className="text-[8px] font-bold text-emerald-800">
+                    HELPLINE: +91 80 4712 3456
+                  </div>
                 </div>
 
                 <div className="pl-1.5">
@@ -3236,7 +3246,12 @@ export default function DropshipperOrdersPush() {
                     <div>
                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bill To / Ship To Recipient</div>
                       <div className="text-sm font-black text-slate-900 mt-0.5">{invoiceModalOrder.customerName}</div>
-                      <div className="text-xs text-slate-600 mt-0.5 font-mono">TEL: {invoiceModalOrder.customerPhone}</div>
+                      <div className="text-xs text-slate-600 mt-0.5 font-mono">
+                        TEL: {invoiceModalOrder.customerPhone ? `${String(invoiceModalOrder.customerPhone).replace(/[\s-]/g, '').slice(0, 5)} XXXXX (Protected)` : '+91 98765 XXXXX (Protected)'}
+                      </div>
+                      <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                        🛡️ Virtual Helpline: +91 80 4712 3456
+                      </div>
                       <div className="text-xs text-slate-600 mt-1 leading-relaxed">
                         {invoiceModalOrder.address || invoiceModalOrder.city}
                       </div>

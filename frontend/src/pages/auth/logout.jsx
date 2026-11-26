@@ -61,7 +61,7 @@ export function LogoutPage() {
  * Route Page for /supplier/logout (Auto-executes supplier logout and redirects to /supplier-login)
  */
 export function SupplierLogoutPage() {
-  const handleSupplierLogout = useLogout('/supplier-login');
+  const handleSupplierLogout = useLogout('/supplier/auth/login');
 
   React.useEffect(() => {
     localStorage.removeItem('meesho_supplier_token');

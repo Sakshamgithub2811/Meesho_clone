@@ -78,7 +78,7 @@ export default function SareesCategoryListing({ onNavigate, onBack }) {
   const handleAddToCart = async (e, saree) => {
     e.stopPropagation();
     try {
-      await addToCart(saree.id, 1, saree.sizes?.[0] || 'Free Size', saree);
+      await addToCart(saree.id, 1, saree.sizes?.[0] || '', saree);
       setCartCount((c) => c + 1);
       triggerToast(`Added ${saree.title.slice(0, 20)}... to Cart! 🛍️`);
     } catch (e) {
@@ -168,7 +168,7 @@ export default function SareesCategoryListing({ onNavigate, onBack }) {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {filtered.map((saree) => {
               const isFav = wishlist.has(saree.id);
-              const img = saree.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600';
+              const img = saree.images?.[0] || saree.image || '';
 
               return (
                 <div

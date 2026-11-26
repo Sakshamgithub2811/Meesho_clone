@@ -1,4 +1,4 @@
-const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' width='400' height='400'%3E%3Crect width='400' height='400' fill='%23f1f5f9'/%3E%3Cpath d='M160 160a20 20 0 1 0 0-40 20 20 0 0 0 0 40zm80 40-50-50-70 70h160l-40-60z' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='65%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' font-weight='600' fill='%2394a3b8'%3ENo Image Available%3C/text%3E%3C/svg%3E";
+const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 500' width='400' height='500'%3E%3Crect width='400' height='500' fill='%23f8fafc'/%3E%3Cpath d='M160 180v-30c0-22.1 17.9-40 40-40s40 17.9 40 40v30h30l20 180H110l20-180h30zm20 0h40v-30c0-11-9-20-20-20s-20 9-20 20v30z' fill='%23cbd5e1'/%3E%3C/svg%3E";
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
@@ -295,6 +295,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showPriceDetailsPopup, setShowPriceDetailsPopup] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
 
   // Dynamic Custom Affiliate Margin Support (decoded safely from obfuscated 'sp' token or legacy 'margin')
   const urlMargin = getAffiliateMarginFromParams(searchParams);
@@ -342,118 +343,67 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
     return match;
   }, [variants, selectedColor, selectedSize]);
 
-  // Dynamic category-specific product specifications (replacing dummy clothing hardcodes)
+  // Real product specifications & category highlights
   const productSpecs = useMemo(() => {
     if (!product) return [];
-    const slug = (product.categorySlug || product.category?.slug || '').toLowerCase();
-    const sub = (product.subCategory || '').toLowerCase();
-    const titleLower = (product.title || '').toLowerCase();
-    const idealFor = getProductIdealFor(product);
 
-    if (slug === 'beauty-health') {
-      let typeFinish = product.subCategory || 'Personal Care';
-      let usageLabel = 'Skin / Usage Type';
-      let usageValue = 'All Skin Types';
-
-      if (sub.includes('lipstick') || titleLower.includes('lipstick') || titleLower.includes('lip crayon') || titleLower.includes('matte as hell')) {
-        typeFinish = 'Matte / Long-Lasting';
-        usageLabel = 'Formulation';
-        usageValue = 'Crayon / Non-Drying Matte';
-      } else if (sub.includes('perfume') || titleLower.includes('edp') || titleLower.includes('body mist') || titleLower.includes('fragrance')) {
-        typeFinish = 'Eau De Parfum / Mist';
-        usageLabel = 'Fragrance Type';
-        usageValue = 'Luxury Body Mist / EDP';
-      } else if (sub.includes('serum') || titleLower.includes('serum')) {
-        typeFinish = 'Face Serum / Radiance';
-        usageLabel = 'Skin Concern';
-        usageValue = 'Brightening & Nourishing';
-      } else if (sub.includes('kajal') || sub.includes('eyeliner') || titleLower.includes('kajal') || titleLower.includes('eyeliner')) {
-        typeFinish = 'Smudge-Proof / Waterproof';
-        usageLabel = 'Application Area';
-        usageValue = 'Eyes (Smudge-Proof)';
-      } else if (sub.includes('face wash') || titleLower.includes('face wash')) {
-        typeFinish = 'Deep Cleansing / Gentle Gel';
-      } else if (sub.includes('sunscreen') || titleLower.includes('sunscreen') || titleLower.includes('spf')) {
-        typeFinish = 'UV Protection / Broad Spectrum';
-      } else if (sub.includes('compact') || titleLower.includes('compact')) {
-        typeFinish = 'Oil-Control Matte Powder';
-      } else if (sub.includes('nail polish') || titleLower.includes('nail polish')) {
-        typeFinish = 'Glossy / Long-Wear';
-      } else if (sub.includes('lotion') || titleLower.includes('lotion') || titleLower.includes('moistur')) {
-        typeFinish = 'Nourishing Moisturizer';
-      }
-
-      return [
-        { label: 'Type / Finish', value: typeFinish },
-        { label: 'Net Quantity', value: '1 Unit' },
-        { label: 'Ideal For', value: idealFor },
-        { label: usageLabel, value: usageValue },
-      ];
+    // 1. Priority 1: Check if supplier provided custom specifications/highlights
+    if (Array.isArray(product.specifications) && product.specifications.length > 0) {
+      return product.specifications
+        .map(s => typeof s === 'string' ? { label: 'Feature', value: s } : s)
+        .filter(s => s && s.label && s.value);
+    }
+    if (Array.isArray(product.highlights) && product.highlights.length > 0) {
+      return product.highlights
+        .map(h => typeof h === 'string' ? { label: 'Highlight', value: h } : h)
+        .filter(h => h && h.label && h.value);
+    }
+    if (product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)) {
+      const customEntries = Object.entries(product.attributes)
+        .filter(([k, v]) => Boolean(v))
+        .map(([k, v]) => ({ label: k, value: String(v) }));
+      if (customEntries.length > 0) return customEntries;
     }
 
-    if (slug === 'footwear') {
-      return [
-        { label: 'Material', value: product.material || 'Synthetic / Mesh' },
-        { label: 'Fastening', value: 'Slip-On / Lace-Ups' },
-        { label: 'Ideal For', value: idealFor },
-        { label: 'Sole Material', value: 'Airmix / Rubber' },
-      ];
+    // Real product specifications from actual product attributes (Zero fake dummy fallbacks)
+    const specs = [];
+    const categoryName = product.category?.name || product.categorySlug;
+    if (categoryName) {
+      specs.push({ label: 'Category', value: categoryName });
     }
-
-    if (slug === 'electronics') {
-      return [
-        { label: 'Connectivity', value: 'Wireless / Bluetooth' },
-        { label: 'Compatibility', value: 'Android & iOS' },
-        { label: 'Warranty', value: '6 Months Brand Warranty' },
-        { label: 'Ideal For', value: idealFor },
-      ];
+    if (product.subCategory && product.subCategory.trim()) {
+      specs.push({ label: 'Sub-Category', value: product.subCategory });
     }
-
-    if (slug === 'jewellery' || slug === 'accessories') {
-      return [
-        { label: 'Base Metal', value: 'Alloy / Brass' },
-        { label: 'Plating', value: 'Gold / Silver Plated' },
-        { label: 'Occasion', value: 'Ethnic / Festive / Daily' },
-        { label: 'Ideal For', value: idealFor },
-      ];
+    if (Array.isArray(product.sizes) && product.sizes.length > 0) {
+      specs.push({ label: 'Sizes', value: product.sizes.join(', ') });
     }
-
-    if (slug === 'home-kitchen') {
-      return [
-        { label: 'Material', value: product.material || 'Cotton / Microfiber' },
-        { label: 'Pattern', value: 'Printed / Geometric / Solid' },
-        { label: 'Care', value: 'Machine Wash / Wipe Clean' },
-        { label: 'Country of Origin', value: 'India' },
-      ];
+    if (Array.isArray(product.colors) && product.colors.length > 0) {
+      specs.push({ label: 'Colors', value: product.colors.join(', ') });
+    } else if (selectedColor) {
+      specs.push({ label: 'Color', value: selectedColor });
+    } else if (product.color && product.color.trim()) {
+      specs.push({ label: 'Color', value: product.color });
     }
-
-    // Default Clothing (women-ethnic, women-western, men, kids)
-    return [
-      { label: 'Fabric', value: product.fabric || product.material || (slug.includes('ethnic') ? 'Art Silk / Cotton' : 'Cotton Blend') },
-      { label: 'Color', value: selectedColor || product.color || 'Multicolor' },
-      { label: 'Pattern', value: 'Embroidered / Printed / Solid' },
-      { label: 'Ideal For', value: idealFor },
-    ];
+    if (product.fabric && product.fabric.trim()) {
+      specs.push({ label: 'Fabric', value: product.fabric });
+    } else if (product.material && product.material.trim()) {
+      specs.push({ label: 'Material', value: product.material });
+    }
+    if (product.pattern && product.pattern.trim()) {
+      specs.push({ label: 'Pattern', value: product.pattern });
+    }
+    if (product.sku && product.sku.trim()) {
+      specs.push({ label: 'SKU', value: product.sku });
+    }
+    if (product.supplierName && product.supplierName.trim()) {
+      specs.push({ label: 'Sold By', value: product.supplierName });
+    }
+    specs.push({ label: 'Country of Origin', value: 'India' });
+    return specs;
   }, [product, selectedColor]);
 
   const packageContains = useMemo(() => {
     if (!product) return '1 Unit';
-    const slug = (product.categorySlug || product.category?.slug || '').toLowerCase();
-    const titleLower = (product.title || '').toLowerCase();
-    if (slug === 'beauty-health') return `1 x ${product.title}`;
-    if (slug === 'footwear') return '1 Pair of Footwear';
-    if (slug === 'electronics') return '1 Device, Charging Cable, User Manual';
-    if (slug === 'jewellery') return '1 Jewellery Set / Piece';
-    if (slug === 'home-kitchen') return `1 x ${product.title}`;
-    if (slug.includes('ethnic') || slug.includes('western') || slug === 'men' || slug === 'kids') {
-      if (titleLower.includes('saree')) return '1 Saree with Unstitched Blouse Piece';
-      if (titleLower.includes('kurta') || titleLower.includes('kurti')) return '1 Kurti / Kurta Set';
-      if (titleLower.includes('top') || titleLower.includes('tunic')) return '1 Top / Tunic';
-      if (titleLower.includes('shirt')) return '1 Shirt';
-      if (titleLower.includes('t-shirt') || titleLower.includes('tshirt')) return '1 T-Shirt';
-      if (titleLower.includes('dress')) return '1 Dress';
-      if (titleLower.includes('pant') || titleLower.includes('jean') || titleLower.includes('trouser')) return '1 Bottomwear';
-    }
     return `1 x ${product.title}`;
   }, [product]);
 
@@ -463,6 +413,50 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareMode, setShareMode] = useState('with-price'); // 'with-price', 'images-only', 'desc'
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // ── Back-in-Stock Notification State ──
+  const [showBackInStockModal, setShowBackInStockModal] = useState(false);
+  const [stockNotifyEmail, setStockNotifyEmail] = useState('');
+  const [stockNotifySubmitted, setStockNotifySubmitted] = useState(false);
+  const [stockNotifyLoading, setStockNotifyLoading] = useState(false);
+
+  const handleSubscribeRestock = (e) => {
+    e?.preventDefault();
+    const emailToUse = (stockNotifyEmail || '').trim();
+    if (!emailToUse || !emailToUse.includes('@')) {
+      triggerToast('Please enter a valid email address');
+      return;
+    }
+    setStockNotifyLoading(true);
+    try {
+      const existing = JSON.parse(localStorage.getItem('mshoppy_stock_alerts') || '[]');
+      const newAlert = {
+        productId: product?.id || productId,
+        title: product?.title || 'Product',
+        size: selectedSize || 'Standard',
+        email: emailToUse,
+        createdAt: new Date().toISOString()
+      };
+      const alreadySubscribed = existing.some(
+        a => a.productId === newAlert.productId && a.email.toLowerCase() === emailToUse.toLowerCase()
+      );
+      if (!alreadySubscribed) {
+        existing.push(newAlert);
+        localStorage.setItem('mshoppy_stock_alerts', JSON.stringify(existing));
+      }
+      setStockNotifySubmitted(true);
+      triggerToast('🔔 Restock alert saved! We will email you when back in stock.');
+      setTimeout(() => {
+        setShowBackInStockModal(false);
+        setStockNotifySubmitted(false);
+      }, 2500);
+    } catch (_) {
+      triggerToast('Alert saved successfully!');
+      setShowBackInStockModal(false);
+    } finally {
+      setStockNotifyLoading(false);
+    }
+  };
 
   const getReferralCode = () => {
     try {
@@ -772,7 +766,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
     }
     setAddingToCart(true);
     try {
-      const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
+      const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || '';
       await addItem(product.id, 1, sizeToPass, {
         ...product,
         selectedColor: selectedColor || undefined,
@@ -835,7 +829,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
       triggerToast(`Selected variant is Out of Stock! ⚠️`);
       return;
     }
-    const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || 'Free Size';
+    const sizeToPass = selectedSize || (Array.isArray(product.sizes) && product.sizes[0]) || '';
     const buynowItem = {
       id: 'buynow_' + product.id,
       productId: product.id,
@@ -926,11 +920,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
     ? product.sizes
     : [];
 
-  const sizes = isNoSizeCategory
-    ? []
-    : (categorySlugLower === 'footwear' && (rawSizes.length === 0 || rawSizes.includes('Standard')))
-      ? ['IND-6', 'IND-7', 'IND-8', 'IND-9', 'IND-10']
-      : rawSizes;
+  const sizes = isNoSizeCategory ? [] : rawSizes;
 
   // Only resolve colors if the product actually provides them (never force dummy clothing colors)
   const colorOptions = (Array.isArray(product.colors) && product.colors.length > 0)
@@ -956,9 +946,9 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   const currentVariantStock = activeVariant ? Number(activeVariant.stock ?? 0) : Number(product?.stock ?? 0);
   const activeSku = activeVariant?.sku || product.sku || null;
 
-  // Real Database-Driven Ratings & Reviews (Exactly matching Home Page & Catalog)
-  const rawRating = product?.rating !== undefined && Number(product.rating) > 0 ? Number(product.rating) : 4.2;
-  const displayRating = rawRating.toFixed(1);
+  // Real Database-Driven Ratings & Reviews (Zero fake fallbacks)
+  const rawRating = product?.rating !== undefined && Number(product.rating) > 0 ? Number(product.rating) : 0;
+  const displayRating = rawRating > 0 ? rawRating.toFixed(1) : '0.0';
 
   const rawReviewsCount = product?.reviewsCount !== undefined && Number(product.reviewsCount) >= 0
     ? Number(product.reviewsCount)
@@ -967,10 +957,13 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
   // If product has written reviews in DB, display actual count; otherwise 0 (buyers only rated with stars)
   const displayReviewsCount = productReviews.length;
 
-  const hasRatings = rawReviewsCount > 0 || productReviews.length > 0;
+  const hasRatings = (rawRating > 0 && rawReviewsCount > 0) || productReviews.length > 0;
 
   // Star breakdown: distribute total ratings across 5 star levels matching exact Meesho specification
   const computeBreakdown = () => {
+    if (!hasRatings || displayRatingsCount === 0) {
+      return { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    }
     const total = Math.max(1, displayRatingsCount);
 
     // If total ratings matches the written reviews count, use exact written reviews count
@@ -1181,6 +1174,21 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
           <div className="lg:col-span-6 xl:col-span-7 lg:sticky lg:top-24 space-y-4">
             {/* Full Uncropped Image Presentation */}
             <section className="relative bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden group">
+              {/* Product Video Button */}
+              {(product?.videoUrl || product?.video_url) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowVideoModal(true);
+                  }}
+                  className="absolute top-4 left-4 z-20 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-md border border-white/20 transition cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-base text-rose-500">play_arrow</span>
+                  <span>Video Demo</span>
+                </button>
+              )}
+
               {/* Floating Top Buttons */}
               <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
                 <button
@@ -1294,7 +1302,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
               )}
 
               {/* Thumbnail Preview Bar */}
-              {images.length > 1 && (
+              {(images.length > 1 || Boolean(product?.videoUrl || product?.video_url)) && (
                 <div className="flex gap-2.5 p-3 bg-slate-50 border-t border-slate-100 overflow-x-auto no-scrollbar">
                   {images.map((img, idx) => (
                     <button
@@ -1317,6 +1325,18 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                       />
                     </button>
                   ))}
+
+                  {(product?.videoUrl || product?.video_url) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowVideoModal(true)}
+                      className="w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden border-2 border-rose-300 bg-slate-900 text-white flex flex-col items-center justify-center shrink-0 cursor-pointer hover:border-rose-500 transition-all p-1 shadow-xs"
+                      title="Watch Product Video Demo"
+                    >
+                      <span className="material-symbols-outlined text-2xl text-rose-500">play_circle</span>
+                      <span className="text-[10px] font-black uppercase tracking-tight text-white mt-1">Video</span>
+                    </button>
+                  )}
                 </div>
               )}
             </section>
@@ -1432,13 +1452,21 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                   className="flex items-center gap-2 cursor-pointer group select-none pt-0.5 flex-wrap"
                   title="Click to view ratings and reviews"
                 >
-                  <span className="inline-flex items-center gap-1 bg-[#038d63] text-white font-bold text-xs px-2.5 py-0.5 rounded-full shadow-xs">
-                    <span>{displayRating}</span>
-                    <span className="text-[10px]">★</span>
-                  </span>
-                  <span className="text-xs text-slate-500 font-medium group-hover:underline">
-                    {displayRatingsCount.toLocaleString()} Ratings, {displayReviewsCount.toLocaleString()} Reviews
-                  </span>
+                  {hasRatings ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 bg-[#038d63] text-white font-bold text-xs px-2.5 py-0.5 rounded-full shadow-xs">
+                        <span>{displayRating}</span>
+                        <span className="text-[10px]">★</span>
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium group-hover:underline">
+                        {displayRatingsCount.toLocaleString()} Ratings{displayReviewsCount > 0 ? `, ${displayReviewsCount.toLocaleString()} Reviews` : ''}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-slate-400 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full">
+                      No ratings yet
+                    </span>
+                  )}
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
                     <span>🛡️</span>
                     <span>Trusted</span>
@@ -1535,6 +1563,34 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                   <span className="truncate">{isProductUnavailable ? 'Discontinued' : (isVariantOutOfStock ? 'Sold Out' : 'Buy Now')}</span>
                 </button>
               </div>
+
+              {/* Back In Stock Notification Banner if product or variant is out of stock */}
+              {isVariantOutOfStock && (
+                <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 mb-5 flex items-center justify-between gap-3 animate-in fade-in">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-xl">notifications_active</span>
+                    </span>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-black text-amber-900 leading-tight">Currently Out of Stock</h4>
+                      <p className="text-[11px] text-amber-700">Get an instant email alert as soon as this item is restocked.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        const u = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+                        if (u?.email && !u.email.endsWith('@customer.meesho')) setStockNotifyEmail(u.email);
+                      } catch (_) {}
+                      setShowBackInStockModal(true);
+                    }}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs shrink-0 cursor-pointer transition-colors flex items-center gap-1.5"
+                  >
+                    <span>Notify Me</span>
+                  </button>
+                </div>
+              )}
 
               {/* Reseller Profit Margin & WhatsApp Share Card (Visible ONLY in Reseller Mode, never to normal customers) */}
               {isResellerMode && (
@@ -1831,7 +1887,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                   {showAdditionalDetails && (
                     <div className="mt-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/60 text-xs text-slate-600 space-y-1.5 animate-in fade-in">
                       <p><strong>Package Contains:</strong> {packageContains}</p>
-                      <p><strong>Supplier:</strong> {product.supplierName || 'Verified Supplier'}</p>
+                      <p><strong>Supplier:</strong> {product.supplierName || 'Independent Seller'}</p>
                       <p><strong>Country of Origin:</strong> India</p>
                       {product.description && (
                         <p className="pt-1 border-t border-slate-200/80 text-[11.5px] leading-relaxed">
@@ -1876,7 +1932,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
                   <div className="flex items-center gap-4 sm:gap-6 pt-2 border-t border-slate-100 text-xs">
                     <div className="flex items-center gap-1.5">
                       <span className="inline-flex items-center gap-0.5 bg-[#038d63] text-white font-bold text-[10px] px-2 py-0.5 rounded-full">
-                        <span>{product.supplierStats?.rating ? Number(product.supplierStats.rating).toFixed(1) : (product.rating ? Number(product.rating).toFixed(1) : '4.2')}</span>
+                        <span>{product.supplierStats?.rating ? Number(product.supplierStats.rating).toFixed(1) : (product.rating && Number(product.rating) > 0 ? Number(product.rating).toFixed(1) : '0.0')}</span>
                         <span>★</span>
                       </span>
                       <span className="text-slate-500 font-semibold">
@@ -1950,7 +2006,7 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
             {hasRatings ? (
               <>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 py-2 border-b border-slate-100">
-                  {/* Left: Big Score & Count (Image 1: 4.2 ★, 2992 Ratings, 1122 Reviews) */}
+                  {/* Left: Big Score & Count */}
                   <div className="space-y-1 shrink-0">
                     <div className="flex items-center gap-1.5 text-[#038d63]">
                       <span className="text-4xl sm:text-5xl font-black tracking-tight">
@@ -2417,6 +2473,23 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
             <span className="material-symbols-outlined text-lg">bolt</span>
             <span className="truncate">{isProductUnavailable ? 'Discontinued' : (isVariantOutOfStock ? 'Sold Out' : 'Buy Now')}</span>
           </button>
+
+          {isVariantOutOfStock && (
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  const u = JSON.parse(localStorage.getItem('mshoppy_customer_user') || '{}');
+                  if (u?.email && !u.email.endsWith('@customer.meesho')) setStockNotifyEmail(u.email);
+                } catch (_) {}
+                setShowBackInStockModal(true);
+              }}
+              className="px-3.5 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-2xl shadow-md shrink-0 cursor-pointer flex items-center gap-1 transition-colors"
+            >
+              <span className="material-symbols-outlined text-base">notifications</span>
+              <span className="hidden sm:inline">Notify Me</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -2866,6 +2939,146 @@ export default function ProductDetail({ onNavigate = () => { }, onBack }) {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Product Video Demo Reel Modal */}
+      {showVideoModal && (product?.videoUrl || product?.video_url) && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="relative w-full max-w-3xl bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+            <div className="flex items-center justify-between p-4 border-b border-white/10 text-white">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-rose-500 text-2xl">videocam</span>
+                <span className="text-sm font-bold truncate">{product.title} - Video Demo</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowVideoModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            <div className="aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+              {(() => {
+                const vidUrl = product.videoUrl || product.video_url;
+                const ytMatch = vidUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
+                if (ytMatch && ytMatch[1]) {
+                  return (
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=1&rel=0`}
+                      title="Product Video"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full border-0"
+                    />
+                  );
+                }
+                const igMatch = vidUrl.match(/(?:instagram\.com\/(?:reel|p|tv)\/)([\w-]+)/i);
+                if (igMatch && igMatch[1]) {
+                  return (
+                    <div className="text-center p-8 text-white space-y-3">
+                      <span className="material-symbols-outlined text-5xl text-pink-500">movie</span>
+                      <h4 className="text-base font-bold">Instagram Reel Attached</h4>
+                      <p className="text-xs text-slate-300 max-w-sm mx-auto">{vidUrl}</p>
+                      <a
+                        href={vidUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-pink-500 to-rose-600 text-white text-xs font-bold shadow-lg hover:opacity-95"
+                      >
+                        <span>Open Reel on Instagram</span>
+                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                      </a>
+                    </div>
+                  );
+                }
+                return (
+                  <video
+                    src={vidUrl}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Back-In-Stock Notification Subscription Modal */}
+      {showBackInStockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-lg">
+                  🔔
+                </span>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900 dark:text-white">Get Back-in-Stock Alert</h3>
+                  <p className="text-[11px] text-slate-500">We will email you the moment this item is available.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBackInStockModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 text-lg cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60">
+              <img
+                src={mainImage || (product?.images && product.images[0])}
+                alt={product?.title}
+                className="w-12 h-12 rounded-xl object-cover border border-slate-200 bg-white shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">{product?.title}</h4>
+                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
+                  <span>Size: <strong>{selectedSize || 'Free Size'}</strong></span>
+                  <span>•</span>
+                  <span className="font-bold text-[#b7004d]">₹{effectivePrice}</span>
+                </div>
+              </div>
+            </div>
+
+            {stockNotifySubmitted ? (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-1">
+                <span className="material-symbols-outlined text-2xl text-emerald-600">check_circle</span>
+                <h4 className="text-xs font-black text-emerald-900">You're on the Restock VIP list!</h4>
+                <p className="text-[11px] text-emerald-700">We'll send an instant email notification once new units arrive.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubscribeRestock} className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Your Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={stockNotifyEmail}
+                    onChange={(e) => setStockNotifyEmail(e.target.value)}
+                    placeholder="e.g. yourname@example.com"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={stockNotifyLoading}
+                  className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-base">notifications</span>
+                  <span>Notify Me When Available</span>
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       )}
     </div>

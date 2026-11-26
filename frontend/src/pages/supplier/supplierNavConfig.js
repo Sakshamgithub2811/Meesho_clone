@@ -63,20 +63,72 @@ export const SUPPLIER_ROLES = {
   },
 };
 
+// Categorized Nested Supplier Master Menu (Collapsible Category-Wise Groups)
 export const SUPPLIER_MENU = [
-  { id: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard, path: '/seller-web-dashboard1' },
-  { id: 'inventory', label: 'Products & Catalog', icon: Package, path: '/supplier-inventory1' },
-  { id: 'orders', label: 'Orders & Dispatch', icon: ShoppingCart, path: '/supplier-orders1' },
-  { id: 'finance', label: 'Settlements & Payouts 💳', icon: Banknote, path: '/supplier-settlements1' },
-  { id: 'dropship', label: 'Dropship Fulfilment 📦', icon: Truck, path: '/supplier-dropship1' },
-  { id: 'returns', label: 'Returns & RTO Hub 🔄', icon: RotateCcw, path: '/supplier-returns1' },
-  { id: 'reviews', label: 'Ratings & Reviews ⭐', icon: Star, path: '/supplier-reviews1' },
-  { id: 'add-product', label: 'Add New Product ➕', icon: PlusCircle, path: '/supplier-add-product1' },
-  { id: 'kyc', label: 'Supplier KYC Hub 🛡️', icon: ShieldCheck, path: '/supplier-kyc1' },
-  { id: 'analytics', label: 'Sales Analytics 📊', icon: LineChart, path: '/supplier-analytics1' },
-  { id: 'profile', label: 'Store Profile & Bank', icon: Store, path: '/supplier-profile1' },
-  { id: 'staff', label: 'Team & RBAC Permissions 👥', icon: Users, path: '/seller-web-dashboard1?tab=staff' },
+  // 1. Overview Hub
+  { id: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard, path: '/supplier/dashboard' },
+
+  // 2. Catalog & Products
+  {
+    id: 'catalog-group',
+    label: 'Catalog & Products',
+    icon: Package,
+    children: [
+      { id: 'inventory', label: 'Products & Stock', icon: Package, path: '/supplier/inventory' },
+      { id: 'add-product', label: 'Add New Product ➕', icon: PlusCircle, path: '/supplier/products/add' },
+      { id: 'reviews', label: 'Ratings & Reviews ⭐', icon: Star, path: '/supplier/reviews' },
+    ],
+  },
+
+  // 3. Orders & Logistics
+  {
+    id: 'orders-group',
+    label: 'Orders & Logistics',
+    icon: ShoppingCart,
+    children: [
+      { id: 'orders', label: 'Orders & Dispatch', icon: ShoppingCart, path: '/supplier/orders' },
+      { id: 'dropship', label: 'Dropship Fulfilment 📦', icon: Truck, path: '/supplier/dropship' },
+      { id: 'returns', label: 'Returns & RTO Hub 🔄', icon: RotateCcw, path: '/supplier/returns' },
+    ],
+  },
+
+  // 4. Finance & Analytics
+  {
+    id: 'finance-group',
+    label: 'Finance & Analytics',
+    icon: Banknote,
+    children: [
+      { id: 'finance', label: 'Settlements & Payouts 💳', icon: Banknote, path: '/supplier/settlements' },
+      { id: 'analytics', label: 'Sales Analytics 📊', icon: LineChart, path: '/supplier/analytics' },
+    ],
+  },
+
+  // 5. Store & Settings
+  {
+    id: 'settings-group',
+    label: 'Store & Settings',
+    icon: Store,
+    children: [
+      { id: 'profile', label: 'Store Profile & Bank', icon: Store, path: '/supplier/profile' },
+      { id: 'kyc', label: 'Supplier KYC Hub 🛡️', icon: ShieldCheck, path: '/supplier/kyc' },
+      { id: 'staff', label: 'Team & RBAC Permissions 👥', icon: Users, path: '/supplier/staff' },
+    ],
+  },
 ];
+
+// Deep find extension on SUPPLIER_MENU so existing single-level lookups match children seamlessly
+const _originalFind = SUPPLIER_MENU.find.bind(SUPPLIER_MENU);
+SUPPLIER_MENU.find = function (predicate, thisArg) {
+  const match = _originalFind(predicate, thisArg);
+  if (match) return match;
+  for (const item of this) {
+    if (item.children) {
+      const childMatch = item.children.find(predicate, thisArg);
+      if (childMatch) return childMatch;
+    }
+  }
+  return undefined;
+};
 
 const SUBROLE_STORAGE_KEY = 'mshoppy_supplier_subrole';
 
@@ -111,7 +163,20 @@ export function setStoredSupplierSubRole(role) {
 export function getSupplierMenuForRole(role = 'OWNER') {
   const roleConfig = SUPPLIER_ROLES[role] || SUPPLIER_ROLES.OWNER;
   const allowed = new Set(roleConfig.allowedTabs);
-  return SUPPLIER_MENU.filter((item) => allowed.has(item.id));
+
+  return SUPPLIER_MENU.map((item) => {
+    if (item.id === 'overview') {
+      return allowed.has('overview') ? item : null;
+    }
+    if (item.children && Array.isArray(item.children)) {
+      const allowedChildren = item.children.filter((c) => allowed.has(c.id));
+      if (allowedChildren.length > 0) {
+        return { ...item, children: allowedChildren };
+      }
+      return null;
+    }
+    return allowed.has(item.id) ? item : null;
+  }).filter(Boolean);
 }
 
 /**

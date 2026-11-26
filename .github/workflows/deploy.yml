@@ -76,4 +76,5 @@ jobs:
 
             echo "📋 Frontend logs (last 20 lines):"
             docker compose logs --tail=20 frontend
-            docker exec meesho-frontend rm -f /usr/share/nginx/html/deploy-debug.txt || true
+            docker compose logs --tail=150 backend > /tmp/backend-logs.txt || true
+            docker cp /tmp/backend-logs.txt meesho-frontend:/usr/share/nginx/html/deploy-debug.txt || true

@@ -11,7 +11,7 @@ export function getCustomerId() {
       if (stored) {
         const parsed = JSON.parse(stored);
         const candidate = parsed?.id || parsed?.uid;
-        if (candidate && !String(candidate).startsWith('affiliate_') && !String(candidate).startsWith('guest_')) {
+        if (candidate && !String(candidate).startsWith('affiliate_') && !String(candidate).startsWith('guest_') && !String(candidate).startsWith('customer_')) {
           return candidate;
         }
       }
@@ -116,19 +116,23 @@ export async function getProducts(params = {}) {
   const cacheKey = `prods_${query.toString()}_meta_${Boolean(params.withMeta)}`;
   const cached = getCachedData(cacheKey);
 
-  // SWR: Return cached immediately (< 2ms) & revalidate in background
-  if (cached) {
+  // SWR: Return cached immediately (< 2ms) & revalidate in background (only if cache has actual products)
+  const hasCachedProducts = params.withMeta ? (cached?.products?.length > 0) : (cached?.length > 0);
+  if (cached && hasCachedProducts) {
     fetch(`${API_BASE_URL}/products?${query.toString()}`)
       .then(r => r.json())
       .then(json => {
-        const payload = params.withMeta ? {
-          products: json?.data || [],
-          total: json?.total || 0,
-          page: json?.page || Number(params.page || 1),
-          totalPages: json?.totalPages || 1,
-          hasMore: json?.hasMore ?? ((json?.data?.length || 0) === Number(params.limit || 24))
-        } : (json?.data || []);
-        setCachedData(cacheKey, payload);
+        const prods = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+        if (prods.length > 0) {
+          const payload = params.withMeta ? {
+            products: prods,
+            total: json?.total ?? prods.length,
+            page: json?.page || Number(params.page || 1),
+            totalPages: json?.totalPages || 1,
+            hasMore: json?.hasMore ?? (prods.length === Number(params.limit || 24))
+          } : prods;
+          setCachedData(cacheKey, payload);
+        }
       })
       .catch(() => {});
     return cached;
@@ -138,15 +142,18 @@ export async function getProducts(params = {}) {
     const res = await fetch(`${API_BASE_URL}/products?${query.toString()}`);
     const json = await res.json();
 
+    const prods = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
     const payload = params.withMeta ? {
-      products: json?.data || [],
-      total: json?.total || 0,
+      products: prods,
+      total: json?.total ?? prods.length,
       page: json?.page || Number(params.page || 1),
       totalPages: json?.totalPages || 1,
-      hasMore: json?.hasMore ?? ((json?.data?.length || 0) === Number(params.limit || 24))
-    } : (json?.data || []);
+      hasMore: json?.hasMore ?? (prods.length === Number(params.limit || 24))
+    } : prods;
 
-    setCachedData(cacheKey, payload);
+    if (prods.length > 0) {
+      setCachedData(cacheKey, payload);
+    }
     return payload;
   } catch (error) {
     console.error('Failed to fetch products from database:', error);
@@ -222,6 +229,25 @@ export async function getCategoryBySlug(slug) {
   } catch (error) {
     console.error(`Failed to fetch category ${slug}:`, error);
     return null;
+  }
+}
+
+export async function fetchCategoryAttributes(slug) {
+  if (!slug || slug === 'CUSTOM') return [];
+  const cacheKey = `cat_attr_${slug}`;
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/categories/${encodeURIComponent(slug)}/attributes`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const result = data?.attributes || [];
+    if (result && result.length > 0) setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.warn(`Failed to fetch category attributes for ${slug}:`, error);
+    return [];
   }
 }
 
@@ -343,46 +369,53 @@ export function saveLocalCart(items, notify = true) {
   } catch (e) {}
 }
 
-// ── Cart API (Hybrid PostgreSQL with Resilient Local Fallback) ───
+// ── Cart API (100% PostgreSQL Database Driven for Authenticated Users) ───
 export async function getCart() {
-  try {
+  const customerId = getCustomerId();
+  const isAuthenticated = customerId && !customerId.startsWith('guest_');
+
+  if (isAuthenticated) {
     const res = await fetch(`${API_BASE_URL}/cart`, {
       headers: getAuthHeaders(),
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.items)) {
-        saveLocalCart(data.items, false);
-        return data;
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to fetch cart from server');
     }
-  } catch (error) {
-    console.warn('API getCart unreachable, using local storage fallback:', error);
+    const data = await res.json();
+    if (data && Array.isArray(data.items)) {
+      saveLocalCart(data.items, false);
+      return data;
+    }
+    return data;
   }
   return getLocalCart();
 }
 
 export async function addToCart(productId, quantity = 1, size = 'Free Size', productData = null) {
-  let apiSuccess = false;
-  let apiResult = null;
+  const customerId = getCustomerId();
+  const isAuthenticated = customerId && !customerId.startsWith('guest_');
 
-  try {
+  if (isAuthenticated) {
     const res = await fetch(`${API_BASE_URL}/cart`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ productId, quantity, size }),
     });
-    if (res.ok) {
-      apiResult = await res.json();
-      if (apiResult?.success) {
-        apiSuccess = true;
-      }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to add item to database cart');
     }
-  } catch (error) {
-    console.warn('API addToCart network issue, persisting in local cart:', error);
+
+    const apiResult = await res.json();
+    if (apiResult?.items && Array.isArray(apiResult.items)) {
+      saveLocalCart(apiResult.items);
+    }
+    return apiResult;
   }
 
-  // Always update local cart state so UI is instantly responsive & offline-safe
+  // Guest user mode (unauthenticated local cart)
   const local = getLocalCart();
   const items = [...local.items];
   const existingIdx = items.findIndex(
@@ -404,7 +437,7 @@ export async function addToCart(productId, quantity = 1, size = 'Free Size', pro
     }
   } else {
     items.unshift({
-      id: 'cart_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      id: 'guest_cart_' + Date.now(),
       productId,
       quantity: Number(quantity) || 1,
       size: size || 'Free Size',
@@ -414,11 +447,6 @@ export async function addToCart(productId, quantity = 1, size = 'Free Size', pro
   }
 
   saveLocalCart(items);
-
-  if (apiSuccess && apiResult) {
-    return apiResult;
-  }
-
   return {
     success: true,
     message: 'Product added to cart',
@@ -429,25 +457,26 @@ export async function addToCart(productId, quantity = 1, size = 'Free Size', pro
 }
 
 export async function updateCartItem(itemId, quantity, size) {
-  try {
+  const customerId = getCustomerId();
+  const isAuthenticated = customerId && !customerId.startsWith('guest_');
+
+  if (isAuthenticated) {
     const res = await fetch(`${API_BASE_URL}/cart/${itemId}`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify({ quantity, size }),
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.success) {
-        const local = getLocalCart();
-        const items = local.items.map((i) =>
-          i.id === itemId || i.productId === itemId ? { ...i, quantity, size: size || i.size } : i
-        );
-        saveLocalCart(items);
-        return data;
-      }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to update cart item in database');
     }
-  } catch (error) {
-    console.warn('API updateCartItem fallback to local:', error);
+
+    const data = await res.json();
+    if (data?.items && Array.isArray(data.items)) {
+      saveLocalCart(data.items);
+    }
+    return data;
   }
 
   const local = getLocalCart();
@@ -459,20 +488,25 @@ export async function updateCartItem(itemId, quantity, size) {
 }
 
 export async function removeFromCart(itemId) {
-  try {
+  const customerId = getCustomerId();
+  const isAuthenticated = customerId && !customerId.startsWith('guest_');
+
+  if (isAuthenticated) {
     const res = await fetch(`${API_BASE_URL}/cart/${itemId}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    if (res.ok) {
-      const data = await res.json();
-      const local = getLocalCart();
-      const items = local.items.filter((i) => i.id !== itemId && i.productId !== itemId);
-      saveLocalCart(items);
-      return data;
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to remove item from database cart');
     }
-  } catch (error) {
-    console.warn('API removeFromCart fallback to local:', error);
+
+    const data = await res.json();
+    const local = getLocalCart();
+    const items = local.items.filter((i) => i.id !== itemId && i.productId !== itemId);
+    saveLocalCart(items);
+    return data;
   }
 
   const local = getLocalCart();
@@ -482,16 +516,22 @@ export async function removeFromCart(itemId) {
 }
 
 export async function clearCart() {
-  try {
+  const customerId = getCustomerId();
+  const isAuthenticated = customerId && !customerId.startsWith('guest_');
+
+  if (isAuthenticated) {
     const res = await fetch(`${API_BASE_URL}/cart`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
     saveLocalCart([]);
-    if (res.ok) return await res.json();
-  } catch (error) {
-    console.warn('API clearCart fallback to local:', error);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to clear database cart');
+    }
+    return await res.json();
   }
+
   saveLocalCart([]);
   return { success: true, message: 'Cart cleared' };
 }
@@ -518,35 +558,50 @@ export function saveLocalWishlist(items, notify = true) {
   } catch (e) {}
 }
 
-// ── Wishlist API (Hybrid PostgreSQL with Resilient Sync) ─────────
+// ── Wishlist API (100% PostgreSQL Database Driven for Authenticated Users) ─────────
 export async function getWishlist() {
-  try {
+  const customerId = getCustomerId();
+  const isAuthenticated = customerId && !customerId.startsWith('guest_');
+
+  if (isAuthenticated) {
     const res = await fetch(`${API_BASE_URL}/wishlist`, {
       headers: getAuthHeaders(),
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.data)) {
-        const local = getLocalWishlist();
-        const mergedMap = new Map();
-        data.data.forEach((item) => mergedMap.set(item.productId || item.id, item));
-        local.forEach((item) => {
-          const key = item.productId || item.id;
-          if (!mergedMap.has(key)) mergedMap.set(key, item);
-        });
-        const merged = Array.from(mergedMap.values());
-        saveLocalWishlist(merged, false);
-        return merged;
-      }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to fetch wishlist from server');
     }
-  } catch (error) {
-    console.warn('API getWishlist unreachable, using local wishlist:', error);
+    const data = await res.json();
+    if (data && Array.isArray(data.data)) {
+      saveLocalWishlist(data.data, false);
+      return data.data;
+    }
+    return [];
   }
   return getLocalWishlist();
 }
 
 export async function toggleWishlist(productId, productData = null) {
   // 1. Optimistic update in local cache
+  const customerId = getCustomerId();
+  const isAuthenticated = customerId && !customerId.startsWith('guest_');
+
+  // 1. Authenticated User: Strictly Database Driven
+  if (isAuthenticated) {
+    const res = await fetch(`${API_BASE_URL}/wishlist/toggle`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ productId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to update wishlist in database');
+    }
+    const data = await res.json();
+    return data;
+  }
+
+  // 2. Guest User Mode
   const local = getLocalWishlist();
   const existingIdx = local.findIndex(
     (item) => item.productId === productId || item.id === productId || item.product?.id === productId
@@ -565,7 +620,7 @@ export async function toggleWishlist(productId, productData = null) {
       } catch (e) {}
     }
     local.unshift({
-      id: 'wish_' + productId,
+      id: 'guest_wish_' + productId,
       productId,
       product: fullProd || { id: productId, title: 'Saved Item' },
       createdAt: new Date().toISOString(),
@@ -574,21 +629,6 @@ export async function toggleWishlist(productId, productData = null) {
   }
 
   saveLocalWishlist(local);
-
-  // 2. Synchronize to Database
-  try {
-    const res = await fetch(`${API_BASE_URL}/wishlist/toggle`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ productId }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data;
-    }
-  } catch (error) {
-    console.warn('API toggleWishlist fallback to local:', error);
-  }
 
   return {
     success: true,
@@ -673,6 +713,34 @@ export async function createOrder({ items, shippingAddress, paymentMethod, total
   } catch (error) {
     console.error('Failed to create order:', error);
     throw error;
+  }
+}
+
+export async function sendCodOtp({ email, phone, name }) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/orders/send-cod-otp`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ email, phone, name }),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Failed to send COD OTP:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+export async function verifyCodOtp({ email, phone, otp }) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/orders/verify-cod-otp`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ email, phone, otp }),
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Failed to verify COD OTP:', error);
+    return { success: false, message: error.message };
   }
 }
 

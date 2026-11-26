@@ -379,8 +379,36 @@ export async function bulkUploadSupplierProducts(products) {
 
 // Get Categories
 export async function fetchCategories() {
-  const data = await request('/supplier/categories');
-  return data.data || [];
+  try {
+    const data = await request('/supplier/categories');
+    if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+      return data.data;
+    }
+  } catch (err) {
+    console.warn('[SupplierAPI] Primary fetchCategories failed, trying public fallback:', err.message);
+  }
+  try {
+    const res = await fetch(`${API_BASE_URL}/categories`);
+    if (res.ok) {
+      const json = await res.json();
+      return json?.data || [];
+    }
+  } catch (e) {
+    console.warn('[SupplierAPI] Public categories fallback failed:', e);
+  }
+  return [];
+}
+
+// Get Category Dynamic Attributes Schema (Taxonomy / Custom DB Schema)
+export async function fetchCategoryAttributes(slug) {
+  if (!slug || slug === 'CUSTOM') return [];
+  try {
+    const data = await request(`/categories/${encodeURIComponent(slug)}/attributes`);
+    return data?.attributes || [];
+  } catch (error) {
+    console.warn(`[SupplierAPI] Failed to fetch category attributes for ${slug}:`, error.message);
+    return [];
+  }
 }
 
 // Add Category
@@ -495,6 +523,7 @@ export default {
   bulkDeleteSupplierProducts,
   bulkUploadSupplierProducts,
   fetchCategories,
+  fetchCategoryAttributes,
   createCategory,
   fetchSupplierOrders,
   updateOrderStatus,

@@ -24,7 +24,7 @@ export function formatToE164(phone) {
 }
 
 /**
- * Request Phone OTP via Firebase SMS (with graceful fallback for localhost before domain verification)
+ * Request Phone OTP via Firebase SMS
  * @param {string} phone - 10-digit mobile number
  * @param {string} containerId - DOM container ID for invisible reCAPTCHA
  */
@@ -53,41 +53,8 @@ export async function requestPhoneOtp(phone, containerId = 'recaptcha-container'
       message: `SMS OTP has been sent to ${e164}. Please enter the 6-digit code.`,
     };
   } catch (firebaseErr) {
-    console.warn('[Firebase Phone Auth] Live SMS error or domain check:', firebaseErr.code || firebaseErr.message);
-
-    // Check if error is due to localhost / unverified domain or quota
-    const isDomainOrQuotaIssue = 
-      firebaseErr.code === 'auth/captcha-check-failed' ||
-      firebaseErr.code === 'auth/invalid-app-credential' ||
-      firebaseErr.code === 'auth/operation-not-allowed' ||
-      firebaseErr.code === 'auth/quota-exceeded' ||
-      firebaseErr.code === 'auth/internal-error' ||
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1';
-
-    if (isDomainOrQuotaIssue) {
-      console.info(
-        `%c[Firebase Phone Auth Setup Ready]
-Domain not yet verified in Firebase Console for this host (${window.location.hostname}).
-When your website goes live, add your domain in:
-👉 Firebase Console -> Authentication -> Settings -> Authorized Domains
-And real SMS will deliver immediately!
-For local development right now, use dev OTP: 123456`,
-        'color: #059669; font-weight: bold;'
-      );
-
-      return {
-        success: true,
-        mode: 'dev_ready',
-        phone: cleanDigits,
-        e164,
-        confirmationResult: null,
-        message: `[Dev Mode] Live SMS setup configured! Since domain is localhost, please enter dev OTP: 123456 (or Firebase test OTP).`,
-        devNotice: 'Real SMS activates automatically once your domain is live and authorized in Firebase Console.',
-      };
-    }
-
-    throw new Error(firebaseErr.message || 'Failed to send verification SMS. Please try again.');
+    console.error('[Firebase Phone Auth] Live SMS error:', firebaseErr.code || firebaseErr.message);
+    throw new Error(firebaseErr.message || 'Failed to send verification SMS to your mobile. Please verify the number and try again.');
   }
 }
 
@@ -104,31 +71,28 @@ export async function confirmOtpAndLogin({ phone, otp, confirmationResult, fullN
     throw new Error('Please enter a valid verification code.');
   }
 
+  if (!confirmationResult || typeof confirmationResult.confirm !== 'function') {
+    throw new Error('No active verification session found. Please request a new OTP code on your phone.');
+  }
+
   const cleanDigits = phone.toString().replace(/\D/g, '').slice(-10);
   let firebaseUid = null;
 
-  // 1. If we have an active Firebase SMS confirmation session, verify through Firebase
-  if (confirmationResult && typeof confirmationResult.confirm === 'function') {
-    try {
-      const firebaseUser = await verifyPhoneOtp(confirmationResult, otp);
-      firebaseUid = firebaseUser.uid;
-      console.log(`[Firebase Phone Auth] Successfully verified phone user UID: ${firebaseUid}`);
-    } catch (confErr) {
-      console.error('[Firebase Phone Auth] Code verification failed:', confErr);
-      throw new Error('Invalid verification code! Please check the code sent to your phone.');
-    }
-  } else {
-    // 2. Dev fallback validation: accept standard test OTP 123456
-    if (otp !== '123456' && otp !== '1234') {
-      throw new Error('Invalid verification code! (In local dev mode, use OTP: 123456)');
-    }
+  try {
+    const firebaseUser = await verifyPhoneOtp(confirmationResult, otp);
+    firebaseUid = firebaseUser.uid;
+    console.log(`[Firebase Phone Auth] Successfully verified phone user UID: ${firebaseUid}`);
+  } catch (confErr) {
+    console.error('[Firebase Phone Auth] Code verification failed:', confErr);
+    throw new Error('Invalid verification code! Please check the code sent to your phone.');
   }
 
-  // 3. Authenticate / Sync customer profile with database
+  // Authenticate / Sync customer profile with database
   const loginResult = await loginCustomer({
     phone: cleanDigits,
     fullName: fullName || `Customer +91 ${cleanDigits.slice(0, 2)}****${cleanDigits.slice(-4)}`,
-    otp: otp || '123456',
+    otp,
+    firebaseUid
   });
 
   return loginResult;

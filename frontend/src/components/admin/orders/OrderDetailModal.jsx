@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import axios from 'axios';
+import { auth } from '../../../utils/firebase';
+import { API_V1_BASE } from '../../../config/apiConfig';
+import { toast } from 'sonner';
 import { 
   X, 
   User, 
@@ -15,7 +19,9 @@ import {
   ExternalLink,
   Hash,
   Sparkles,
-  Printer
+  Printer,
+  KeyRound,
+  AlertCircle
 } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
 import OrderPrintSlipModal from './OrderPrintSlipModal';
@@ -73,12 +79,94 @@ export default function OrderDetailModal({
   );
   const [showPrintModal, setShowPrintModal] = useState(false);
 
+  const defaultCustomerEmail = order.user?.email && !order.user.email.endsWith('@customer.meesho')
+    ? order.user.email
+    : (shipping.email && !shipping.email.endsWith('@customer.meesho') ? shipping.email : '');
+
+  const [customEmail, setCustomEmail] = useState(defaultCustomerEmail);
+  const [resendingDispatch, setResendingDispatch] = useState(false);
+  const [resendingOtp, setResendingOtp] = useState(false);
+  const [lastEmailResult, setLastEmailResult] = useState(null);
+
   const handleGenerateDemoAwb = () => {
     const isBlue = courierPartner.toLowerCase().includes('blue');
     const isDelhivery = courierPartner.toLowerCase().includes('delhivery');
     const prefix = isBlue ? 'BD' : isDelhivery ? 'DEL' : 'MSH';
     const randomNum = Math.floor(10000000 + Math.random() * 90000000);
     setTrackingNumber(`${prefix}-${randomNum}`);
+  };
+
+  const handleManualResendDispatch = async () => {
+    try {
+      setResendingDispatch(true);
+      setLastEmailResult(null);
+      const token = await auth.currentUser?.getIdToken();
+      const res = await axios.post(
+        `${API_V1_BASE}/admin-orders/${order.id}/resend-dispatch-email`,
+        {
+          customEmail: customEmail.trim() || undefined,
+          courierPartner,
+          trackingNumber,
+          trackingUrl: computedLiveUrl
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }
+      );
+      if (res.data?.success) {
+        toast.success(`Dispatch email sent to ${res.data.data?.sentTo || 'customer'}!`, {
+          description: `AWB: ${res.data.data?.awb || 'N/A'} via ${res.data.data?.courier || 'Courier'}`
+        });
+        setLastEmailResult({
+          type: 'dispatch',
+          sentTo: res.data.data?.sentTo,
+          awb: res.data.data?.awb,
+          timestamp: new Date().toLocaleTimeString()
+        });
+      }
+    } catch (err) {
+      console.error('Failed to resend dispatch email:', err);
+      toast.error('Failed to resend dispatch email', {
+        description: err.response?.data?.message || err.message
+      });
+    } finally {
+      setResendingDispatch(false);
+    }
+  };
+
+  const handleManualResendOtp = async () => {
+    try {
+      setResendingOtp(true);
+      setLastEmailResult(null);
+      const token = await auth.currentUser?.getIdToken();
+      const res = await axios.post(
+        `${API_V1_BASE}/admin-orders/${order.id}/resend-delivery-otp`,
+        {
+          customEmail: customEmail.trim() || undefined
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }
+      );
+      if (res.data?.success) {
+        toast.success(`Delivery OTP email sent to ${res.data.data?.sentTo || 'customer'}!`, {
+          description: `Verification OTP: ${res.data.data?.otp}`
+        });
+        setLastEmailResult({
+          type: 'otp',
+          sentTo: res.data.data?.sentTo,
+          otp: res.data.data?.otp,
+          timestamp: new Date().toLocaleTimeString()
+        });
+      }
+    } catch (err) {
+      console.error('Failed to resend delivery OTP email:', err);
+      toast.error('Failed to resend delivery OTP email', {
+        description: err.response?.data?.message || err.message
+      });
+    } finally {
+      setResendingOtp(false);
+    }
   };
 
   const handleSaveStatus = () => {
@@ -311,7 +399,124 @@ export default function OrderDetailModal({
             </div>
           </div>
 
-          {/* ── 6. STATUS UPDATE & DISPATCH CONTROLS ───────────────────── */}
+          {/* ── 6. MANUAL EMAIL & OTP BACKUP DISPATCH ──────────────────── */}
+          <div className="bg-gradient-to-r from-rose-50/70 via-pink-50/50 to-amber-50/50 border border-pink-200/90 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-pink-100 text-[#b7004d] rounded-lg">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                    Customer Notifications & Manual Email Backup
+                  </h4>
+                  <p className="text-[11px] text-gray-500">
+                    Automated emails dispatch upon status transitions. Use these tools for customer support or alternate inbox overrides.
+                  </p>
+                </div>
+              </div>
+
+              {/* Payment Mode Indicator */}
+              <div className="flex items-center gap-1.5">
+                {order.paymentMethod === 'COD' ? (
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                    💵 COD: Collect ₹{Number(order.totalAmount || 0).toLocaleString('en-IN')}
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    💳 Prepaid: ₹0 Due (Fully Paid)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Recipient Email Override Field */}
+            <div>
+              <label className="text-[11px] font-semibold text-gray-700 block mb-1">
+                Customer Email Address (Direct DB Login or Query Override)
+              </label>
+              <div className="relative">
+                <Mail className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                <input
+                  type="email"
+                  value={customEmail}
+                  onChange={(e) => setCustomEmail(e.target.value)}
+                  placeholder="customer@gmail.com"
+                  className="w-full text-xs font-medium pl-8 pr-2.5 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#b7004d]/20 focus:border-[#b7004d]"
+                />
+              </div>
+            </div>
+
+            {/* 2-Button Action Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleManualResendDispatch}
+                disabled={resendingDispatch}
+                className="text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 hover:border-emerald-500 flex items-center justify-center gap-1.5 cursor-pointer font-bold shadow-xs"
+              >
+                {resendingDispatch ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-700" />
+                    <span>Sending Dispatch Email...</span>
+                  </>
+                ) : (
+                  <>
+                    <Truck className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Resend Dispatch Email (AWB)</span>
+                  </>
+                )}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleManualResendOtp}
+                disabled={resendingOtp}
+                className="text-xs border-rose-300 text-[#b7004d] hover:bg-rose-50 hover:border-[#b7004d] flex items-center justify-center gap-1.5 cursor-pointer font-bold shadow-xs"
+              >
+                {resendingOtp ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#b7004d]" />
+                    <span>Sending Delivery OTP...</span>
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="w-3.5 h-3.5 text-[#b7004d]" />
+                    <span>Resend Delivery OTP (Prepaid & COD)</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Live Result Feedback Banner */}
+            {lastEmailResult && (
+              <div className="text-[11px] bg-white border border-emerald-200 rounded-lg p-2.5 text-emerald-800 flex items-center justify-between animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    {lastEmailResult.type === 'dispatch' ? (
+                      <>
+                        Dispatch alert emailed to <strong>{lastEmailResult.sentTo}</strong> (AWB: <code>{lastEmailResult.awb || 'N/A'}</code>)
+                      </>
+                    ) : (
+                      <>
+                        Delivery OTP emailed to <strong>{lastEmailResult.sentTo}</strong> (OTP: <strong className="font-mono text-sm tracking-wider text-[#9f0038] bg-pink-50 px-1.5 py-0.5 rounded">{lastEmailResult.otp}</strong>)
+                      </>
+                    )}
+                  </span>
+                </div>
+                <span className="text-[10px] text-gray-400 font-mono shrink-0 ml-2">
+                  {lastEmailResult.timestamp}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── 7. STATUS UPDATE & DISPATCH CONTROLS ───────────────────── */}
           <div className="border-t pt-4 space-y-4">
             <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">
               Update Order & Logistics Status

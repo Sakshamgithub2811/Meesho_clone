@@ -448,28 +448,8 @@ export default function ShoppingCart({ onNavigate, onBack }) {
       setIsChangingAddress(false);
       triggerToast('Delivery address saved successfully! 📍');
     } catch (err) {
-      console.warn('API saveAddress notice:', err);
-      const fallbackAddr = {
-        id: 'local_addr_' + Date.now(),
-        name: payload.fullName,
-        fullName: payload.fullName,
-        phone: payload.phone,
-        pincode: payload.pincode,
-        houseNo: addressForm.houseNo.trim(),
-        street: addressForm.street.trim(),
-        landmark: addressForm.landmark.trim(),
-        city: payload.city,
-        state: payload.state,
-        addressType: addressForm.addressType,
-        details: `${combinedAddressLine}, ${payload.city}, ${payload.state}`,
-      };
-      setAddress(fallbackAddr);
-      try {
-        localStorage.setItem('mshoppy_selected_address', JSON.stringify(fallbackAddr));
-        localStorage.setItem('mshoppy_user_pincode', cleanPin);
-      } catch (e) {}
-      setIsChangingAddress(false);
-      triggerToast('Delivery address saved! 📍');
+      console.error('API saveAddress error:', err);
+      triggerToast(err.message || 'Failed to save delivery address. Please try again.');
     } finally {
       setIsSavingAddress(false);
     }
@@ -643,7 +623,7 @@ export default function ShoppingCart({ onNavigate, onBack }) {
               <div className="space-y-4">
                 {items.map((item) => {
                   const prod = item.product || {};
-                  const img = prod.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400';
+                  const img = prod.images?.[0] || prod.image || '';
                   const itemTotal = prod.price * item.quantity;
 
                   return (
@@ -675,9 +655,11 @@ export default function ShoppingCart({ onNavigate, onBack }) {
                             </h3>
 
                             <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-slate-500">
-                              <span className="bg-slate-100 px-2 py-0.5 rounded-md font-semibold">
-                                Size: <strong className="text-slate-800">{item.size || 'Free Size'}</strong>
-                              </span>
+                              {item.size && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded-md font-semibold">
+                                  Size: <strong className="text-slate-800">{item.size}</strong>
+                                </span>
+                              )}
                               {prod.supplierName && (
                                 <span className="text-[11px] text-slate-400">
                                   Seller: <strong className="text-slate-600">{prod.supplierName.toLowerCase().includes('meesho') ? 'Official Store' : prod.supplierName}</strong>

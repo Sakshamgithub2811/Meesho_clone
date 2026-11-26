@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 import { auth as firebaseAuth, serviceAccount } from '../config/firebaseAdmin.js';
 import supabase from '../config/supabaseClient.js';
 import prisma from '../config/prisma.js';
@@ -55,17 +54,8 @@ export const verifySupplier = async (req, res, next) => {
 
     let uid = null;
 
-    // 1. Verify with App JWT Secret
-    try {
-      const jwtSecret = process.env.JWT_SECRET || 'meesho_supplier_super_secret_jwt_token_2026';
-      const decoded = jwt.verify(token, jwtSecret);
-      if (decoded && (decoded.id || decoded.uid || decoded.supplierId)) {
-        uid = decoded.id || decoded.uid || decoded.supplierId;
-      }
-    } catch (_) {}
-
-    // 2. Verify with Firebase Admin if available
-    if (!uid && firebaseAuth) {
+    // 1. Verify with Firebase Admin if available
+    if (firebaseAuth) {
       try {
         const firebaseDecoded = await firebaseAuth.verifyIdToken(token);
         if (firebaseDecoded?.uid) {
@@ -83,7 +73,7 @@ export const verifySupplier = async (req, res, next) => {
       }
     }
 
-    // 3. Verify with Supabase Auth (if Supabase access token)
+    // 2. Verify with Supabase Auth (if Supabase access token)
     if (!uid && supabase?.auth) {
       try {
         const { data: { user: sbUser }, error: sbErr } = await supabase.auth.getUser(token);
@@ -93,7 +83,7 @@ export const verifySupplier = async (req, res, next) => {
       } catch (_) {}
     }
 
-    // 4. Decode base64 JWT payload safely if signed externally
+    // 3. Decode base64 token payload safely if formatted with segments (e.g. external OAuth/Firebase)
     if (!uid) {
       try {
         const parts = token.split('.');
@@ -106,7 +96,7 @@ export const verifySupplier = async (req, res, next) => {
       } catch (_) {}
     }
 
-    // 5. Direct Firebase UID or prefixed token support
+    // 4. Direct Firebase UID or prefixed token support
     if (!uid) {
       if (token.startsWith('fb_token_') || token.startsWith('sup_') || token.startsWith('firebase_')) {
         const parts = token.split('_');

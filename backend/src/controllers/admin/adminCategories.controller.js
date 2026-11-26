@@ -30,6 +30,9 @@ export const getAllCategories = async (req, res) => {
     const totalCategories = categories.length;
     const mainCategories = categories.filter(c => !c.parentId).length;
     const subCategories = categories.filter(c => !!c.parentId).length;
+    const pendingCategories = categories.filter(c => c.status === 'PENDING').length;
+    const approvedCategories = categories.filter(c => c.status === 'APPROVED').length;
+    const rejectedCategories = categories.filter(c => c.status === 'REJECTED').length;
     const totalProducts = categories.reduce((sum, cat) => sum + (cat._count?.products || 0), 0);
     const emptyCategories = categories.filter(
       cat => (cat._count?.products || 0) === 0 && (cat._count?.subcategories || 0) === 0
@@ -43,6 +46,9 @@ export const getAllCategories = async (req, res) => {
         totalCategories,
         mainCategories,
         subCategories,
+        pendingCategories,
+        approvedCategories,
+        rejectedCategories,
         totalProducts,
         emptyCategories,
         activeCategories: totalCategories - emptyCategories
@@ -106,7 +112,8 @@ export const createCategory = async (req, res) => {
         name: name.trim(),
         slug: generatedSlug,
         imageUrl: imageUrl && imageUrl.trim() ? imageUrl.trim() : null,
-        parentId: parentId && parentId.trim() ? parentId.trim() : null
+        parentId: parentId && parentId.trim() ? parentId.trim() : null,
+        status: 'APPROVED',
       },
       include: {
         parent: {
@@ -297,5 +304,107 @@ export const deleteCategory = async (req, res) => {
   } catch (error) {
     console.error('Error deleting category:', error);
     res.status(500).json({ success: false, message: 'Failed to delete category', error: error.message });
+  }
+};
+
+/**
+ * 5. APPROVE CATEGORY
+ * PATCH /api/admin-categories/:id/approve
+ */
+export const approveCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.category.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+
+    const updated = await prisma.category.update({
+      where: { id },
+      data: {
+        status: 'APPROVED',
+        rejectionReason: null
+      },
+      include: {
+        parent: { select: { id: true, name: true, slug: true } },
+        _count: { select: { products: true, subcategories: true } }
+      }
+    });
+
+    // Automatically ACTIVATE all products that were waiting under review for this category!
+    const activatedResult = await prisma.product.updateMany({
+      where: {
+        categorySlug: updated.slug,
+        isDeleted: false,
+      },
+      data: {
+        isActive: true,
+      },
+    });
+
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'CATEGORY_APPROVED',
+      targetType: 'CATALOG',
+      targetId: id,
+      details: `Approved category "${updated.name}" (Slug: ${updated.slug}) and activated ${activatedResult.count} pending product(s) into live catalog`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Category "${updated.name}" approved successfully! ${activatedResult.count} pending product(s) are now active in the live catalog.`,
+      data: updated,
+      activatedProductsCount: activatedResult.count
+    });
+  } catch (error) {
+    console.error('Error approving category:', error);
+    res.status(500).json({ success: false, message: 'Failed to approve category', error: error.message });
+  }
+};
+
+/**
+ * 6. REJECT CATEGORY
+ * PATCH /api/admin-categories/:id/reject
+ */
+export const rejectCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+
+    const existing = await prisma.category.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+
+    const updated = await prisma.category.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        rejectionReason: reason || 'Does not comply with catalog standards'
+      },
+      include: {
+        parent: { select: { id: true, name: true, slug: true } },
+        _count: { select: { products: true, subcategories: true } }
+      }
+    });
+
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'CATEGORY_REJECTED',
+      targetType: 'CATALOG',
+      targetId: id,
+      details: `Rejected category "${updated.name}" (Slug: ${updated.slug}). Reason: ${reason || 'N/A'}`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Category "${updated.name}" has been rejected.`,
+      data: updated
+    });
+  } catch (error) {
+    console.error('Error rejecting category:', error);
+    res.status(500).json({ success: false, message: 'Failed to reject category', error: error.message });
   }
 };

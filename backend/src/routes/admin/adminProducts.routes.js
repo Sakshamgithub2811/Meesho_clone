@@ -5,7 +5,9 @@ import {
   getProductDetails,
   updateProductStock,
   deleteProduct,
-  bulkUpdateProductStatus
+  bulkUpdateProductStatus,
+  approveProduct,
+  rejectProduct
 } from '../../controllers/admin/adminProducts.controller.js';
 
 const router = Router();
@@ -13,6 +15,8 @@ const router = Router();
 // All Admin Products endpoints require valid authentication and ADMIN role
 router.get('/', verifyAuth, authorizeRole('ADMIN'), getAllProducts);
 router.patch('/bulk-status', verifyAuth, authorizeRole('ADMIN'), bulkUpdateProductStatus);
+router.post('/:id/approve', verifyAuth, authorizeRole('ADMIN'), approveProduct);
+router.post('/:id/reject', verifyAuth, authorizeRole('ADMIN'), rejectProduct);
 router.get('/:id', verifyAuth, authorizeRole('ADMIN'), getProductDetails);
 router.patch('/:id/stock', verifyAuth, authorizeRole('ADMIN'), updateProductStock);
 router.delete('/:id', verifyAuth, authorizeRole('ADMIN'), deleteProduct);

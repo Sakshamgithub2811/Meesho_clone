@@ -33,9 +33,9 @@ export default function OrderTrackingModal({
 
   const primaryItem = order?.items?.[0] || {};
   const product = primaryItem.product || {};
-  const image = order.image || product.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=200';
+  const image = order.image || product.images?.[0] || product.image || '';
   const productName = order.productName || product.title || (order.items?.length > 1 ? `${order.items.length} Order Items` : 'Catalog Order');
-  const size = order.size || primaryItem.size || 'Free Size';
+  const size = order.size || primaryItem.size || '';
   const price = Number(order.price ?? order.totalAmount ?? 0);
 
   const orderDate = order.createdAt ? new Date(order.createdAt) : new Date();
@@ -72,12 +72,12 @@ export default function OrderTrackingModal({
 
   // Deterministic 4-digit Delivery OTP (multiplier 33) & Return Pickup OTP (multiplier 41)
   const deliveryOtp = React.useMemo(() => {
-    const seed = (order.id || 'order-sample').split('').reduce((acc, char) => (acc * 33 + char.charCodeAt(0)) % 9000, 1000);
+    const seed = (order.id || '').split('').reduce((acc, char) => (acc * 33 + char.charCodeAt(0)) % 9000, 1000);
     return Math.abs(seed) + 1000;
   }, [order.id]);
 
   const returnPickupOtp = React.useMemo(() => {
-    const seed = (order.id || 'order-sample').split('').reduce((acc, char) => (acc * 41 + char.charCodeAt(0)) % 9000, 1000);
+    const seed = (order.id || '').split('').reduce((acc, char) => (acc * 41 + char.charCodeAt(0)) % 9000, 1000);
     return Math.abs(seed) + 1000;
   }, [order.id]);
 
@@ -208,7 +208,7 @@ export default function OrderTrackingModal({
                 {productName}
               </h3>
               <p className="text-xs text-slate-500 font-semibold mt-1">
-                Size: <span className="text-slate-800">{size}</span> • <span className="text-[#b7004d] font-bold">₹{price.toLocaleString('en-IN')}</span>
+                {size ? <>Size: <span className="text-slate-800">{size}</span> • </> : null}<span className="text-[#b7004d] font-bold">₹{price.toLocaleString('en-IN')}</span>
               </p>
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-xs font-bold text-slate-600 font-mono">

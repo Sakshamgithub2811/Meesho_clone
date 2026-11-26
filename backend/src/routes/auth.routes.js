@@ -42,7 +42,7 @@ router.put('/payout-settings', (req, res, next) => {
   next();
 }, updatePayoutSettings);
 
-// Protected endpoints (Requires valid Firebase/JWT Token)
+// Protected endpoints (Requires valid Auth Token)
 router.get('/me', verifyAuth, getCurrentUser);
 router.put('/reseller-profile', verifyAuth, authorizeRole('RESELLER', 'ADMIN'), updateResellerProfile);
 router.put('/customer-profile', verifyAuth, authorizeRole('CUSTOMER', 'ADMIN'), updateCustomerProfile);

@@ -37,7 +37,10 @@ import { verifySupplier } from '../middlewares/supplierAuth.middleware.js';
 
 const router = Router();
 
-// Apply supplier authentication middleware to all supplier routes
+// Public / Unauthenticated category read for suppliers and catalog picker
+router.get('/categories', getCategories);
+
+// Apply supplier authentication middleware to all protected supplier routes
 router.use(verifySupplier);
 
 // Profile & KYC Management
@@ -67,8 +70,7 @@ router.delete('/products/bulk', bulkDeleteProducts);
 router.put('/products/:id', uploadProductMedia.array('images', 8), updateProduct);
 router.delete('/products/:id', deleteProduct);
 
-// Categories
-router.get('/categories', getCategories);
+// Categories (Creation requires authenticated supplier)
 router.post('/categories', addCategory);
 
 // Orders & Fulfillment

@@ -110,7 +110,7 @@ export default function SellerDropship1({ onNavigate, embedded = false, onNaviga
     } finally {
       clearAuthSession();
       toast.success('Logged out successfully');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 

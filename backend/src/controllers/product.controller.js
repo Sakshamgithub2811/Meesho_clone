@@ -25,7 +25,9 @@ export const getProducts = async (req, res) => {
     }
 
     const conditions = [
-      { isDeleted: false } // Soft delete filter: do not show discontinued/deleted products in live catalog
+      { isDeleted: false }, // Soft delete filter: do not show discontinued/deleted products in live catalog
+      { isActive: true }, // Only show active products (exclude under-review products)
+      { category: { status: 'APPROVED' } } // Category must be approved by admin before appearing in live catalog
     ];
 
     // Category filter - exact slug/name matching (prevents 'men' from loosely matching 'women-ethnic')
@@ -433,11 +435,14 @@ export const createProduct = async (req, res) => {
       images,
       sizes,
       colors,
+      videoUrl,
+      videoType,
       stock = 50,
       isFreeDelivery = true,
       supplierName = 'Verified Supplier',
       rating = 0,
-      reviewsCount = 0
+      reviewsCount = 0,
+      specifications
     } = req.body;
 
     if (!title || price === undefined || price === null || price === '') {
@@ -515,6 +520,9 @@ export const createProduct = async (req, res) => {
         images: productImages,
         sizes: productSizes,
         colors: productColors,
+        videoUrl: (videoUrl || '').trim() || null,
+        videoType: (videoType || '').trim() || null,
+        specifications: Array.isArray(specifications) ? specifications : (typeof specifications === 'string' ? JSON.parse(specifications || '[]') : []),
         stock: parseInt(stock, 10) || 50,
         isFreeDelivery: Boolean(isFreeDelivery),
         supplierName: supplierName || 'Verified Supplier'
@@ -604,6 +612,8 @@ export const updateProduct = async (req, res) => {
     }
 
     if (supplierName !== undefined) data.supplierName = supplierName;
+    if (req.body.videoUrl !== undefined) data.videoUrl = (req.body.videoUrl || '').trim() || null;
+    if (req.body.videoType !== undefined) data.videoType = (req.body.videoType || '').trim() || null;
 
     const updated = await prisma.product.update({
       where: { id },

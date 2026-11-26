@@ -48,17 +48,13 @@ export default function SupplierDashboardOverview({
   // Robust multi-source KYC status resolution
   const extractedStatus = (kycData?.status || kycData?.kyc?.status || profile?.kycStatus || '').toUpperCase();
   const rawKycStatus = (extractedStatus === 'UNDEFINED' || extractedStatus === 'NULL') ? '' : extractedStatus;
-  const isKycApproved = Boolean(
+  const isKycApproved =
     rawKycStatus === 'APPROVED' ||
     kycData?.isVerified === true ||
-    profile?.isVerified === true ||
-    profile?.tierLabel?.toLowerCase().includes('verified') ||
-    (profile?.gstin && profile?.bankDetails)
-  );
-  const currentKycStatus = (
-    (isKycApproved ? 'APPROVED' : rawKycStatus) ||
-    'PENDING'
-  ).toUpperCase();
+    Boolean(profile?.tierLabel?.toLowerCase().includes('verified'));
+  const isKycPending = !isKycApproved && (rawKycStatus === 'PENDING' || rawKycStatus === 'UNDER_REVIEW');
+  const isKycRejected = !isKycApproved && rawKycStatus === 'REJECTED';
+  const currentKycStatus = isKycApproved ? 'APPROVED' : (rawKycStatus || 'NOT_SUBMITTED');
 
   // Compute combined recent orders from stats or orders list
   const recentOrdersList =
@@ -181,6 +177,33 @@ export default function SupplierDashboardOverview({
             View Verification ➔
           </button>
         </div>
+      ) : isKycPending ? (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-amber-950">KYC Under Compliance Review</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold">
+                  VERIFICATION IN PROGRESS
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-800 mt-0.5">
+                Your documents are currently being checked by the merchant verification desk. Verification typically completes within 4-12 business hours.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigateTab('kyc')}
+            className="text-xs font-bold text-amber-900 hover:underline shrink-0 cursor-pointer flex items-center gap-1"
+          >
+            <span>View KYC Hub</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       ) : (
         <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 border border-pink-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -206,7 +229,7 @@ export default function SupplierDashboardOverview({
             onClick={() => onNavigateTab('kyc')}
             className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#d82a62] hover:bg-[#b7004d] text-white text-xs font-bold transition shadow-sm shrink-0 cursor-pointer"
           >
-            <span>Check KYC Status</span>
+            <span>Complete KYC</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

@@ -14,7 +14,7 @@ import { verifySupplier } from '../../middlewares/supplierAuth.middleware.js';
 
 const router = Router();
 
-// Public Authentication Routes (Firebase UID Based, No JWT)
+// Public Authentication Routes (Firebase UID Based)
 router.post('/register', registerSupplier);
 router.post('/login', loginSupplier);
 router.post('/logout', logoutSupplier);

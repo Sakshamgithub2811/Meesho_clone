@@ -29,6 +29,7 @@ import {
   Receipt,
   FileText,
   X,
+  XCircle,
   Wallet
 } from 'lucide-react';
 import { exportSettlementsToCsv } from '../../utils/csvExport';
@@ -75,19 +76,7 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
       if (financeRes.status === 'fulfilled' && financeRes.value) {
         setFinanceData(financeRes.value);
       } else {
-        // Fallback calculation if backend endpoint is unavailable
-        setFinanceData({
-          lifetimeSettled: 0,
-          escrowBalance: 0,
-          nextPayoutAmount: 0,
-          nextPayoutDate: 'Next Tuesday',
-          totalRevenue: 0,
-          totalDeductions: 0,
-          totalOrders: 0,
-          commissionRate: '0%',
-          tdsRate: '1%',
-          settlements: [],
-        });
+        setFinanceData(null);
       }
 
       if (profRes.status === 'fulfilled' && profRes.value) {
@@ -127,7 +116,7 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
     } finally {
       clearAuthSession();
       toast.success('Successfully logged out of Supplier portal');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 
@@ -403,7 +392,7 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
 
             <div className="flex flex-wrap items-center gap-2">
               {/* Status Filter Buttons */}
-              {['ALL', 'PAID', 'PROCESSING'].map((st) => (
+              {['ALL', 'PAID', 'PROCESSING', 'REJECTED'].map((st) => (
                 <button
                   key={st}
                   type="button"
@@ -414,7 +403,7 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  {st === 'ALL' ? 'All Batches' : st}
+                  {st === 'ALL' ? 'All Batches' : st === 'PROCESSING' ? 'Pending Approval' : st}
                 </button>
               ))}
 
@@ -504,16 +493,30 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
                           </div>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                              isPaid
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-amber-50 text-amber-700'
-                            }`}
-                          >
-                            {isPaid ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                            {item.status}
-                          </span>
+                          {(() => {
+                            const isPaid = item.status === 'PAID';
+                            const isRejected = item.status === 'REJECTED';
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                                  isPaid
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : isRejected
+                                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200 animate-pulse'
+                                }`}
+                              >
+                                {isPaid ? (
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                ) : isRejected ? (
+                                  <XCircle className="w-3 h-3 text-rose-600" />
+                                ) : (
+                                  <Clock className="w-3 h-3 text-amber-600" />
+                                )}
+                                {isPaid ? 'Paid & Disbursed' : isRejected ? 'Rejected' : 'Admin Approval Pending ⏳'}
+                              </span>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );
@@ -655,12 +658,14 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
               </div>
 
               {/* Fee Notice */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-500 space-y-0.5">
-                <div className="flex items-center gap-1.5 text-slate-700 font-bold">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>0% Commission • Statutory 1% TDS u/s 194-O</span>
+              <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Admin Verification & Compliance Workflow</span>
                 </div>
-                <p>Funds will be credited via IMPS/NEFT within 24 to 48 banking hours.</p>
+                <p className="text-amber-800 leading-relaxed">
+                  Payout request submit hone par pehle Admin Panel par approval ke liye jayegi. Admin ke approve aur UTR disburse karte hi payment direct aapke bank account mein transfer ho jayegi.
+                </p>
               </div>
 
               {/* Submit CTA */}
@@ -681,12 +686,12 @@ export default function SellerSettlements1({ onNavigate, embedded = false, onNav
                   {isSubmittingWithdraw ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Processing...</span>
+                      <span>Submitting Request...</span>
                     </>
                   ) : (
                     <>
                       <ArrowUpRight className="w-4 h-4" />
-                      <span>Confirm Transfer</span>
+                      <span>Submit for Admin Approval ➔</span>
                     </>
                   )}
                 </button>

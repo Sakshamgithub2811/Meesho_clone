@@ -99,6 +99,7 @@ model Profile {
   webhookLogs     WebhookLog[]
   marginConfig    DropshipperMarginConfig?
   fcmDevices      FcmDevice[]
+  logisticsShipmentsAsDriver LogisticsShipment[] @relation("DriverShipments")
 
   // Soft Delete Fields
   isDeleted Boolean   @default(false) @map("is_deleted")
@@ -139,11 +140,16 @@ model Category {
   imageUrl      String?    @map("image_url")
   parentId      String?    @map("parent_id")
   parent        Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  subcategories Category[] @relation("CategoryHierarchy")
-  products      Product[]
-  createdAt     DateTime   @default(now()) @map("created_at")
+  subcategories         Category[] @relation("CategoryHierarchy")
+  products              Product[]
+  status                String     @default("APPROVED")
+  requestedBySupplierId String?    @map("requested_by_supplier_id")
+  rejectionReason       String?    @map("rejection_reason")
+  attributeSchema       Json?      @map("attribute_schema")
+  createdAt             DateTime   @default(now()) @map("created_at")
 
   @@index([parentId])
+  @@index([status])
   @@map("categories")
 }
 
@@ -168,6 +174,9 @@ model Product {
   thicknesses        String[] @default([])
   sku                String?
   variants           Json?    @default("[]")
+  specifications     Json?    @default("[]")
+  videoUrl           String?  @map("video_url")
+  videoType          String?  @map("video_type")
   stock              Int      @default(50)
   isFreeDelivery     Boolean  @default(true) @map("is_free_delivery")
   supplierName       String   @default("Verified Supplier") @map("supplier_name")
@@ -178,11 +187,18 @@ model Product {
   wishlistItems WishlistItem[]
   reviews       Review[]
   orderItems    OrderItem[]
+  warehouseStocks LogisticsWarehouseStock[]
+  shipmentItems   ShipmentItem[]
 
   // Soft Delete Fields
   isDeleted Boolean   @default(false) @map("is_deleted")
   deletedAt DateTime? @map("deleted_at")
   isActive  Boolean   @default(true) @map("is_active")
+
+  // Admin Approval & Moderation
+  approvalStatus  String    @default("APPROVED") @map("approval_status") // PENDING, APPROVED, REJECTED
+  rejectionReason String?   @map("rejection_reason")
+  approvedAt      DateTime? @map("approved_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -236,6 +252,7 @@ model Order {
   orderStatus     OrderStatus   @default(ORDERED) @map("order_status")
   deliveryTask    DeliveryTask?
   returnRequest   ReturnRequest?
+  logisticsShipments LogisticsShipment[]
 
   // Soft Delete Fields
   isDeleted Boolean   @default(false) @map("is_deleted")
@@ -260,6 +277,7 @@ model OrderItem {
   price      Float
   size       String?
   itemStatus OrderStatus @default(ORDERED) @map("item_status")
+  shipmentItems ShipmentItem[]
 
   @@map("order_items")
 }
@@ -556,4 +574,373 @@ model FcmDevice {
 
   @@index([userId])
   @@map("fcm_devices")
+}
+
+// ============================================================================
+// 🚚 SUPPLY CHAIN & LOGISTICS MODULE (16 NON-DESTRUCTIVE TABLES)
+// ============================================================================
+
+// ── 1. Warehouses & Fulfillment Hubs ──────────────────────────────
+model LogisticsWarehouse {
+  id               String   @id @default(uuid())
+  warehouseCode    String   @unique @map("warehouse_code") // e.g. WH-DEL-01
+  name             String
+  type             String   @default("CENTRAL_HUB") // CENTRAL_HUB | REGIONAL_DEPOT | SUPPLIER_LOCATION | RETURN_CENTER
+  contactPerson    String?  @map("contact_person")
+  phone            String
+  email            String?
+  addressLine1     String   @map("address_line1")
+  addressLine2     String?  @map("address_line2")
+  city             String
+  state            String
+  pincode          String
+  latitude         Float?
+  longitude        Float?
+  operatingHours   String?  @default("08:00 - 20:00 IST") @map("operating_hours")
+  maxDailyCapacity Int      @default(5000) @map("max_daily_capacity")
+  isActive         Boolean  @default(true) @map("is_active")
+  isDeleted        Boolean  @default(false) @map("is_deleted")
+
+  // Relations
+  stocks           LogisticsWarehouseStock[]
+  shipments        LogisticsShipment[]
+  pickupRequests   PickupRequest[]
+  manifests        DispatchManifest[]
+  fleetVehicles    LogisticsFleetVehicle[]
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([pincode])
+  @@map("logistics_warehouses")
+}
+
+// ── 2. Warehouse Stock & Physical Bin Allocation ───────────────────
+model LogisticsWarehouseStock {
+  id             String             @id @default(uuid())
+  warehouseId    String             @map("warehouse_id")
+  warehouse      LogisticsWarehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  productId      String             @map("product_id")
+  product        Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  zone           String             @default("Zone-A")
+  aisle          String             @default("Aisle-01")
+  rack           String             @default("Rack-01")
+  bin            String             @default("Bin-01")
+  availableStock Int                @default(0) @map("available_stock")
+  reservedStock  Int                @default(0) @map("reserved_stock")
+  damagedStock   Int                @default(0) @map("damaged_stock")
+
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  @@unique([warehouseId, productId, bin])
+  @@map("logistics_warehouse_stock")
+}
+
+// ── 3. Logistics Partners & Courier Aggregators ────────────────────
+model LogisticsPartner {
+  id                  String             @id @default(uuid())
+  partnerCode         String             @unique @map("partner_code") // DELHIVERY | BLUEDART | SHADOWFAX | XPRESSBEES | FLEET_INTERNAL
+  name                String
+  trackingUrlTemplate String?            @map("tracking_url_template") // e.g. https://www.delhivery.com/track/package/{AWB}
+  apiEndpoint         String?            @map("api_endpoint")
+  apiKeyEncrypted     String?            @map("api_key_encrypted")
+  webhookSecret       String?            @map("webhook_secret")
+  serviceType         String             @default("SURFACE") // SURFACE | AIR | HYPERLOCAL | MULTI_MODAL
+  supportsCod         Boolean            @default(true) @map("supports_cod")
+  supportsReverse     Boolean            @default(true) @map("supports_reverse")
+  status              String             @default("ACTIVE") // ACTIVE | INACTIVE | SANDBOX
+
+  // Relations
+  rateCards           LogisticsRateCard[]
+  serviceablePincodes LogisticsServiceablePincode[]
+  shipments           LogisticsShipment[]
+  pickupRequests      PickupRequest[]
+  manifests           DispatchManifest[]
+  expenses            LogisticsExpense[]
+
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  @@map("logistics_partners")
+}
+
+// ── 4. Logistics Rate Cards (Zonal Pricing Engine) ─────────────────
+model LogisticsRateCard {
+  id                      String           @id @default(uuid())
+  partnerId               String           @map("partner_id")
+  partner                 LogisticsPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  zone                    String           // ZONE_A (Intra-city) | ZONE_B (Intra-state) | ZONE_C (Metro) | ZONE_D (ROI) | ZONE_E (Special)
+  baseWeightGrams         Int              @default(500) @map("base_weight_grams")
+  baseRate                Float            @default(45.0) @map("base_rate")
+  incrementalSlabGrams    Int              @default(500) @map("incremental_slab_grams")
+  incrementalSlabRate     Float            @default(25.0) @map("incremental_slab_rate")
+  codChargeFixed          Float            @default(30.0) @map("cod_charge_fixed")
+  codChargePercentage     Float            @default(1.5) @map("cod_charge_percentage")
+  fuelSurchargePercentage  Float            @default(5.0) @map("fuel_surcharge_percentage")
+  expectedSlaDays         Int              @default(3) @map("expected_sla_days")
+  isActive                Boolean          @default(true) @map("is_active")
+
+  createdAt               DateTime         @default(now()) @map("created_at")
+  updatedAt               DateTime         @updatedAt @map("updated_at")
+
+  @@unique([partnerId, zone])
+  @@map("logistics_rate_cards")
+}
+
+// ── 5. Serviceable PIN Codes & SLA Matrix ──────────────────────────
+model LogisticsServiceablePincode {
+  id                       String           @id @default(uuid())
+  pincode                  String
+  city                     String
+  state                    String
+  zone                     String           @default("ZONE_D")
+  partnerId                String           @map("partner_id")
+  partner                  LogisticsPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  isPrepaidAvailable       Boolean          @default(true) @map("is_prepaid_available")
+  isCodAvailable           Boolean          @default(true) @map("is_cod_available")
+  isReversePickupAvailable Boolean          @default(true) @map("is_reverse_pickup_available")
+  deliverySlaDays          Int              @default(3) @map("delivery_sla_days")
+
+  createdAt                DateTime         @default(now()) @map("created_at")
+
+  @@unique([pincode, partnerId])
+  @@index([pincode])
+  @@map("logistics_serviceable_pincodes")
+}
+
+// ── 6. Master Logistics Shipment ───────────────────────────────────
+model LogisticsShipment {
+  id                    String                   @id @default(uuid())
+  shipmentNumber        String                   @unique @map("shipment_number") // SHP-YYYYMMDD-XXXXXX
+  orderId               String                   @map("order_id")
+  order                 Order                    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  warehouseId           String                   @map("warehouse_id")
+  warehouse             LogisticsWarehouse       @relation(fields: [warehouseId], references: [id])
+  partnerId             String?                  @map("partner_id")
+  partner               LogisticsPartner?        @relation(fields: [partnerId], references: [id])
+  awbNumber             String?                  @unique @map("awb_number")
+  shippingMode          String                   @default("SURFACE") @map("shipping_mode") // SURFACE | AIR | HYPERLOCAL
+  status                String                   @default("ORDER_CONFIRMED") // ORDER_CONFIRMED | READY_FOR_DISPATCH | PICKED_UP | IN_TRANSIT | OUT_FOR_DELIVERY | DELIVERED | DELIVERY_ATTEMPTED | RTO_INITIATED | CANCELLED
+  paymentMethod         String                   @default("COD") @map("payment_method")
+  codAmount             Float                    @default(0.0) @map("cod_amount")
+  totalPackages         Int                      @default(1) @map("total_packages")
+  deadWeightKg          Float                    @default(0.5) @map("dead_weight_kg")
+  volumetricWeightKg    Float                    @default(0.5) @map("volumetric_weight_kg")
+  billableWeightKg      Float                    @default(0.5) @map("billable_weight_kg")
+  estimatedShippingCost Float                    @default(0.0) @map("estimated_shipping_cost")
+  actualShippingCost    Float?                   @map("actual_shipping_cost")
+  estimatedDeliveryDate DateTime?                @map("estimated_delivery_date")
+  actualDeliveryDate    DateTime?                @map("actual_delivery_date")
+  assignedDriverId      String?                  @map("assigned_driver_id")
+  assignedDriver        Profile?                 @relation("DriverShipments", fields: [assignedDriverId], references: [id])
+  shippingAddressSnapshot Json                   @map("shipping_address_snapshot")
+  isDeleted             Boolean                  @default(false) @map("is_deleted")
+
+  // Relations
+  packages              ShipmentPackage[]
+  items                 ShipmentItem[]
+  trackingEvents        ShipmentTrackingEvent[]
+  deliveryAttempts      DeliveryAttempt[]
+  proofOfDelivery       ProofOfDelivery?
+  expenses              LogisticsExpense[]
+  documents             LogisticsDocument[]
+
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([status])
+  @@index([awbNumber])
+  @@map("logistics_shipments")
+}
+
+// ── 7. Shipment Packages (Cartons / Boxes) ─────────────────────────
+model ShipmentPackage {
+  id             String            @id @default(uuid())
+  shipmentId     String            @map("shipment_id")
+  shipment       LogisticsShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  packageNumber  String            @map("package_number") // PKG-SHP-001
+  boxType        String            @default("MEDIUM_BOX") @map("box_type") // SMALL_BOX | MEDIUM_BOX | LARGE_CARTON | POLY_MAILER
+  lengthCm       Float             @default(20.0) @map("length_cm")
+  widthCm        Float             @default(15.0) @map("width_cm")
+  heightCm       Float             @default(10.0) @map("height_cm")
+  weightKg       Float             @default(0.5) @map("weight_kg")
+  barcode        String?
+  items          ShipmentItem[]
+
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@map("shipment_packages")
+}
+
+// ── 8. Shipment Items Mapping ──────────────────────────────────────
+model ShipmentItem {
+  id          String            @id @default(uuid())
+  shipmentId  String            @map("shipment_id")
+  shipment    LogisticsShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  packageId   String?           @map("package_id")
+  package     ShipmentPackage?  @relation(fields: [packageId], references: [id])
+  orderItemId String            @map("order_item_id")
+  orderItem   OrderItem         @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  productId   String            @map("product_id")
+  product     Product           @relation(fields: [productId], references: [id])
+  quantity    Int               @default(1)
+
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  @@map("shipment_items")
+}
+
+// ── 9. Shipment Tracking Events (Audit Milestone Log) ──────────────
+model ShipmentTrackingEvent {
+  id          String            @id @default(uuid())
+  shipmentId  String            @map("shipment_id")
+  shipment    LogisticsShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status      String
+  eventName   String            @map("event_name") // HUB_IN_SCAN | OUT_FOR_DELIVERY | DELIVERED
+  location    String?           // e.g. Okhla Hub, New Delhi
+  latitude    Float?
+  longitude   Float?
+  description String?
+  source      String            @default("SYSTEM") // COURIER_WEBHOOK | DRIVER_APP | ADMIN_MANUAL | SYSTEM
+  eventTime   DateTime          @default(now()) @map("event_time")
+
+  @@index([shipmentId])
+  @@map("shipment_tracking_events")
+}
+
+// ── 10. Pickup Requests ────────────────────────────────────────────
+model PickupRequest {
+  id                   String             @id @default(uuid())
+  pickupRequestNumber  String             @unique @map("pickup_request_number") // PKP-YYYYMMDD-XXXX
+  warehouseId          String             @map("warehouse_id")
+  warehouse            LogisticsWarehouse @relation(fields: [warehouseId], references: [id])
+  partnerId            String             @map("partner_id")
+  partner              LogisticsPartner   @relation(fields: [partnerId], references: [id])
+  scheduledDate        DateTime           @map("scheduled_date")
+  pickupSlot           String             @default("14:00 - 18:00") @map("pickup_slot")
+  expectedPackageCount Int                @default(1) @map("expected_package_count")
+  actualPickedCount    Int                @default(0) @map("actual_picked_count")
+  status               String             @default("REQUESTED") // REQUESTED | CONFIRMED | COMPLETED | CANCELLED | FAILED
+  failureReason        String?            @map("failure_reason")
+
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  @@map("pickup_requests")
+}
+
+// ── 11. Dispatch Manifests ─────────────────────────────────────────
+model DispatchManifest {
+  id                    String             @id @default(uuid())
+  manifestNumber        String             @unique @map("manifest_number") // MNF-YYYYMMDD-XXXX
+  warehouseId           String             @map("warehouse_id")
+  warehouse             LogisticsWarehouse @relation(fields: [warehouseId], references: [id])
+  partnerId             String             @map("partner_id")
+  partner               LogisticsPartner   @relation(fields: [partnerId], references: [id])
+  totalShipments        Int                @default(0) @map("total_shipments")
+  totalWeightKg         Float              @default(0.0) @map("total_weight_kg")
+  handoverPersonName    String?            @map("handover_person_name")
+  courierDriverName     String?            @map("courier_driver_name")
+  courierDriverPhone    String?            @map("courier_driver_phone")
+  vehicleNumber         String?            @map("vehicle_number")
+  signatureUrl          String?            @map("signature_url") // Supabase Storage URL
+  status                String             @default("GENERATED") // GENERATED | HANDED_OVER | DISPUTED
+  handedOverAt          DateTime?          @map("handed_over_at")
+  documents             LogisticsDocument[]
+
+  createdAt             DateTime           @default(now()) @map("created_at")
+
+  @@map("dispatch_manifests")
+}
+
+// ── 12. Delivery Attempts (NDR Exceptions) ─────────────────────────
+model DeliveryAttempt {
+  id              String            @id @default(uuid())
+  shipmentId      String            @map("shipment_id")
+  shipment        LogisticsShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  attemptNumber   Int               @default(1) @map("attempt_number")
+  attemptTime     DateTime          @default(now()) @map("attempt_time")
+  reasonCode      String            @map("reason_code") // CUSTOMER_UNAVAILABLE | INCORRECT_ADDRESS | CASH_NOT_READY | CUSTOMER_REFUSED
+  driverRemarks   String?           @map("driver_remarks")
+  customerAction  String?           @map("customer_action") // RESCHEDULE_ACCEPTED | ADDRESS_UPDATED | RETURN_CONFIRMED
+  rescheduledDate DateTime?         @map("rescheduled_date")
+
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  @@map("delivery_attempts")
+}
+
+// ── 13. Proof of Delivery (POD) ────────────────────────────────────
+model ProofOfDelivery {
+  id                String            @id @default(uuid())
+  shipmentId        String            @unique @map("shipment_id")
+  shipment          LogisticsShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  receiverName      String            @map("receiver_name")
+  receiverRelation  String            @default("SELF") @map("receiver_relation") // SELF | FAMILY_MEMBER | NEIGHBOUR | SECURITY
+  receiverPhone     String?           @map("receiver_phone")
+  otpVerified       Boolean           @default(true) @map("otp_verified")
+  signatureImageUrl String?           @map("signature_image_url") // Supabase Storage URL
+  deliveryPhotoUrl  String?           @map("delivery_photo_url")  // Supabase Storage URL
+  deliveryLatitude  Float?            @map("delivery_latitude")
+  deliveryLongitude Float?            @map("delivery_longitude")
+  deliveredAt       DateTime          @default(now()) @map("delivered_at")
+
+  @@map("proof_of_delivery")
+}
+
+// ── 14. Fleet & Vehicle Records ────────────────────────────────────
+model LogisticsFleetVehicle {
+  id                   String             @id @default(uuid())
+  vehicleNumber        String             @unique @map("vehicle_number") // DL-01-AB-1234
+  vehicleType          String             @default("TWO_WHEELER") @map("vehicle_type") // TWO_WHEELER | THREE_WHEELER | MINI_TRUCK | HEAVY_VAN
+  capacityWeightKg     Float              @default(50.0) @map("capacity_weight_kg")
+  capacityVolumeCbm    Float              @default(0.5) @map("capacity_volume_cbm")
+  fuelType             String             @default("ELECTRIC") @map("fuel_type") // ELECTRIC | PETROL | DIESEL | CNG
+  assignedWarehouseId  String?            @map("assigned_warehouse_id")
+  assignedWarehouse    LogisticsWarehouse? @relation(fields: [assignedWarehouseId], references: [id])
+  status               String             @default("AVAILABLE") // AVAILABLE | ON_TRIP | MAINTENANCE | INACTIVE
+
+  createdAt            DateTime           @default(now()) @map("created_at")
+
+  @@map("logistics_fleet_vehicles")
+}
+
+// ── 15. Logistics Expenses & Reconciliation ────────────────────────
+model LogisticsExpense {
+  id                   String             @id @default(uuid())
+  shipmentId           String             @map("shipment_id")
+  shipment             LogisticsShipment  @relation(fields: [shipmentId], references: [id])
+  partnerId            String             @map("partner_id")
+  partner              LogisticsPartner   @relation(fields: [partnerId], references: [id])
+  expenseType          String             @default("FORWARD_FREIGHT") @map("expense_type") // FORWARD_FREIGHT | REVERSE_FREIGHT | COD_FEE | RTO_SURCHARGE
+  estimatedAmount      Float              @default(0.0) @map("estimated_amount")
+  actualBilledAmount   Float?             @map("actual_billed_amount")
+  invoiceNumber        String?            @map("invoice_number")
+  invoiceDate          DateTime?          @map("invoice_date")
+  reconciliationStatus String             @default("MATCHED") @map("reconciliation_status") // MATCHED | DISCREPANCY | SETTLED
+
+  createdAt            DateTime           @default(now()) @map("created_at")
+
+  @@map("logistics_expenses")
+}
+
+// ── 16. Logistics Documents (Supabase Storage Repository) ──────────
+model LogisticsDocument {
+  id           String             @id @default(uuid())
+  shipmentId   String?            @map("shipment_id")
+  shipment     LogisticsShipment? @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  manifestId   String?            @map("manifest_id")
+  manifest     DispatchManifest?  @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  documentType String             @map("document_type") // SHIPPING_LABEL | PACKING_SLIP | MANIFEST | TAX_INVOICE | POD_SLIP
+  fileUrl      String             @map("file_url")      // Permanent Supabase Storage Public URL
+  bucketName   String             @default("logistics-documents") @map("bucket_name")
+  storagePath  String             @map("storage_path")  // Path in Supabase bucket
+  fileSizeKb   Int?               @map("file_size_kb")
+  createdBy    String             @default("SYSTEM") @map("created_by") // Firebase UID or SYSTEM
+
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  @@map("logistics_documents")
 }

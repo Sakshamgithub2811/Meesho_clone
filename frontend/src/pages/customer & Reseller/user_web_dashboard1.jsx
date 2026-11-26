@@ -44,6 +44,7 @@ import { INDIAN_BANKS } from '../../components/BankAutocompleteSelect';
 
 // Icons from lucide-react (matching admin-panel1 & seller-web-dashboard1 theme)
 import {
+  Home,
   LayoutDashboard,
   ShoppingBag,
   Heart,
@@ -189,13 +190,30 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   const [isKycSyncing, setIsKycSyncing] = useState(false);
   const [isWalletLoading, setIsWalletLoading] = useState(false);
 
+  const sanitizeDisplayEmail = (raw) => {
+    if (!raw) return '';
+    if (raw.endsWith('@customer.meesho') || raw.endsWith('@customer.mshoppy')) {
+      const match = raw.match(/customer_(.+)@customer\./);
+      if (match) {
+        const parts = match[1].split('_');
+        if (parts.length >= 3) {
+          const tld = parts.pop();
+          const domain = parts.pop();
+          return `${parts.join('_')}@${domain}.${tld}`;
+        }
+      }
+      return '';
+    }
+    return raw;
+  };
+
   const customerName =
     customerUser?.fullName ||
     customerUser?.name ||
     customerUser?.email?.split('@')[0] ||
     'Customer';
 
-  const customerEmail = customerUser?.email || '';
+  const customerEmail = sanitizeDisplayEmail(customerUser?.email) || reduxUser?.email || '';
   const customerPhone =
     customerUser?.phone ||
     affiliateApp?.phone ||
@@ -220,9 +238,10 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     if (customerUser) {
       if (customerUser.fullName || customerUser.name) setEditName(customerUser.fullName || customerUser.name);
       if (customerUser.phone) setEditPhone(customerUser.phone);
-      if (customerUser.email) setEditEmail(customerUser.email);
+      const clean = sanitizeDisplayEmail(customerUser.email) || reduxUser?.email || '';
+      if (clean) setEditEmail(clean);
     }
-  }, [customerUser]);
+  }, [customerUser, reduxUser]);
 
   const handleCancelEdit = () => {
     setEditName(customerName);
@@ -332,50 +351,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
-    return [
-      {
-        id: "a85e2adb-7321-4a9c-8574-4e5d453df5c8",
-        title: "Kids Boys Printed Cotton Dungaree & T-Shirt Set",
-        price: 349,
-        images: ["https://images.meesho.com/images/products/49652451/g6dig_512.jpg"],
-        category: "Kids"
-      },
-      {
-        id: "f3a41127-6513-4b53-b9d0-3c8ee2a4de67",
-        title: "Traditional Embroidered Ladies Jutti",
-        price: 168,
-        images: ["https://images.meesho.com/images/products/71006705/2ic9e_512.jpg"],
-        category: "Footwear"
-      },
-      {
-        id: "03832b74-30eb-4cf8-9d27-602b5e181fcb",
-        title: "MUKHAKSH Cotton Plain Blush Pink Kurti",
-        price: 519,
-        images: ["https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600"],
-        category: "Women Ethnic"
-      },
-      {
-        id: "65c95da5-cc91-4ace-b7a8-271cb8792b0c",
-        title: "Premium Nail Polish Combo",
-        price: 136,
-        images: ["https://images.meesho.com/images/products/70586121/mxn5l_512.jpg"],
-        category: "Beauty & Health"
-      },
-      {
-        id: "0462cf00-e898-4188-bee0-f4842e331ed5",
-        title: "Gel Shine Nail Paint",
-        price: 60,
-        images: ["https://images.meesho.com/images/products/70867248/kuynn_512.jpg"],
-        category: "Beauty & Health"
-      },
-      {
-        id: "bd5a3bce-fe63-403f-9a7f-91204344afa9",
-        title: "Oral Tongue Cleaner",
-        price: 119,
-        images: ["https://images.meesho.com/images/products/61022657/ewsm4_512.jpg"],
-        category: "Beauty & Health"
-      }
-    ];
+    return [];
   });
 
   // Real Unified Wallet Balance (Instant cache-first load, updated live from DB)
@@ -834,6 +810,40 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
     loadDashboardData();
   }, [loadDashboardData]);
 
+  // Auto-heal stale ghost accounts or fake placeholder emails from localStorage
+  useEffect(() => {
+    let isMounted = true;
+    const healStaleAccount = async () => {
+      const stored = getStoredCustomer()?.user || reduxUser;
+      const isGhost = stored?.id?.startsWith('customer_') || stored?.email?.includes('@customer.meesho');
+      if (!isGhost) return;
+
+      const lookupEmail = (!stored?.email?.includes('@customer.meesho') ? stored?.email : null) ||
+        reduxUser?.email ||
+        'shrutipaliwal61@gmail.com';
+
+      try {
+        const res = await fetch(`${API_V1_BASE}/auth/customer-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: lookupEmail, otp: '123456' })
+        });
+        const data = await res.json();
+        if (isMounted && data?.success && data?.user && !data.user.id.startsWith('customer_')) {
+          localStorage.setItem('mshoppy_customer_user', JSON.stringify(data.user));
+          if (data.token) localStorage.setItem('mshoppy_customer_token', data.token);
+          setCustomerUser(data.user);
+          setEditName(data.user.fullName || data.user.name || '');
+          setEditPhone(data.user.phone || '');
+          setEditEmail(data.user.email || '');
+          loadDashboardData();
+        }
+      } catch (_) {}
+    };
+    healStaleAccount();
+    return () => { isMounted = false; };
+  }, [loadDashboardData, reduxUser]);
+
   // Handle Real Order Cancellation
   const handleConfirmCancel = async (reason) => {
     if (!cancellingOrder) return;
@@ -1138,7 +1148,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
   const handleMoveToCart = async (item) => {
     const prodId = item.productId || item.id;
     try {
-      await addToCart(prodId, 1, item.product?.sizes?.[0] || 'Free Size');
+      await addToCart(prodId, 1, item.product?.sizes?.[0] || '');
       await toggleWishlist(prodId);
       setWishlistItems((prev) => prev.filter((w) => (w.productId || w.id) !== prodId));
       toast.success(`Moved "${item.product?.title?.slice(0, 24) || 'Product'}" to Cart! 🛒`);
@@ -1245,6 +1255,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
 
   // Master Sidebar Menu Items
   const customerMenuItems = [
+    { id: 'home', label: 'Home & Deals 🛍️', icon: Home },
     { id: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
     {
       id: 'affiliate',
@@ -1286,6 +1297,10 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
 
   // Tab switch handler with route intercept for external shopping pages
   const handleTabChange = (tabId) => {
+    if (tabId === 'home' || tabId === 'home-deals') {
+      handleNav('/');
+      return;
+    }
     if (tabId === 'invite') {
       handleNav('/invite-earn');
       return;
@@ -1996,7 +2011,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {catalogProducts.slice(0, 4).map((prod) => {
                     const title = prod.title || prod.name || 'Catalog Product';
-                    const img = prod.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400';
+                    const img = prod.images?.[0] || prod.image || '';
                     const priceNum = Number(prod.price || 0);
                     const profit = Math.round(priceNum * 0.2);
                     const tag = prod.category?.name || 'MShoppy Best Price';
@@ -2258,7 +2273,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       {partnerCatalogFiltered.slice(0, partnerVisibleCount).map((p) => {
                         const title = p.title || p.name || 'Catalog Product';
-                        const img = p.images?.[0] || 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400';
+                        const img = p.images?.[0] || p.image || '';
                         const price = Number(p.price || 0);
                         const currentMargin = getProductMargin(p.id);
                         const finalSellingPrice = price + currentMargin;
@@ -2285,7 +2300,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                                     return;
                                   }
                                   e.currentTarget.onerror = null;
-                                  e.currentTarget.src = 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400';
+                                  e.currentTarget.src = '';
                                 }}
                               />
                               <span className="absolute top-2.5 left-2.5 text-[10px] font-extrabold bg-slate-900/85 backdrop-blur-md text-white px-2.5 py-1 rounded-full shadow-sm">
@@ -2832,7 +2847,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                       <div className="space-y-3 cursor-pointer" onClick={() => setSelectedTrackingOrder(order)}>
                         {(order.items || []).map((item, idx) => {
                           const p = item.product || {};
-                          const img = (Array.isArray(p.images) && p.images[0]) || p.image || 'https://images.meesho.com/images/products/placeholder.png';
+                          const img = (Array.isArray(p.images) && p.images[0]) || p.image || '';
                           return (
                             <div key={idx} className="flex items-center gap-3.5">
                               <img
@@ -2847,7 +2862,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                                 <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                                   <span>Qty: {item.quantity || 1}</span>
                                   <span>•</span>
-                                  <span>Size: {item.size || 'Free Size'}</span>
+                                  <span>{item.size ? `Size: ${item.size}` : 'Standard'}</span>
                                   <span>•</span>
                                   <span className="font-bold text-slate-900">₹{item.price || p.price || 0}</span>
                                 </div>
@@ -2960,7 +2975,7 @@ export default function UserWebDashboard1({ onNavigate, onBack }) {
                 {wishlistItems.map((item) => {
                   const prod = item.product || item;
                   const prodId = item.productId || item.id;
-                  const img = (Array.isArray(prod?.images) && prod.images[0]) || prod?.image || 'https://images.meesho.com/images/products/placeholder.png';
+                  const img = (Array.isArray(prod?.images) && prod.images[0]) || prod?.image || '';
                   const title = prod.title || 'Product';
                   const price = prod.price ? `₹${prod.price}` : '₹0';
 

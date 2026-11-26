@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { maskPhoneNumber, getVirtualPilotNumber } from './telephony.service.js';
 
 /**
  * Generates an official Tax Invoice & Shipping Label PDF stream
@@ -38,7 +39,9 @@ export function generateOrderPdf(order, supplier = {}, mode = 'invoice') {
   }
 
   const customerName = shipping.fullName || shipping.name || order.user?.name || 'Valued Customer';
-  const customerPhone = shipping.phone || order.user?.phone || 'Not provided';
+  const rawCustomerPhone = shipping.phone || order.user?.phone || '';
+  const customerPhone = maskPhoneNumber(rawCustomerPhone);
+  const virtualHelpline = getVirtualPilotNumber();
   const customerAddress = [
     shipping.addressLine1 || shipping.street || shipping.address,
     shipping.addressLine2,
@@ -91,9 +94,10 @@ export function generateOrderPdf(order, supplier = {}, mode = 'invoice') {
 
     // Ship To Section
     doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold').text('SHIP TO (DELIVERY ADDRESS):', 18, 138);
-    doc.fontSize(10).font('Helvetica-Bold').text(customerName, 18, 150);
-    doc.fontSize(8).font('Helvetica').text(`Ph: ${customerPhone}`, 18, 164);
-    doc.fontSize(8).font('Helvetica').text(customerAddress, 18, 176, { width: 250 });
+    doc.fontSize(10).font('Helvetica-Bold').text(customerName, 18, 149);
+    doc.fontSize(7.5).font('Helvetica').text(`Phone: ${customerPhone} (Masked)`, 18, 161);
+    doc.fontSize(7.5).font('Helvetica-Bold').text(`Virtual Helpline: ${virtualHelpline}`, 18, 171);
+    doc.fontSize(7.5).font('Helvetica').text(customerAddress, 18, 182, { width: 250 });
 
     // Divider
     doc.moveTo(10, 230).lineTo(278, 230).lineWidth(0.5).stroke('#777777');
@@ -160,8 +164,9 @@ export function generateOrderPdf(order, supplier = {}, mode = 'invoice') {
     doc.fillColor('#0F172A').fontSize(9.5).font('Helvetica-Bold').text('BILL TO & SHIP TO:', 320, 172);
     doc.font('Helvetica-Bold').fontSize(9).text(customerName, 320, 186);
     doc.font('Helvetica').fontSize(8);
-    doc.text(`Contact: ${customerPhone}`, 320, 198);
-    doc.text(`Address: ${customerAddress}`, 320, 210, { width: 240 });
+    doc.text(`Phone: ${customerPhone} (Protected)`, 320, 198);
+    doc.text(`Delivery Bridge: ${virtualHelpline}`, 320, 209);
+    doc.text(`Address: ${customerAddress}`, 320, 220, { width: 240 });
 
     // Table Header
     doc.rect(36, 260, 523, 22).fill('#F1F5F9');

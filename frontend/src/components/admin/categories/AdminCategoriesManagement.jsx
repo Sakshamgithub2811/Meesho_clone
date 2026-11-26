@@ -12,12 +12,6 @@ import FilterBar from '../../common/FilterBar';
 import CategoriesTable from './CategoriesTable';
 import CategoryFormModal from './CategoryFormModal';
 
-const CATEGORY_TABS = [
-  { id: 'all', label: 'All Taxonomies 🏷️' },
-  { id: 'main', label: 'Main Categories 📁' },
-  { id: 'sub', label: 'Subcategories 🌿' },
-];
-
 export default function AdminCategoriesManagement() {
   const currentUser = useSelector((state) => state.user?.currentUser);
 
@@ -26,6 +20,9 @@ export default function AdminCategoriesManagement() {
     totalCategories: 0,
     mainCategories: 0,
     subCategories: 0,
+    pendingCategories: 0,
+    approvedCategories: 0,
+    rejectedCategories: 0,
     totalProducts: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -37,6 +34,19 @@ export default function AdminCategoriesManagement() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Dynamic Tabs with Pending Approvals Badge
+  const pendingCount = categories.filter((c) => c.status === 'PENDING').length;
+  const categoryTabs = [
+    { id: 'all', label: 'All Taxonomies 🏷️' },
+    {
+      id: 'pending',
+      label: pendingCount > 0 ? `Pending Approvals ⏳ (${pendingCount})` : 'Pending Approvals ⏳',
+    },
+    { id: 'approved', label: 'Approved Active ✅' },
+    { id: 'main', label: 'Main Categories 📁' },
+    { id: 'sub', label: 'Subcategories 🌿' },
+  ];
 
   // Auth token helper
   const getAuthToken = async () => {
@@ -200,8 +210,74 @@ export default function AdminCategoriesManagement() {
     }
   };
 
+  // 4. Approve Category Handler
+  const handleApproveCategory = async (category) => {
+    try {
+      const token = await getAuthToken();
+      if (!token) return;
+      const res = await axios.patch(
+        `${API_BASE}/admin-categories/${category.id}/approve`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (res.data.success) {
+        toast.success(res.data.message || `Category "${category.name}" approved successfully!`);
+        fetchCategories(true);
+      } else {
+        toast.error(res.data.message || 'Failed to approve category');
+      }
+    } catch (error) {
+      console.error('Approve category error:', error);
+      toast.error(
+        error.response?.data?.message || 'Error occurred while approving category'
+      );
+    }
+  };
+
+  // 5. Reject Category Handler
+  const handleRejectCategory = async (category) => {
+    const reason = window.prompt(
+      `Enter reason for rejecting category "${category.name}":`,
+      'Does not comply with catalog guidelines'
+    );
+    if (reason === null) return; // Cancelled
+
+    try {
+      const token = await getAuthToken();
+      if (!token) return;
+      const res = await axios.patch(
+        `${API_BASE}/admin-categories/${category.id}/reject`,
+        { reason },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (res.data.success) {
+        toast.success(res.data.message || `Category "${category.name}" rejected`);
+        fetchCategories(true);
+      } else {
+        toast.error(res.data.message || 'Failed to reject category');
+      }
+    } catch (error) {
+      console.error('Reject category error:', error);
+      toast.error(
+        error.response?.data?.message || 'Error occurred while rejecting category'
+      );
+    }
+  };
+
   // Filter categories by Tab & Search
   const filteredCategories = categories.filter((cat) => {
+    if (activeTab === 'pending' && cat.status !== 'PENDING') return false;
+    if (activeTab === 'approved' && cat.status !== 'APPROVED') return false;
     if (activeTab === 'main' && Boolean(cat.parentId)) return false;
     if (activeTab === 'sub' && !Boolean(cat.parentId)) return false;
 
@@ -230,7 +306,7 @@ export default function AdminCategoriesManagement() {
               Taxonomy &amp; Hierarchy Master
             </h2>
             <p className="text-xs text-gray-500">
-              Organize root departments, map subcategories, and structure product catalogs.
+              Organize root departments, review supplier custom category requests, and approve catalog listings.
             </p>
           </div>
         </div>
@@ -249,7 +325,7 @@ export default function AdminCategoriesManagement() {
         searchPlaceholder="Search categories, subcategories, slugs..."
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
-        tabs={CATEGORY_TABS}
+        tabs={categoryTabs}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         totalCount={filteredCategories.length}
@@ -264,6 +340,8 @@ export default function AdminCategoriesManagement() {
         loading={loading}
         onEdit={handleOpenEdit}
         onDelete={handleDeleteCategory}
+        onApprove={handleApproveCategory}
+        onReject={handleRejectCategory}
       />
 
       {/* 5. Form Modal */}

@@ -283,7 +283,7 @@ export default function SellerOrders1({ onNavigate, embedded = false, onNavigate
     } finally {
       clearAuthSession();
       toast.success('Logged out successfully');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 

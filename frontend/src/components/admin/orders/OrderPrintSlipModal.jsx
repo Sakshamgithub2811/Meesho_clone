@@ -85,6 +85,13 @@ export default function OrderPrintSlipModal({ order, onClose }) {
   const isCod = (order.paymentMethod || 'COD').toUpperCase() === 'COD';
   const totalAmount = Number(order.totalAmount || 0);
 
+  const rawPhone = String(shipping.phone || order.user?.phone || '');
+  const cleanPhone = rawPhone.replace(/[\s-]/g, '');
+  const maskedPhone = cleanPhone.length >= 10
+    ? `${cleanPhone.slice(0, 5)} XXXXX (Protected)`
+    : '+91 98765 XXXXX (Protected)';
+  const virtualHelpline = '+91 80 4712 3456';
+
   const items = order.items && order.items.length > 0 ? order.items : [];
   const primarySupplier = items[0]?.product?.supplierName || 'Verified Supplier Hub';
 
@@ -257,9 +264,10 @@ export default function OrderPrintSlipModal({ order, onClose }) {
                 <p className="text-gray-900 font-semibold mt-0.5">
                   {shipping.city ? `${shipping.city}, ` : ''}{shipping.state || ''} - <strong>{shipping.pincode}</strong>
                 </p>
-                <p className="font-mono text-[10px] font-bold text-black mt-1">
-                  📞 {shipping.phone || order.user?.phone || 'On File'}
-                </p>
+                <div className="font-mono text-[10px] text-black mt-1 space-y-0.5">
+                  <p className="font-bold">📞 {maskedPhone}</p>
+                  <p className="text-[9px] font-bold text-emerald-800">🛡️ Helpline: {virtualHelpline}</p>
+                </div>
               </div>
 
               {/* Return to Origin (RTO) */}
@@ -346,7 +354,8 @@ export default function OrderPrintSlipModal({ order, onClose }) {
                   {shipping.addressLine || shipping.details || 'Address on file'}<br />
                   {shipping.city ? `${shipping.city}, ` : ''}{shipping.state || ''} - <strong>{shipping.pincode}</strong>
                 </p>
-                <p className="text-slate-500 mt-1">Phone: <strong>{shipping.phone || order.user?.phone || 'On File'}</strong></p>
+                <p className="text-slate-500 mt-1">Phone: <strong>{maskedPhone}</strong></p>
+                <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">🛡️ Virtual Helpline: {virtualHelpline}</p>
               </div>
 
               <div>

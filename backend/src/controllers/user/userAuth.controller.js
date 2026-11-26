@@ -2,11 +2,6 @@ import prisma from '../../config/prisma.js';
 import admin from '../../config/firebaseAdmin.js';
 import { sendVerificationEmail, sendLoginOtpEmail } from '../../utils/emailTemplates.js';
 
-// In-memory fallback in case Prisma / database connection is unavailable
-const fallbackUserStore = new Map();
-// In-memory OTP store for secure email login verification (fallback)
-const loginOtpStore = new Map();
-
 // Ensure PostgreSQL login_otps table exists for durable multi-instance Serverless OTP storage
 let isOtpTableReady = false;
 async function ensureOtpTable() {
@@ -39,7 +34,8 @@ export const registerUser = async (req, res) => {
     let profile;
     try {
       profile = await prisma.profile.findUnique({
-        where: { id: firebaseUid }
+        where: { id: firebaseUid },
+        include: { wallet: true }
       });
 
       if (!profile) {
@@ -63,17 +59,10 @@ export const registerUser = async (req, res) => {
         });
       }
     } catch (dbError) {
-      console.warn("Prisma DB fallback triggered for user register:", dbError.message);
-      profile = {
-        id: firebaseUid,
-        email: email,
-        phone: phone || null,
-        fullName: fullName || "MShoppy Customer",
-        role: "CUSTOMER",
-        walletBalance: 0,
-        createdAt: new Date().toISOString()
-      };
-      fallbackUserStore.set(firebaseUid, profile);
+      console.error("Prisma DB error during user register:", dbError.message);
+      return res.status(500).json({ 
+        error: "Database error during registration. User profile could not be created." 
+      });
     }
 
     // Automatically send high-impact, branded Meesho HTML Verification Email
@@ -155,7 +144,7 @@ export const loginUser = async (req, res) => {
     const cleanEmail = email.toLowerCase().trim();
     let profile;
     try {
-      profile = await prisma.profile.findFirst({
+      const candidates = await prisma.profile.findMany({
         where: {
           OR: [
             { id: firebaseUid },
@@ -166,6 +155,17 @@ export const loginUser = async (req, res) => {
           wallet: true
         }
       });
+
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => {
+          if (a.id === firebaseUid) return -1;
+          if (b.id === firebaseUid) return 1;
+          const aGhost = a.id.startsWith('customer_') ? 1 : 0;
+          const bGhost = b.id.startsWith('customer_') ? 1 : 0;
+          return aGhost - bGhost;
+        });
+        profile = candidates[0];
+      }
 
       if (!profile) {
         // Auto-provision if user exists in Firebase but not in DB yet
@@ -188,15 +188,10 @@ export const loginUser = async (req, res) => {
         });
       }
     } catch (dbError) {
-      console.warn("Prisma DB fallback triggered for user login:", dbError.message);
-      profile = fallbackUserStore.get(firebaseUid) || fallbackUserStore.get(cleanEmail) || {
-        id: firebaseUid,
-        email: cleanEmail,
-        fullName: cleanEmail.split('@')[0] || "MShoppy Customer",
-        role: "CUSTOMER",
-        walletBalance: 0,
-        createdAt: new Date().toISOString()
-      };
+      console.error("Prisma DB error during user login:", dbError.message);
+      return res.status(500).json({ 
+        error: "Database error during login. Unable to verify user profile." 
+      });
     }
 
     return res.status(200).json({ 
@@ -242,11 +237,9 @@ export const sendLoginOtp = async (req, res) => {
         SET otp = EXCLUDED.otp, expires_at = EXCLUDED.expires_at, full_name = EXCLUDED.full_name, created_at = CURRENT_TIMESTAMP;
       `, cleanEmail, otp, fullName, BigInt(expiresAt));
     } catch (dbErr) {
-      console.warn("DB login_otps save failed, falling back to memory:", dbErr.message);
+      console.error("DB login_otps save failed:", dbErr.message);
+      return res.status(500).json({ error: "Failed to store login OTP. Database is unavailable." });
     }
-
-    // 2. Secondary in-memory backup
-    loginOtpStore.set(cleanEmail, { otp, expiresAt, fullName });
 
     const emailRes = await sendLoginOtpEmail({
       email: cleanEmail,
@@ -294,12 +287,8 @@ export const verifyLoginOtp = async (req, res) => {
         };
       }
     } catch (dbErr) {
-      console.warn("DB login_otps query failed:", dbErr.message);
-    }
-
-    // 2. Fallback to in-memory store if DB query returned nothing
-    if (!record) {
-      record = loginOtpStore.get(cleanEmail);
+      console.error("DB login_otps query failed:", dbErr.message);
+      return res.status(500).json({ error: "Failed to verify OTP. Database unavailable." });
     }
 
     if (!record) {
@@ -312,7 +301,6 @@ export const verifyLoginOtp = async (req, res) => {
       try {
         await prisma.$executeRawUnsafe('DELETE FROM login_otps WHERE email = $1', cleanEmail);
       } catch (_) {}
-      loginOtpStore.delete(cleanEmail);
       return res.status(400).json({ 
         error: "This OTP has expired. Please request a fresh OTP code." 
       });
@@ -324,15 +312,14 @@ export const verifyLoginOtp = async (req, res) => {
       });
     }
 
-    // OTP Verified! Clear it from DB and memory store
+    // OTP Verified! Clear it from DB
     try {
       await prisma.$executeRawUnsafe('DELETE FROM login_otps WHERE email = $1', cleanEmail);
     } catch (_) {}
-    loginOtpStore.delete(cleanEmail);
 
     let profile;
     try {
-      profile = await prisma.profile.findFirst({
+      const candidates = await prisma.profile.findMany({
         where: {
           OR: [
             firebaseUid ? { id: firebaseUid } : null,
@@ -342,10 +329,24 @@ export const verifyLoginOtp = async (req, res) => {
         include: { wallet: true }
       });
 
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => {
+          if (firebaseUid && a.id === firebaseUid) return -1;
+          if (firebaseUid && b.id === firebaseUid) return 1;
+          const aGhost = a.id.startsWith('customer_') ? 1 : 0;
+          const bGhost = b.id.startsWith('customer_') ? 1 : 0;
+          return aGhost - bGhost;
+        });
+        profile = candidates[0];
+      }
+
       if (!profile) {
+        if (!firebaseUid) {
+          return res.status(400).json({ error: "Firebase authentication required to create customer profile." });
+        }
         profile = await prisma.profile.create({
           data: {
-            id: firebaseUid || `user_${Date.now()}`,
+            id: firebaseUid,
             email: cleanEmail,
             role: "CUSTOMER",
             fullName: record.fullName || cleanEmail.split('@')[0],
@@ -357,14 +358,8 @@ export const verifyLoginOtp = async (req, res) => {
         });
       }
     } catch (dbError) {
-      console.warn("Prisma fallback during OTP login:", dbError.message);
-      profile = fallbackUserStore.get(firebaseUid || cleanEmail) || {
-        id: firebaseUid || `user_${Date.now()}`,
-        email: cleanEmail,
-        fullName: record.fullName || cleanEmail.split('@')[0],
-        role: "CUSTOMER",
-        walletBalance: 0
-      };
+      console.error("Prisma error during OTP login profile resolution:", dbError.message);
+      return res.status(500).json({ error: "Database error while verifying login session." });
     }
 
     return res.status(200).json({

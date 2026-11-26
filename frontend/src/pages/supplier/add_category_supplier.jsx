@@ -46,13 +46,13 @@ export function AddCategorySupplier({ onBack, onSaveCategory }) {
     }
 
     try {
-      await supplierApiService.createCategory({
+      const res = await supplierApiService.createCategory({
         name: categoryName,
         imageUrl: iconImage,
       });
-      showToast(`Category "${categoryName}" saved to backend database! 🎉`);
+      showToast(`Category "${categoryName}" submitted for Admin approval! ⏳`);
     } catch (err) {
-      showToast(`Category saved locally: ${err.message}`);
+      showToast(`Submission note: ${err.message}`);
     }
 
     const categoryData = {
@@ -94,10 +94,10 @@ export function AddCategorySupplier({ onBack, onSaveCategory }) {
             </button>
             <div>
               <h1 className="font-extrabold text-base sm:text-lg text-[#191C1E] tracking-tight leading-none">
-                Create New Category
+                Submit New Category
               </h1>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                Supplier Hub • Catalog Taxonomy
+              <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
+                <span>⏳ Requires Admin Approval</span>
               </span>
             </div>
           </div>
@@ -107,8 +107,8 @@ export function AddCategorySupplier({ onBack, onSaveCategory }) {
             onClick={handleSubmit}
             className="px-5 py-2 bg-gradient-to-r from-[#b90041] to-[#df2457] text-white font-extrabold text-xs rounded-xl shadow-md shadow-pink-500/25 active:scale-95 transition-transform flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm">save</span>
-            <span>Save Category</span>
+            <span className="material-symbols-outlined text-sm">send</span>
+            <span>Submit for Review</span>
           </button>
         </div>
       </header>

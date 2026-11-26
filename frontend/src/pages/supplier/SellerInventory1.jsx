@@ -31,7 +31,9 @@ import {
   ExternalLink,
   UploadCloud,
   Image as ImageIcon,
-  Download
+  Download,
+  Video,
+  Clock
 } from 'lucide-react';
 import { exportInventoryToCsv } from '../../utils/csvExport';
 import BulkCatalogUploadModal from '../../components/supplier/catalog/BulkCatalogUploadModal';
@@ -154,7 +156,7 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
     } finally {
       clearAuthSession();
       toast.success('Logged out successfully');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 
@@ -276,6 +278,20 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
     }
   };
 
+  // Helper to determine if product is under review (e.g. pending admin approval)
+  const isProductUnderReview = (prod) => {
+    return (
+      prod?.approvalStatus === 'PENDING' ||
+      (!prod?.isActive && prod?.approvalStatus !== 'REJECTED') ||
+      prod?.category?.status === 'PENDING' ||
+      prod?.category_status === 'PENDING'
+    );
+  };
+
+  const isProductRejected = (prod) => {
+    return prod?.approvalStatus === 'REJECTED';
+  };
+
   // Filtered products list (Pure Dynamic Logic)
   const filteredProducts = products.filter((prod) => {
     const titleMatch = (prod.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -286,20 +302,32 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                      (prod.category?.name === selectedCategory) ||
                      (prod.category?.slug === selectedCategory);
 
+    const underReview = isProductUnderReview(prod);
+    const rejected = isProductRejected(prod);
     let stockMatch = true;
     const stock = Number(prod.stock || 0);
-    if (stockFilter === 'IN_STOCK') stockMatch = stock > 0;
-    else if (stockFilter === 'LOW_STOCK') stockMatch = stock > 0 && stock < 10;
-    else if (stockFilter === 'OUT_OF_STOCK') stockMatch = stock === 0;
+
+    if (stockFilter === 'UNDER_REVIEW') stockMatch = underReview && !rejected;
+    else if (stockFilter === 'LIVE') stockMatch = !underReview && !rejected;
+    else if (stockFilter === 'REJECTED') stockMatch = rejected;
+    else if (stockFilter === 'IN_STOCK') stockMatch = stock > 0 && !underReview && !rejected;
+    else if (stockFilter === 'LOW_STOCK') stockMatch = stock > 0 && stock < 10 && !underReview && !rejected;
+    else if (stockFilter === 'OUT_OF_STOCK') stockMatch = stock === 0 && !underReview && !rejected;
 
     return titleMatch && catMatch && stockMatch;
   });
 
   // Calculate real inventory statistics
   const totalItems = products.length;
-  const inStockItems = products.filter((p) => Number(p.stock) > 0).length;
-  const lowStockItems = products.filter((p) => Number(p.stock) > 0 && Number(p.stock) < 10).length;
-  const outOfStockItems = products.filter((p) => Number(p.stock) === 0).length;
+  const underReviewItems = products.filter((p) => isProductUnderReview(p) && !isProductRejected(p)).length;
+  const rejectedItems = products.filter(isProductRejected).length;
+  const liveItems = products.filter((p) => !isProductUnderReview(p) && !isProductRejected(p)).length;
+  const inStockItems = products.filter((p) => Number(p.stock) > 0 && !isProductUnderReview(p) && !isProductRejected(p)).length;
+  const lowStockItems = products.filter((p) => {
+    const s = Number(p.stock || 0);
+    return s > 0 && s < 10 && !isProductUnderReview(p) && !isProductRejected(p);
+  }).length;
+  const outOfStockItems = products.filter((p) => Number(p.stock) === 0 && !isProductUnderReview(p) && !isProductRejected(p)).length;
 
   const supplierDisplayName = profile?.storeName || profile?.fullName || profile?.name || 'Verified Supplier';
 
@@ -544,30 +572,39 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
           </div>
         </div>
 
-        {/* 4 Metric KPI Cards (Calculated Dynamically from Real Data) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+        {/* 5 Metric KPI Cards (Calculated Dynamically from Real Data) */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+          <div className="bg-white p-4.5 rounded-2xl border border-slate-100 shadow-xs">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Listings</span>
             <p className="text-2xl font-black text-slate-900 mt-1">{loading ? '...' : totalItems}</p>
-            <span className="text-[11px] text-slate-500">Live products in catalog</span>
+            <span className="text-[11px] text-slate-500">All supplier items</span>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-xs">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">In Stock</span>
-            <p className="text-2xl font-black text-emerald-700 mt-1">{loading ? '...' : inStockItems}</p>
-            <span className="text-[11px] text-emerald-600 font-medium">Ready for dispatch</span>
+          <div className="bg-white p-4.5 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/40 to-white shadow-xs">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1">
+              <Clock className="w-3 h-3 text-amber-500" />
+              Under Review
+            </span>
+            <p className="text-2xl font-black text-amber-800 mt-1">{loading ? '...' : underReviewItems}</p>
+            <span className="text-[11px] text-amber-700 font-medium">Category pending review</span>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-xs">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">Low Stock Alert</span>
-            <p className="text-2xl font-black text-amber-700 mt-1">{loading ? '...' : lowStockItems}</p>
-            <span className="text-[11px] text-amber-600 font-medium">Below 10 units</span>
+          <div className="bg-white p-4.5 rounded-2xl border border-emerald-100 shadow-xs">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Live in Catalog</span>
+            <p className="text-2xl font-black text-emerald-700 mt-1">{loading ? '...' : liveItems}</p>
+            <span className="text-[11px] text-emerald-600 font-medium">Active on marketplace</span>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-rose-100 shadow-xs">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600">Out of Stock</span>
-            <p className="text-2xl font-black text-rose-700 mt-1">{loading ? '...' : outOfStockItems}</p>
-            <span className="text-[11px] text-rose-600 font-medium">Inactive listings</span>
+          <div className="bg-white p-4.5 rounded-2xl border border-blue-100 shadow-xs">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600">In Stock</span>
+            <p className="text-2xl font-black text-blue-700 mt-1">{loading ? '...' : inStockItems}</p>
+            <span className="text-[11px] text-blue-600 font-medium">Ready for dispatch</span>
+          </div>
+
+          <div className="bg-white p-4.5 rounded-2xl border border-rose-100 shadow-xs col-span-2 sm:col-span-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600">Out / Low Stock</span>
+            <p className="text-2xl font-black text-rose-700 mt-1">{loading ? '...' : lowStockItems + outOfStockItems}</p>
+            <span className="text-[11px] text-rose-600 font-medium">{outOfStockItems} out, {lowStockItems} low</span>
           </div>
         </div>
 
@@ -604,16 +641,25 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                 <option value="ALL">All Categories</option>
                 {categories.map((cat) => (
                   <option key={cat.id || cat.slug} value={cat.slug || cat.name}>
-                    {cat.name}
+                    {cat.name} {cat.status === 'PENDING' ? '⏳ (In Review)' : ''}
                   </option>
                 ))}
               </select>
             )}
 
-            {/* Stock Level Filter Pills */}
-            <div className="bg-slate-100 p-1 rounded-2xl flex items-center text-xs font-bold">
+            {/* Stock & Approval Level Filter Pills */}
+            <div className="bg-slate-100 p-1 rounded-2xl flex items-center text-xs font-bold overflow-x-auto">
               {[
                 { id: 'ALL', label: 'All' },
+                {
+                  id: 'UNDER_REVIEW',
+                  label: underReviewItems > 0 ? `⏳ Under Review (${underReviewItems})` : 'Under Review ⏳',
+                },
+                {
+                  id: 'REJECTED',
+                  label: rejectedItems > 0 ? `❌ Rejected (${rejectedItems})` : 'Rejected ❌',
+                },
+                { id: 'LIVE', label: 'Live Catalog ✅' },
                 { id: 'IN_STOCK', label: 'In Stock' },
                 { id: 'LOW_STOCK', label: 'Low Stock' },
                 { id: 'OUT_OF_STOCK', label: 'Out of Stock' },
@@ -622,9 +668,13 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                   key={pill.id}
                   type="button"
                   onClick={() => setStockFilter(pill.id)}
-                  className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl transition cursor-pointer whitespace-nowrap ${
                     stockFilter === pill.id
-                      ? 'bg-white text-[#b7004d] shadow-xs'
+                      ? pill.id === 'UNDER_REVIEW'
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : pill.id === 'REJECTED'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-white text-[#b7004d] shadow-xs'
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
@@ -766,6 +816,12 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                                 <span className="text-[11px] text-slate-400 font-mono">
                                   SKU: {prod.sku || `MSH-${String(prod.id).slice(-6)}`}
                                 </span>
+                                {Boolean(prod.videoUrl || prod.video_url) && (
+                                  <span className="text-[9.5px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 flex items-center gap-1" title="Product has Video Demo Reel attached">
+                                    <Video className="w-2.5 h-2.5 text-rose-600" />
+                                    <span>Video</span>
+                                  </span>
+                                )}
                                 {prod.thickness && (
                                   <span className="text-[9.5px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                                     {prod.thickness}
@@ -792,8 +848,34 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4 text-slate-600 font-medium">
-                          {prod.category?.name || prod.categorySlug || 'General'}
+                        <td className="py-3.5 px-4 font-medium">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-slate-800 font-semibold">
+                              {prod.category?.name || prod.categorySlug || 'General'}
+                            </span>
+                            {prod.approvalStatus === 'REJECTED' ? (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-rose-100 text-rose-800 border border-rose-200"
+                                title={`Rejection Reason: ${prod.rejectionReason || 'Violated catalog guidelines'}`}
+                              >
+                                ❌ Rejected {prod.rejectionReason ? `(${prod.rejectionReason})` : ''}
+                              </span>
+                            ) : Boolean(isProductUnderReview(prod)) ? (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-100 text-amber-800 border border-amber-200"
+                                title="Product is waiting for Admin approval before going live to customers"
+                              >
+                                ⏳ Review Pending
+                              </span>
+                            ) : (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                title="Product is live for customers to purchase"
+                              >
+                                ✅ Live
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="py-3.5 px-4 font-black text-slate-900 text-sm">
@@ -815,29 +897,39 @@ export default function SellerInventory1({ onNavigate, embedded = false, onNavig
                         </td>
 
                         <td className="py-3.5 px-4">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                              isOut
-                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                : isLow
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            }`}
-                          >
-                            {isOut ? (
-                              'Out of Stock'
-                            ) : isLow ? (
-                              <>
-                                <AlertTriangle className="w-3 h-3" />
-                                Low Stock
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 className="w-3 h-3" />
-                                In Stock
-                              </>
-                            )}
-                          </span>
+                          {isProductUnderReview(prod) ? (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs animate-pulse"
+                              title="Under Review: This product's custom category is awaiting Admin approval. It will automatically go live in customer catalog once approved."
+                            >
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Under Review ⏳</span>
+                            </span>
+                          ) : (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                isOut
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : isLow
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              }`}
+                            >
+                              {isOut ? (
+                                'Out of Stock'
+                              ) : isLow ? (
+                                <>
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Low Stock
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Live in Catalog
+                                </>
+                              )}
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-3.5 px-5 text-right">

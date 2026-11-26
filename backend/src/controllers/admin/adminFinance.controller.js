@@ -221,13 +221,19 @@ const parseWithdrawalMetadata = (desc = '', type = '') => {
 
   if (d.includes('rejected') || type === 'reversed') {
     status = 'REJECTED';
-  } else if (d.includes('paid') || d.includes('utr:') || d.includes('completed')) {
+  } else if (
+    d.includes('withdrawal paid') ||
+    d.includes('payout paid') ||
+    d.includes('status: paid') ||
+    (d.includes('paid') && d.includes('utr:')) ||
+    d.includes('completed')
+  ) {
     status = 'PAID';
   }
 
-  // Extract UTR if present
+  // Extract UTR if present (only when actually paid)
   const utrMatch = desc.match(/UTR[:\s]+([A-Za-z0-9_-]+)/i);
-  if (utrMatch) utr = utrMatch[1];
+  if (utrMatch && status === 'PAID') utr = utrMatch[1];
 
   // Extract Destination if present
   const destMatch = desc.match(/(?:to|dest:)\s+([^|]+)/i);

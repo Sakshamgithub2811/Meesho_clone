@@ -34,38 +34,86 @@ import {
   Wallet, Banknote, Store, Headphones, Layers, Ticket, Image, FileText, Globe, Star, Zap, Sliders, Megaphone,
   UserCheck, FileClock
 } from 'lucide-react';
-// Yeh raha aapka MASTER MENU (with Sub-menus)
+// Categorized Nested Admin Master Menu
 const ADMIN_MENU = [
+  // 1. Overview Hub
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+
+  // 2. Catalog & Products
   {
-    id: 'kyc',
-    label: 'KYC Verifications',
-    icon: ShieldCheck,
+    id: 'catalog-group',
+    label: 'Catalog & Products',
+    icon: Package,
     children: [
-      { id: 'supplier-kyc', label: 'Supplier KYC ', icon: Store },
-      { id: 'dropshipper-kyc', label: 'Dropshipper KYC ', icon: Truck, path: '/admin-dropshipper-kyc' },
-      { id: 'affiliate-kyc', label: 'Affiliate KYC ', icon: Users, path: '/admin-affiliate-kyc' },
+      { id: 'products', label: 'Products Master', icon: Package },
+      { id: 'categories', label: 'Categories', icon: Layers },
+      { id: 'reviews', label: 'Reviews & Ratings ⭐', icon: Star },
     ],
   },
-  { id: 'products', label: 'Products ', icon: Package },
-  { id: 'categories', label: 'Categories ', icon: Layers },
-  { id: 'reviews', label: 'Reviews & Ratings ⭐', icon: Star },
-  { id: 'flash-sale', label: 'Flash Sale & Deals ⚡', icon: Zap },
-  { id: 'coupons', label: 'Coupons 🎟️', icon: Ticket },
-  { id: 'banners', label: 'Banners 🎨', icon: Image },
-  { id: 'cms', label: 'CMS Pages 📄', icon: FileText },
-  { id: 'seo', label: 'SEO & Sitemap 🌐', icon: Globe },
-  { id: 'settings', label: 'Platform Settings ⚙️', icon: Sliders },
-  { id: 'broadcast', label: 'Announcements 📢', icon: Megaphone },
-  { id: 'staff', label: 'Staff & Roles 👥', icon: UserCheck },
-  { id: 'audit', label: 'Audit Logs 📜', icon: FileClock },
-  { id: 'orders', label: 'Orders', icon: ShoppingCart },
-  { id: 'returns', label: 'Returns & Refunds ', icon: RotateCcw },
-  { id: 'sellers', label: 'Sellers ', icon: Store },
-  { id: 'finance', label: 'Finance & Payouts ', icon: Banknote },
-  { id: 'analytics', label: 'Analytics ', icon: LineChart },
-  { id: 'support', label: 'Support Desk ', icon: Headphones },
-  { id: 'users', label: 'Users', icon: Users, path: '/user-dashboard' },
+
+  // 3. Orders & Logistics
+  {
+    id: 'orders-group',
+    label: 'Orders & Logistics',
+    icon: ShoppingCart,
+    children: [
+      { id: 'orders', label: 'All Orders', icon: ShoppingCart },
+      { id: 'returns', label: 'Returns & Refunds', icon: RotateCcw },
+    ],
+  },
+
+  // 4. Partners & KYC
+  {
+    id: 'partners-group',
+    label: 'Partners & KYC',
+    icon: ShieldCheck,
+    children: [
+      { id: 'supplier-kyc', label: 'Supplier KYC', icon: Store },
+      { id: 'dropshipper-kyc', label: 'Dropshipper KYC', icon: Truck, path: '/admin-dropshipper-kyc' },
+      { id: 'affiliate-kyc', label: 'Affiliate KYC', icon: Users, path: '/admin-affiliate-kyc' },
+      { id: 'sellers', label: 'Sellers / Vendors', icon: Store },
+      { id: 'users', label: 'Customers / Users', icon: Users, path: '/user-dashboard' },
+    ],
+  },
+
+  // 5. Marketing & Deals
+  {
+    id: 'marketing-group',
+    label: 'Marketing & Deals',
+    icon: Zap,
+    children: [
+      { id: 'flash-sale', label: 'Flash Sale & Deals ⚡', icon: Zap },
+      { id: 'coupons', label: 'Coupons 🎟️', icon: Ticket },
+      { id: 'banners', label: 'Homepage Banners 🎨', icon: Image },
+      { id: 'broadcast', label: 'Announcements 📢', icon: Megaphone },
+    ],
+  },
+
+  // 6. Finance & Reports
+  {
+    id: 'finance-group',
+    label: 'Finance & Analytics',
+    icon: Banknote,
+    children: [
+      { id: 'finance', label: 'Finance & Payouts', icon: Banknote },
+      { id: 'analytics', label: 'Business Analytics', icon: LineChart },
+    ],
+  },
+
+  // 7. System & Settings
+  {
+    id: 'system-group',
+    label: 'System & Settings',
+    icon: Sliders,
+    children: [
+      { id: 'staff', label: 'Staff & Roles (RBAC) 👥', icon: UserCheck },
+      { id: 'audit', label: 'Audit Logs 📜', icon: FileClock },
+      { id: 'settings', label: 'Platform Settings ⚙️', icon: Sliders },
+      { id: 'seo', label: 'SEO & Sitemap 🌐', icon: Globe },
+      { id: 'cms', label: 'CMS & Legal Pages 📄', icon: FileText },
+      { id: 'support', label: 'Support Desk 🎧', icon: Headphones },
+    ],
+  },
 ];
 
 
@@ -78,7 +126,7 @@ export default function AdminWebPanel() {
   const adminName = user?.fullName || user?.email?.split('@')[0] || "Admin";
 
   // Custom Firebase Logout Hook call
-  const handleLogout = useLogout('/admin/login');
+  const handleLogout = useLogout('/admin/auth/login');
 
   useEffect(() => {
     const fetchCurrentStaffPermissions = async () => {
@@ -113,10 +161,17 @@ export default function AdminWebPanel() {
   const filteredMenuItems = useMemo(() => {
     if (isSuperAdmin) return ADMIN_MENU;
     const allowed = Array.isArray(staffInfo?.permissions) ? staffInfo.permissions : [];
-    return ADMIN_MENU.filter((item) => {
-      if (item.id === 'dashboard') return true;
-      return allowed.includes(item.id);
-    });
+    return ADMIN_MENU.map((item) => {
+      if (item.id === 'dashboard') return item;
+      if (item.children) {
+        const allowedChildren = item.children.filter(c => allowed.includes(c.id) || allowed.includes(item.id));
+        if (allowedChildren.length > 0) {
+          return { ...item, children: allowedChildren };
+        }
+        return null;
+      }
+      return allowed.includes(item.id) ? item : null;
+    }).filter(Boolean);
   }, [isSuperAdmin, staffInfo]);
 
   // Helper function to get Title and Subtitle dynamically based on Active Tab

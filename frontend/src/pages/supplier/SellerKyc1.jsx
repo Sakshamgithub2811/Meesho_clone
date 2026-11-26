@@ -244,7 +244,7 @@ export default function SellerKyc1({ onNavigate, embedded = false, onNavigateTab
     } finally {
       clearAuthSession();
       toast.success('Logged out successfully');
-      handleNav('/supplier-login');
+      handleNav('/supplier/auth/login');
     }
   };
 
@@ -324,10 +324,13 @@ export default function SellerKyc1({ onNavigate, embedded = false, onNavigateTab
     (profile?.tierLabel?.toLowerCase().includes('verified') ? 'APPROVED' : null) ||
     'PENDING'
   ).toUpperCase();
-  const isApproved = kycStatus === 'APPROVED' || kycData?.isVerified === true;
-  const isUnderReview = kycStatus === 'UNDER_REVIEW' || (kycData && kycStatus === 'PENDING');
-  const isRejected = kycStatus === 'REJECTED';
-  const isNotSubmitted = !kycData;
+  const isApproved =
+    kycStatus === 'APPROVED' ||
+    kycData?.isVerified === true ||
+    Boolean(profile?.tierLabel?.toLowerCase().includes('verified'));
+  const isUnderReview = !isApproved && (kycStatus === 'UNDER_REVIEW' || kycStatus === 'PENDING');
+  const isRejected = !isApproved && kycStatus === 'REJECTED';
+  const isNotSubmitted = !isApproved && (!kycData || kycStatus === 'NOT_SUBMITTED');
 
   const mainContent = (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">

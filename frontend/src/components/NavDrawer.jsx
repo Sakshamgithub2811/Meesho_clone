@@ -41,9 +41,7 @@ const customerNavSections = [
   {
     title: "Shop & Categories",
     items: [
-      { name: "Home & Deals", path: "/", icon: "home" },
       { name: "Explore All Categories", path: "/explorer", icon: "grid_view" },
-      // { name: "Curated Spotlight", path: "/spotlight", icon: "auto_awesome" }, // temporarily hidden as requested
     ]
   },
   {
@@ -56,10 +54,7 @@ const customerNavSections = [
     title: "My Account & Orders",
     items: [
       { name: "My Orders & Tracking", path: "/orders", icon: "local_shipping" },
-      { name: "My Wishlist", path: "/wishlist", icon: "favorite" },
-      { name: "Shopping Bag", path: "/cart", icon: "shopping_bag" },
       { name: "Account Profile", path: "/user-dashboard1?tab=profile", icon: "account_circle" },
-      { name: "Notifications", path: "/notifications", icon: "notifications" },
     ]
   },
   {
@@ -67,13 +62,6 @@ const customerNavSections = [
     items: [
       { name: "Help Center", path: "/support-center", icon: "support_agent" },
       { name: "Raise a Ticket", path: "/raise-ticket", icon: "confirmation_number" },
-    ]
-  },
-  {
-    title: "Partner & Earn Programs",
-    items: [
-      { name: "Become a Supplier", path: "/supplier", icon: "storefront", badge: "0% Comm" },
-      { name: "Join as Dropshipper", path: "/dropshipper-register", icon: "hub", badge: "High Margin" },
     ]
   }
 ];

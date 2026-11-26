@@ -1580,7 +1580,12 @@ export default function CustomerOrderSupplierFulfilment({ onNavigate, onBack }) 
                     {shippingLabelOrder.customer.city}, {shippingLabelOrder.customer.state} -{' '}
                     <strong className="text-slate-900 text-sm">{shippingLabelOrder.customer.pincode}</strong>
                   </p>
-                  <p className="text-slate-800 font-bold">Tel: {shippingLabelOrder.customer.phone}</p>
+                  <p className="text-slate-800 font-bold">
+                    Tel: {shippingLabelOrder.customer.phone ? `${String(shippingLabelOrder.customer.phone).replace(/[\s-]/g, '').slice(0, 5)} XXXXX (Protected)` : '+91 98765 XXXXX (Protected)'}
+                  </p>
+                  <p className="text-[10px] text-emerald-800 font-bold">
+                    🛡️ Virtual Delivery Helpline: +91 80 4712 3456
+                  </p>
                 </div>
 
                 {/* Items & Packing Summary */}

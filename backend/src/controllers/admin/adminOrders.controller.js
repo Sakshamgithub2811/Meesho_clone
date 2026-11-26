@@ -1,6 +1,10 @@
 import prisma from '../../config/prisma.js';
 import { dispatchDeliveryOtpEmail } from '../order.controller.js';
 import { logAdminAction } from '../../utils/auditLogger.js';
+import {
+  sendOrderDispatchedEmail,
+  sendOrderOutForDeliveryEmail
+} from '../../utils/emailTemplates.js';
 
 /**
  * 1. GET ALL ORDERS FOR ADMIN (With Filters, Search & Summary KPIs)
@@ -368,6 +372,17 @@ export const updateOrderStatus = async (req, res) => {
           }
         }).catch(() => {});
       }
+
+      // Automated Dispatched Branded Email via SMTP
+      sendOrderDispatchedEmail({
+        order: updatedOrder,
+        courierPartner: updateData.shippingAddress?.courier,
+        trackingNumber: updateData.shippingAddress?.awb,
+        trackingUrl: updateData.shippingAddress?.trackingUrl
+      })
+        .then((resEmail) => console.log(`📦 [Admin Order ${id}] Automated SHIPPED email sent to: ${resEmail.sentTo} (AWB: ${resEmail.awb})`))
+        .catch((err) => console.warn(`⚠️ [Admin Order ${id}] Automated SHIPPED email notice:`, err.message));
+
     } else if (upperOrder === 'DELIVERED') {
       await prisma.deliveryTask.updateMany({
         where: { orderId: id },
@@ -379,12 +394,10 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     if (upperOrder === 'OUT_FOR_DELIVERY') {
-      try {
-        const otpResult = await dispatchDeliveryOtpEmail({ orderId: id, type: 'DELIVERY' });
-        console.log(`🚚 [Admin Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${otpResult.sentTo}`);
-      } catch (err) {
-        console.error(`⚠️ [Admin Order ${id}] OTP email failed:`, err.message);
-      }
+      // Universal Verification OTP for both Prepaid & COD
+      sendOrderOutForDeliveryEmail({ order: updatedOrder })
+        .then((otpResult) => console.log(`🚚 [Admin Order ${id}] OUT_FOR_DELIVERY OTP automatically emailed to: ${otpResult.sentTo} (OTP: ${otpResult.otp})`))
+        .catch((err) => console.warn(`⚠️ [Admin Order ${id}] OTP email notice:`, err.message));
     }
 
     // Audit log
@@ -482,5 +495,96 @@ export const getLiveOrderUpdates = async (req, res) => {
   } catch (error) {
     console.error('Error in live order polling:', error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * 5. ADMIN MANUAL RESEND: Order Dispatched (SHIPPED) Email
+ * POST /api/v1/admin-orders/:id/resend-dispatch-email
+ */
+export const resendAdminOrderDispatchEmail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { customEmail, courierPartner, trackingNumber, trackingUrl, recipientName } = req.body;
+
+    const result = await sendOrderDispatchedEmail({
+      orderId: id,
+      customEmail,
+      courierPartner,
+      trackingNumber,
+      trackingUrl,
+      recipientName
+    });
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'ORDER_DISPATCH_EMAIL_RESENT',
+      targetType: 'ORDER',
+      targetId: id,
+      details: `Manually resent dispatch email to ${result.sentTo} (AWB: ${result.awb || 'N/A'})`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Dispatch alert email successfully sent to ${result.sentTo}`,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error in resendAdminOrderDispatchEmail:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to resend dispatch email',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * 6. ADMIN MANUAL RESEND: Out for Delivery OTP Email
+ * POST /api/v1/admin-orders/:id/resend-delivery-otp
+ */
+export const resendAdminOrderDeliveryOtp = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { customEmail, otp, recipientName, slotLabel } = req.body;
+
+    const result = await sendOrderOutForDeliveryEmail({
+      orderId: id,
+      otp,
+      customEmail,
+      recipientName,
+      slotLabel
+    });
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    await logAdminAction({
+      adminEmail: req.user?.email || 'admin@meesho.com',
+      adminName: req.user?.fullName || 'Super Admin',
+      action: 'ORDER_DELIVERY_OTP_RESENT',
+      targetType: 'ORDER',
+      targetId: id,
+      details: `Manually resent delivery OTP email to ${result.sentTo} (OTP: ${result.otp})`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Delivery OTP email successfully sent to ${result.sentTo} (OTP: ${result.otp})`,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error in resendAdminOrderDeliveryOtp:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to resend delivery OTP email',
+      error: error.message
+    });
   }
 };

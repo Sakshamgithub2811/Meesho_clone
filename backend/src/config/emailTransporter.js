@@ -65,7 +65,7 @@ if (hasSmtpConfig) {
     console.warn("⚠️ Email Transporter Init Warning:", err.message);
   }
 } else {
-  console.log("ℹ️ Optional SMTP credentials not provided; email notifications will be safely mocked in runtime.");
+  console.warn("⚠️ SMTP credentials not configured in environment (SMTP_USER/SMTP_PASS). Email delivery will be disabled.");
 }
 
 export const transporter = {
@@ -81,8 +81,8 @@ export const transporter = {
         throw err;
       }
     }
-    console.log(`ℹ️ [Email Mock] To: ${options?.to}, Subject: "${options?.subject}" (SMTP not configured)`);
-    return { messageId: 'mock-mail-id-' + Date.now(), skipped: true };
+    console.error(`❌ [Email Delivery Blocked] Cannot send email to ${options?.to}: SMTP credentials not configured.`);
+    return { success: false, error: 'SMTP credentials not configured in server environment.', skipped: true };
   }
 };
 

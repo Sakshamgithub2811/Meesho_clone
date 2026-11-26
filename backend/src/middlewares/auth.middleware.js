@@ -1,10 +1,22 @@
 import admin from '../config/firebaseAdmin.js';
 import prisma from '../config/prisma.js';
-import jwt from 'jsonwebtoken';
+
+// Helper to safely parse token payload if formatted as a 3-part base64 token
+const parseTokenPayload = (rawToken) => {
+  try {
+    if (typeof rawToken === 'string') {
+      const parts = rawToken.split('.');
+      if (parts.length === 3) {
+        return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+      }
+    }
+  } catch (_) {}
+  return null;
+};
 
 /**
- * Firebase & JWT Authentication Middleware
- * Verifies Firebase ID Token or standard JWT and loads user profile directly from PostgreSQL database
+ * Firebase & Database Authentication Middleware
+ * Verifies Firebase ID Token or session token and loads user profile directly from PostgreSQL database
  */
 export const verifyAuth = async (req, res, next) => {
   try {
@@ -28,19 +40,15 @@ export const verifyAuth = async (req, res, next) => {
         uid = decodedToken.uid || decodedToken.user_id || decodedToken.sub;
         email = decodedToken.email;
       } catch (tokenErr) {
-        // Fallback: Check if token is a standard signed JWT (Firebase client token or OAuth JWT)
-        try {
-          const jwtDecoded = jwt.decode(token);
-          if (jwtDecoded) {
-            uid = jwtDecoded.user_id || jwtDecoded.sub || jwtDecoded.uid || jwtDecoded.id || uid;
-            email = jwtDecoded.email || null;
-            decodedToken = jwtDecoded;
-          }
-        } catch (jwtErr) {}
+        // Fallback: Check if token has readable payload (Firebase client token or OAuth token)
+        const parsedPayload = parseTokenPayload(token);
+        if (parsedPayload) {
+          uid = parsedPayload.user_id || parsedPayload.sub || parsedPayload.uid || parsedPayload.id || uid;
+          email = parsedPayload.email || null;
+          decodedToken = parsedPayload;
+        }
 
-        if (!decodedToken && (token.startsWith('firebase_') || (token.length >= 3 && !token.startsWith('ey')))) {
-          uid = token;
-        } else if (!decodedToken) {
+        if (!decodedToken) {
           return res.status(401).json({ 
             success: false, 
             error: 'Unauthorized: Invalid Authentication Token', 
@@ -49,15 +57,13 @@ export const verifyAuth = async (req, res, next) => {
         }
       }
     } else {
-      // Admin auth not initialized, check JWT or token format
-      try {
-        const jwtDecoded = jwt.decode(token);
-        if (jwtDecoded) {
-          uid = jwtDecoded.user_id || jwtDecoded.sub || jwtDecoded.uid || jwtDecoded.id || uid;
-          email = jwtDecoded.email || null;
-          decodedToken = jwtDecoded;
-        }
-      } catch (jwtErr) {}
+      // Admin auth not initialized, check token payload or token format
+      const parsedPayload = parseTokenPayload(token);
+      if (parsedPayload) {
+        uid = parsedPayload.user_id || parsedPayload.sub || parsedPayload.uid || parsedPayload.id || uid;
+        email = parsedPayload.email || null;
+        decodedToken = parsedPayload;
+      }
     }
 
     // Database user check in PostgreSQL

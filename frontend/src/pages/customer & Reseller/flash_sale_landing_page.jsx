@@ -67,129 +67,6 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
     'Bags & Wallets',
   ];
 
-  const initialProducts = [
-    {
-      id: 1,
-      title: 'Aurelia Royal Silk Banarasi Wrap Saree',
-      category: 'Ethnic Sarees',
-      price: 499,
-      originalPrice: 1999,
-      discount: 75,
-      rating: 4.8,
-      reviewsCount: '3.4k',
-      margin: 250,
-      stockTag: 'Only 4 left',
-      claimedPct: 88,
-      image:
-        'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 2,
-      title: 'Urban Glide Ultra-Light Foam Sneakers',
-      category: 'Footwear',
-      price: 799,
-      originalPrice: 2499,
-      discount: 68,
-      rating: 4.6,
-      reviewsCount: '1.8k',
-      margin: 220,
-      stockTag: 'Selling Fast',
-      claimedPct: 92,
-      image:
-        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 3,
-      title: 'Handcrafted Vegan Leather Crossbody Bag',
-      category: 'Bags & Wallets',
-      price: 649,
-      originalPrice: 2199,
-      discount: 70,
-      rating: 4.9,
-      reviewsCount: '920',
-      margin: 280,
-      stockTag: 'Almost Gone',
-      claimedPct: 95,
-      image:
-        'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 4,
-      title: 'Aviator 24K Gold Plated Polarized Sunglasses',
-      category: 'Accessories',
-      price: 299,
-      originalPrice: 999,
-      discount: 70,
-      rating: 4.5,
-      reviewsCount: '2.1k',
-      margin: 110,
-      stockTag: 'Only 2 left',
-      claimedPct: 90,
-      image:
-        'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 5,
-      title: 'French Floral Chiffon Maxi Sundress',
-      category: 'Western Wear',
-      price: 549,
-      originalPrice: 1799,
-      discount: 69,
-      rating: 4.7,
-      reviewsCount: '4.5k',
-      margin: 190,
-      stockTag: 'Deal of the Day',
-      claimedPct: 82,
-      image:
-        'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 6,
-      title: 'Rose Gold Minimalist Chrono Mesh Watch',
-      category: 'Accessories',
-      price: 489,
-      originalPrice: 1899,
-      discount: 74,
-      rating: 4.7,
-      reviewsCount: '1.1k',
-      margin: 200,
-      stockTag: 'Hot Seller',
-      claimedPct: 79,
-      image:
-        'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 7,
-      title: 'Kanchipuram Woven Zari Border Saree',
-      category: 'Ethnic Sarees',
-      price: 899,
-      originalPrice: 3499,
-      discount: 74,
-      rating: 4.9,
-      reviewsCount: '5.2k',
-      margin: 380,
-      stockTag: 'Only 3 left',
-      claimedPct: 96,
-      image:
-        'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 8,
-      title: 'Chunky Sole Streetwear High-Tops',
-      category: 'Footwear',
-      price: 949,
-      originalPrice: 2999,
-      discount: 68,
-      rating: 4.6,
-      reviewsCount: '780',
-      margin: 310,
-      stockTag: 'Flash Exclusive',
-      claimedPct: 74,
-      image:
-        'https://images.unsplash.com/photo-1552346154-21d32810aba3?w=600&auto=format&fit=crop&q=80',
-    },
-  ];
-
   useEffect(() => {
     let isMounted = true;
     async function loadFlashData() {
@@ -226,14 +103,14 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
               title: p.title,
               category: p.category?.name || 'Flash Deals',
               price: p.price,
-              originalPrice: p.originalPrice || Math.round(p.price * 1.8),
+              originalPrice: p.originalPrice || p.price,
               discount: p.discountPercentage,
-              rating: p.rating > 0 ? p.rating : 4.6,
-              reviewsCount: p.reviewsCount > 0 ? `${p.reviewsCount}` : `${120 + idx * 45}`,
-              margin: Math.round(p.price * 0.3),
-              stockTag: idx % 3 === 0 ? 'Only 3 left' : 'Lightning Deal',
-              claimedPct: 75 + (idx % 22),
-              image: p.images?.[0] || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600'
+              rating: p.rating !== undefined && Number(p.rating) > 0 ? Number(p.rating) : 0,
+              reviewsCount: p.reviewsCount !== undefined && Number(p.reviewsCount) > 0 ? `${p.reviewsCount}` : '0',
+              margin: Math.round(Number(p.price) * 0.15) || 50,
+              stockTag: p.stock && p.stock < 10 ? `Only ${p.stock} left` : 'Flash Deal',
+              claimedPct: Math.min(95, Math.max(10, Math.round(((100 - (p.stock || 50)) / 100) * 100))),
+              image: p.images?.[0] || p.image || ''
             }));
             setDbProducts(mapped);
           }
@@ -258,7 +135,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     try {
-      await addToCart(product.id, 1, 'Free Size', product);
+      await addToCart(product.id, 1, Array.isArray(product.sizes) && product.sizes.length > 0 ? product.sizes[0] : '', product);
       setCartCount((c) => c + 1);
       triggerToast(`Added "${product.title.slice(0, 25)}..." to Cart! 🛒`);
     } catch (err) {
@@ -277,7 +154,7 @@ export default function FlashSaleLandingPage({ onNavigate = () => { }, onBack })
     }
   };
 
-  const productSource = dbProducts.length > 0 ? dbProducts : initialProducts;
+  const productSource = dbProducts;
 
   const filteredProducts = productSource
     .filter((p) => {

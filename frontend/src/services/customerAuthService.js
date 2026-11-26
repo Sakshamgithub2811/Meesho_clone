@@ -21,7 +21,7 @@ function notifyListeners() {
 /**
  * Customer / User Login via Mobile or Email & OTP
  */
-export async function loginCustomer({ phone, email, fullName, otp = '123456' }) {
+export async function loginCustomer({ phone, email, fullName, otp }) {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/customer-login`, {
       method: 'POST',
@@ -66,7 +66,7 @@ export function getStoredCustomer() {
     const userStr = localStorage.getItem(USER_KEY);
     const token = localStorage.getItem(TOKEN_KEY);
 
-    if (!userStr) return null; const parsedUser = JSON.parse(userStr); return { user: parsedUser, token: token || parsedUser?.id || 'mock_cust_token' };
+    if (!userStr || !token) return null;
 
     return {
       user: JSON.parse(userStr),

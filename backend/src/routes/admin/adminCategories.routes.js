@@ -4,7 +4,9 @@ import {
   getAllCategories,
   createCategory,
   updateCategory,
-  deleteCategory
+  deleteCategory,
+  approveCategory,
+  rejectCategory
 } from '../../controllers/admin/adminCategories.controller.js';
 
 const router = Router();
@@ -14,5 +16,7 @@ router.get('/', verifyAuth, authorizeRole('ADMIN'), getAllCategories);
 router.post('/', verifyAuth, authorizeRole('ADMIN'), createCategory);
 router.put('/:id', verifyAuth, authorizeRole('ADMIN'), updateCategory);
 router.delete('/:id', verifyAuth, authorizeRole('ADMIN'), deleteCategory);
+router.patch('/:id/approve', verifyAuth, authorizeRole('ADMIN'), approveCategory);
+router.patch('/:id/reject', verifyAuth, authorizeRole('ADMIN'), rejectCategory);
 
 export default router;

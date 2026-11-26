@@ -1,11 +1,13 @@
 import React from 'react';
-import { CheckCircle2, EyeOff, Trash2, X, Loader2 } from 'lucide-react';
+import { CheckCircle2, EyeOff, Trash2, X, Loader2, Check, XCircle } from 'lucide-react';
 import { Button } from '../../ui/button';
 
 export default function BulkActionBar({
   selectedCount = 0,
   totalCount = 0,
   onClearSelection,
+  onBulkApprove,
+  onBulkReject,
   onBulkActivate,
   onBulkDeactivate,
   onBulkDelete,
@@ -15,7 +17,7 @@ export default function BulkActionBar({
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 duration-200">
-      <div className="bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center gap-3 sm:gap-5 flex-wrap">
+      <div className="bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center gap-3 sm:gap-4 flex-wrap">
         {/* Counter Badge */}
         <div className="flex items-center gap-2">
           <span className="w-6 h-6 rounded-full bg-[#b7004d] text-white flex items-center justify-center text-xs font-bold shadow-xs">
@@ -29,14 +31,42 @@ export default function BulkActionBar({
         <div className="h-4 w-px bg-slate-700 hidden sm:block"></div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 0. Bulk Approve */}
+          {onBulkApprove && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={onBulkApprove}
+              disabled={loading}
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 h-8 px-3 cursor-pointer shadow-xs active:scale-95 transition-all"
+            >
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              <span>Approve All</span>
+            </Button>
+          )}
+
+          {/* 0. Bulk Reject */}
+          {onBulkReject && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={onBulkReject}
+              disabled={loading}
+              className="rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold flex items-center gap-1.5 h-8 px-3 cursor-pointer shadow-xs active:scale-95 transition-all"
+            >
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+              <span>Reject All</span>
+            </Button>
+          )}
+
           {/* 1. Bulk Activate */}
           <Button
             type="button"
             size="sm"
             onClick={onBulkActivate}
             disabled={loading}
-            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 h-8 px-3 cursor-pointer shadow-xs active:scale-95 transition-all"
+            className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 h-8 px-3 cursor-pointer shadow-xs active:scale-95 transition-all"
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
             <span>Activate</span>
@@ -60,7 +90,7 @@ export default function BulkActionBar({
             size="sm"
             onClick={onBulkDelete}
             disabled={loading}
-            className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 h-8 px-3 cursor-pointer shadow-xs active:scale-95 transition-all"
+            className="rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center gap-1.5 h-8 px-3 cursor-pointer shadow-xs active:scale-95 transition-all"
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
             <span>Delete</span>

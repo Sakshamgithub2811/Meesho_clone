@@ -15,6 +15,78 @@ import { useSelector } from 'react-redux';
 import { getDropshipperKycState } from "../../services/dropshipperService";
 import DropshipperNotificationBell from '../dropshipper/DropshipperNotificationBell';
 
+function CollapsibleMenuItem({ item, activeTab, isDropshipperRole, isKycApproved, handleMenuClick }) {
+  const hasActiveChild = item.children.some(c => c.id === activeTab);
+  const [isOpen, setIsOpen] = React.useState(hasActiveChild);
+
+  React.useEffect(() => {
+    if (hasActiveChild) {
+      setIsOpen(true);
+    }
+  }, [hasActiveChild]);
+
+  return (
+    <Collapsible 
+      key={item.id} 
+      open={isOpen} 
+      onOpenChange={setIsOpen} 
+      className="group/collapsible"
+    >
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton 
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-pink-50 hover:text-[#b7004d] transition-colors cursor-pointer ${
+              hasActiveChild ? "text-[#b7004d] font-bold bg-pink-50/50" : ""
+            }`}
+          >
+            {item.icon && <item.icon className="h-4.5 w-4.5 shrink-0 text-slate-500 group-hover:text-[#b7004d]" />}
+            <span className="flex-1 min-w-0 truncate text-[14px] font-medium text-left leading-normal" title={item.label}>
+              {item.label}
+            </span>
+            <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 text-slate-400" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent>
+          <SidebarMenuSub className="border-l-2 border-pink-200 ml-4 mr-1 pl-2 pr-1 py-1 space-y-1">
+            {item.children.map((subItem) => {
+              const isLocked = isDropshipperRole && subItem.requiresKyc && !isKycApproved;
+              const isActive = activeTab === subItem.id;
+              return (
+                <SidebarMenuSubItem key={subItem.id}>
+                  <SidebarMenuSubButton 
+                    isActive={isActive}
+                    onClick={() => handleMenuClick(subItem)}
+                    className={`min-h-[36px] h-auto w-full py-1.5 px-2.5 rounded-lg flex items-center gap-2.5 transition-all cursor-pointer ${
+                      isActive 
+                        ? "text-[#b7004d] font-bold bg-pink-50 shadow-2xs" 
+                        : "text-slate-600 hover:text-[#b7004d] hover:bg-pink-50/70"
+                    } ${isLocked ? "opacity-85" : ""}`}
+                  >
+                    {subItem.icon && <subItem.icon className="h-4 w-4 shrink-0 text-slate-400" />}
+                    <span 
+                      className="flex-1 min-w-0 truncate text-[13px] font-medium text-left leading-snug" 
+                      title={subItem.label}
+                    >
+                      {subItem.label}
+                    </span>
+                    {isLocked && (
+                      <span className="shrink-0 ml-auto inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200/90 px-1.5 py-0.5 rounded-full shadow-2xs">
+                        <Lock className="h-2.5 w-2.5 shrink-0 text-amber-600" />
+                        <span>KYC</span>
+                      </span>
+                    )}
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
 function DashboardLayoutContent({
   menuItems = [],
   activeTab,
@@ -88,61 +160,15 @@ function DashboardLayoutContent({
               {displayedMenuItems.map((item) => {
                 // CONDITION 1: Agar Menu ke andar Sub-menu (children) hain
                 if (item.children && Array.isArray(item.children)) {
-                  const hasActiveChild = item.children.some(c => c.id === activeTab);
                   return (
-                    <Collapsible key={item.id} defaultOpen={hasActiveChild} className="group/collapsible">
-                      <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
-                          <SidebarMenuButton 
-                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-pink-50 hover:text-[#b7004d] transition-colors cursor-pointer ${
-                              hasActiveChild ? "text-[#b7004d] font-bold bg-pink-50/40" : ""
-                            }`}
-                          >
-                            {item.icon && <item.icon className="h-4.5 w-4.5 shrink-0 text-slate-500 group-hover:text-[#b7004d]" />}
-                            <span className="flex-1 min-w-0 truncate text-[14px] font-medium text-left leading-normal" title={item.label}>
-                              {item.label}
-                            </span>
-                            <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 text-slate-400" />
-                          </SidebarMenuButton>
-                        </CollapsibleTrigger>
-                        
-                        <CollapsibleContent>
-                          <SidebarMenuSub className="border-l-2 border-pink-200 ml-4 mr-1 pl-2 pr-1 py-1 space-y-1">
-                            {item.children.map((subItem) => {
-                              const isLocked = isDropshipperRole && subItem.requiresKyc && !isKycApproved;
-                              const isActive = activeTab === subItem.id;
-                              return (
-                                <SidebarMenuSubItem key={subItem.id}>
-                                  <SidebarMenuSubButton 
-                                    isActive={isActive}
-                                    onClick={() => handleMenuClick(subItem)}
-                                    className={`min-h-[36px] h-auto w-full py-1.5 px-2.5 rounded-lg flex items-center gap-2.5 transition-all cursor-pointer ${
-                                      isActive 
-                                        ? "text-[#b7004d] font-bold bg-pink-50 shadow-2xs" 
-                                        : "text-slate-600 hover:text-[#b7004d] hover:bg-pink-50/70"
-                                    } ${isLocked ? "opacity-85" : ""}`}
-                                  >
-                                    {subItem.icon && <subItem.icon className="h-4 w-4 shrink-0 text-slate-400" />}
-                                    <span 
-                                      className="flex-1 min-w-0 truncate text-[13px] font-medium text-left leading-snug" 
-                                      title={subItem.label}
-                                    >
-                                      {subItem.label}
-                                    </span>
-                                    {isLocked && (
-                                      <span className="shrink-0 ml-auto inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200/90 px-1.5 py-0.5 rounded-full shadow-2xs">
-                                        <Lock className="h-2.5 w-2.5 shrink-0 text-amber-600" />
-                                        <span>KYC</span>
-                                      </span>
-                                    )}
-                                  </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                              );
-                            })}
-                          </SidebarMenuSub>
-                        </CollapsibleContent>
-                      </SidebarMenuItem>
-                    </Collapsible>
+                    <CollapsibleMenuItem 
+                      key={item.id}
+                      item={item}
+                      activeTab={activeTab}
+                      isDropshipperRole={isDropshipperRole}
+                      isKycApproved={isKycApproved}
+                      handleMenuClick={handleMenuClick}
+                    />
                   );
                 }
                 // CONDITION 2: Agar Normal Single Menu hai
