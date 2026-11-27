@@ -13,6 +13,8 @@ import {
   SUPPLIER_ROLES,
   getStoredSupplierSubRole,
   setStoredSupplierSubRole,
+  getStoredSupplierPermissions,
+  setStoredSupplierPermissions,
   getSupplierMenuForRole,
   isTabAllowedForRole,
 } from './supplierNavConfig';
@@ -118,7 +120,7 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
     }
   }, []);
 
-  // React to sub-role change events across components/tabs
+  // React to sub-role and custom permissions change events across components/tabs
   useEffect(() => {
     const handleRoleChanged = (e) => {
       const nextRole = e?.detail || getStoredSupplierSubRole();
@@ -129,9 +131,41 @@ export default function SellerWebDashboard1({ onNavigate, onBack, initialTab }) 
         handleTabChange(allowed[0]);
       }
     };
+
+    const handlePermissionsChanged = (e) => {
+      const perms = e?.detail;
+      if (!isTabAllowedForRole(activeTab, currentSubRole, perms)) {
+        const firstAllowed = perms && perms.length > 0 ? perms[0] : 'overview';
+        handleTabChange(firstAllowed);
+      }
+    };
+
     window.addEventListener('supplier_subrole_changed', handleRoleChanged);
-    return () => window.removeEventListener('supplier_subrole_changed', handleRoleChanged);
-  }, [activeTab, handleTabChange]);
+    window.addEventListener('supplier_permissions_changed', handlePermissionsChanged);
+    return () => {
+      window.removeEventListener('supplier_subrole_changed', handleRoleChanged);
+      window.removeEventListener('supplier_permissions_changed', handlePermissionsChanged);
+    };
+  }, [activeTab, currentSubRole, handleTabChange]);
+
+  // Load active supplier permissions from database on dashboard mount
+  useEffect(() => {
+    supplierApiService.fetchMySupplierPermissions()
+      .then((res) => {
+        if (res && res.success) {
+          if (res.supplierRole) {
+            setStoredSupplierSubRole(res.supplierRole);
+            setCurrentSubRole(res.supplierRole);
+          }
+          if (Array.isArray(res.permissions)) {
+            setStoredSupplierPermissions(res.permissions);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not fetch active supplier permissions:', err?.message);
+      });
+  }, []);
 
   // Sync tab with URL on browser back/forward (SPA navigation)
   useEffect(() => {

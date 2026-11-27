@@ -32,6 +32,13 @@ import {
   getSupplierKyc,
   submitSupplierKyc,
 } from '../controllers/supplier/supplierKyc.controller.js';
+import {
+  getSupplierStaffList,
+  getMySupplierPermissions,
+  updateSupplierStaffPermissions,
+  createSupplierStaff,
+  deleteSupplierStaff,
+} from '../controllers/supplier/supplierRbac.controller.js';
 import { uploadProductMedia } from '../middlewares/upload.middleware.js';
 import { verifySupplier } from '../middlewares/supplierAuth.middleware.js';
 
@@ -86,5 +93,12 @@ router.patch('/returns/:id/status', updateReturnStatus);
 // Product Reviews & Ratings (UGC & Feedback Hub)
 router.get('/reviews', getSupplierReviews);
 router.post('/reviews/:id/reply', replyToProductReview);
+
+// Team & RBAC Permissions Hub (100% Database-Driven)
+router.get('/rbac/staff', getSupplierStaffList);
+router.get('/rbac/my-permissions', getMySupplierPermissions);
+router.put('/rbac/staff/:id/permissions', updateSupplierStaffPermissions);
+router.post('/rbac/staff', createSupplierStaff);
+router.delete('/rbac/staff/:id', deleteSupplierStaff);
 
 export default router;

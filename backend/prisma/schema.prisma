@@ -83,6 +83,12 @@ model Profile {
   followers       String?  @default("0")
   experienceYears String?  @default("1+") @map("experience_years")
 
+  // Supplier Team & RBAC Permissions
+  supplierRole     String?  @default("OWNER") @map("supplier_role")
+  permissions      Json?    @default("[]")
+  station          String?  @default("Main Office & Hub")
+  parentSupplierId String?  @map("parent_supplier_id")
+
   addresses       Address[]
   orders          Order[]
   cart            CartItem[]

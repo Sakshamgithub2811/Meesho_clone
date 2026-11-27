@@ -61,6 +61,27 @@ export const SUPPLIER_ROLES = {
       'staff', // allow accessing staff switcher to test/switch
     ],
   },
+  FINANCE_ACCOUNTS: {
+    id: 'FINANCE_ACCOUNTS',
+    label: 'Finance & Accounts Specialist',
+    shortLabel: 'Finance Staff',
+    badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+    description: 'Finance & Settlement access: Settlements ledger, payout withdrawals & sales analytics.',
+    allowedTabs: [
+      'overview',
+      'finance',
+      'analytics',
+      'staff',
+    ],
+  },
+  CUSTOM: {
+    id: 'CUSTOM',
+    label: 'Custom Role',
+    shortLabel: 'Custom',
+    badgeClass: 'bg-slate-100 text-slate-800 border-slate-300',
+    description: 'Granular permissions configured directly by the Store Owner/Admin.',
+    allowedTabs: ['staff'],
+  },
 };
 
 // Categorized Nested Supplier Master Menu (Collapsible Category-Wise Groups)
@@ -131,6 +152,7 @@ SUPPLIER_MENU.find = function (predicate, thisArg) {
 };
 
 const SUBROLE_STORAGE_KEY = 'mshoppy_supplier_subrole';
+const PERMISSIONS_STORAGE_KEY = 'mshoppy_supplier_permissions';
 
 /**
  * Get active supplier sub-role from storage (defaults to OWNER)
@@ -158,9 +180,42 @@ export function setStoredSupplierSubRole(role) {
 }
 
 /**
- * Get filtered supplier navigation menu based on active role
+ * Get active supplier permissions from storage
  */
-export function getSupplierMenuForRole(role = 'OWNER') {
+export function getStoredSupplierPermissions() {
+  try {
+    const raw = localStorage.getItem(PERMISSIONS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (_) {}
+  return null;
+}
+
+/**
+ * Set active supplier permissions in storage
+ */
+export function setStoredSupplierPermissions(permissions) {
+  try {
+    if (Array.isArray(permissions)) {
+      localStorage.setItem(PERMISSIONS_STORAGE_KEY, JSON.stringify(permissions));
+      window.dispatchEvent(new CustomEvent('supplier_permissions_changed', { detail: permissions }));
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+/**
+ * Get filtered supplier navigation menu based on active role and optional custom permissions
+ */
+export function getSupplierMenuForRole(role = 'OWNER', customPermissions = null) {
+  const perms = customPermissions || getStoredSupplierPermissions();
+  if (Array.isArray(perms) && perms.length > 0) {
+    const allowed = new Set([...perms, 'staff']);
+    return SUPPLIER_MENU.filter((item) => allowed.has(item.id));
+  }
   const roleConfig = SUPPLIER_ROLES[role] || SUPPLIER_ROLES.OWNER;
   const allowed = new Set(roleConfig.allowedTabs);
 
@@ -180,9 +235,14 @@ export function getSupplierMenuForRole(role = 'OWNER') {
 }
 
 /**
- * Check if a tab is allowed for a given role
+ * Check if a tab is allowed for a given role and optional custom permissions
  */
-export function isTabAllowedForRole(tabId, role = 'OWNER') {
+export function isTabAllowedForRole(tabId, role = 'OWNER', customPermissions = null) {
+  if (tabId === 'staff') return true;
+  const perms = customPermissions || getStoredSupplierPermissions();
+  if (Array.isArray(perms) && perms.length > 0) {
+    return perms.includes(tabId);
+  }
   const roleConfig = SUPPLIER_ROLES[role] || SUPPLIER_ROLES.OWNER;
   return roleConfig.allowedTabs.includes(tabId);
 }

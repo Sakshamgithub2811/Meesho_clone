@@ -497,6 +497,55 @@ export async function replyToSupplierReview(reviewId, reply) {
   return data;
 }
 
+/**
+ * ========================================================
+ * 12. TEAM & RBAC PERMISSIONS HUB (100% Database-Driven)
+ * ========================================================
+ */
+
+/**
+ * Fetch all supplier & staff profiles with their database roles and permissions
+ */
+export async function fetchSupplierStaffList() {
+  return request('/supplier/rbac/staff', { method: 'GET' });
+}
+
+/**
+ * Fetch current logged-in supplier's active permissions from database
+ */
+export async function fetchMySupplierPermissions() {
+  return request('/supplier/rbac/my-permissions', { method: 'GET' });
+}
+
+/**
+ * Update a supplier or staff profile's role, permissions, and station
+ */
+export async function updateSupplierStaffPermissions(id, payload) {
+  return request(`/supplier/rbac/staff/${id}/permissions`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Create/Invite a new staff member under the supplier store
+ */
+export async function createSupplierStaff(payload) {
+  return request('/supplier/rbac/staff', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Remove or deactivate a staff member
+ */
+export async function deleteSupplierStaff(id) {
+  return request(`/supplier/rbac/staff/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 export default {
   getAuthToken,
   getCurrentSupplier,
@@ -536,4 +585,9 @@ export default {
   updateReturnStatus,
   fetchSupplierReviews,
   replyToSupplierReview,
+  fetchSupplierStaffList,
+  fetchMySupplierPermissions,
+  updateSupplierStaffPermissions,
+  createSupplierStaff,
+  deleteSupplierStaff,
 };
