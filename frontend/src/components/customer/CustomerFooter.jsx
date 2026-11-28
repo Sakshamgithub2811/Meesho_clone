@@ -203,7 +203,7 @@ export default function CustomerFooter({ onNavigate }) {
               <li>
                 <button
                   type="button"
-                  onClick={() => handleNav('/p/terms-and-conditions')}
+                  onClick={() => handleNav('/terms-and-conditions')}
                   className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
                 >
                   Terms of Service
@@ -212,7 +212,7 @@ export default function CustomerFooter({ onNavigate }) {
               <li>
                 <button
                   type="button"
-                  onClick={() => handleNav('/p/privacy-policy')}
+                  onClick={() => handleNav('/privacy-policy')}
                   className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
                 >
                   Privacy Policy
@@ -221,7 +221,7 @@ export default function CustomerFooter({ onNavigate }) {
               <li>
                 <button
                   type="button"
-                  onClick={() => handleNav('/p/return-and-refund-policy')}
+                  onClick={() => handleNav('/return-and-refund-policy')}
                   className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
                 >
                   Return &amp; Refund Policy
@@ -230,7 +230,7 @@ export default function CustomerFooter({ onNavigate }) {
               <li>
                 <button
                   type="button"
-                  onClick={() => handleNav('/p/shipping-policy')}
+                  onClick={() => handleNav('/shipping-policy')}
                   className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
                 >
                   Shipping Policy
