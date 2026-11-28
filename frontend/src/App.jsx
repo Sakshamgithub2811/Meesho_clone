@@ -56,10 +56,6 @@ import AffiliateKycStatus from './pages/customer & Reseller/AffiliateKycStatus';
 import InviteEarn from './pages/customer & Reseller/InviteEarn';
 import InviteLanding from './pages/customer & Reseller/InviteLanding';
 import PolicyPage from './pages/customer & Reseller/PolicyPage';
-import TermsOfService from './pages/customer & Reseller/policies/TermsOfService';
-import PrivacyPolicy from './pages/customer & Reseller/policies/PrivacyPolicy';
-import ReturnRefundPolicy from './pages/customer & Reseller/policies/ReturnRefundPolicy';
-import ShippingPolicy from './pages/customer & Reseller/policies/ShippingPolicy';
 import { getAffiliateMarginFromParams } from './utils/affiliateLinkHelper';
 
 // Delivery & Driver Logistics Pages
@@ -1236,34 +1232,34 @@ function AppRoutes() {
         <Route path="/gilded-pulse" element={<GildedPulse onNavigate={handleNav} />} />
         <Route path="/social-commerce-luxe" element={<SocialCommerceLuxe onNavigate={handleNav} />} />
         <Route path="/signal-core" element={<SignalCore onNavigate={handleNav} />} />
-        {/* Customer Policy & Legal Pages (Clean standalone pages - content to be added later) */}
-        <Route path="/terms-and-conditions" element={<TermsOfService />} />
-        <Route path="/terms" element={<TermsOfService />} />
-        <Route path="/terms-of-service" element={<TermsOfService />} />
-        <Route path="/p/terms-and-conditions" element={<TermsOfService />} />
+        {/* Customer Policy & Legal Pages (Unified, Production-Grade Document Viewer) */}
+        <Route path="/terms-and-conditions" element={<PolicyPage />} />
+        <Route path="/terms" element={<PolicyPage />} />
+        <Route path="/terms-of-service" element={<PolicyPage />} />
+        <Route path="/p/terms-and-conditions" element={<PolicyPage />} />
 
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/p/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/privacy-policy" element={<PolicyPage />} />
+        <Route path="/privacy" element={<PolicyPage />} />
+        <Route path="/p/privacy-policy" element={<PolicyPage />} />
 
-        <Route path="/return-and-refund-policy" element={<ReturnRefundPolicy />} />
-        <Route path="/refund-policy" element={<ReturnRefundPolicy />} />
-        <Route path="/return-policy" element={<ReturnRefundPolicy />} />
-        <Route path="/returns-policy" element={<ReturnRefundPolicy />} />
-        <Route path="/p/return-and-refund-policy" element={<ReturnRefundPolicy />} />
+        <Route path="/return-and-refund-policy" element={<PolicyPage />} />
+        <Route path="/refund-policy" element={<PolicyPage />} />
+        <Route path="/return-policy" element={<PolicyPage />} />
+        <Route path="/returns-policy" element={<PolicyPage />} />
+        <Route path="/p/return-and-refund-policy" element={<PolicyPage />} />
 
-        <Route path="/shipping-policy" element={<ShippingPolicy />} />
-        <Route path="/shipping" element={<ShippingPolicy />} />
-        <Route path="/delivery-policy" element={<ShippingPolicy />} />
-        <Route path="/p/shipping-policy" element={<ShippingPolicy />} />
+        <Route path="/shipping-policy" element={<PolicyPage />} />
+        <Route path="/shipping" element={<PolicyPage />} />
+        <Route path="/delivery-policy" element={<PolicyPage />} />
+        <Route path="/p/shipping-policy" element={<PolicyPage />} />
 
         {/* Dynamic Published CMS & Policies Routes (Full alias support) */}
         <Route path="/p/:slug" element={<PolicyPage />} />
-        <Route path="/p" element={<TermsOfService />} />
+        <Route path="/p" element={<PolicyPage />} />
         <Route path="/policy/:slug" element={<PolicyPage />} />
-        <Route path="/policy" element={<TermsOfService />} />
+        <Route path="/policy" element={<PolicyPage />} />
         <Route path="/policies/:slug" element={<PolicyPage />} />
-        <Route path="/policies" element={<TermsOfService />} />
+        <Route path="/policies" element={<PolicyPage />} />
 
         {/* Navigation Aliases for Reseller and Supplier */}
         <Route path="/reseller" element={<Navigate to="/reseller-home" replace />} />
