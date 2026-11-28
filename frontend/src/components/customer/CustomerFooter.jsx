@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function CustomerFooter({ onNavigate }) {
+  const routerNavigate = useNavigate();
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -52,10 +54,18 @@ export default function CustomerFooter({ onNavigate }) {
   };
 
   const handleNav = (path) => {
+    if (!path) return;
+    if (path.startsWith('mailto:') || path.startsWith('http://') || path.startsWith('https://')) {
+      window.location.href = path;
+      return;
+    }
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (_) {}
     if (typeof onNavigate === 'function') {
       onNavigate(path);
     } else {
-      window.location.href = path;
+      routerNavigate(path);
     }
   };
 
@@ -125,17 +135,29 @@ export default function CustomerFooter({ onNavigate }) {
             <h4 className="font-bold text-white uppercase text-[11px] tracking-wider">Explore</h4>
             <ul className="space-y-1.5">
               <li>
-                <button type="button" onClick={() => handleNav('/explorer')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/explorer')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   All Categories
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => handleNav('/reseller')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/reseller-home')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   Reseller Hub
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => handleNav('/seller/register')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/become-supplier')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   Become a Supplier
                 </button>
               </li>
@@ -146,17 +168,29 @@ export default function CustomerFooter({ onNavigate }) {
             <h4 className="font-bold text-white uppercase text-[11px] tracking-wider">Orders &amp; Account</h4>
             <ul className="space-y-1.5">
               <li>
-                <button type="button" onClick={() => handleNav('/orders')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/orders')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   My Orders
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => handleNav('/cart')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/cart')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   Cart
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => handleNav('/wishlist')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/wishlist')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   Wishlist
                 </button>
               </li>
@@ -167,22 +201,38 @@ export default function CustomerFooter({ onNavigate }) {
             <h4 className="font-bold text-white uppercase text-[11px] tracking-wider">Policies</h4>
             <ul className="space-y-1.5">
               <li>
-                <button type="button" onClick={() => handleNav('/policy?type=terms')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/p/terms-and-conditions')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   Terms of Service
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => handleNav('/policy?type=privacy')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/p/privacy-policy')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   Privacy Policy
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => handleNav('/policy?type=return')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/p/return-and-refund-policy')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   Return &amp; Refund Policy
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => handleNav('/policy?type=shipping')} className="hover:text-white transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => handleNav('/p/shipping-policy')}
+                  className="hover:text-white transition-colors cursor-pointer text-left block w-full py-0.5"
+                >
                   Shipping Policy
                 </button>
               </li>
@@ -195,11 +245,21 @@ export default function CustomerFooter({ onNavigate }) {
               <li>
                 <a
                   href="mailto:support@mshoppy.in"
-                  className="text-pink-400 hover:text-pink-300 transition-colors flex items-center gap-1"
+                  className="text-pink-400 hover:text-pink-300 transition-colors flex items-center gap-1.5 py-0.5"
                 >
                   <span className="material-symbols-outlined text-xs">mail</span>
                   <span>support@mshoppy.in</span>
                 </a>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => handleNav('/support-center')}
+                  className="hover:text-white transition-colors cursor-pointer text-left flex items-center gap-1.5 text-slate-400 py-0.5 block w-full"
+                >
+                  <span className="material-symbols-outlined text-xs">headset_mic</span>
+                  <span>Help &amp; Support Center</span>
+                </button>
               </li>
               <li className="text-[11px] text-slate-500 pt-1">
                 Mon - Sat (9:00 AM - 6:00 PM)

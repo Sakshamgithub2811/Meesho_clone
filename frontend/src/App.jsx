@@ -1232,8 +1232,21 @@ function AppRoutes() {
         <Route path="/gilded-pulse" element={<GildedPulse onNavigate={handleNav} />} />
         <Route path="/social-commerce-luxe" element={<SocialCommerceLuxe onNavigate={handleNav} />} />
         <Route path="/signal-core" element={<SignalCore onNavigate={handleNav} />} />
-        {/* Dynamic Published CMS & Policies Route (Method 2) */}
+        {/* Dynamic Published CMS & Policies Routes (Full alias support) */}
         <Route path="/p/:slug" element={<PolicyPage />} />
+        <Route path="/p" element={<PolicyPage />} />
+        <Route path="/policy/:slug" element={<PolicyPage />} />
+        <Route path="/policy" element={<PolicyPage />} />
+        <Route path="/policies/:slug" element={<PolicyPage />} />
+        <Route path="/policies" element={<PolicyPage />} />
+
+        {/* Navigation Aliases for Reseller and Supplier */}
+        <Route path="/reseller" element={<Navigate to="/reseller-home" replace />} />
+        <Route path="/reseller-hub" element={<Navigate to="/reseller-home" replace />} />
+        <Route path="/seller/register" element={<Navigate to="/supplier-register" replace />} />
+        <Route path="/seller/landing" element={<Navigate to="/become-supplier" replace />} />
+        <Route path="/become-a-supplier" element={<Navigate to="/become-supplier" replace />} />
+
         {/* Fallback Catch-all Route to prevent blank screens on unknown paths */}
         <Route path="*" element={<Navigate to="/user-home" replace />} />
       </Routes>
